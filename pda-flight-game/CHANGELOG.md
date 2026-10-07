@@ -1,5 +1,10 @@
 # Torn PDA Arcade Changelog
 
+## v0.10.7
+- Reworked mobile joystick tracking to use touch identifiers independently from the FIRE button.
+- Corrected aircraft style selection and score-based transitions every 5,000 points.
+- Health packs collected at 100 HP award 100 score points.
+
 ## v0.10.6
 - Fixed joystick multitouch ownership when lifting and repositioning the movement thumb while holding FIRE.
 - Reset movement on pointer release, cancellation, lost capture, or window blur.
