@@ -1,5 +1,11 @@
 # Torn PDA Arcade Changelog
 
+## v0.10.0
+- Added eight-stage aircraft design progression, advancing every 1,000 points and looping after the final design.
+- Increased player aircraft maneuver speed from 235 to 270.
+- Added persistent volume and sound toggle controls.
+- Added movement/engine, explosion, and healing pickup sounds using Web Audio.
+
 ## v0.9.0
 - Added remaining-time status for flight, jail, and hospital conditions.
 - Games pause when the active Torn condition ends and prompt to continue or leave.
