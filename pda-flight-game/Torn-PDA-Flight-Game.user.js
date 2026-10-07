@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.9.0
+// @version      0.9.1
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -12,8 +12,9 @@
 
 /*
  * TORN PDA ARCADE - RELEASE NOTES
- * v0.9.0 - Added condition timers/end prompts plus save-and-resume for unfinished games.
- * v0.9.0 - Added per-game Show in Game List setting and persistent visibility preferences.
+ * v0.9.1 - Fixed launcher initialization regression that could prevent the Arcade icon from appearing.
+ * v0.9.1 - Added condition timers/end prompts plus save-and-resume for unfinished games.
+ * v0.9.1 - Added per-game Show in Game List setting and persistent visibility preferences.
  * v0.7.0 - Added modular Arcade registry; Flight Arcade became a registered module.
  * v0.6.0 - Added selected-tab highlighting, escaped-enemy damage, and +10 health pickups.
  * v0.5.0 - Added crosshair Game Manager, Games/Settings tabs, and removed displayed flight status.
@@ -31,7 +32,7 @@
 
     const GAME = {
         name: 'Torn PDA Flight Game',
-        version: '0.9.0',
+        version: '0.9.1',
         creator: 'RelaxSweety',
         creatorId: '4539436',
         creatorUrl: 'https://www.torn.com/profiles.php?XID=4539436',
@@ -235,9 +236,9 @@
     </div>
   </div>
 </div>`;
-        const manager=document.createElement('div');manager.id='tpfg-manager';manager.innerHTML='<div class="tpfg-settings-card"><h3>TORN PDA ARCADE</h3><div class="tpfg-manager-tabs"><button id="tpfg-tab-games">GAMES</button><button id="tpfg-tab-settings">SETTINGS</button></div><div id="tpfg-manager-body"></div><button class="tpfg-resultbtn" id="tpfg-manager-close">CLOSE</button></div>';document.body.appendChild(manager);
-        const prompt=document.createElement('div');prompt.id='tpfg-prompt';prompt.innerHTML='<div class="tpfg-settings-card"><h3></h3><p></p><div id="tpfg-prompt-actions"></div></div>';document.body.appendChild(prompt);
-        const gameSettings=document.createElement('div');gameSettings.id='tpfg-game-settings';gameSettings.innerHTML='<div class="tpfg-settings-card"><h3>GAME SETTINGS</h3><div class="tpfg-setting-row"><b>Flight Arcade</b><span>Enabled</span></div><label><input type="radio" name="tpfg-mode" value="flight"> Flight only</label><label><input type="radio" name="tpfg-mode" value="always"> Always available</label><label><input type="radio" name="tpfg-mode" value="disabled"> Disabled</label><p class="tpfg-settings-note">Additional Torn games can be added here as modules.</p><button class="tpfg-resultbtn" id="tpfg-settings-close">CLOSE</button></div>';document.body.appendChild(gameSettings);
+        const manager=document.createElement('div');manager.id='tpfg-manager';manager.style.display='none';manager.innerHTML='<div class="tpfg-settings-card"><h3>TORN PDA ARCADE</h3><div class="tpfg-manager-tabs"><button id="tpfg-tab-games">GAMES</button><button id="tpfg-tab-settings">SETTINGS</button></div><div id="tpfg-manager-body"></div><button class="tpfg-resultbtn" id="tpfg-manager-close">CLOSE</button></div>';document.body.appendChild(manager);
+        const prompt=document.createElement('div');prompt.id='tpfg-prompt';prompt.style.display='none';prompt.innerHTML='<div class="tpfg-settings-card"><h3></h3><p></p><div id="tpfg-prompt-actions"></div></div>';document.body.appendChild(prompt);
+        const gameSettings=document.createElement('div');gameSettings.id='tpfg-game-settings';gameSettings.style.display='none';gameSettings.innerHTML='<div class="tpfg-settings-card"><h3>GAME SETTINGS</h3><div class="tpfg-setting-row"><b>Flight Arcade</b><span>Enabled</span></div><label><input type="radio" name="tpfg-mode" value="flight"> Flight only</label><label><input type="radio" name="tpfg-mode" value="always"> Always available</label><label><input type="radio" name="tpfg-mode" value="disabled"> Disabled</label><p class="tpfg-settings-note">Additional Torn games can be added here as modules.</p><button class="tpfg-resultbtn" id="tpfg-settings-close">CLOSE</button></div>';document.body.appendChild(gameSettings);
         gameSettings.querySelectorAll('input[name="tpfg-mode"]').forEach(r=>{r.checked=(launchMode()===r.value);r.addEventListener('change',()=>localStorage.setItem(LAUNCH_MODE_KEY,r.value));});
         document.getElementById('tpfg-settings-close').onclick=()=>gameSettings.style.display='none';
         document.getElementById('tpfg-manager-close').onclick=()=>manager.style.display='none';
