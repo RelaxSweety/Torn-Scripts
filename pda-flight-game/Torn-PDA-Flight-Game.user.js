@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.9.2
+// @version      0.9.3
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -12,10 +12,11 @@
 
 /*
  * TORN PDA ARCADE - RELEASE NOTES
+ * v0.9.3 - Fixed two literal escape sequences that caused a fatal JavaScript parse error and prevented the Arcade launcher from loading.
  * v0.9.2 - Fixed fatal initialization syntax error that prevented the userscript and launcher from loading.
- * v0.9.2 - Fixed launcher initialization regression that could prevent the Arcade icon from appearing.
- * v0.9.2 - Added condition timers/end prompts plus save-and-resume for unfinished games.
- * v0.9.2 - Added per-game Show in Game List setting and persistent visibility preferences.
+ * v0.9.1 - Fixed launcher initialization regression that could prevent the Arcade icon from appearing.
+ * v0.9.0 - Added condition timers/end prompts plus save-and-resume for unfinished games.
+ * v0.8.0 - Added per-game Show in Game List setting and persistent visibility preferences.
  * v0.7.0 - Added modular Arcade registry; Flight Arcade became a registered module.
  * v0.6.0 - Added selected-tab highlighting, escaped-enemy damage, and +10 health pickups.
  * v0.5.0 - Added crosshair Game Manager, Games/Settings tabs, and removed displayed flight status.
@@ -33,7 +34,7 @@
 
     const GAME = {
         name: 'Torn PDA Flight Game',
-        version: '0.9.2',
+        version: '0.9.3',
         creator: 'RelaxSweety',
         creatorId: '4539436',
         creatorUrl: 'https://www.torn.com/profiles.php?XID=4539436',
@@ -370,7 +371,8 @@
     }
     function loop(ts) {
         if (!state.running) return;
-        monitorCondition(ts);\n        let dt=Math.min((ts-state.lastTs)/1000, .05);
+        monitorCondition(ts);
+        let dt=Math.min((ts-state.lastTs)/1000, .05);
         state.lastTs=ts;
         if (!state.paused && !state.over) {
             state.activeMs += dt*1000;
@@ -553,7 +555,8 @@
 
     async function finishGame(manual) {
         if (!state.running || state.over) return;
-        state.over=true; state.paused=true;\n        clearGameSave('flight-arcade');
+        state.over=true; state.paused=true;
+        clearGameSave('flight-arcade');
         const score=Math.floor(state.score);
         saved.highScore=Math.max(Number(saved.highScore||0),score);
         saved.bestKills=Math.max(Number(saved.bestKills||0),state.kills);
