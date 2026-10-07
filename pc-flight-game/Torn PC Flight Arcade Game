@@ -1,4 +1,3 @@
-Use this as the complete replacement script. This is v1.7.4. The main change is that chat detection now walks upward from each message input to identify the outermost reasonable Torn chat window, then restricts chat-name detection to the header region.
 // ==UserScript==
 // @name         Torn In-Flight Arcade
 // @namespace    torn-inflight-arcade
