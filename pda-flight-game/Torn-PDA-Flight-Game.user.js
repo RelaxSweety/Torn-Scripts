@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.5.0
+// @version      0.6.0
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -18,7 +18,7 @@
 
     const GAME = {
         name: 'Torn PDA Flight Game',
-        version: '0.5.0',
+        version: '0.6.0',
         creator: 'RelaxSweety',
         creatorId: '4539436',
         creatorUrl: 'https://www.torn.com/profiles.php?XID=4539436',
@@ -61,7 +61,7 @@
 #tpfg-launcher{position:fixed;right:12px;bottom:88px;z-index:2147483000;width:42px;height:42px;border:1px solid #777;background:#171717;color:#eee;border-radius:50%;font-size:23px;font-weight:800;touch-action:none;box-shadow:0 2px 8px #0008}
 #tpfg-manager,#tpfg-game-settings{position:fixed;inset:0;z-index:2147483800;background:#000b;display:none;align-items:center;justify-content:center;padding:16px}
 .tpfg-settings-card{width:min(420px,100%);background:#151a20;border:1px solid #59616b;border-radius:12px;padding:16px;color:#fff;font-family:Arial,sans-serif}
-.tpfg-settings-card label{display:block;padding:12px 4px;border-top:1px solid #343a40}.tpfg-manager-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.tpfg-manager-tabs button,.tpfg-game-card button{min-height:42px;border:1px solid #59616b;border-radius:8px;background:#252c34;color:#fff;font-weight:800}.tpfg-game-card{display:grid;gap:8px;padding:12px;border:1px solid #343a40;border-radius:9px}.tpfg-game-card span,.tpfg-empty{color:#9da6af;font-size:12px}.tpfg-setting-row{display:flex;justify-content:space-between;padding:8px 4px}.tpfg-settings-note{color:#9da6af;font-size:11px}
+.tpfg-settings-card label{display:block;padding:12px 4px;border-top:1px solid #343a40}.tpfg-manager-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.tpfg-manager-tabs button,.tpfg-game-card button{min-height:42px;border:1px solid #59616b;border-radius:8px;background:#252c34;color:#fff;font-weight:800}.tpfg-manager-tabs button.tpfg-selected{background:#596674;border-color:#aeb8c2;box-shadow:inset 0 0 0 1px #d7dde3}.tpfg-game-card{display:grid;gap:8px;padding:12px;border:1px solid #343a40;border-radius:9px}.tpfg-game-card span,.tpfg-empty{color:#9da6af;font-size:12px}.tpfg-setting-row{display:flex;justify-content:space-between;padding:8px 4px}.tpfg-settings-note{color:#9da6af;font-size:11px}
 #tpfg-launch{position:fixed;right:10px;bottom:88px;z-index:2147483000;border:1px solid #777;background:#171717;color:#eee;border-radius:10px;padding:10px 13px;font:700 12px Arial,sans-serif;box-shadow:0 2px 8px #0008;touch-action:manipulation}
 #tpfg-launch:active{transform:scale(.97)}
 #tpfg-root{position:fixed;inset:0;z-index:2147483600;background:#090b0e;color:#fff;font-family:Arial,sans-serif;display:none;overscroll-behavior:none;touch-action:none}
@@ -124,6 +124,8 @@
     function openManager(){document.getElementById('tpfg-manager').style.display='flex';renderManager('games');}
     function renderManager(tab){
         const body=document.getElementById('tpfg-manager-body');
+        document.getElementById('tpfg-tab-games')?.classList.toggle('tpfg-selected',tab==='games');
+        document.getElementById('tpfg-tab-settings')?.classList.toggle('tpfg-selected',tab==='settings');
         if(tab==='games'){
             body.innerHTML=gameAvailable()?'<div class="tpfg-game-card"><b>Flight Arcade</b><span>Available now</span><button id="tpfg-play-flight">PLAY</button></div>':'<p class="tpfg-empty">No games are available in your current Torn situation.</p>';
             const p=document.getElementById('tpfg-play-flight');if(p)p.onclick=()=>{document.getElementById('tpfg-manager').style.display='none';startGame();};
@@ -290,7 +292,7 @@
         state.keys={up:false,down:false,left:false,right:false,fire:false};
         state.stick={x:0,y:0};
         state.player={x:45,y:150,w:44,h:24,speed:235};
-        state.bullets=[]; state.enemies=[]; state.enemyBullets=[]; state.particles=[];
+        state.bullets=[]; state.enemies=[]; state.enemyBullets=[]; state.particles=[]; state.healthDrops=[];
         document.getElementById('tpfg-root').style.display='block';
         document.getElementById('tpfg-results').style.display='none';
         document.getElementById('tpfg-message').textContent='';
@@ -370,6 +372,7 @@
         state.bullets.forEach(b=>b.x+=b.vx*dt);
         state.enemyBullets.forEach(b=>{b.x+=b.vx*dt;b.y+=b.vy*dt;});
         state.enemies.forEach(e=>e.x-=e.speed*dt);
+        state.healthDrops.forEach(h=>h.x-=h.speed*dt);
         state.particles.forEach(q=>{q.x+=q.vx*dt;q.y+=q.vy*dt;q.life-=dt;});
 
         for (let bi=state.bullets.length-1;bi>=0;bi--) {
@@ -382,6 +385,7 @@
                     if (e.hp<=0) {
                         explode(e.x+e.w/2,e.y+e.h/2);
                         state.score+=e.tough?300:120; state.kills++;
+                        state.healthDrops.push({x:e.x+e.w/2-8,y:e.y+e.h/2-8,w:18,h:18,speed:55});
                         state.enemies.splice(ei,1);
                     }
                     break;
@@ -400,7 +404,7 @@
 
         for (let i=state.enemies.length-1;i>=0;i--) {
             const e=state.enemies[i];
-            if (e.x+e.w<0) {state.enemies.splice(i,1);continue;}
+            if (e.x+e.w<0) {explode(8,e.y+e.h/2,18);state.enemies.splice(i,1);damage(e.tough?30:20);continue;}
             if (rectHit(e,p)) {
                 state.enemies.splice(i,1);
                 explode(e.x+e.w/2,e.y+e.h/2);
@@ -408,6 +412,7 @@
             }
         }
 
+        for(let i=state.healthDrops.length-1;i>=0;i--){const h=state.healthDrops[i];if(h.x+h.w<0){state.healthDrops.splice(i,1);continue;}if(rectHit(h,p)){state.hp=Math.min(100,state.hp+10);state.healthDrops.splice(i,1);explode(p.x+p.w/2,p.y+p.h/2,8);}}
         state.particles=state.particles.filter(q=>q.life>0);
         state.score += 8*dt;
         if (state.hp<=0) finishGame(false);
@@ -470,6 +475,7 @@
 
         state.bullets.forEach(b=>{ctx.fillStyle='#f5e8a8';ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();});
         state.enemyBullets.forEach(b=>{ctx.fillStyle='#e46a5e';ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();});
+        state.healthDrops.forEach(h=>{ctx.save();ctx.translate(h.x,h.y);ctx.fillStyle='#49c86b';ctx.fillRect(0,0,h.w,h.h);ctx.fillStyle='#fff';ctx.fillRect(7,3,4,12);ctx.fillRect(3,7,12,4);ctx.restore();});
         state.enemies.forEach(e=>{
             ctx.save();ctx.translate(e.x,e.y);
             ctx.fillStyle=e.tough?'#737b83':'#59616a';
