@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Torn PDA Flight Game
+// @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.3.0
+// @version      0.4.0
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -18,7 +18,7 @@
 
     const GAME = {
         name: 'Torn PDA Flight Game',
-        version: '0.3.0',
+        version: '0.4.0',
         creator: 'RelaxSweety',
         creatorId: '4539436',
         creatorUrl: 'https://www.torn.com/profiles.php?XID=4539436',
@@ -27,6 +27,7 @@
 
     const STORE_KEY = 'tornPdaFlightGame';
     const LAUNCH_MODE_KEY = 'tpfgLaunchMode';
+    const LAUNCH_POS_KEY = 'tpfgLaunchPosition';
     const launchMode = () => localStorage.getItem(LAUNCH_MODE_KEY) || 'flight';
     let saved = { highScore: 0, bestKills: 0, games: 0 };
 
@@ -57,6 +58,12 @@
         const s = document.createElement('style');
         s.id = 'tpfg-style';
         s.textContent = `
+#tpfg-launcher{position:fixed;right:10px;bottom:88px;z-index:2147483000;display:flex;gap:5px;align-items:center;touch-action:none}
+#tpfg-launcher #tpfg-launch{position:static!important;right:auto!important;bottom:auto!important}
+#tpfg-launch-settings{width:38px;height:38px;border:1px solid #777;background:#171717;color:#eee;border-radius:10px;font-weight:800}
+#tpfg-game-settings{position:fixed;inset:0;z-index:2147483800;background:#000b;display:none;align-items:center;justify-content:center;padding:16px}
+.tpfg-settings-card{width:min(420px,100%);background:#151a20;border:1px solid #59616b;border-radius:12px;padding:16px;color:#fff;font-family:Arial,sans-serif}
+.tpfg-settings-card label{display:block;padding:12px 4px;border-top:1px solid #343a40}.tpfg-setting-row{display:flex;justify-content:space-between;padding:8px 4px}.tpfg-settings-note{color:#9da6af;font-size:11px}
 #tpfg-launch{position:fixed;right:10px;bottom:88px;z-index:2147483000;border:1px solid #777;background:#171717;color:#eee;border-radius:10px;padding:10px 13px;font:700 12px Arial,sans-serif;box-shadow:0 2px 8px #0008;touch-action:manipulation}
 #tpfg-launch:active{transform:scale(.97)}
 #tpfg-root{position:fixed;inset:0;z-index:2147483600;background:#090b0e;color:#fff;font-family:Arial,sans-serif;display:none;overscroll-behavior:none;touch-action:none}
@@ -97,64 +104,36 @@
     }
 
     function detectFlight() {
-        const text = (document.body?.innerText || '').replace(/\s+/g, ' ');
-        let origin = 'Unknown';
-        let destination = 'Unknown';
-        let flying = /traveling|travelling|flying|arrival|destination|flight/i.test(text);
-
-        const patterns = [
-            /(?:flying|travelling|traveling)\s+(?:from\s+)?([A-Za-z ]+?)\s+to\s+([A-Za-z ]+?)(?:\.|,|\||\d|$)/i,
-            /([A-Za-z ]{2,30})\s*(?:→|->|to)\s*([A-Za-z ]{2,30})/i
-        ];
-        for (const p of patterns) {
-            const m = text.match(p);
-            if (m) {
-                origin = m[1].trim();
-                destination = m[2].trim();
-                flying = true;
-                break;
-            }
+        // Torn's travel card is authoritative. Do not infer flight state from generic page words.
+        const nodes=[...document.querySelectorAll('body *')];
+        const re=/([A-Za-z][A-Za-z .'-]{1,35}?)\s+to\s+([A-Za-z][A-Za-z .'-]{1,35}?)\.\s*Remaining Flight Time\s*-\s*(\d{1,2}:\d{2}:\d{2})/i;
+        for (const el of nodes) {
+            if (el.children.length) continue;
+            const t=(el.textContent||'').replace(/\s+/g,' ').trim();
+            const m=t.match(re);
+            if(m) return {flying:true,origin:m[1].trim(),destination:m[2].trim(),remaining:m[3]};
         }
-
-        // Torn travel-page clues. Kept DOM-based so the game still works if API access is unavailable.
-        const candidates = [...document.querySelectorAll('[class*="travel"], [class*="flight"], [class*="destination"], [class*="country"]')]
-            .map(el => (el.textContent || '').trim()).filter(Boolean).join(' ');
-        for (const p of patterns) {
-            const m = candidates.match(p);
-            if (m) { origin = m[1].trim(); destination = m[2].trim(); flying = true; break; }
-        }
-
-        return { flying, origin, destination };
+        const text=(document.body?.innerText||'').replace(/\s+/g,' ');
+        const m=text.match(re);
+        return m ? {flying:true,origin:m[1].trim(),destination:m[2].trim(),remaining:m[3]} :
+                   {flying:false,origin:'Unknown',destination:'Unknown',remaining:''};
     }
 
     function buildUI() {
         if (document.getElementById('tpfg-root')) return;
-        const launch = document.createElement('button');
-        launch.id = 'tpfg-launch';
-        launch.type = 'button';
-        launch.textContent = 'Play a Game?';
-        document.body.appendChild(launch);
-        const settings = document.createElement('button');
-        settings.id = 'tpfg-launch-settings';
-        settings.type = 'button';
-        settings.textContent = '⚙';
-        settings.title = 'Game button visibility: tap to change';
-        settings.style.cssText = 'position:fixed;right:10px;bottom:88px;z-index:2147483000;width:34px;height:34px;border:1px solid #777;background:#171717;color:#eee;border-radius:10px';
-        document.body.appendChild(settings);
-        launch.style.right = '50px';
-        const refreshLaunch = () => {
-            launch.style.display = launchMode() === 'always' ? '' : 'none';
-            settings.title = 'Game button: ' + (launchMode() === 'always' ? 'Always visible' : 'Hidden');
-        };
-        settings.addEventListener('click', () => {
-            const next = launchMode() === 'always' ? 'flight' : 'always';
-            localStorage.setItem(LAUNCH_MODE_KEY, next);
-            refreshLaunch();
-            settings.textContent = next === 'always' ? '⚙A' : '⚙F';
-        });
-        refreshLaunch();
-        settings.textContent = launchMode() === 'always' ? '⚙A' : '⚙F';
-        setInterval(refreshLaunch, 3000);
+        const launcher=document.createElement('div');
+        launcher.id='tpfg-launcher';
+        launcher.innerHTML='<button id="tpfg-launch" type="button">PLAY A GAME?</button><button id="tpfg-launch-settings" type="button" title="Game Settings">⚙</button>';
+        document.body.appendChild(launcher);
+        const launch=document.getElementById('tpfg-launch'), settings=document.getElementById('tpfg-launch-settings');
+        const restorePos=()=>{try{const p=JSON.parse(localStorage.getItem(LAUNCH_POS_KEY)||'null');if(p){launcher.style.left=p.x+'px';launcher.style.top=p.y+'px';launcher.style.right='auto';launcher.style.bottom='auto';}}catch(_){}};
+        const refreshLaunch=()=>{const flight=detectFlight();launch.style.display=(launchMode()==='always'||(launchMode()==='flight'&&flight.flying))?'':'none';settings.textContent='⚙'+(launchMode()==='always'?'A':'F');settings.title='Game Settings — '+(launchMode()==='always'?'Always':'Flight only');};
+        restorePos();refreshLaunch();setInterval(refreshLaunch,1500);
+        let drag=null,moved=false;
+        launcher.addEventListener('pointerdown',e=>{drag={id:e.pointerId,x:e.clientX,y:e.clientY,l:launcher.offsetLeft,t:launcher.offsetTop};moved=false;launcher.setPointerCapture(e.pointerId);});
+        launcher.addEventListener('pointermove',e=>{if(!drag||drag.id!==e.pointerId)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.hypot(dx,dy)>7)moved=true;if(moved){const x=Math.max(0,Math.min(innerWidth-launcher.offsetWidth,drag.l+dx)),y=Math.max(0,Math.min(innerHeight-launcher.offsetHeight,drag.t+dy));launcher.style.left=x+'px';launcher.style.top=y+'px';launcher.style.right='auto';launcher.style.bottom='auto';}});
+        launcher.addEventListener('pointerup',e=>{if(!drag||drag.id!==e.pointerId)return;if(moved)localStorage.setItem(LAUNCH_POS_KEY,JSON.stringify({x:launcher.offsetLeft,y:launcher.offsetTop}));drag=null;});
+        settings.addEventListener('click',e=>{if(moved){e.preventDefault();return;}document.getElementById('tpfg-game-settings').style.display='flex';});
 
         const root = document.createElement('div');
         root.id = 'tpfg-root';
@@ -200,6 +179,9 @@
     </div>
   </div>
 </div>`;
+        const gameSettings=document.createElement('div');gameSettings.id='tpfg-game-settings';gameSettings.innerHTML='<div class="tpfg-settings-card"><h3>GAME SETTINGS</h3><div class="tpfg-setting-row"><b>Flight Arcade</b><span>Enabled</span></div><label><input type="radio" name="tpfg-mode" value="flight"> Flight only</label><label><input type="radio" name="tpfg-mode" value="always"> Always available</label><label><input type="radio" name="tpfg-mode" value="disabled"> Disabled</label><p class="tpfg-settings-note">Additional Torn games can be added here as modules.</p><button class="tpfg-resultbtn" id="tpfg-settings-close">CLOSE</button></div>';document.body.appendChild(gameSettings);
+        gameSettings.querySelectorAll('input[name="tpfg-mode"]').forEach(r=>{r.checked=(launchMode()===r.value);r.addEventListener('change',()=>{localStorage.setItem(LAUNCH_MODE_KEY,r.value);refreshLaunch();});});
+        document.getElementById('tpfg-settings-close').onclick=()=>gameSettings.style.display='none';
         const picker=document.createElement('div');picker.id='tpfg-chatpick';picker.innerHTML='<div id="tpfg-chatcard"><b>Share Arcade Results</b><p>Select an open Torn chat. Results are inserted but not sent.</p><div id="tpfg-chatlist"></div><button class="tpfg-resultbtn" id="tpfg-copy">COPY RESULTS</button><button class="tpfg-resultbtn" id="tpfg-chatcancel">CANCEL</button></div>';document.body.appendChild(picker);
         document.body.appendChild(root);
         wireUI();
