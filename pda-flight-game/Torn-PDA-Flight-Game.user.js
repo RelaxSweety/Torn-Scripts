@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Flight Game
 // @namespace    https://www.torn.com/
-// @version      0.1.0
+// @version      0.2.0
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -16,7 +16,7 @@
 
     const GAME = {
         name: 'Torn PDA Flight Game',
-        version: '0.1.0',
+        version: '0.2.0',
         creator: 'RelaxSweety',
         creatorId: '4539436',
         creatorUrl: 'https://www.torn.com/profiles.php?XID=4539436',
@@ -24,6 +24,8 @@
     };
 
     const STORE_KEY = 'tornPdaFlightGame';
+    const LAUNCH_MODE_KEY = 'tpfgLaunchMode';
+    const launchMode = () => localStorage.getItem(LAUNCH_MODE_KEY) || 'flight';
     let saved = { highScore: 0, bestKills: 0, games: 0 };
 
     async function storageGet() {
@@ -128,8 +130,29 @@
         const launch = document.createElement('button');
         launch.id = 'tpfg-launch';
         launch.type = 'button';
-        launch.textContent = '✈ FLIGHT GAME';
+        launch.textContent = 'Play a Game?';
         document.body.appendChild(launch);
+        const settings = document.createElement('button');
+        settings.id = 'tpfg-launch-settings';
+        settings.type = 'button';
+        settings.textContent = '⚙';
+        settings.title = 'Game button visibility: tap to change';
+        settings.style.cssText = 'position:fixed;right:10px;bottom:88px;z-index:2147483000;width:34px;height:34px;border:1px solid #777;background:#171717;color:#eee;border-radius:10px';
+        document.body.appendChild(settings);
+        launch.style.right = '50px';
+        const refreshLaunch = () => {
+            launch.style.display = (launchMode() === 'always' || detectFlight().flying) ? '' : 'none';
+            settings.title = 'Game button: ' + (launchMode() === 'always' ? 'Always visible' : 'Flight only');
+        };
+        settings.addEventListener('click', () => {
+            const next = launchMode() === 'always' ? 'flight' : 'always';
+            localStorage.setItem(LAUNCH_MODE_KEY, next);
+            refreshLaunch();
+            settings.textContent = next === 'always' ? '⚙A' : '⚙F';
+        });
+        refreshLaunch();
+        settings.textContent = launchMode() === 'always' ? '⚙A' : '⚙F';
+        setInterval(refreshLaunch, 3000);
 
         const root = document.createElement('div');
         root.id = 'tpfg-root';
