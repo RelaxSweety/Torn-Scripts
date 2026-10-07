@@ -1,5 +1,9 @@
 # Torn PDA Arcade Changelog
 
+## v0.10.6
+- Fixed joystick multitouch ownership when lifting and repositioning the movement thumb while holding FIRE.
+- Reset movement on pointer release, cancellation, lost capture, or window blur.
+
 ## v0.10.5
 - Removed continuous engine sound; explosion and healing sounds remain.
 - Added immediate aircraft stage checks when kill points are awarded at 5,000-point intervals.
