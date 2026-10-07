@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.9.3
+// @version      0.10.0
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -12,6 +12,7 @@
 
 /*
  * TORN PDA ARCADE - RELEASE NOTES
+ * v0.10.0 - Added 8-stage aircraft progression, faster maneuvering, and volume-controlled movement/explosion/healing audio.
  * v0.9.3 - Fixed two literal escape sequences that caused a fatal JavaScript parse error and prevented the Arcade launcher from loading.
  * v0.9.2 - Fixed fatal initialization syntax error that prevented the userscript and launcher from loading.
  * v0.9.1 - Fixed launcher initialization regression that could prevent the Arcade icon from appearing.
@@ -34,7 +35,7 @@
 
     const GAME = {
         name: 'Torn PDA Flight Game',
-        version: '0.9.3',
+        version: '0.10.0',
         creator: 'RelaxSweety',
         creatorId: '4539436',
         creatorUrl: 'https://www.torn.com/profiles.php?XID=4539436',
@@ -99,7 +100,7 @@
 #tpfg-fire{border:1px solid #58616b;background:#252c34;color:#fff;font-weight:900;border-radius:12px;touch-action:none}
 #tpfg-fire.on{background:#555f6b;transform:scale(.96)}
 
-#tpfg-actions{display:flex;flex-direction:column;justify-content:center;gap:8px}
+#tpfg-actions{display:flex;flex-direction:column;justify-content:center;gap:8px}\n#tpfg-audio{display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;font:700 10px Arial,sans-serif;color:#aeb6bf}#tpfg-volume{width:100%;accent-color:#8b949e}#tpfg-mute{min-height:28px;border:1px solid #555;border-radius:7px;background:#242a31;color:#fff;font-weight:800}
 #tpfg-fire{min-height:82px;font-size:20px}
 #tpfg-pause,#tpfg-end{min-height:40px;border:1px solid #555;border-radius:9px;background:#242a31;color:#fff;font-weight:800}
 #tpfg-results{position:absolute;inset:0;background:#0d1117;z-index:3;display:none;overflow:auto;padding:22px}
@@ -164,7 +165,7 @@
     }
     function launchGame(game){const s=getGameSave(game.id);if(s)promptBox('SAVED GAME','Continue your saved '+game.name+' game?',[{label:'CONTINUE SAVED GAME',action:()=>restoreGame(s)},{label:'START NEW GAME',action:()=>{clearGameSave(game.id);game.start();}},{label:'CANCEL',action:()=>{}}]);else game.start();}
     function requestLeave(){if(!state.running||state.over){minimize();return;}state.paused=true;document.getElementById('tpfg-pause').textContent='RESUME';promptBox('SAVE YOUR GAME?','Save your current progress and continue from this point next time?',[{label:'SAVE & LEAVE',action:()=>{saveCurrentGame();closeActiveGame();}},{label:'LEAVE WITHOUT SAVING',action:()=>{clearGameSave('flight-arcade');closeActiveGame();}},{label:'CANCEL',action:()=>{state.paused=false;state.lastTs=performance.now();document.getElementById('tpfg-pause').textContent='PAUSE';}}]);}
-    function closeActiveGame(){state.running=false;state.paused=true;cancelAnimationFrame(raf);document.getElementById('tpfg-root').style.display='none';}
+    function closeActiveGame(){state.running=false;state.paused=true;updateEngineSound(false);cancelAnimationFrame(raf);document.getElementById('tpfg-root').style.display='none';}
     function openManager(){document.getElementById('tpfg-manager').style.display='flex';renderManager('games');}
     function renderManager(tab){
         const body=document.getElementById('tpfg-manager-body');
@@ -232,7 +233,7 @@
   <div id="tpfg-controls">
     <div id="tpfg-stick"><div id="tpfg-stick-label">SLIDE TO MOVE</div><div id="tpfg-stick-knob"></div></div>
     <div id="tpfg-actions">
-      <button id="tpfg-fire" type="button">FIRE</button>
+      <button id="tpfg-fire" type="button">FIRE</button>\n      <div id="tpfg-audio"><span>VOL</span><input id="tpfg-volume" type="range" min="0" max="100" value="55"><button id="tpfg-mute" type="button">ON</button></div>
       <button id="tpfg-pause" type="button">PAUSE</button>
       <button id="tpfg-end" type="button">END GAME</button>
     </div>
@@ -259,7 +260,7 @@
         player:null, bullets:[], enemies:[], enemyBullets:[], particles:[]
     };
 
-    let canvas, ctx, raf = 0, W = 0, H = 0;
+    let canvas, ctx, raf = 0, W = 0, H = 0;\n\n    const AIRCRAFT_COUNT=8;\n    const AUDIO_KEY='tpfgAudio';\n    let audioCtx=null,engineOsc=null,engineGain=null;\n    let audioPrefs=(()=>{try{return {...{volume:.55,muted:false},...JSON.parse(localStorage.getItem(AUDIO_KEY)||'{}')}}catch(_){return {volume:.55,muted:false}}})();\n    function saveAudio(){try{localStorage.setItem(AUDIO_KEY,JSON.stringify(audioPrefs));}catch(_){}}\n    function ensureAudio(){if(audioCtx)return audioCtx;const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;audioCtx=new AC();return audioCtx;}\n    function tone(freq,dur,type='sine',gain=.12,endFreq=null){if(audioPrefs.muted||audioPrefs.volume<=0)return;const a=ensureAudio();if(!a)return;if(a.state==='suspended')a.resume();const o=a.createOscillator(),g=a.createGain(),t=a.currentTime;o.type=type;o.frequency.setValueAtTime(freq,t);if(endFreq)o.frequency.exponentialRampToValueAtTime(Math.max(20,endFreq),t+dur);g.gain.setValueAtTime(Math.max(.0001,gain*audioPrefs.volume),t);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g).connect(a.destination);o.start(t);o.stop(t+dur);}\n    function explosionSound(){tone(110,.28,'sawtooth',.18,38);tone(62,.34,'square',.08,28);}\n    function healSound(){tone(520,.12,'sine',.10,760);setTimeout(()=>tone(760,.16,'sine',.08,1040),70);}\n    function updateEngineSound(moving){if(audioPrefs.muted||audioPrefs.volume<=0||!state.running||state.paused||state.over)moving=false;const a=moving?ensureAudio():audioCtx;if(!a)return;if(moving){if(a.state==='suspended')a.resume();if(!engineOsc){engineOsc=a.createOscillator();engineGain=a.createGain();engineOsc.type='sawtooth';engineOsc.frequency.value=82;engineGain.gain.value=.0001;engineOsc.connect(engineGain).connect(a.destination);engineOsc.start();}engineOsc.frequency.setTargetAtTime(96,a.currentTime,.06);engineGain.gain.setTargetAtTime(.035*audioPrefs.volume,a.currentTime,.05);}else if(engineGain){engineGain.gain.setTargetAtTime(.0001,a.currentTime,.05);}}
 
     function resize() {
         if (!canvas) return;
@@ -287,7 +288,7 @@
         document.getElementById('tpfg-copy').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(state.shareText);}catch(_){window.prompt('Copy results:',state.shareText);}});
 
         bindStick(document.getElementById('tpfg-stick'));
-        bindHold(document.getElementById('tpfg-fire'), 'fire');
+        bindHold(document.getElementById('tpfg-fire'), 'fire');\n        const vol=document.getElementById('tpfg-volume'),mute=document.getElementById('tpfg-mute');vol.value=Math.round(audioPrefs.volume*100);mute.textContent=audioPrefs.muted?'OFF':'ON';vol.addEventListener('input',()=>{audioPrefs.volume=Number(vol.value)/100;saveAudio();});mute.addEventListener('click',()=>{audioPrefs.muted=!audioPrefs.muted;mute.textContent=audioPrefs.muted?'OFF':'ON';saveAudio();if(audioPrefs.muted)updateEngineSound(false);else ensureAudio();});
 
         window.addEventListener('resize', resize);
         window.addEventListener('keydown', e => {
@@ -338,7 +339,7 @@
         state.lastTs=performance.now(); state.spawnClock=0; state.shotClock=0; state.enemyShotClock=0;
         state.keys={up:false,down:false,left:false,right:false,fire:false};
         state.stick={x:0,y:0};
-        state.player={x:45,y:150,w:44,h:24,speed:235};
+        state.player={x:45,y:150,w:44,h:24,speed:270};
         state.bullets=[]; state.enemies=[]; state.enemyBullets=[]; state.particles=[]; state.healthDrops=[];
         showGame();
         setTimeout(resize, 0);
@@ -390,7 +391,7 @@
         if(Math.abs(state.stick.x)>.04||Math.abs(state.stick.y)>.04){dx=state.stick.x;dy=state.stick.y;}
         const mag=Math.max(1,Math.hypot(dx,dy));
         p.x=Math.max(4,Math.min(W-p.w-4,p.x+dx/mag*p.speed*dt));
-        p.y=Math.max(4,Math.min(H-p.h-4,p.y+dy/mag*p.speed*dt));
+        p.y=Math.max(4,Math.min(H-p.h-4,p.y+dy/mag*p.speed*dt));\n        updateEngineSound(Math.abs(dx)>.04||Math.abs(dy)>.04);
 
         state.shotClock-=dt;
         if (state.keys.fire && state.shotClock<=0) {
@@ -434,7 +435,7 @@
                 if (circleRect(b,e)) {
                     state.bullets.splice(bi,1); e.hp--;
                     if (e.hp<=0) {
-                        explode(e.x+e.w/2,e.y+e.h/2);
+                        explode(e.x+e.w/2,e.y+e.h/2); explosionSound();
                         state.score+=e.tough?300:120; state.kills++;
                         state.healthDrops.push({x:e.x+e.w/2-8,y:e.y+e.h/2-8,w:18,h:18,speed:55});
                         state.enemies.splice(ei,1);
@@ -455,7 +456,7 @@
 
         for (let i=state.enemies.length-1;i>=0;i--) {
             const e=state.enemies[i];
-            if (e.x+e.w<0) {explode(8,e.y+e.h/2,18);state.enemies.splice(i,1);damage(e.tough?30:20);continue;}
+            if (e.x+e.w<0) {explode(8,e.y+e.h/2,18); explosionSound();state.enemies.splice(i,1);damage(e.tough?30:20);continue;}
             if (rectHit(e,p)) {
                 state.enemies.splice(i,1);
                 explode(e.x+e.w/2,e.y+e.h/2);
@@ -463,7 +464,7 @@
             }
         }
 
-        for(let i=state.healthDrops.length-1;i>=0;i--){const h=state.healthDrops[i];if(h.x+h.w<0){state.healthDrops.splice(i,1);continue;}if(rectHit(h,p)){state.hp=Math.min(100,state.hp+10);state.healthDrops.splice(i,1);explode(p.x+p.w/2,p.y+p.h/2,8);}}
+        for(let i=state.healthDrops.length-1;i>=0;i--){const h=state.healthDrops[i];if(h.x+h.w<0){state.healthDrops.splice(i,1);continue;}if(rectHit(h,p)){state.hp=Math.min(100,state.hp+10);state.healthDrops.splice(i,1);explode(p.x+p.w/2,p.y+p.h/2,8);healSound();}}
         state.particles=state.particles.filter(q=>q.life>0);
         state.score += 8*dt;
         if (state.hp<=0) finishGame(false);
@@ -496,50 +497,38 @@
     }
     function rectHit(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;}
 
+    function aircraftStage(){return Math.floor(Math.max(0,state.score)/1000)%AIRCRAFT_COUNT;}
+    function drawAircraft(x,y,w,h,design,enemy=false,tough=false){
+        ctx.save();ctx.translate(x,y);if(enemy){ctx.translate(w,0);ctx.scale(-1,1);}
+        const body=enemy?(tough?'#7d858d':'#626b74'):'#d8dde2',accent=enemy?'#c4544c':'#6fa8d8',dark=enemy?'#343b42':'#697580';
+        ctx.fillStyle=body;ctx.strokeStyle=dark;ctx.lineWidth=1;
+        const cy=h/2;
+        if(design===0){ctx.beginPath();ctx.moveTo(w,cy);ctx.lineTo(w*.58,h*.30);ctx.lineTo(w*.38,0);ctx.lineTo(w*.30,h*.34);ctx.lineTo(0,h*.18);ctx.lineTo(w*.14,cy);ctx.lineTo(0,h*.82);ctx.lineTo(w*.30,h*.66);ctx.lineTo(w*.38,h);ctx.lineTo(w*.58,h*.70);ctx.closePath();}
+        else if(design===1){ctx.beginPath();ctx.moveTo(w,cy);ctx.lineTo(w*.48,.08*h);ctx.lineTo(w*.18,0);ctx.lineTo(w*.28,h*.38);ctx.lineTo(0,h*.18);ctx.lineTo(w*.12,cy);ctx.lineTo(0,h*.82);ctx.lineTo(w*.28,h*.62);ctx.lineTo(w*.18,h);ctx.lineTo(w*.48,.92*h);ctx.closePath();}
+        else if(design===2){ctx.beginPath();ctx.moveTo(w,cy);ctx.lineTo(w*.55,.22*h);ctx.lineTo(w*.30,0);ctx.lineTo(w*.22,h*.32);ctx.lineTo(0,h*.12);ctx.lineTo(w*.12,cy);ctx.lineTo(0,h*.88);ctx.lineTo(w*.22,h*.68);ctx.lineTo(w*.30,h);ctx.lineTo(w*.55,.78*h);ctx.closePath();}
+        else if(design===3){ctx.beginPath();ctx.moveTo(w,cy);ctx.lineTo(w*.60,h*.36);ctx.lineTo(w*.48,0);ctx.lineTo(w*.35,h*.36);ctx.lineTo(0,h*.28);ctx.lineTo(0,h*.72);ctx.lineTo(w*.35,h*.64);ctx.lineTo(w*.48,h);ctx.lineTo(w*.60,h*.64);ctx.closePath();}
+        else if(design===4){ctx.beginPath();ctx.moveTo(w,cy);ctx.lineTo(w*.55,h*.38);ctx.lineTo(w*.42,0);ctx.lineTo(w*.32,h*.38);ctx.lineTo(0,h*.24);ctx.lineTo(w*.10,cy);ctx.lineTo(0,h*.76);ctx.lineTo(w*.32,h*.62);ctx.lineTo(w*.42,h);ctx.lineTo(w*.55,h*.62);ctx.closePath();}
+        else if(design===5){ctx.beginPath();ctx.moveTo(w,cy);ctx.lineTo(w*.62,h*.26);ctx.lineTo(w*.42,.08*h);ctx.lineTo(w*.32,h*.34);ctx.lineTo(0,0);ctx.lineTo(w*.12,cy);ctx.lineTo(0,h);ctx.lineTo(w*.32,h*.66);ctx.lineTo(w*.42,.92*h);ctx.lineTo(w*.62,.74*h);ctx.closePath();}
+        else if(design===6){ctx.beginPath();ctx.moveTo(w,cy);ctx.lineTo(w*.58,h*.20);ctx.lineTo(w*.28,0);ctx.lineTo(w*.24,h*.36);ctx.lineTo(0,h*.18);ctx.lineTo(w*.10,cy);ctx.lineTo(0,h*.82);ctx.lineTo(w*.24,h*.64);ctx.lineTo(w*.28,h);ctx.lineTo(w*.58,h*.80);ctx.closePath();}
+        else {ctx.beginPath();ctx.moveTo(w,cy);ctx.lineTo(w*.52,h*.30);ctx.lineTo(w*.34,h*.08);ctx.lineTo(w*.28,h*.38);ctx.lineTo(0,h*.24);ctx.lineTo(w*.12,cy);ctx.lineTo(0,h*.76);ctx.lineTo(w*.28,h*.62);ctx.lineTo(w*.34,h*.92);ctx.lineTo(w*.52,h*.70);ctx.closePath();}
+        ctx.fill();ctx.stroke();
+        ctx.fillStyle=accent;ctx.beginPath();ctx.ellipse(w*.62,cy,w*.13,Math.max(2,h*.12),0,0,Math.PI*2);ctx.fill();
+        if(design===2||design===3||design===6){ctx.fillStyle=dark;ctx.fillRect(w*.08,h*.18,w*.10,h*.18);ctx.fillRect(w*.08,h*.64,w*.10,h*.18);}
+        if(design===4){ctx.strokeStyle='#d7d7d7';ctx.beginPath();ctx.moveTo(w*.70,cy-h*.32);ctx.lineTo(w*.70,cy+h*.32);ctx.stroke();}
+        ctx.restore();
+    }
     function draw() {
         if (!ctx) return;
         ctx.clearRect(0,0,W,H);
-        const g=ctx.createLinearGradient(0,0,0,H);
-        g.addColorStop(0,'#071525'); g.addColorStop(1,'#101820');
-        ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
-
-        // Stars / speed lines
-        ctx.strokeStyle='rgba(255,255,255,.16)'; ctx.lineWidth=1;
-        for(let i=0;i<18;i++){
-            const y=(i*47 + (state.activeMs*.025))%H;
-            const x=(i*83)%W;
-            ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+16,y);ctx.stroke();
-        }
-
-        // Player prop plane
-        const p=state.player;
-        if (p) {
-            ctx.save(); ctx.translate(p.x,p.y);
-            ctx.fillStyle='#d9dde1'; ctx.fillRect(5,8,31,9);
-            ctx.fillStyle='#aab1b8'; ctx.beginPath();ctx.moveTo(14,8);ctx.lineTo(22,0);ctx.lineTo(27,8);ctx.fill();
-            ctx.beginPath();ctx.moveTo(14,17);ctx.lineTo(22,24);ctx.lineTo(27,17);ctx.fill();
-            ctx.fillStyle='#c7ccd1';ctx.fillRect(35,5,5,15);
-            ctx.strokeStyle='#f0f0f0';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(41,2);ctx.lineTo(41,22);ctx.stroke();
-            ctx.fillStyle='#7c8791';ctx.beginPath();ctx.moveTo(5,8);ctx.lineTo(0,4);ctx.lineTo(0,17);ctx.lineTo(7,16);ctx.fill();
-            ctx.restore();
-        }
-
+        const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#071525');g.addColorStop(1,'#101820');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+        ctx.strokeStyle='rgba(255,255,255,.16)';ctx.lineWidth=1;for(let i=0;i<18;i++){const y=(i*47+(state.activeMs*.025))%H,x=(i*83)%W;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+16,y);ctx.stroke();}
+        const stage=aircraftStage(),enemyDesign=(stage+1)%AIRCRAFT_COUNT,p=state.player;
+        if(p)drawAircraft(p.x,p.y,p.w,p.h,stage,false,false);
         state.bullets.forEach(b=>{ctx.fillStyle='#f5e8a8';ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();});
         state.enemyBullets.forEach(b=>{ctx.fillStyle='#e46a5e';ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();});
         state.healthDrops.forEach(h=>{ctx.save();ctx.translate(h.x,h.y);ctx.fillStyle='#49c86b';ctx.fillRect(0,0,h.w,h.h);ctx.fillStyle='#fff';ctx.fillRect(7,3,4,12);ctx.fillRect(3,7,12,4);ctx.restore();});
-        state.enemies.forEach(e=>{
-            ctx.save();ctx.translate(e.x,e.y);
-            ctx.fillStyle=e.tough?'#737b83':'#59616a';
-            ctx.fillRect(4,7,e.w-8,e.h-14);
-            ctx.fillStyle=e.tough?'#a5adb5':'#858e97';
-            ctx.beginPath();ctx.moveTo(10,7);ctx.lineTo(e.w*.52,0);ctx.lineTo(e.w*.72,7);ctx.fill();
-            ctx.beginPath();ctx.moveTo(10,e.h-7);ctx.lineTo(e.w*.52,e.h);ctx.lineTo(e.w*.72,e.h-7);ctx.fill();
-            ctx.fillStyle='#b84f47';ctx.fillRect(0,e.h*.35,7,e.h*.3);
-            ctx.restore();
-        });
-        state.particles.forEach(q=>{
-            ctx.globalAlpha=Math.max(0,q.life/.7);ctx.fillStyle='#e3a34c';ctx.fillRect(q.x,q.y,3,3);ctx.globalAlpha=1;
-        });
+        state.enemies.forEach(e=>drawAircraft(e.x,e.y,e.w,e.h,enemyDesign,true,e.tough));
+        state.particles.forEach(q=>{ctx.globalAlpha=Math.max(0,q.life/.7);ctx.fillStyle='#e3a34c';ctx.fillRect(q.x,q.y,3,3);ctx.globalAlpha=1;});
     }
 
     function updateHud() {
