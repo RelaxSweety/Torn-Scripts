@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.10.8
+// @version      0.11.0
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -161,6 +161,53 @@
         isAvailable(){const mode=launchMode();return mode==='always'||(mode==='flight'&&detectFlight().flying);},
         start(){startGame();},pause(){if(state.running&&!state.paused)togglePause();},resume(){if(state.running&&state.paused)togglePause();},stop(){if(state.running&&!state.over)requestLeave();}
     });
+
+    // Stick Figure Fighter: self-contained arcade module.
+    const StickFighter = (() => {
+        let host=null, canvas=null, ctx=null, frame=0, last=0, active=false, keys=new Set(), joystick={x:0,y:0}, player, enemies, pickups, shots, score, elapsed, spawn, attack, weapon, pointer=null;
+        const W=360,H=600, names=['Knife','Bat','Sword','Shotgun','Dual Pistols'];
+        const rand=(a,b)=>a+Math.random()*(b-a);
+        const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+        function reset(){player={x:W/2,y:H/2,hp:100};enemies=[];pickups=[];shots=[];score=0;elapsed=0;spawn=0;attack=0;weapon=0;last=performance.now();}
+        function stick(x,y,color){ctx.strokeStyle=color;ctx.lineWidth=4;ctx.lineCap='round';ctx.beginPath();ctx.arc(x,y-15,8,0,Math.PI*2);ctx.moveTo(x,y-7);ctx.lineTo(x,y+18);ctx.moveTo(x-12,y+5);ctx.lineTo(x+12,y+5);ctx.moveTo(x,y+18);ctx.lineTo(x-11,y+34);ctx.moveTo(x,y+18);ctx.lineTo(x+11,y+34);ctx.stroke();}
+        function draw(){
+            ctx.fillStyle='#11151b';ctx.fillRect(0,0,W,H);
+            ctx.strokeStyle='#27313b';ctx.lineWidth=1;
+            for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+            for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+            for(const p of pickups){ctx.fillStyle=p.type==='health'?'#48d16a':'#e4c35c';ctx.fillRect(p.x-9,p.y-9,18,18);ctx.fillStyle='#101010';ctx.font='bold 14px sans-serif';ctx.fillText(p.type==='health'?'+':'W',p.x-6,p.y+5);}
+            for(const e of enemies)stick(e.x,e.y,'#e64d54');
+            for(const s of shots){ctx.fillStyle='#ffd35b';ctx.beginPath();ctx.arc(s.x,s.y,3,0,7);ctx.fill();}
+            stick(player.x,player.y,'#55e879');
+            ctx.fillStyle='#fff';ctx.font='bold 15px sans-serif';ctx.fillText('HP '+Math.ceil(player.hp)+'   KILLS '+score,12,23);ctx.fillText(names[weapon],12,44);ctx.fillText(Math.floor(elapsed)+'s',W-52,23);
+            ctx.fillStyle='#4d2227';ctx.fillRect(12,53,140,9);ctx.fillStyle='#4bdf73';ctx.fillRect(12,53,140*Math.max(0,player.hp)/100,9);
+            ctx.strokeStyle='#b8c1d0';ctx.lineWidth=2;ctx.beginPath();ctx.arc(62,H-68,43,0,7);ctx.stroke();ctx.fillStyle='#71879b';ctx.beginPath();ctx.arc(62+joystick.x*27,H-68+joystick.y*27,17,0,7);ctx.fill();
+            if(player.hp<=0){ctx.fillStyle='#000c';ctx.fillRect(0,0,W,H);ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold 30px sans-serif';ctx.fillText('GAME OVER',W/2,H/2-30);ctx.font='18px sans-serif';ctx.fillText('Kills: '+score+' · Time: '+Math.floor(elapsed)+'s',W/2,H/2+5);ctx.fillText('Tap RESTART to play again',W/2,H/2+38);ctx.textAlign='left';}
+        }
+        function tick(ts){if(!active)return;const dt=Math.min(.05,(ts-last)/1000||0);last=ts;if(player.hp>0){elapsed+=dt;spawn-=dt;attack-=dt;
+            let dx=joystick.x+(keys.has('ArrowRight')||keys.has('d')?1:0)-(keys.has('ArrowLeft')||keys.has('a')?1:0),dy=joystick.y+(keys.has('ArrowDown')||keys.has('s')?1:0)-(keys.has('ArrowUp')||keys.has('w')?1:0);let m=Math.hypot(dx,dy)||1;player.x=Math.max(18,Math.min(W-18,player.x+dx/m*145*dt));player.y=Math.max(38,Math.min(H-38,player.y+dy/m*145*dt));
+            if(spawn<=0){spawn=Math.max(.35,1.6-elapsed/100);const edge=Math.floor(rand(0,4));enemies.push({x:edge===0?-15:edge===1?W+15:rand(0,W),y:edge===2?-15:edge===3?H+15:rand(0,H),hp:weapon===3?2:1});}
+            for(const e of enemies){let d=dist(e,player)||1;e.x+=(player.x-e.x)/d*(35+Math.min(55,elapsed/5))*dt;e.y+=(player.y-e.y)/d*(35+Math.min(55,elapsed/5))*dt;if(d<21)player.hp=Math.max(0,player.hp-20*dt);}
+            const target=enemies.filter(e=>dist(e,player)<(weapon===0?60:weapon===1?80:weapon===2?115:240)).sort((a,b)=>dist(a,player)-dist(b,player))[0];
+            if(target&&attack<=0){attack=[.27,.55,.42,.9,.18][weapon];if(weapon<3){const range=[60,80,115][weapon];const hits=enemies.filter(e=>dist(e,player)<range).slice(0,weapon===0?1:weapon===1?3:5);for(const e of hits){e.hp--;if(weapon===1){let d=dist(e,player)||1;e.x+=(e.x-player.x)/d*20;e.y+=(e.y-player.y)/d*20;}}}else{let a=Math.atan2(target.y-player.y,target.x-player.x);for(let i=0;i<(weapon===3?5:1);i++){let angle=a+(weapon===3?(i-2)*.16:0);shots.push({x:player.x,y:player.y,vx:Math.cos(angle)*350,vy:Math.sin(angle)*350,life:.8});}}}
+            for(const s of shots){s.x+=s.vx*dt;s.y+=s.vy*dt;s.life-=dt;for(const e of enemies){if(dist(s,e)<15){e.hp--;s.life=0;break;}}}shots=shots.filter(s=>s.life>0);
+            for(const e of enemies.filter(e=>e.hp<=0)){score++;if(Math.random()<.12)pickups.push({x:e.x,y:e.y,type:'health'});if(Math.random()<.045)pickups.push({x:e.x,y:e.y,type:'weapon',weapon:Math.floor(rand(0,5))});}
+            enemies=enemies.filter(e=>e.hp>0);
+            if(Math.random()<dt*.12)pickups.push({x:rand(25,W-25),y:rand(70,H-70),type:'weapon',weapon:Math.floor(rand(0,5))});
+            for(const p of pickups){if(dist(p,player)<23){if(p.type==='health')player.hp=Math.min(100,player.hp+25);else weapon=p.weapon;p.used=true;}}pickups=pickups.filter(p=>!p.used).slice(-35);
+        }draw();frame=requestAnimationFrame(tick);}
+        function setPointer(e){if(pointer!==null&&e.pointerId!==pointer)return;const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;if(pointer===null&&Math.hypot(x-62,y-(H-68))>105)return;pointer=e.pointerId;let dx=x-62,dy=y-(H-68),m=Math.max(1,Math.hypot(dx,dy));joystick={x:dx/Math.max(43,m),y:dy/Math.max(43,m)};}
+        function start(){stop();reset();host=document.createElement('div');host.id='tpfg-stick-fighter';host.style.cssText='position:fixed;inset:0;z-index:2147483646;background:#080b10;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px;box-sizing:border-box';host.innerHTML='<div style="width:min(100%,420px);display:flex;justify-content:space-between;color:white;font:600 15px sans-serif;padding:6px"><span>STICK FIGURE FIGHTER</span><span><button id="sff-restart">RESTART</button> <button id="sff-exit">EXIT</button></span></div>';canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;canvas.style.cssText='width:min(100%,420px);height:auto;max-height:calc(100dvh - 62px);touch-action:none;object-fit:contain;border:1px solid #3b4652';host.appendChild(canvas);document.body.appendChild(host);ctx=canvas.getContext('2d');canvas.addEventListener('pointerdown',onDown);canvas.addEventListener('pointermove',onMove);canvas.addEventListener('pointerup',onUp);canvas.addEventListener('pointercancel',onUp);document.addEventListener('keydown',onKeyDown);document.addEventListener('keyup',onKeyUp);host.querySelector('#sff-restart').onclick=reset;host.querySelector('#sff-exit').onclick=stop;active=true;frame=requestAnimationFrame(tick);}
+        function onDown(e){setPointer(e);if(pointer===e.pointerId){canvas.setPointerCapture(e.pointerId);e.preventDefault();}}
+        function onMove(e){if(pointer===e.pointerId)setPointer(e);}
+        function onUp(e){if(pointer===e.pointerId){pointer=null;joystick={x:0,y:0};}}
+        function onKeyDown(e){keys.add(e.key);}
+        function onKeyUp(e){keys.delete(e.key);}
+        function stop(){active=false;cancelAnimationFrame(frame);document.removeEventListener('keydown',onKeyDown);document.removeEventListener('keyup',onKeyUp);host?.remove();host=null;pointer=null;joystick={x:0,y:0};keys.clear();}
+        return {start,stop};
+    })();
+    Arcade.registerGame({id:'stick-figure-fighter',name:'Stick Figure Fighter',version:'0.1.0',isAvailable(){return (localStorage.getItem('tpfgMode:stick-figure-fighter')||'always')==='always';},start:StickFighter.start,stop:StickFighter.stop});
+
     function gameSaveKey(id){return SAVE_PREFIX+id;}
     function getGameSave(id){try{return JSON.parse(localStorage.getItem(gameSaveKey(id))||'null');}catch(_){return null;}}
     function clearGameSave(id){try{localStorage.removeItem(gameSaveKey(id));}catch(_){}}
@@ -174,7 +221,7 @@
         const p=document.getElementById('tpfg-prompt');p.querySelector('h3').textContent=title;p.querySelector('p').textContent=message;
         const a=p.querySelector('#tpfg-prompt-actions');a.innerHTML='';buttons.forEach(x=>{const b=document.createElement('button');b.className='tpfg-resultbtn';b.textContent=x.label;b.onclick=()=>{p.style.display='none';x.action();};a.appendChild(b);});p.style.display='flex';
     }
-    function launchGame(game){const s=getGameSave(game.id);if(s)promptBox('SAVED GAME','Continue your saved '+game.name+' game?',[{label:'CONTINUE SAVED GAME',action:()=>restoreGame(s)},{label:'START NEW GAME',action:()=>{clearGameSave(game.id);game.start();}},{label:'CANCEL',action:()=>{}}]);else game.start();}
+    function launchGame(game){if(game.id!=='flight-arcade'){game.start();return;}const s=getGameSave(game.id);if(s)promptBox('SAVED GAME','Continue your saved '+game.name+' game?',[{label:'CONTINUE SAVED GAME',action:()=>restoreGame(s)},{label:'START NEW GAME',action:()=>{clearGameSave(game.id);game.start();}},{label:'CANCEL',action:()=>{}}]);else game.start();}
     function requestLeave(){if(!state.running||state.over){updateEngineSound(false);minimize();return;}state.paused=true;updateEngineSound(false);document.getElementById('tpfg-pause').textContent='RESUME';promptBox('SAVE YOUR GAME?','Save your current progress and continue from this point next time?',[{label:'SAVE & LEAVE',action:()=>{saveCurrentGame();closeActiveGame();}},{label:'LEAVE WITHOUT SAVING',action:()=>{clearGameSave('flight-arcade');closeActiveGame();}},{label:'CANCEL',action:()=>{state.paused=false;state.lastTs=performance.now();document.getElementById('tpfg-pause').textContent='PAUSE';}}]);}
     function closeActiveGame(){transition=null;state.running=false;state.paused=true;updateEngineSound(false);cancelAnimationFrame(raf);document.getElementById('tpfg-root').style.display='none';}
     function openManager(){document.getElementById('tpfg-manager').style.display='flex';renderManager('games');}
@@ -187,9 +234,9 @@
             body.innerHTML=games.length?games.map(g=>'<div class="tpfg-game-card"><b>'+g.name+'</b><span>Available now</span><button data-game="'+g.id+'">PLAY</button></div>').join(''):'<p class="tpfg-empty">No games are available in your current Torn situation.</p>';
             body.querySelectorAll('button[data-game]').forEach(btn=>btn.onclick=()=>{document.getElementById('tpfg-manager').style.display='none';Arcade.start(btn.dataset.game);});
         } else {
-            body.innerHTML=Arcade.list().map(g=>{const mode=launchMode();return '<div class="tpfg-game-card"><b>'+g.name+'</b><label><input type="checkbox" data-enable-game="'+g.id+'" '+(Arcade.enabled(g)?'checked':'')+'> Show in Game List</label><span>Availability</span><label><input type="radio" name="manager-mode-'+g.id+'" value="flight" '+(mode==='flight'?'checked':'')+'> Traveling</label><label><input type="radio" name="manager-mode-'+g.id+'" value="always" '+(mode==='always'?'checked':'')+'> Always</label><label><input type="radio" name="manager-mode-'+g.id+'" value="disabled" '+(mode==='disabled'?'checked':'')+'> Disabled</label></div>';}).join('');
+            body.innerHTML=Arcade.list().map(g=>{const mode=g.id==='flight-arcade'?launchMode():(localStorage.getItem('tpfgMode:'+g.id)||'always');return '<div class="tpfg-game-card"><b>'+g.name+'</b><label><input type="checkbox" data-enable-game="'+g.id+'" '+(Arcade.enabled(g)?'checked':'')+'> Show in Game List</label><span>Availability</span><label><input type="radio" name="manager-mode-'+g.id+'" value="flight" '+(mode==='flight'?'checked':'')+'> Traveling</label><label><input type="radio" name="manager-mode-'+g.id+'" value="always" '+(mode==='always'?'checked':'')+'> Always</label><label><input type="radio" name="manager-mode-'+g.id+'" value="disabled" '+(mode==='disabled'?'checked':'')+'> Disabled</label></div>';}).join('');
             body.querySelectorAll('input[data-enable-game]').forEach(x=>x.onchange=()=>Arcade.setEnabled(Arcade.games.get(x.dataset.enableGame),x.checked));
-            body.querySelectorAll('input[type="radio"]').forEach(r=>r.onchange=()=>localStorage.setItem(LAUNCH_MODE_KEY,r.value));
+            body.querySelectorAll('input[type="radio"]').forEach(r=>r.onchange=()=>{const id=r.name.replace('manager-mode-','');localStorage.setItem(id==='flight-arcade'?LAUNCH_MODE_KEY:'tpfgMode:'+id,r.value);});
         }
     }
 
