@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.10.4
+// @version      0.10.5
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -12,6 +12,7 @@
 
 /*
  * TORN PDA ARCADE - RELEASE NOTES
+ * v0.10.5 - Removed continuous engine audio and corrected aircraft transitions on score awards.
  * v0.10.4 - Changed aircraft progression to 5,000-point stages with exit-right and reenter-left transformation animation.
  * v0.10.3 - Ensured engine audio stops immediately on pause, leave prompts, game over, minimize, and exit.
  * v0.10.2 - Reduced aircraft engine/movement sound volume while preserving effects volume.
@@ -39,7 +40,7 @@
 
     const GAME = {
         name: 'Torn PDA Flight Game',
-        version: '0.10.4',
+        version: '0.10.5',
         creator: 'RelaxSweety',
         creatorId: '4539436',
         creatorUrl: 'https://www.torn.com/profiles.php?XID=4539436',
@@ -281,7 +282,7 @@
     function tone(freq,dur,type='sine',gain=.12,endFreq=null){if(audioPrefs.muted||audioPrefs.volume<=0)return;const a=ensureAudio();if(!a)return;if(a.state==='suspended')a.resume();const o=a.createOscillator(),g=a.createGain(),t=a.currentTime;o.type=type;o.frequency.setValueAtTime(freq,t);if(endFreq)o.frequency.exponentialRampToValueAtTime(Math.max(20,endFreq),t+dur);g.gain.setValueAtTime(Math.max(.0001,gain*audioPrefs.volume),t);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g).connect(a.destination);o.start(t);o.stop(t+dur);}
     function explosionSound(){tone(110,.28,'sawtooth',.18,38);tone(62,.34,'square',.08,28);}
     function healSound(){tone(520,.12,'sine',.10,760);setTimeout(()=>tone(760,.16,'sine',.08,1040),70);}
-    function updateEngineSound(moving){if(audioPrefs.muted||audioPrefs.volume<=0||!state.running||state.paused||state.over)moving=false;const a=moving?ensureAudio():audioCtx;if(!a)return;if(moving){if(a.state==='suspended')a.resume();if(!engineOsc){engineOsc=a.createOscillator();engineGain=a.createGain();engineOsc.type='sawtooth';engineOsc.frequency.value=82;engineGain.gain.value=.0001;engineOsc.connect(engineGain).connect(a.destination);engineOsc.start();}engineOsc.frequency.setTargetAtTime(96,a.currentTime,.06);engineGain.gain.setTargetAtTime(.012*audioPrefs.volume,a.currentTime,.05);}else if(engineGain){engineGain.gain.setTargetAtTime(.0001,a.currentTime,.05);}}
+    function updateEngineSound(){if(engineOsc){try{engineOsc.stop();engineOsc.disconnect();}catch(_){}engineOsc=null;}if(engineGain){try{engineGain.disconnect();}catch(_){}engineGain=null;}}
 
     function resize() {
         if (!canvas) return;
@@ -416,7 +417,7 @@
         const mag=Math.max(1,Math.hypot(dx,dy));
         p.x=Math.max(4,Math.min(W-p.w-4,p.x+dx/mag*p.speed*dt));
         p.y=Math.max(4,Math.min(H-p.h-4,p.y+dy/mag*p.speed*dt));
-        updateEngineSound(Math.abs(dx)>.04||Math.abs(dy)>.04);
+        // Continuous engine audio removed.
 
         state.shotClock-=dt;
         if (state.keys.fire && state.shotClock<=0) {
@@ -462,6 +463,7 @@
                     if (e.hp<=0) {
                         explode(e.x+e.w/2,e.y+e.h/2); explosionSound();
                         state.score+=e.tough?300:120; state.kills++;
+                        if(!transition&&aircraftStage()!==shownStage)startAircraftTransition(aircraftStage());
                         state.healthDrops.push({x:e.x+e.w/2-8,y:e.y+e.h/2-8,w:18,h:18,speed:55});
                         state.enemies.splice(ei,1);
                     }
@@ -492,8 +494,8 @@
         for(let i=state.healthDrops.length-1;i>=0;i--){const h=state.healthDrops[i];if(h.x+h.w<0){state.healthDrops.splice(i,1);continue;}if(rectHit(h,p)){state.hp=Math.min(100,state.hp+10);state.healthDrops.splice(i,1);explode(p.x+p.w/2,p.y+p.h/2,8);healSound();}}
         state.particles=state.particles.filter(q=>q.life>0);
         state.score += 8*dt;
+        if(!transition&&aircraftStage()!==shownStage)startAircraftTransition(aircraftStage());
         if (state.hp<=0) finishGame(false);
-        else if(!transition&&aircraftStage()!==shownStage)startAircraftTransition(aircraftStage());
     }
 
     function spawnEnemy(difficulty) {
