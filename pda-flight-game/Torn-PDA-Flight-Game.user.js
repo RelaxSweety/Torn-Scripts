@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.10.6
+// @version      0.10.7
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -12,6 +12,7 @@
 
 /*
  * TORN PDA ARCADE - RELEASE NOTES
+ * v0.10.7 - Touch-identifier joystick tracking, reliable score-driven aircraft styling, and 100-point full-health pickups.
  * v0.10.6 - Fixed multitouch joystick pointer ownership and reset on release or lost capture.
  * v0.10.5 - Removed continuous engine audio and corrected aircraft transitions on score awards.
  * v0.10.4 - Changed aircraft progression to 5,000-point stages with exit-right and reenter-left transformation animation.
@@ -41,7 +42,7 @@
 
     const GAME = {
         name: 'Torn PDA Flight Game',
-        version: '0.10.6',
+        version: '0.10.7',
         creator: 'RelaxSweety',
         creatorId: '4539436',
         creatorUrl: 'https://www.torn.com/profiles.php?XID=4539436',
@@ -325,42 +326,51 @@
 
     function bindStick(stick) {
         const knob=document.getElementById('tpfg-stick-knob');
-        let pid=null;
-        const reset=()=>{
-            pid=null;
-            state.stick={x:0,y:0};
-            knob.style.transform='translate(0,0)';
-        };
-        const move=e=>{
-            if(pid!==e.pointerId)return;
-            if(!Number.isFinite(e.clientX)||!Number.isFinite(e.clientY))return;
-            e.preventDefault();
+        let activeTouch=null,activePointer=null;
+        const reset=()=>{activeTouch=null;activePointer=null;state.stick={x:0,y:0};knob.style.transform='translate(0,0)';};
+        const move=(x,y)=>{
+            if(!Number.isFinite(x)||!Number.isFinite(y))return;
             const r=stick.getBoundingClientRect(),max=r.width*.32;
             if(max<=0)return;
-            let x=e.clientX-r.left-r.width/2,y=e.clientY-r.top-r.height/2;
-            const d=Math.hypot(x,y);
-            if(d>max){x=x/d*max;y=y/d*max;}
-            state.stick={x:x/max,y:y/max};
-            knob.style.transform='translate('+x+'px,'+y+'px)';
+            let vx=x-r.left-r.width/2,vy=y-r.top-r.height/2;
+            const dist=Math.hypot(vx,vy);
+            if(dist>max){vx=vx/dist*max;vy=vy/dist*max;}
+            state.stick={x:vx/max,y:vy/max};
+            knob.style.transform='translate('+vx+'px,'+vy+'px)';
         };
+        // Android WebView: use the original touch identifier so the held FIRE
+        // finger can never take over when the movement thumb is replaced.
+        stick.addEventListener('touchstart',e=>{
+            e.preventDefault();
+            if(activeTouch!==null)return;
+            const t=Array.from(e.changedTouches).find(t=>t.target===stick||stick.contains(t.target));
+            if(!t)return;
+            activeTouch=t.identifier;move(t.clientX,t.clientY);
+        },{passive:false});
+        stick.addEventListener('touchmove',e=>{
+            e.preventDefault();
+            if(activeTouch===null)return;
+            const t=Array.from(e.touches).find(t=>t.identifier===activeTouch);
+            if(t)move(t.clientX,t.clientY);
+        },{passive:false});
+        const endTouch=e=>{
+            if(activeTouch===null)return;
+            if(Array.from(e.changedTouches).some(t=>t.identifier===activeTouch))reset();
+        };
+        stick.addEventListener('touchend',endTouch,{passive:false});
+        stick.addEventListener('touchcancel',endTouch,{passive:false});
+        // Mouse/stylus fallback; touch is exclusively handled above.
         stick.addEventListener('pointerdown',e=>{
-            if(pid!==null)return; // Ignore other fingers, including the fire-button finger.
+            if(e.pointerType==='touch'||activeTouch!==null||activePointer!==null)return;
             if(e.pointerType==='mouse'&&e.button!==0)return;
-            pid=e.pointerId;
-            try{stick.setPointerCapture(pid);}catch(_){}
-            move(e);
+            activePointer=e.pointerId;move(e.clientX,e.clientY);
+            try{stick.setPointerCapture(e.pointerId);}catch(_){}
         });
-        stick.addEventListener('pointermove',move);
-        const end=e=>{
-            if(pid!==e.pointerId)return;
-            reset();
-            if(stick.hasPointerCapture(e.pointerId)){
-                try{stick.releasePointerCapture(e.pointerId);}catch(_){}
-            }
-        };
-        stick.addEventListener('pointerup',end);
-        stick.addEventListener('pointercancel',end);
-        stick.addEventListener('lostpointercapture',end);
+        stick.addEventListener('pointermove',e=>{if(e.pointerType!=='touch'&&activePointer===e.pointerId)move(e.clientX,e.clientY);});
+        const endPointer=e=>{if(activePointer===e.pointerId)reset();};
+        stick.addEventListener('pointerup',endPointer);
+        stick.addEventListener('pointercancel',endPointer);
+        stick.addEventListener('lostpointercapture',endPointer);
         window.addEventListener('blur',reset);
     }
 
@@ -438,6 +448,7 @@
             if(transition){advanceAircraftTransition(dt);draw();updateHud();raf=requestAnimationFrame(loop);return;}
             state.activeMs += dt*1000;
             update(dt);
+            if(!state.over&&!transition&&aircraftStage()!==shownStage)startAircraftTransition(aircraftStage());
             draw();
             updateHud();
         } else draw();
@@ -526,10 +537,9 @@
             }
         }
 
-        for(let i=state.healthDrops.length-1;i>=0;i--){const h=state.healthDrops[i];if(h.x+h.w<0){state.healthDrops.splice(i,1);continue;}if(rectHit(h,p)){state.hp=Math.min(100,state.hp+10);state.healthDrops.splice(i,1);explode(p.x+p.w/2,p.y+p.h/2,8);healSound();}}
+        for(let i=state.healthDrops.length-1;i>=0;i--){const h=state.healthDrops[i];if(h.x+h.w<0){state.healthDrops.splice(i,1);continue;}if(rectHit(h,p)){if(state.hp>=100)state.score+=100;else state.hp=Math.min(100,state.hp+10);state.healthDrops.splice(i,1);explode(p.x+p.w/2,p.y+p.h/2,8);healSound();}}
         state.particles=state.particles.filter(q=>q.life>0);
         state.score += 8*dt;
-        if(!transition&&aircraftStage()!==shownStage)startAircraftTransition(aircraftStage());
         if (state.hp<=0) finishGame(false);
     }
 
@@ -598,7 +608,7 @@
         ctx.clearRect(0,0,W,H);
         const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#071525');g.addColorStop(1,'#101820');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
         ctx.strokeStyle='rgba(255,255,255,.16)';ctx.lineWidth=1;for(let i=0;i<18;i++){const y=(i*47+(state.activeMs*.025))%H,x=(i*83)%W;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+16,y);ctx.stroke();}
-        const stage=shownStage,enemyDesign=(stage+1)%AIRCRAFT_COUNT,p=state.player;
+        const stage=transition?transition.from:aircraftStage(),enemyDesign=((transition?transition.to:stage)+1)%AIRCRAFT_COUNT,p=state.player;
         if(p){
             if(transition){
                 const t=transition.elapsed/TRANSITION_SECONDS;
