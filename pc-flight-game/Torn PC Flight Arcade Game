@@ -1,0 +1,4448 @@
+Use this as the complete replacement script. This is v1.7.4. The main change is that chat detection now walks upward from each message input to identify the outermost reasonable Torn chat window, then restricts chat-name detection to the header region.
+// ==UserScript==
+// @name         Torn In-Flight Arcade
+// @namespace    torn-inflight-arcade
+// @version      1.7.4
+// @description  In-flight arcade shooter for Torn travel with live flight data and chat sharing.
+// @author       RelaxSweety [4539436]
+// @match        https://www.torn.com/*
+// @grant        none
+// @run-at       document-idle
+// ==/UserScript==
+
+/*
+ * ============================================================
+ * SCRIPT CREATOR
+ * ============================================================
+ *
+ * Torn:
+ * RelaxSweety [4539436]
+ * https://www.torn.com/profiles.php?XID=4539436
+ *
+ * Discord:
+ * relaxsweety
+ * https://discord.com/users/relaxsweety
+ *
+ * ============================================================
+ */
+
+(() => {
+    'use strict';
+
+    // ============================================================
+    // CONFIGURATION
+    // ============================================================
+
+    const ROOT_ID = 'tfa-root';
+    const BTN_ID = 'tfa-launch';
+    const RESTORE_ID = 'tfa-restore';
+    const SHARE_ID = 'tfa-share-panel';
+    const STYLE_ID = 'tfa-style';
+
+    const POS_KEY = 'tfa_button_position_v7';
+    const HIDDEN_KEY = 'tfa_button_hidden_v7';
+    const SHARE_POS_KEY = 'tfa_share_position_v1';
+    const HIGH_KEY = 'tfa_highscore_v4';
+
+    const DONATION_PROFILE =
+        'https://www.torn.com/profiles.php?XID=4539436';
+
+    let activeGame = null;
+    let pendingShare = null;
+    let shareScanTimer = null;
+
+    // ============================================================
+    // GENERAL HELPERS
+    // ============================================================
+
+    function cleanText(value) {
+        return (value || '')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function onTravelPage() {
+        return (
+            location.pathname.includes('/page.php') &&
+            new URLSearchParams(location.search).get('sid') === 'travel'
+        );
+    }
+
+    function formatNumber(value) {
+        return Math.floor(value)
+            .toLocaleString('en-US');
+    }
+
+    function formatGameTime(seconds) {
+        seconds = Math.max(
+            0,
+            Math.floor(seconds)
+        );
+
+        const hours =
+            Math.floor(seconds / 3600);
+
+        const minutes =
+            Math.floor(
+                (seconds % 3600) / 60
+            );
+
+        const secs =
+            seconds % 60;
+
+        if (hours > 0) {
+            return (
+                String(hours).padStart(2, '0') +
+                ':' +
+                String(minutes).padStart(2, '0') +
+                ':' +
+                String(secs).padStart(2, '0')
+            );
+        }
+
+        return (
+            String(minutes).padStart(2, '0') +
+            ':' +
+            String(secs).padStart(2, '0')
+        );
+    }
+
+    function formatTornTimestamp(date = new Date()) {
+        const hh =
+            String(date.getHours())
+                .padStart(2, '0');
+
+        const mm =
+            String(date.getMinutes())
+                .padStart(2, '0');
+
+        const ss =
+            String(date.getSeconds())
+                .padStart(2, '0');
+
+        const month =
+            String(date.getMonth() + 1)
+                .padStart(2, '0');
+
+        const day =
+            String(date.getDate())
+                .padStart(2, '0');
+
+        const year =
+            String(date.getFullYear())
+                .slice(-2);
+
+        return (
+            `${hh}:${mm}:${ss} - ` +
+            `${month}/${day}/${year}`
+        );
+    }
+
+    function elementVisible(el) {
+        if (!el) return false;
+
+        const style =
+            getComputedStyle(el);
+
+        if (
+            style.display === 'none' ||
+            style.visibility === 'hidden' ||
+            Number(style.opacity) === 0
+        ) {
+            return false;
+        }
+
+        const rect =
+            el.getBoundingClientRect();
+
+        return (
+            rect.width > 0 &&
+            rect.height > 0 &&
+            rect.bottom > 0 &&
+            rect.right > 0 &&
+            rect.left < window.innerWidth &&
+            rect.top < window.innerHeight
+        );
+    }
+
+    // ============================================================
+    // PLAYER NAME
+    // ============================================================
+
+    function getTornUsername() {
+
+        const sidebars = [
+            document.querySelector('#sidebarroot'),
+            ...document.querySelectorAll(
+                '[class*="sidebar"], [id*="sidebar"]'
+            )
+        ].filter(Boolean);
+
+        for (const sidebar of sidebars) {
+
+            const rect =
+                sidebar.getBoundingClientRect();
+
+            if (
+                rect.width <= 0 ||
+                rect.left > 350
+            ) {
+                continue;
+            }
+
+            const text =
+                cleanText(sidebar.innerText);
+
+            const match =
+                text.match(
+                    /\bName:\s*([A-Za-z0-9_-]{2,32})\b/i
+                );
+
+            if (match) {
+                return match[1];
+            }
+        }
+
+        const candidates =
+            document.querySelectorAll(
+                'div, span, li, p'
+            );
+
+        for (const el of candidates) {
+
+            if (
+                el.closest(`#${ROOT_ID}`) ||
+                el.closest(`#${SHARE_ID}`)
+            ) {
+                continue;
+            }
+
+            const rect =
+                el.getBoundingClientRect();
+
+            if (
+                rect.width <= 0 ||
+                rect.height <= 0 ||
+                rect.left > 350
+            ) {
+                continue;
+            }
+
+            const text =
+                cleanText(el.textContent);
+
+            const match =
+                text.match(
+                    /^Name:\s*([A-Za-z0-9_-]{2,32})$/i
+                );
+
+            if (match) {
+                return match[1];
+            }
+        }
+
+        return 'Player';
+    }
+
+    // ============================================================
+    // FLIGHT INFORMATION
+    // ============================================================
+
+    function parseFlightLine(text) {
+
+        text = cleanText(text);
+
+        if (!text) {
+            return null;
+        }
+
+        const match =
+            text.match(
+                /(.+?)\s+to\s+(.+?)\.\s*Remaining Flight Time\s*-\s*(\d{1,2}:\d{2}:\d{2})/i
+            );
+
+        if (!match) {
+            return null;
+        }
+
+        const origin =
+            cleanText(match[1]);
+
+        const destination =
+            cleanText(match[2]);
+
+        if (
+            origin.length > 50 ||
+            destination.length > 50
+        ) {
+            return null;
+        }
+
+        return {
+            origin,
+            destination,
+            itinerary:
+                `${origin} → ${destination}`,
+            remaining:
+                match[3]
+        };
+    }
+
+    function scrapeTravelInfo() {
+
+        const candidates =
+            [...document.querySelectorAll('body *')]
+                .filter(el => {
+
+                    if (
+                        el.closest(`#${ROOT_ID}`) ||
+                        el.closest(`#${BTN_ID}`) ||
+                        el.closest(`#${SHARE_ID}`) ||
+                        el.id === RESTORE_ID
+                    ) {
+                        return false;
+                    }
+
+                    const text =
+                        cleanText(el.innerText);
+
+                    return (
+                        text &&
+                        text.length < 250 &&
+                        /Remaining Flight Time/i.test(text)
+                    );
+                })
+                .sort(
+                    (a, b) =>
+                        cleanText(a.innerText).length -
+                        cleanText(b.innerText).length
+                );
+
+        for (const el of candidates) {
+
+            const parsed =
+                parseFlightLine(
+                    el.innerText
+                );
+
+            if (parsed) {
+                return parsed;
+            }
+        }
+
+        return {
+            origin: 'Unknown',
+            destination: 'Unknown',
+            itinerary:
+                'Flight information unavailable',
+            remaining:
+                '--:--:--'
+        };
+    }
+
+    // ============================================================
+    // STYLES
+    // ============================================================
+
+    function injectStyles() {
+
+        if (
+            document.getElementById(STYLE_ID)
+        ) {
+            return;
+        }
+
+        const style =
+            document.createElement('style');
+
+        style.id = STYLE_ID;
+
+        style.textContent = `
+
+#${BTN_ID}{
+    position:fixed;
+    z-index:2147483000;
+    display:flex;
+    align-items:stretch;
+    border:1px solid #707a80;
+    border-radius:7px;
+    background:linear-gradient(#30363a,#1b1f22);
+    color:#eee;
+    font:700 13px Arial,sans-serif;
+    box-shadow:0 3px 14px #0008;
+    user-select:none;
+    overflow:hidden;
+    touch-action:none;
+}
+
+#${BTN_ID} button{
+    font:inherit;
+    color:inherit;
+}
+
+#${BTN_ID} .drag{
+    width:27px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-right:1px solid #555;
+    cursor:grab;
+    color:#aaa;
+}
+
+#${BTN_ID} .launch{
+    border:0;
+    background:transparent;
+    padding:10px 13px;
+    cursor:pointer;
+}
+
+#${BTN_ID} .launch:hover{
+    background:#ffffff0d;
+}
+
+#${BTN_ID} .hide{
+    width:29px;
+    border:0;
+    border-left:1px solid #555;
+    background:transparent;
+    cursor:pointer;
+    color:#aaa;
+}
+
+#${BTN_ID} .hide:hover{
+    background:#5b2525;
+    color:#fff;
+}
+
+#${RESTORE_ID}{
+    position:fixed;
+    right:2px;
+    bottom:80px;
+    z-index:2147483000;
+    width:22px;
+    height:48px;
+    border:1px solid #555;
+    border-right:0;
+    border-radius:6px 0 0 6px;
+    background:#1c2226;
+    color:#aaa;
+    cursor:pointer;
+    opacity:.55;
+}
+
+#${RESTORE_ID}:hover{
+    opacity:1;
+}
+
+/* ============================================================
+   GAME WINDOW
+   ============================================================ */
+
+#${ROOT_ID}{
+    position:fixed;
+    inset:0;
+    z-index:2147483640;
+    background:rgba(3,6,8,.96);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:Arial,sans-serif;
+    color:#eee;
+}
+
+#${ROOT_ID}.tfa-minimized{
+    display:none;
+}
+
+#${ROOT_ID} .shell{
+    width:min(1180px,96vw);
+    height:min(760px,94vh);
+    background:#11181d;
+    border:1px solid #657078;
+    border-radius:10px;
+    box-shadow:0 18px 70px #000;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+}
+
+#${ROOT_ID} .head{
+    min-height:58px;
+    display:flex;
+    align-items:center;
+    gap:18px;
+    padding:0 14px;
+    background:linear-gradient(#252d32,#151a1e);
+    border-bottom:1px solid #4c565d;
+}
+
+#${ROOT_ID} .title{
+    font-size:16px;
+    font-weight:800;
+    letter-spacing:1px;
+    margin-right:auto;
+    white-space:nowrap;
+}
+
+#${ROOT_ID} .infoBox{
+    display:flex;
+    flex-direction:column;
+    line-height:1.25;
+    min-width:130px;
+}
+
+#${ROOT_ID} .label{
+    color:#929ba1;
+    font-size:9px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.7px;
+}
+
+#${ROOT_ID} .playerName{
+    color:#ffd75a;
+    font-size:13px;
+    font-weight:800;
+    white-space:nowrap;
+}
+
+#${ROOT_ID} .route{
+    color:#9bd6ff;
+    font-size:13px;
+    font-weight:800;
+    white-space:nowrap;
+}
+
+#${ROOT_ID} .time{
+    color:#7cff92;
+    font-size:14px;
+    font-weight:800;
+    white-space:nowrap;
+}
+
+#${ROOT_ID} .head button,
+#${ROOT_ID} .dialog button{
+    border:1px solid #667078;
+    background:#252c31;
+    color:#eee;
+    border-radius:5px;
+    padding:7px 11px;
+    cursor:pointer;
+    font-weight:700;
+}
+
+#${ROOT_ID} .head button:hover,
+#${ROOT_ID} .dialog button:hover{
+    background:#353e44;
+}
+
+#${ROOT_ID} .stage{
+    position:relative;
+    flex:1;
+    min-height:0;
+    background:#000;
+}
+
+#${ROOT_ID} canvas{
+    width:100%;
+    height:100%;
+    display:block;
+}
+
+#${ROOT_ID} .help{
+    position:absolute;
+    left:12px;
+    bottom:10px;
+    background:#000a;
+    border-radius:5px;
+    padding:6px 9px;
+    font-size:11px;
+    color:#ddd;
+    pointer-events:none;
+}
+
+#${ROOT_ID} .message{
+    position:absolute;
+    inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    background:#0009;
+}
+
+#${ROOT_ID} .dialog{
+    min-width:360px;
+    max-width:540px;
+    padding:25px;
+    background:#171d21;
+    border:1px solid #626d74;
+    border-radius:9px;
+    box-shadow:0 12px 40px #000;
+}
+
+#${ROOT_ID} .dialog h2{
+    margin:0 0 14px;
+    font-size:24px;
+}
+
+#${ROOT_ID} .resultGrid{
+    display:grid;
+    grid-template-columns:auto auto;
+    gap:8px 20px;
+    margin:18px auto;
+    width:max-content;
+    text-align:left;
+}
+
+#${ROOT_ID} .resultGrid span{
+    color:#9aa2a7;
+}
+
+#${ROOT_ID} .resultGrid strong{
+    color:#fff;
+    text-align:right;
+}
+
+#${ROOT_ID} .newHigh{
+    color:#ffd75a;
+    font-size:16px;
+    font-weight:800;
+    margin:12px 0;
+}
+
+#${ROOT_ID} .dialogActions{
+    display:flex;
+    gap:10px;
+    justify-content:center;
+    margin-top:20px;
+}
+
+#${ROOT_ID} .shareButton{
+    border-color:#557a5e!important;
+}
+
+#${ROOT_ID} .donationBox{
+    margin-top:22px;
+    padding-top:16px;
+    border-top:1px solid #3d464c;
+    text-align:center;
+    font-size:12px;
+    line-height:1.55;
+    color:#aeb6bb;
+}
+
+#${ROOT_ID} .donationBox strong{
+    display:block;
+    margin-bottom:3px;
+    color:#ddd;
+    font-size:13px;
+}
+
+#${ROOT_ID} .donationBox a{
+    display:inline-block;
+    margin-top:5px;
+    color:#ffd75a;
+    font-weight:800;
+    text-decoration:none;
+}
+
+#${ROOT_ID} .donationBox a:hover{
+    text-decoration:underline;
+}
+
+/* ============================================================
+   SHARE WINDOW
+   ============================================================ */
+
+#${SHARE_ID}{
+    position:fixed;
+    z-index:2147483645;
+    width:min(420px,calc(100vw - 20px));
+    font-family:Arial,sans-serif;
+    color:#eee;
+    pointer-events:none;
+}
+
+#${SHARE_ID} .sharePanel{
+    width:100%;
+    box-sizing:border-box;
+    max-height:70vh;
+    overflow:hidden;
+    background:#171d21;
+    border:1px solid #68737a;
+    border-radius:9px;
+    box-shadow:0 15px 50px #000;
+    pointer-events:auto;
+}
+
+#${SHARE_ID} .shareDragHeader{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    padding:11px 13px;
+    background:linear-gradient(#30383d,#20262a);
+    border-bottom:1px solid #505b62;
+    cursor:grab;
+    user-select:none;
+    touch-action:none;
+}
+
+#${SHARE_ID} .shareDragTitle{
+    font-size:15px;
+    font-weight:800;
+    flex:1;
+}
+
+#${SHARE_ID} .dragIcon{
+    color:#8f999f;
+}
+
+#${SHARE_ID} .dragHint{
+    color:#8f999f;
+    font-size:10px;
+}
+
+#${SHARE_ID} .shareContent{
+    box-sizing:border-box;
+    max-height:calc(70vh - 42px);
+    overflow:auto;
+    padding:15px 18px 18px;
+}
+
+#${SHARE_ID} .instructions{
+    color:#bbb;
+    line-height:1.45;
+    margin-bottom:12px;
+}
+
+#${SHARE_ID} .scanStatus{
+    margin:10px 0;
+    padding:7px 9px;
+    background:#101518;
+    border-radius:5px;
+    color:#8fd3ff;
+    font-size:11px;
+}
+
+#${SHARE_ID} .chatList{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    margin:12px 0;
+}
+
+#${SHARE_ID} .chatChoice{
+    width:100%;
+    box-sizing:border-box;
+    text-align:left;
+    border:1px solid #59636a;
+    border-radius:6px;
+    padding:11px 12px;
+    background:#242b30;
+    color:#eee;
+    cursor:pointer;
+    font-weight:700;
+}
+
+#${SHARE_ID} .chatChoice:hover{
+    background:#343d43;
+    border-color:#829099;
+}
+
+#${SHARE_ID} .chatSub{
+    display:block;
+    margin-top:4px;
+    font-size:10px;
+    font-weight:400;
+    color:#999;
+}
+
+#${SHARE_ID} .noChats{
+    padding:15px;
+    margin:12px 0;
+    border:1px dashed #555;
+    border-radius:6px;
+    color:#bbb;
+    text-align:center;
+}
+
+#${SHARE_ID} .shareActions{
+    display:flex;
+    gap:8px;
+    justify-content:center;
+    margin-top:12px;
+}
+
+#${SHARE_ID} .shareActions button{
+    border:1px solid #667078;
+    background:#252c31;
+    color:#eee;
+    border-radius:5px;
+    padding:8px 12px;
+    cursor:pointer;
+    font-weight:700;
+}
+
+#${SHARE_ID} .shareActions button:hover{
+    background:#353e44;
+}
+
+`;
+
+        document.head.appendChild(style);
+    }
+
+    // ============================================================
+    // LAUNCHER POSITION
+    // ============================================================
+
+    function applyPosition(button) {
+
+        let saved = null;
+
+        try {
+            saved =
+                JSON.parse(
+                    localStorage.getItem(
+                        POS_KEY
+                    )
+                );
+        } catch {}
+
+        let left =
+            saved?.left ??
+            window.innerWidth - 205;
+
+        let top =
+            saved?.top ??
+            window.innerHeight - 75;
+
+        left =
+            Math.max(
+                0,
+                Math.min(
+                    left,
+                    window.innerWidth -
+                    button.offsetWidth
+                )
+            );
+
+        top =
+            Math.max(
+                0,
+                Math.min(
+                    top,
+                    window.innerHeight -
+                    button.offsetHeight
+                )
+            );
+
+        button.style.left =
+            `${left}px`;
+
+        button.style.top =
+            `${top}px`;
+    }
+
+    function makeDraggable(button) {
+
+        const handle =
+            button.querySelector('.drag');
+
+        let dragging = false;
+
+        let startX = 0;
+        let startY = 0;
+        let startLeft = 0;
+        let startTop = 0;
+
+        handle.addEventListener(
+            'pointerdown',
+            event => {
+
+                if (event.button !== 0) {
+                    return;
+                }
+
+                dragging = true;
+
+                const rect =
+                    button.getBoundingClientRect();
+
+                startX = event.clientX;
+                startY = event.clientY;
+
+                startLeft = rect.left;
+                startTop = rect.top;
+
+                try {
+                    handle.setPointerCapture(
+                        event.pointerId
+                    );
+                } catch {}
+
+                event.preventDefault();
+            }
+        );
+
+        handle.addEventListener(
+            'pointermove',
+            event => {
+
+                if (!dragging) {
+                    return;
+                }
+
+                let left =
+                    startLeft +
+                    event.clientX -
+                    startX;
+
+                let top =
+                    startTop +
+                    event.clientY -
+                    startY;
+
+                left =
+                    Math.max(
+                        0,
+                        Math.min(
+                            left,
+                            window.innerWidth -
+                            button.offsetWidth
+                        )
+                    );
+
+                top =
+                    Math.max(
+                        0,
+                        Math.min(
+                            top,
+                            window.innerHeight -
+                            button.offsetHeight
+                        )
+                    );
+
+                button.style.left =
+                    `${left}px`;
+
+                button.style.top =
+                    `${top}px`;
+            }
+        );
+
+        function stopDragging() {
+
+            if (!dragging) {
+                return;
+            }
+
+            dragging = false;
+
+            const rect =
+                button.getBoundingClientRect();
+
+            localStorage.setItem(
+                POS_KEY,
+                JSON.stringify({
+                    left: rect.left,
+                    top: rect.top
+                })
+            );
+        }
+
+        handle.addEventListener(
+            'pointerup',
+            stopDragging
+        );
+
+        handle.addEventListener(
+            'pointercancel',
+            stopDragging
+        );
+    }
+
+    // ============================================================
+    // SHARE WINDOW DRAGGING
+    // ============================================================
+
+    function applySharePosition(panel) {
+
+        let saved = null;
+
+        try {
+            saved =
+                JSON.parse(
+                    localStorage.getItem(
+                        SHARE_POS_KEY
+                    )
+                );
+        } catch {}
+
+        const rect =
+            panel.getBoundingClientRect();
+
+        let left =
+            saved?.left ??
+            Math.max(
+                10,
+                window.innerWidth -
+                rect.width -
+                20
+            );
+
+        let top =
+            saved?.top ?? 120;
+
+        left =
+            Math.max(
+                0,
+                Math.min(
+                    left,
+                    window.innerWidth -
+                    rect.width
+                )
+            );
+
+        top =
+            Math.max(
+                0,
+                Math.min(
+                    top,
+                    window.innerHeight -
+                    42
+                )
+            );
+
+        panel.style.left =
+            `${left}px`;
+
+        panel.style.top =
+            `${top}px`;
+
+        panel.style.right =
+            'auto';
+    }
+
+    function makeSharePanelDraggable(panel) {
+
+        const handle =
+            panel.querySelector(
+                '.shareDragHeader'
+            );
+
+        if (!handle) {
+            return;
+        }
+
+        let dragging = false;
+
+        let startX = 0;
+        let startY = 0;
+
+        let startLeft = 0;
+        let startTop = 0;
+
+        handle.addEventListener(
+            'pointerdown',
+            event => {
+
+                if (event.button !== 0) {
+                    return;
+                }
+
+                dragging = true;
+
+                const rect =
+                    panel.getBoundingClientRect();
+
+                startX =
+                    event.clientX;
+
+                startY =
+                    event.clientY;
+
+                startLeft =
+                    rect.left;
+
+                startTop =
+                    rect.top;
+
+                try {
+                    handle.setPointerCapture(
+                        event.pointerId
+                    );
+                } catch {}
+
+                event.preventDefault();
+            }
+        );
+
+        handle.addEventListener(
+            'pointermove',
+            event => {
+
+                if (!dragging) {
+                    return;
+                }
+
+                const rect =
+                    panel.getBoundingClientRect();
+
+                let left =
+                    startLeft +
+                    event.clientX -
+                    startX;
+
+                let top =
+                    startTop +
+                    event.clientY -
+                    startY;
+
+                left =
+                    Math.max(
+                        0,
+                        Math.min(
+                            left,
+                            window.innerWidth -
+                            rect.width
+                        )
+                    );
+
+                top =
+                    Math.max(
+                        0,
+                        Math.min(
+                            top,
+                            window.innerHeight -
+                            42
+                        )
+                    );
+
+                panel.style.left =
+                    `${left}px`;
+
+                panel.style.top =
+                    `${top}px`;
+
+                panel.style.right =
+                    'auto';
+            }
+        );
+
+        function finish() {
+
+            if (!dragging) {
+                return;
+            }
+
+            dragging = false;
+
+            const rect =
+                panel.getBoundingClientRect();
+
+            localStorage.setItem(
+                SHARE_POS_KEY,
+                JSON.stringify({
+                    left: rect.left,
+                    top: rect.top
+                })
+            );
+        }
+
+        handle.addEventListener(
+            'pointerup',
+            finish
+        );
+
+        handle.addEventListener(
+            'pointercancel',
+            finish
+        );
+    }
+
+    // ============================================================
+    // LAUNCHER
+    // ============================================================
+
+    function ensureRestoreButton() {
+
+        if (
+            document.getElementById(
+                RESTORE_ID
+            )
+        ) {
+            return;
+        }
+
+        const button =
+            document.createElement(
+                'button'
+            );
+
+        button.id =
+            RESTORE_ID;
+
+        button.textContent =
+            '✈';
+
+        button.title =
+            'Restore In-Flight Arcade';
+
+        button.addEventListener(
+            'click',
+            () => {
+
+                localStorage.removeItem(
+                    HIDDEN_KEY
+                );
+
+                button.remove();
+
+                ensureLauncher();
+            }
+        );
+
+        document.body.appendChild(
+            button
+        );
+    }
+
+    function ensureLauncher() {
+
+        injectStyles();
+
+        if (!onTravelPage()) {
+
+            document
+                .getElementById(BTN_ID)
+                ?.remove();
+
+            document
+                .getElementById(RESTORE_ID)
+                ?.remove();
+
+            return;
+        }
+
+        if (
+            localStorage.getItem(
+                HIDDEN_KEY
+            ) === '1'
+        ) {
+
+            document
+                .getElementById(BTN_ID)
+                ?.remove();
+
+            ensureRestoreButton();
+
+            return;
+        }
+
+        document
+            .getElementById(RESTORE_ID)
+            ?.remove();
+
+        if (
+            document.getElementById(
+                BTN_ID
+            )
+        ) {
+            return;
+        }
+
+        const button =
+            document.createElement(
+                'div'
+            );
+
+        button.id =
+            BTN_ID;
+
+        button.innerHTML = `
+
+<div class="drag" title="Drag to relocate">
+    ⋮⋮
+</div>
+
+<button class="launch" type="button">
+    ✈ IN-FLIGHT ARCADE
+</button>
+
+<button class="hide" type="button" title="Hide launcher">
+    ×
+</button>
+
+`;
+
+        document.body.appendChild(
+            button
+        );
+
+        applyPosition(button);
+
+        makeDraggable(button);
+
+        button
+            .querySelector('.launch')
+            .addEventListener(
+                'click',
+                () => {
+
+                    if (activeGame) {
+                        activeGame.restore();
+                    } else {
+                        createGame();
+                    }
+                }
+            );
+
+        button
+            .querySelector('.hide')
+            .addEventListener(
+                'click',
+                () => {
+
+                    localStorage.setItem(
+                        HIDDEN_KEY,
+                        '1'
+                    );
+
+                    button.remove();
+
+                    ensureRestoreButton();
+                }
+            );
+    }
+
+    // ============================================================
+    // RESULT MESSAGE
+    // ============================================================
+
+    function buildResultsMessage(result) {
+
+        return (
+            `${result.timestamp} ` +
+
+            `Achieved an In-Flight Arcade score of ` +
+
+            `${formatNumber(result.score)} ` +
+
+            `while flying from ` +
+
+            `${result.origin} to ` +
+
+            `${result.destination}. ` +
+
+            `Game Time: ` +
+
+            `${formatGameTime(result.playTime)} | ` +
+
+            `Kills: ${result.kills} | ` +
+
+            `High Score: ` +
+
+            `${formatNumber(result.highScore)}`
+        );
+    }
+
+    // ============================================================
+    // CHAT INPUT DETECTION
+    // ============================================================
+
+    function getChatInputs() {
+
+        const selectors = [
+
+            'textarea[placeholder*="message" i]',
+
+            'textarea[placeholder*="chat" i]',
+
+            '[contenteditable="true"][data-placeholder*="message" i]',
+
+            '[contenteditable="true"][aria-label*="message" i]',
+
+            '[contenteditable="true"][role="textbox"]'
+        ];
+
+        const found =
+            new Set();
+
+        for (const selector of selectors) {
+
+            document
+                .querySelectorAll(selector)
+                .forEach(el => {
+
+                    if (
+                        el.closest(`#${ROOT_ID}`) ||
+                        el.closest(`#${SHARE_ID}`)
+                    ) {
+                        return;
+                    }
+
+                    if (
+                        !elementVisible(el)
+                    ) {
+                        return;
+                    }
+
+                    found.add(el);
+                });
+        }
+
+        return [...found];
+    }
+
+    // ============================================================
+    // CHAT WINDOW DETECTION
+    //
+    // IMPORTANT:
+    //
+    // The previous versions stopped at the first plausible
+    // container above the input.
+    //
+    // That often meant the script selected the MESSAGE BODY,
+    // not the complete Torn chat window.
+    //
+    // This version walks upward and keeps the OUTERMOST
+    // reasonable floating chat container.
+    // ============================================================
+
+    function findChatContainer(input) {
+
+        if (!input) {
+            return null;
+        }
+
+        let current =
+            input.parentElement;
+
+        let bestCandidate =
+            null;
+
+        while (
+            current &&
+            current !== document.body &&
+            current !== document.documentElement
+        ) {
+
+            const rect =
+                current.getBoundingClientRect();
+
+            /*
+             * Ignore invisible ancestors.
+             */
+
+            if (
+                rect.width > 0 &&
+                rect.height > 0
+            ) {
+
+                /*
+                 * Reasonable dimensions for Torn's floating
+                 * chat windows.
+                 *
+                 * We deliberately keep walking upward instead
+                 * of returning immediately.
+                 */
+
+                if (
+                    rect.width >= 220 &&
+                    rect.width <= 700 &&
+                    rect.height >= 160 &&
+                    rect.height <=
+                        window.innerHeight * .95
+                ) {
+                    bestCandidate =
+                        current;
+                }
+            }
+
+            current =
+                current.parentElement;
+        }
+
+        return (
+            bestCandidate ||
+            input.parentElement?.parentElement ||
+            input.parentElement ||
+            input
+        );
+    }
+
+    // ============================================================
+    // CHAT HEADER DETECTION
+    //
+    // THIS IS THE MAJOR v1.7.4 CHANGE.
+    //
+    // Once the OUTER chat window is identified, only the
+    // TOP HEADER STRIP is permitted to supply the chat name.
+    //
+    // Message transcript text below the header is ignored.
+    // ============================================================
+
+    function detectChatName(
+        container,
+        input,
+        index
+    ) {
+
+        if (!container) {
+            return (
+                `Open Chat ${index + 1}`
+            );
+        }
+
+        const windowRect =
+            container.getBoundingClientRect();
+
+        /*
+         * First try elements explicitly carrying title-like
+         * metadata inside the header.
+         */
+
+        const metadataElements =
+            container.querySelectorAll(
+                '[title], [aria-label]'
+            );
+
+        const metadataCandidates =
+            [];
+
+        for (
+            const el of metadataElements
+        ) {
+
+            if (
+                !elementVisible(el)
+            ) {
+                continue;
+            }
+
+            const rect =
+                el.getBoundingClientRect();
+
+            const centerY =
+                rect.top +
+                rect.height / 2;
+
+            /*
+             * HARD HEADER BOUNDARY.
+             */
+
+            if (
+                centerY <
+                    windowRect.top - 5 ||
+                centerY >
+                    windowRect.top + 70
+            ) {
+                continue;
+            }
+
+            const value =
+                cleanText(
+                    el.getAttribute('title') ||
+                    el.getAttribute('aria-label')
+                );
+
+            if (
+                !value ||
+                value.length < 2 ||
+                value.length > 40
+            ) {
+                continue;
+            }
+
+            if (
+                /close|minimize|maximize|options|settings|send|message|emoji|profile/i
+                    .test(value)
+            ) {
+                continue;
+            }
+
+            metadataCandidates.push({
+                text: value,
+                left:
+                    rect.left -
+                    windowRect.left,
+                top:
+                    rect.top -
+                    windowRect.top
+            });
+        }
+
+        if (
+            metadataCandidates.length
+        ) {
+
+            metadataCandidates.sort(
+                (a, b) => {
+
+                    const idealLeft = 60;
+
+                    const aScore =
+                        Math.abs(
+                            a.left -
+                            idealLeft
+                        ) +
+                        Math.abs(a.top) * 2;
+
+                    const bScore =
+                        Math.abs(
+                            b.left -
+                            idealLeft
+                        ) +
+                        Math.abs(b.top) * 2;
+
+                    return (
+                        aScore -
+                        bScore
+                    );
+                }
+            );
+
+            /*
+             * Only return metadata if it resembles an actual
+             * chat title rather than a generic UI label.
+             */
+
+            for (
+                const candidate of
+                metadataCandidates
+            ) {
+
+                if (
+                    !/^(chat|private chat|private chats|your private chats)$/i
+                        .test(candidate.text)
+                ) {
+                    return candidate.text;
+                }
+            }
+        }
+
+        /*
+         * Now inspect visible text nodes/elements, but ONLY
+         * inside the header geometry.
+         */
+
+        const elements =
+            container.querySelectorAll(
+                'span, div, a, strong, b, h1, h2, h3, h4'
+            );
+
+        const candidates =
+            [];
+
+        for (
+            const el of elements
+        ) {
+
+            if (
+                !elementVisible(el)
+            ) {
+                continue;
+            }
+
+            const rect =
+                el.getBoundingClientRect();
+
+            /*
+             * Must actually lie within the detected chat window.
+             */
+
+            if (
+                rect.left <
+                    windowRect.left - 2 ||
+
+                rect.right >
+                    windowRect.right + 2 ||
+
+                rect.top <
+                    windowRect.top - 2 ||
+
+                rect.bottom >
+                    windowRect.bottom + 2
+            ) {
+                continue;
+            }
+
+            const centerY =
+                rect.top +
+                rect.height / 2;
+
+            /*
+             * ABSOLUTE RULE:
+             *
+             * Nothing below the top 70 pixels can become
+             * the chat name.
+             */
+
+            if (
+                centerY >
+                    windowRect.top + 70
+            ) {
+                continue;
+            }
+
+            /*
+             * Large wrappers often contain both the header
+             * and transcript. Never use them.
+             */
+
+            if (
+                rect.height > 55 ||
+                rect.width >
+                    windowRect.width * .78
+            ) {
+                continue;
+            }
+
+            /*
+             * Prefer leaf-like elements.
+             */
+
+            if (
+                el.children.length > 2
+            ) {
+                continue;
+            }
+
+            const text =
+                cleanText(
+                    el.textContent
+                );
+
+            if (
+                !text ||
+                text.length < 2 ||
+                text.length > 40
+            ) {
+                continue;
+            }
+
+            /*
+             * Reject controls.
+             */
+
+            if (
+                /^(close|minimize|maximize|options|settings|send|message|chat|private chat|private chats|your private chats)$/i
+                    .test(text)
+            ) {
+                continue;
+            }
+
+            /*
+             * Reject dates and timestamps.
+             */
+
+            if (
+                /^today\b/i.test(text) ||
+                /^yesterday\b/i.test(text) ||
+                /^\d{1,2}:\d{2}/.test(text) ||
+                /^\d{1,2}\/\d{1,2}/.test(text)
+            ) {
+                continue;
+            }
+
+            /*
+             * Reject message UI.
+             */
+
+            if (
+                /last message/i.test(text) ||
+                /type your message/i.test(text) ||
+                /send message/i.test(text)
+            ) {
+                continue;
+            }
+
+            const relativeLeft =
+                rect.left -
+                windowRect.left;
+
+            const relativeTop =
+                rect.top -
+                windowRect.top;
+
+            /*
+             * The Torn title should be in the left/middle
+             * portion of the header, not where close/minimize
+             * controls live.
+             */
+
+            if (
+                relativeLeft >
+                    windowRect.width * .72
+            ) {
+                continue;
+            }
+
+            candidates.push({
+                text,
+                relativeLeft,
+                relativeTop,
+                width:
+                    rect.width,
+                height:
+                    rect.height
+            });
+        }
+
+        if (
+            !candidates.length
+        ) {
+            return (
+                `Open Chat ${index + 1}`
+            );
+        }
+
+        /*
+         * Torn headers generally resemble:
+         *
+         * [avatar] Walterwh1      — ×
+         *
+         * [avatar] MrsPuff        — ×
+         *
+         * [icon]   Chaos Cartel   — ×
+         *
+         * The name therefore usually begins around
+         * 35–90px from the left edge.
+         */
+
+        candidates.sort(
+            (a, b) => {
+
+                const idealLeft = 60;
+                const idealTop = 10;
+
+                const aScore =
+                    Math.abs(
+                        a.relativeLeft -
+                        idealLeft
+                    ) +
+
+                    Math.abs(
+                        a.relativeTop -
+                        idealTop
+                    ) * 2 +
+
+                    a.text.length * .1;
+
+                const bScore =
+                    Math.abs(
+                        b.relativeLeft -
+                        idealLeft
+                    ) +
+
+                    Math.abs(
+                        b.relativeTop -
+                        idealTop
+                    ) * 2 +
+
+                    b.text.length * .1;
+
+                return (
+                    aScore -
+                    bScore
+                );
+            }
+        );
+
+        return (
+            candidates[0].text
+        );
+    }
+
+    // ============================================================
+    // OPEN CHAT LIST
+    // ============================================================
+
+    function detectOpenChats() {
+
+        const inputs =
+            getChatInputs();
+
+        const chats = [];
+
+        const seenContainers =
+            new Set();
+
+        inputs.forEach(
+            (input, index) => {
+
+                const container =
+                    findChatContainer(
+                        input
+                    );
+
+                if (!container) {
+                    return;
+                }
+
+                /*
+                 * Avoid duplicate input detections belonging
+                 * to the same Torn chat window.
+                 */
+
+                if (
+                    seenContainers.has(
+                        container
+                    )
+                ) {
+                    return;
+                }
+
+                seenContainers.add(
+                    container
+                );
+
+                const name =
+                    detectChatName(
+                        container,
+                        input,
+                        index
+                    );
+
+                chats.push({
+                    input,
+                    container,
+                    name
+                });
+            }
+        );
+
+        /*
+         * Match Torn's visible left-to-right window order.
+         */
+
+        chats.sort(
+            (a, b) => {
+
+                const ar =
+                    a.container
+                        .getBoundingClientRect();
+
+                const br =
+                    b.container
+                        .getBoundingClientRect();
+
+                return (
+                    ar.left -
+                    br.left
+                );
+            }
+        );
+
+        return chats;
+    }
+
+    // ============================================================
+    // INSERT RESULT INTO CHAT
+    // ============================================================
+
+    function insertIntoChat(
+        input,
+        text
+    ) {
+
+        if (!input) {
+            return false;
+        }
+
+        input.focus();
+
+        if (
+            input instanceof HTMLTextAreaElement ||
+            input instanceof HTMLInputElement
+        ) {
+
+            try {
+
+                const prototype =
+                    Object.getPrototypeOf(
+                        input
+                    );
+
+                const descriptor =
+                    Object
+                        .getOwnPropertyDescriptor(
+                            prototype,
+                            'value'
+                        );
+
+                if (
+                    descriptor &&
+                    descriptor.set
+                ) {
+                    descriptor
+                        .set
+                        .call(
+                            input,
+                            text
+                        );
+                } else {
+                    input.value =
+                        text;
+                }
+
+                input.dispatchEvent(
+                    new Event(
+                        'input',
+                        {
+                            bubbles: true
+                        }
+                    )
+                );
+
+                input.dispatchEvent(
+                    new Event(
+                        'change',
+                        {
+                            bubbles: true
+                        }
+                    )
+                );
+
+                return true;
+
+            } catch (error) {
+
+                console.error(
+                    '[In-Flight Arcade] Chat insertion failed:',
+                    error
+                );
+
+                return false;
+            }
+        }
+
+        try {
+
+            input.focus();
+
+            const selection =
+                window.getSelection();
+
+            const range =
+                document.createRange();
+
+            range.selectNodeContents(
+                input
+            );
+
+            range.deleteContents();
+
+            const textNode =
+                document.createTextNode(
+                    text
+                );
+
+            input.appendChild(
+                textNode
+            );
+
+            range.selectNodeContents(
+                input
+            );
+
+            range.collapse(false);
+
+            selection.removeAllRanges();
+
+            selection.addRange(
+                range
+            );
+
+            input.dispatchEvent(
+                new InputEvent(
+                    'input',
+                    {
+                        bubbles: true,
+                        inputType:
+                            'insertText',
+                        data:
+                            text
+                    }
+                )
+            );
+
+            return true;
+
+        } catch (error) {
+
+            console.error(
+                '[In-Flight Arcade] Contenteditable insertion failed:',
+                error
+            );
+
+            return false;
+        }
+    }
+
+    // ============================================================
+    // SHARE PANEL
+    // ============================================================
+
+    function closeSharePanel() {
+
+        if (shareScanTimer) {
+
+            clearInterval(
+                shareScanTimer
+            );
+
+            shareScanTimer =
+                null;
+        }
+
+        document
+            .getElementById(
+                SHARE_ID
+            )
+            ?.remove();
+    }
+
+    function showChatSelector() {
+
+        closeSharePanel();
+
+        if (!pendingShare) {
+            return;
+        }
+
+        const panel =
+            document.createElement(
+                'div'
+            );
+
+        panel.id =
+            SHARE_ID;
+
+        panel.innerHTML = `
+
+<div class="sharePanel">
+
+    <div
+        class="shareDragHeader"
+        title="Drag to move">
+
+        <span class="dragIcon">
+            ⋮⋮
+        </span>
+
+        <span class="shareDragTitle">
+            Share Arcade Results
+        </span>
+
+        <span class="dragHint">
+            DRAG TO MOVE
+        </span>
+
+    </div>
+
+    <div class="shareContent">
+
+        <div class="instructions">
+            Select an open Torn chat.
+            If the chat you want is not open,
+            open it and it will automatically
+            appear here.
+        </div>
+
+        <div
+            class="scanStatus"
+            id="tfa-chat-status">
+
+            Scanning for open chats...
+
+        </div>
+
+        <div
+            class="chatList"
+            id="tfa-chat-list">
+        </div>
+
+        <div class="shareActions">
+
+            <button
+                type="button"
+                id="tfa-copy-results">
+
+                COPY RESULTS
+
+            </button>
+
+            <button
+                type="button"
+                id="tfa-cancel-share">
+
+                CANCEL
+
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+`;
+
+        document.body.appendChild(
+            panel
+        );
+
+        applySharePosition(
+            panel
+        );
+
+        makeSharePanelDraggable(
+            panel
+        );
+
+        const list =
+            panel.querySelector(
+                '#tfa-chat-list'
+            );
+
+        const status =
+            panel.querySelector(
+                '#tfa-chat-status'
+            );
+
+        let lastSignature =
+            null;
+
+        function renderChats() {
+
+            if (
+                !document.body.contains(
+                    panel
+                )
+            ) {
+                return;
+            }
+
+            const chats =
+                detectOpenChats();
+
+            const signature =
+                chats
+                    .map(
+                        (chat, index) => {
+
+                            const rect =
+                                chat.container
+                                    .getBoundingClientRect();
+
+                            return (
+                                `${index}:` +
+                                `${chat.name}:` +
+                                `${Math.round(rect.left)}:` +
+                                `${Math.round(rect.top)}:` +
+                                `${Math.round(rect.width)}:` +
+                                `${Math.round(rect.height)}`
+                            );
+                        }
+                    )
+                    .join('|');
+
+            if (
+                signature ===
+                lastSignature
+            ) {
+                return;
+            }
+
+            lastSignature =
+                signature;
+
+            list.innerHTML =
+                '';
+
+            if (
+                chats.length === 0
+            ) {
+
+                status.textContent =
+                    'No open chat detected. Open a Torn chat and it will appear here automatically.';
+
+                list.innerHTML = `
+
+<div class="noChats">
+    Waiting for an open Torn chat...
+</div>
+
+`;
+
+                return;
+            }
+
+            status.textContent =
+                chats.length === 1
+                    ? '1 open chat detected.'
+                    : `${chats.length} open chats detected.`;
+
+            chats.forEach(
+                chat => {
+
+                    const button =
+                        document.createElement(
+                            'button'
+                        );
+
+                    button.type =
+                        'button';
+
+                    button.className =
+                        'chatChoice';
+
+                    button.innerHTML = `
+
+${escapeHtml(chat.name)}
+
+<span class="chatSub">
+    Click to place results in this chat
+</span>
+
+`;
+
+                    button.addEventListener(
+                        'click',
+                        () => {
+
+                            const success =
+                                insertIntoChat(
+                                    chat.input,
+                                    pendingShare.message
+                                );
+
+                            if (success) {
+
+                                pendingShare =
+                                    null;
+
+                                closeSharePanel();
+
+                            } else {
+
+                                status.textContent =
+                                    'The chat was detected, but the result could not be inserted.';
+                            }
+                        }
+                    );
+
+                    list.appendChild(
+                        button
+                    );
+                }
+            );
+        }
+
+        panel
+            .querySelector(
+                '#tfa-copy-results'
+            )
+            .addEventListener(
+                'click',
+                async () => {
+
+                    try {
+
+                        await navigator
+                            .clipboard
+                            .writeText(
+                                pendingShare.message
+                            );
+
+                        status.textContent =
+                            'Results copied to clipboard.';
+
+                    } catch {
+
+                        window.prompt(
+                            'Copy the results:',
+                            pendingShare.message
+                        );
+                    }
+                }
+            );
+
+        panel
+            .querySelector(
+                '#tfa-cancel-share'
+            )
+            .addEventListener(
+                'click',
+                () => {
+
+                    pendingShare =
+                        null;
+
+                    closeSharePanel();
+                }
+            );
+
+        renderChats();
+
+        shareScanTimer =
+            setInterval(
+                renderChats,
+                750
+            );
+    }
+
+    // ============================================================
+    // GAME
+    // ============================================================
+
+    function createGame() {
+
+        if (activeGame) {
+
+            activeGame.restore();
+
+            return;
+        }
+
+        const startingFlight =
+            scrapeTravelInfo();
+
+        const username =
+            getTornUsername();
+
+        const root =
+            document.createElement(
+                'div'
+            );
+
+        root.id =
+            ROOT_ID;
+
+        root.innerHTML = `
+
+<div class="shell">
+
+    <div class="head">
+
+        <div class="title">
+            IN-FLIGHT ARCADE
+        </div>
+
+        <div class="infoBox">
+
+            <span class="label">
+                Player
+            </span>
+
+            <span class="playerName">
+                ${escapeHtml(username)}
+            </span>
+
+        </div>
+
+        <div class="infoBox">
+
+            <span class="label">
+                Flight Itinerary
+            </span>
+
+            <span
+                class="route"
+                id="tfa-route">
+
+                ${escapeHtml(startingFlight.itinerary)}
+
+            </span>
+
+        </div>
+
+        <div class="infoBox">
+
+            <span class="label">
+                Remaining Flight Time
+            </span>
+
+            <span
+                class="time"
+                id="tfa-time">
+
+                ${escapeHtml(startingFlight.remaining)}
+
+            </span>
+
+        </div>
+
+        <button
+            id="tfa-pause"
+            type="button">
+
+            PAUSE
+
+        </button>
+
+        <button
+            id="tfa-close"
+            type="button">
+
+            CLOSE
+
+        </button>
+
+    </div>
+
+    <div class="stage">
+
+        <canvas
+            id="tfa-canvas">
+        </canvas>
+
+        <div class="help">
+
+            WASD / ARROWS: fly
+            &nbsp; • &nbsp;
+            SPACE: fire
+            &nbsp; • &nbsp;
+            P: pause
+            &nbsp; • &nbsp;
+            ESC: close
+
+        </div>
+
+        <div
+            class="message"
+            id="tfa-message">
+        </div>
+
+    </div>
+
+</div>
+
+`;
+
+        document.body.appendChild(
+            root
+        );
+
+        const canvas =
+            root.querySelector(
+                '#tfa-canvas'
+            );
+
+        const ctx =
+            canvas.getContext(
+                '2d'
+            );
+
+        const stage =
+            root.querySelector(
+                '.stage'
+            );
+
+        const routeEl =
+            root.querySelector(
+                '#tfa-route'
+            );
+
+        const timeEl =
+            root.querySelector(
+                '#tfa-time'
+            );
+
+        const pauseButton =
+            root.querySelector(
+                '#tfa-pause'
+            );
+
+        const closeButton =
+            root.querySelector(
+                '#tfa-close'
+            );
+
+        const message =
+            root.querySelector(
+                '#tfa-message'
+            );
+
+        let width = 1000;
+        let height = 600;
+        let dpr = 1;
+
+        let paused = false;
+        let minimized = false;
+        let ended = false;
+
+        let score = 0;
+        let kills = 0;
+        let health = 100;
+
+        let playTime = 0;
+        let elapsed = 0;
+
+        let enemyTimer = 0;
+        let cloudTimer = 0;
+
+        let bullets = [];
+        let enemies = [];
+        let enemyBullets = [];
+        let particles = [];
+        let clouds = [];
+
+        let animationFrame = 0;
+
+        let last =
+            performance.now();
+
+        const keys =
+            new Set();
+
+        const previousHighScore =
+            Number(
+                localStorage.getItem(
+                    HIGH_KEY
+                ) || 0
+            );
+
+        let highScore =
+            previousHighScore;
+
+        const player = {
+            x: 135,
+            y: 300,
+            width: 72,
+            height: 34,
+            speed: 330,
+            cooldown: 0,
+            invincible: 0
+        };
+
+        // ========================================================
+        // LIVE FLIGHT INFO
+        // ========================================================
+
+        function updateFlightDisplay() {
+
+            const info =
+                scrapeTravelInfo();
+
+            if (
+                info.origin !== 'Unknown' &&
+                info.destination !== 'Unknown'
+            ) {
+                routeEl.textContent =
+                    info.itinerary;
+            }
+
+            if (
+                info.remaining !==
+                '--:--:--'
+            ) {
+                timeEl.textContent =
+                    info.remaining;
+            }
+        }
+
+        const travelTimer =
+            setInterval(
+                updateFlightDisplay,
+                1000
+            );
+
+        // ========================================================
+        // RESIZE
+        // ========================================================
+
+        function resize() {
+
+            if (minimized) {
+                return;
+            }
+
+            const rect =
+                stage.getBoundingClientRect();
+
+            dpr =
+                Math.min(
+                    devicePixelRatio || 1,
+                    2
+                );
+
+            width =
+                Math.max(
+                    600,
+                    Math.floor(
+                        rect.width
+                    )
+                );
+
+            height =
+                Math.max(
+                    360,
+                    Math.floor(
+                        rect.height
+                    )
+                );
+
+            canvas.width =
+                Math.floor(
+                    width * dpr
+                );
+
+            canvas.height =
+                Math.floor(
+                    height * dpr
+                );
+
+            ctx.setTransform(
+                dpr,
+                0,
+                0,
+                dpr,
+                0,
+                0
+            );
+        }
+
+        const resizeObserver =
+            new ResizeObserver(
+                resize
+            );
+
+        resizeObserver.observe(
+            stage
+        );
+
+        resize();
+
+        // ========================================================
+        // COLLISION
+        // ========================================================
+
+        function collision(
+            a,
+            b,
+            padding = 0
+        ) {
+
+            return (
+                a.x + padding <
+                    b.x +
+                    b.width -
+                    padding &&
+
+                a.x +
+                    a.width -
+                    padding >
+                    b.x +
+                    padding &&
+
+                a.y + padding <
+                    b.y +
+                    b.height -
+                    padding &&
+
+                a.y +
+                    a.height -
+                    padding >
+                    b.y +
+                    padding
+            );
+        }
+
+        // ========================================================
+        // PARTICLES
+        // ========================================================
+
+        function explosion(
+            x,
+            y,
+            amount = 12
+        ) {
+
+            for (
+                let i = 0;
+                i < amount;
+                i++
+            ) {
+
+                const angle =
+                    Math.random() *
+                    Math.PI *
+                    2;
+
+                const speed =
+                    40 +
+                    Math.random() *
+                    190;
+
+                particles.push({
+
+                    x,
+                    y,
+
+                    vx:
+                        Math.cos(angle) *
+                        speed,
+
+                    vy:
+                        Math.sin(angle) *
+                        speed,
+
+                    life:
+                        .3 +
+                        Math.random() *
+                        .6,
+
+                    maxLife:
+                        .9,
+
+                    radius:
+                        1 +
+                        Math.random() *
+                        4
+                });
+            }
+        }
+
+        // ========================================================
+        // SHOOT
+        // ========================================================
+
+        function shoot() {
+
+            bullets.push({
+
+                x:
+                    player.x + 62,
+
+                y:
+                    player.y + 16,
+
+                width:
+                    18,
+
+                height:
+                    4,
+
+                vx:
+                    690
+            });
+
+            player.cooldown =
+                .13;
+        }
+
+        // ========================================================
+        // ENEMY
+        // ========================================================
+
+        function spawnEnemy() {
+
+            const tough =
+                Math.random() <
+                Math.min(
+                    .12 +
+                    elapsed / 240,
+                    .32
+                );
+
+            enemies.push({
+
+                x:
+                    width + 30,
+
+                y:
+                    45 +
+                    Math.random() *
+                    (height - 110),
+
+                width:
+                    tough
+                        ? 72
+                        : 56,
+
+                height:
+                    tough
+                        ? 32
+                        : 26,
+
+                vx:
+                    -(
+                        150 +
+                        Math.random() *
+                        80 +
+                        Math.min(
+                            elapsed * 1.1,
+                            120
+                        )
+                    ),
+
+                hp:
+                    tough
+                        ? 3
+                        : 1,
+
+                fire:
+                    .6 +
+                    Math.random() *
+                    1.7,
+
+                wave:
+                    Math.random() *
+                    Math.PI *
+                    2,
+
+                amplitude:
+                    10 +
+                    Math.random() *
+                    25,
+
+                tough
+            });
+        }
+
+        // ========================================================
+        // DAMAGE
+        // ========================================================
+
+        function damage(amount) {
+
+            if (
+                player.invincible > 0 ||
+                ended
+            ) {
+                return;
+            }
+
+            health -= amount;
+
+            player.invincible =
+                .7;
+
+            explosion(
+                player.x + 30,
+                player.y + 17,
+                10
+            );
+
+            if (
+                health <= 0
+            ) {
+
+                health = 0;
+
+                finishGame(
+                    'gameover'
+                );
+            }
+        }
+
+        // ========================================================
+        // FINISH GAME
+        // ========================================================
+
+        function finishGame(reason) {
+
+            if (ended) {
+                return;
+            }
+
+            ended = true;
+            paused = true;
+
+            keys.clear();
+
+            const finalScore =
+                Math.floor(score);
+
+            const isNewHigh =
+                finalScore >
+                previousHighScore;
+
+            if (
+                finalScore >
+                highScore
+            ) {
+                highScore =
+                    finalScore;
+            }
+
+            localStorage.setItem(
+                HIGH_KEY,
+                String(highScore)
+            );
+
+            const result = {
+
+                timestamp:
+                    formatTornTimestamp(),
+
+                username,
+
+                origin:
+                    startingFlight.origin,
+
+                destination:
+                    startingFlight.destination,
+
+                score:
+                    finalScore,
+
+                kills,
+
+                playTime,
+
+                highScore
+            };
+
+            const resultText =
+                buildResultsMessage(
+                    result
+                );
+
+            message.innerHTML = `
+
+<div class="dialog">
+
+    <h2>
+        ${
+            reason === 'gameover'
+                ? 'GAME OVER'
+                : 'IN-FLIGHT ARCADE RESULTS'
+        }
+    </h2>
+
+    ${
+        isNewHigh
+            ? `
+                <div class="newHigh">
+                    NEW HIGH SCORE
+                </div>
+              `
+            : ''
+    }
+
+    <div class="resultGrid">
+
+        <span>Player</span>
+
+        <strong>
+            ${escapeHtml(username)}
+        </strong>
+
+        <span>Game Time</span>
+
+        <strong>
+            ${formatGameTime(playTime)}
+        </strong>
+
+        <span>Score</span>
+
+        <strong>
+            ${formatNumber(finalScore)}
+        </strong>
+
+        <span>Kills</span>
+
+        <strong>
+            ${kills}
+        </strong>
+
+        <span>High Score</span>
+
+        <strong>
+            ${formatNumber(highScore)}
+        </strong>
+
+        <span>Flight</span>
+
+        <strong>
+            ${escapeHtml(startingFlight.origin)}
+            →
+            ${escapeHtml(startingFlight.destination)}
+        </strong>
+
+    </div>
+
+    <p>
+        Share these results in a Torn chat?
+    </p>
+
+    <div class="dialogActions">
+
+        <button
+            type="button"
+            class="shareButton"
+            id="tfa-share">
+
+            SHARE RESULTS
+
+        </button>
+
+        <button
+            type="button"
+            id="tfa-no-share">
+
+            DON'T SHARE
+
+        </button>
+
+    </div>
+
+    <div class="donationBox">
+
+        <strong>
+            Enjoying In-Flight Arcade?
+        </strong>
+
+        <div>
+            If you enjoyed the game,
+            Torn donations are appreciated.
+        </div>
+
+        <a
+            href="${DONATION_PROFILE}"
+            target="_blank"
+            rel="noopener noreferrer">
+
+            RelaxSweety [4539436]
+
+        </a>
+
+    </div>
+
+</div>
+
+`;
+
+            message.style.display =
+                'flex';
+
+            root
+                .querySelector(
+                    '#tfa-share'
+                )
+                .addEventListener(
+                    'click',
+                    () => {
+
+                        pendingShare = {
+                            result,
+                            message:
+                                resultText
+                        };
+
+                        destroyGame();
+
+                        setTimeout(
+                            showChatSelector,
+                            100
+                        );
+                    }
+                );
+
+            root
+                .querySelector(
+                    '#tfa-no-share'
+                )
+                .addEventListener(
+                    'click',
+                    destroyGame
+                );
+        }
+
+        // ========================================================
+        // DESTROY
+        // ========================================================
+
+        function destroyGame() {
+
+            clearInterval(
+                travelTimer
+            );
+
+            cancelAnimationFrame(
+                animationFrame
+            );
+
+            resizeObserver.disconnect();
+
+            window.removeEventListener(
+                'keydown',
+                keyDown,
+                true
+            );
+
+            window.removeEventListener(
+                'keyup',
+                keyUp,
+                true
+            );
+
+            root.remove();
+
+            activeGame =
+                null;
+        }
+
+        // ========================================================
+        // PAUSE
+        // ========================================================
+
+        function togglePause() {
+
+            if (ended) {
+                return;
+            }
+
+            paused =
+                !paused;
+
+            keys.clear();
+
+            pauseButton.textContent =
+                paused
+                    ? 'RESUME'
+                    : 'PAUSE';
+
+            if (paused) {
+
+                message.innerHTML = `
+
+<div class="dialog">
+
+    <h2>
+        PAUSED
+    </h2>
+
+    <p>
+        Game Time:
+        <strong>
+            ${formatGameTime(playTime)}
+        </strong>
+    </p>
+
+    <p>
+        Closing the window while paused
+        preserves this game.
+    </p>
+
+</div>
+
+`;
+
+                message.style.display =
+                    'flex';
+
+            } else {
+
+                message.style.display =
+                    'none';
+
+                last =
+                    performance.now();
+            }
+        }
+
+        // ========================================================
+        // MINIMIZE
+        // ========================================================
+
+        function minimizeGame() {
+
+            if (ended) {
+                return;
+            }
+
+            minimized = true;
+            paused = true;
+
+            keys.clear();
+
+            root.classList.add(
+                'tfa-minimized'
+            );
+
+            pauseButton.textContent =
+                'RESUME';
+        }
+
+        // ========================================================
+        // RESTORE
+        // ========================================================
+
+        function restoreGame() {
+
+            if (ended) {
+                return;
+            }
+
+            minimized = false;
+            paused = true;
+
+            keys.clear();
+
+            root.classList.remove(
+                'tfa-minimized'
+            );
+
+            pauseButton.textContent =
+                'RESUME';
+
+            message.innerHTML = `
+
+<div class="dialog">
+
+    <h2>
+        PAUSED
+    </h2>
+
+    <p>
+        Player:
+        <strong>
+            ${escapeHtml(username)}
+        </strong>
+    </p>
+
+    <p>
+        Game Time:
+        <strong>
+            ${formatGameTime(playTime)}
+        </strong>
+    </p>
+
+    <p>
+        Your previous game has been restored.
+    </p>
+
+</div>
+
+`;
+
+            message.style.display =
+                'flex';
+
+            last =
+                performance.now();
+
+            requestAnimationFrame(
+                resize
+            );
+        }
+
+        // ========================================================
+        // CLOSE
+        // ========================================================
+
+        function closeGame() {
+
+            if (ended) {
+                return;
+            }
+
+            if (paused) {
+
+                minimizeGame();
+
+                return;
+            }
+
+            finishGame(
+                'closed'
+            );
+        }
+
+        // ========================================================
+        // UPDATE
+        // ========================================================
+
+        function update(dt) {
+
+            if (
+                paused ||
+                minimized ||
+                ended
+            ) {
+                return;
+            }
+
+            playTime += dt;
+            elapsed += dt;
+
+            score +=
+                dt * 8;
+
+            player.cooldown =
+                Math.max(
+                    0,
+                    player.cooldown - dt
+                );
+
+            player.invincible =
+                Math.max(
+                    0,
+                    player.invincible - dt
+                );
+
+            let dx = 0;
+            let dy = 0;
+
+            if (
+                keys.has('ArrowLeft') ||
+                keys.has('KeyA')
+            ) {
+                dx--;
+            }
+
+            if (
+                keys.has('ArrowRight') ||
+                keys.has('KeyD')
+            ) {
+                dx++;
+            }
+
+            if (
+                keys.has('ArrowUp') ||
+                keys.has('KeyW')
+            ) {
+                dy--;
+            }
+
+            if (
+                keys.has('ArrowDown') ||
+                keys.has('KeyS')
+            ) {
+                dy++;
+            }
+
+            if (
+                dx &&
+                dy
+            ) {
+                dx *= .707;
+                dy *= .707;
+            }
+
+            player.x =
+                Math.max(
+                    15,
+                    Math.min(
+                        width * .55,
+                        player.x +
+                        dx *
+                        player.speed *
+                        dt
+                    )
+                );
+
+            player.y =
+                Math.max(
+                    18,
+                    Math.min(
+                        height -
+                        player.height -
+                        18,
+
+                        player.y +
+                        dy *
+                        player.speed *
+                        dt
+                    )
+                );
+
+            if (
+                keys.has('Space') &&
+                player.cooldown <= 0
+            ) {
+                shoot();
+            }
+
+            enemyTimer -= dt;
+
+            if (
+                enemyTimer <= 0
+            ) {
+
+                spawnEnemy();
+
+                const rate =
+                    Math.max(
+                        .34,
+                        1.15 -
+                        elapsed *
+                        .006
+                    );
+
+                enemyTimer =
+                    rate *
+                    (
+                        .65 +
+                        Math.random() *
+                        .7
+                    );
+            }
+
+            cloudTimer -= dt;
+
+            if (
+                cloudTimer <= 0
+            ) {
+
+                clouds.push({
+
+                    x:
+                        width + 100,
+
+                    y:
+                        30 +
+                        Math.random() *
+                        height *
+                        .7,
+
+                    scale:
+                        .5 +
+                        Math.random() *
+                        1.4,
+
+                    speed:
+                        20 +
+                        Math.random() *
+                        35
+                });
+
+                cloudTimer =
+                    .5 +
+                    Math.random() *
+                    1.6;
+            }
+
+            clouds.forEach(
+                cloud => {
+
+                    cloud.x -=
+                        cloud.speed *
+                        dt;
+                }
+            );
+
+            clouds =
+                clouds.filter(
+                    cloud =>
+                        cloud.x >
+                        -180
+                );
+
+            bullets.forEach(
+                bullet => {
+
+                    bullet.x +=
+                        bullet.vx *
+                        dt;
+                }
+            );
+
+            bullets =
+                bullets.filter(
+                    bullet =>
+                        bullet.x <
+                        width + 40
+                );
+
+            enemies.forEach(
+                enemy => {
+
+                    enemy.x +=
+                        enemy.vx *
+                        dt;
+
+                    enemy.wave +=
+                        dt * 2;
+
+                    enemy.y +=
+                        Math.sin(
+                            enemy.wave
+                        ) *
+                        enemy.amplitude *
+                        dt;
+
+                    enemy.fire -=
+                        dt;
+
+                    if (
+                        enemy.fire <= 0 &&
+                        enemy.x <
+                        width - 80
+                    ) {
+
+                        const angle =
+                            Math.atan2(
+                                player.y -
+                                enemy.y,
+
+                                player.x -
+                                enemy.x
+                            );
+
+                        const speed =
+                            220 +
+                            Math.min(
+                                elapsed,
+                                100
+                            );
+
+                        enemyBullets.push({
+
+                            x:
+                                enemy.x,
+
+                            y:
+                                enemy.y +
+                                enemy.height / 2,
+
+                            width:
+                                8,
+
+                            height:
+                                5,
+
+                            vx:
+                                Math.cos(
+                                    angle
+                                ) *
+                                speed,
+
+                            vy:
+                                Math.sin(
+                                    angle
+                                ) *
+                                speed
+                        });
+
+                        enemy.fire =
+                            1.2 +
+                            Math.random() *
+                            1.7;
+                    }
+
+                    if (
+                        collision(
+                            player,
+                            enemy,
+                            6
+                        )
+                    ) {
+
+                        enemy.hp =
+                            0;
+
+                        damage(
+                            enemy.tough
+                                ? 30
+                                : 20
+                        );
+
+                        explosion(
+                            enemy.x,
+                            enemy.y,
+                            15
+                        );
+                    }
+                }
+            );
+
+            enemyBullets.forEach(
+                bullet => {
+
+                    bullet.x +=
+                        bullet.vx *
+                        dt;
+
+                    bullet.y +=
+                        bullet.vy *
+                        dt;
+
+                    if (
+                        collision(
+                            player,
+                            bullet,
+                            4
+                        )
+                    ) {
+
+                        bullet.dead =
+                            true;
+
+                        damage(12);
+                    }
+                }
+            );
+
+            enemyBullets =
+                enemyBullets.filter(
+                    bullet =>
+
+                        !bullet.dead &&
+
+                        bullet.x >
+                        -30 &&
+
+                        bullet.x <
+                        width + 30 &&
+
+                        bullet.y >
+                        -30 &&
+
+                        bullet.y <
+                        height + 30
+                );
+
+            for (
+                const bullet of bullets
+            ) {
+
+                for (
+                    const enemy of enemies
+                ) {
+
+                    if (
+                        !bullet.dead &&
+                        enemy.hp > 0 &&
+                        collision(
+                            bullet,
+                            enemy
+                        )
+                    ) {
+
+                        bullet.dead =
+                            true;
+
+                        enemy.hp--;
+
+                        explosion(
+                            bullet.x,
+                            bullet.y,
+                            4
+                        );
+
+                        if (
+                            enemy.hp <= 0
+                        ) {
+
+                            kills++;
+
+                            score +=
+                                enemy.tough
+                                    ? 300
+                                    : 120;
+
+                            explosion(
+                                enemy.x +
+                                enemy.width / 2,
+
+                                enemy.y +
+                                enemy.height / 2,
+
+                                enemy.tough
+                                    ? 24
+                                    : 15
+                            );
+                        }
+                    }
+                }
+            }
+
+            bullets =
+                bullets.filter(
+                    bullet =>
+                        !bullet.dead
+                );
+
+            enemies =
+                enemies.filter(
+                    enemy =>
+
+                        enemy.hp > 0 &&
+
+                        enemy.x >
+                        -120 &&
+
+                        enemy.y >
+                        -80 &&
+
+                        enemy.y <
+                        height + 80
+                );
+
+            particles.forEach(
+                particle => {
+
+                    particle.x +=
+                        particle.vx *
+                        dt;
+
+                    particle.y +=
+                        particle.vy *
+                        dt;
+
+                    particle.vx *=
+                        .985;
+
+                    particle.vy *=
+                        .985;
+
+                    particle.life -=
+                        dt;
+                }
+            );
+
+            particles =
+                particles.filter(
+                    particle =>
+                        particle.life >
+                        0
+                );
+
+            if (
+                score >
+                highScore
+            ) {
+                highScore =
+                    Math.floor(
+                        score
+                    );
+            }
+        }
+
+        // ========================================================
+        // DRAW PLANE
+        // ========================================================
+
+        function drawPlane(
+            x,
+            y,
+            flipped,
+            enemy,
+            tough
+        ) {
+
+            ctx.save();
+
+            ctx.translate(
+                x +
+                (
+                    flipped
+                        ? 65
+                        : 0
+                ),
+                y
+            );
+
+            if (flipped) {
+                ctx.scale(
+                    -1,
+                    1
+                );
+            }
+
+            ctx.fillStyle =
+                enemy
+                    ? (
+                        tough
+                            ? '#6f1d1d'
+                            : '#79402f'
+                    )
+                    : '#c7c3b6';
+
+            ctx.strokeStyle =
+                '#171717';
+
+            ctx.lineWidth =
+                2;
+
+            ctx.beginPath();
+
+            ctx.moveTo(
+                2,
+                17
+            );
+
+            ctx.lineTo(
+                18,
+                10
+            );
+
+            ctx.lineTo(
+                47,
+                9
+            );
+
+            ctx.lineTo(
+                63,
+                15
+            );
+
+            ctx.lineTo(
+                48,
+                20
+            );
+
+            ctx.lineTo(
+                18,
+                21
+            );
+
+            ctx.closePath();
+
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle =
+                enemy
+                    ? '#8c4a35'
+                    : '#8e918c';
+
+            ctx.beginPath();
+
+            ctx.moveTo(
+                26,
+                12
+            );
+
+            ctx.lineTo(
+                35,
+                -4
+            );
+
+            ctx.lineTo(
+                43,
+                -4
+            );
+
+            ctx.lineTo(
+                38,
+                13
+            );
+
+            ctx.closePath();
+
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.beginPath();
+
+            ctx.moveTo(
+                27,
+                19
+            );
+
+            ctx.lineTo(
+                38,
+                35
+            );
+
+            ctx.lineTo(
+                46,
+                35
+            );
+
+            ctx.lineTo(
+                39,
+                18
+            );
+
+            ctx.closePath();
+
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle =
+                enemy
+                    ? '#3d1712'
+                    : '#526b76';
+
+            ctx.fillRect(
+                43,
+                10,
+                8,
+                6
+            );
+
+            ctx.strokeStyle =
+                '#bbb';
+
+            ctx.beginPath();
+
+            ctx.moveTo(
+                64,
+                5
+            );
+
+            ctx.lineTo(
+                64,
+                26
+            );
+
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // ========================================================
+        // DRAW
+        // ========================================================
+
+        function draw() {
+
+            if (minimized) {
+                return;
+            }
+
+            const gradient =
+                ctx.createLinearGradient(
+                    0,
+                    0,
+                    0,
+                    height
+                );
+
+            gradient.addColorStop(
+                0,
+                '#07131d'
+            );
+
+            gradient.addColorStop(
+                .6,
+                '#173345'
+            );
+
+            gradient.addColorStop(
+                1,
+                '#584c3d'
+            );
+
+            ctx.fillStyle =
+                gradient;
+
+            ctx.fillRect(
+                0,
+                0,
+                width,
+                height
+            );
+
+            clouds.forEach(
+                cloud => {
+
+                    ctx.save();
+
+                    ctx.globalAlpha =
+                        .12;
+
+                    ctx.fillStyle =
+                        '#dbe6eb';
+
+                    ctx.beginPath();
+
+                    ctx.ellipse(
+                        cloud.x,
+                        cloud.y,
+                        55 *
+                        cloud.scale,
+                        16 *
+                        cloud.scale,
+                        0,
+                        0,
+                        Math.PI * 2
+                    );
+
+                    ctx.fill();
+
+                    ctx.restore();
+                }
+            );
+
+            ctx.fillStyle =
+                '#111816';
+
+            ctx.beginPath();
+
+            ctx.moveTo(
+                0,
+                height
+            );
+
+            for (
+                let x = 0;
+                x <= width;
+                x += 80
+            ) {
+
+                const y =
+                    height -
+                    28 -
+
+                    Math.sin(
+                        (
+                            x +
+                            elapsed *
+                            35
+                        ) /
+                        150
+                    ) *
+                    18 -
+
+                    Math.sin(
+                        (
+                            x +
+                            elapsed *
+                            50
+                        ) /
+                        47
+                    ) *
+                    7;
+
+                ctx.lineTo(
+                    x,
+                    y
+                );
+            }
+
+            ctx.lineTo(
+                width,
+                height
+            );
+
+            ctx.closePath();
+
+            ctx.fill();
+
+            ctx.fillStyle =
+                '#ffd35a';
+
+            bullets.forEach(
+                bullet => {
+
+                    ctx.fillRect(
+                        bullet.x,
+                        bullet.y,
+                        bullet.width,
+                        bullet.height
+                    );
+                }
+            );
+
+            ctx.fillStyle =
+                '#ff684f';
+
+            enemyBullets.forEach(
+                bullet => {
+
+                    ctx.fillRect(
+                        bullet.x,
+                        bullet.y,
+                        bullet.width,
+                        bullet.height
+                    );
+                }
+            );
+
+            enemies.forEach(
+                enemy => {
+
+                    drawPlane(
+                        enemy.x,
+                        enemy.y,
+                        true,
+                        true,
+                        enemy.tough
+                    );
+                }
+            );
+
+            if (
+                player.invincible <= 0 ||
+
+                Math.floor(
+                    player.invincible *
+                    14
+                ) %
+                2 === 0
+            ) {
+
+                drawPlane(
+                    player.x,
+                    player.y,
+                    false,
+                    false,
+                    false
+                );
+            }
+
+            particles.forEach(
+                particle => {
+
+                    ctx.save();
+
+                    ctx.globalAlpha =
+                        Math.max(
+                            0,
+                            particle.life /
+                            particle.maxLife
+                        );
+
+                    ctx.fillStyle =
+                        particle.life > .35
+                            ? '#f0a33a'
+                            : '#777';
+
+                    ctx.beginPath();
+
+                    ctx.arc(
+                        particle.x,
+                        particle.y,
+                        particle.radius,
+                        0,
+                        Math.PI * 2
+                    );
+
+                    ctx.fill();
+
+                    ctx.restore();
+                }
+            );
+
+            ctx.fillStyle =
+                '#0008';
+
+            ctx.fillRect(
+                12,
+                12,
+                205,
+                122
+            );
+
+            ctx.fillStyle =
+                '#eee';
+
+            ctx.font =
+                'bold 13px Arial';
+
+            ctx.fillText(
+                `TIME    ${formatGameTime(playTime)}`,
+                24,
+                35
+            );
+
+            ctx.fillText(
+                `SCORE   ${formatNumber(score)}`,
+                24,
+                58
+            );
+
+            ctx.fillText(
+                `KILLS   ${kills}`,
+                24,
+                81
+            );
+
+            ctx.fillText(
+                `HEALTH  ${Math.max(0, Math.floor(health))}`,
+                24,
+                104
+            );
+
+            ctx.fillText(
+                `HIGH    ${formatNumber(highScore)}`,
+                24,
+                127
+            );
+        }
+
+        // ========================================================
+        // LOOP
+        // ========================================================
+
+        function loop(now) {
+
+            const dt =
+                Math.min(
+                    .033,
+                    (
+                        now -
+                        last
+                    ) /
+                    1000 ||
+                    0
+                );
+
+            last =
+                now;
+
+            update(dt);
+
+            draw();
+
+            animationFrame =
+                requestAnimationFrame(
+                    loop
+                );
+        }
+
+        // ========================================================
+        // KEYBOARD
+        // ========================================================
+
+        function keyDown(event) {
+
+            if (
+                minimized ||
+                ended
+            ) {
+                return;
+            }
+
+            if (
+                [
+                    'ArrowUp',
+                    'ArrowDown',
+                    'ArrowLeft',
+                    'ArrowRight',
+                    'Space'
+                ].includes(
+                    event.code
+                )
+            ) {
+                event.preventDefault();
+            }
+
+            if (
+                event.code ===
+                'Escape'
+            ) {
+
+                event.preventDefault();
+
+                closeGame();
+
+                return;
+            }
+
+            if (
+                event.code ===
+                'KeyP' &&
+                !event.repeat
+            ) {
+
+                event.preventDefault();
+
+                togglePause();
+
+                return;
+            }
+
+            keys.add(
+                event.code
+            );
+        }
+
+        function keyUp(event) {
+
+            keys.delete(
+                event.code
+            );
+        }
+
+        window.addEventListener(
+            'keydown',
+            keyDown,
+            true
+        );
+
+        window.addEventListener(
+            'keyup',
+            keyUp,
+            true
+        );
+
+        pauseButton.addEventListener(
+            'click',
+            togglePause
+        );
+
+        closeButton.addEventListener(
+            'click',
+            closeGame
+        );
+
+        activeGame = {
+            restore:
+                restoreGame,
+
+            minimize:
+                minimizeGame,
+
+            destroy:
+                destroyGame
+        };
+
+        animationFrame =
+            requestAnimationFrame(
+                loop
+            );
+    }
+
+    // ============================================================
+    // INITIALIZATION
+    // ============================================================
+
+    injectStyles();
+
+    ensureLauncher();
+
+    const observer =
+        new MutationObserver(
+            () => {
+
+                clearTimeout(
+                    observer._timer
+                );
+
+                observer._timer =
+                    setTimeout(
+                        ensureLauncher,
+                        350
+                    );
+            }
+        );
+
+    observer.observe(
+        document.documentElement,
+        {
+            childList:
+                true,
+
+            subtree:
+                true
+        }
+    );
+
+    setInterval(
+        ensureLauncher,
+        3000
+    );
+
+})();
+The key change is in the clearly marked CHAT WINDOW DETECTION and CHAT HEADER DETECTION sections. This version no longer stops at the first container surrounding the text-entry box; it walks outward to identify the full chat window and then imposes a hard header-region boundary before selecting a name.
