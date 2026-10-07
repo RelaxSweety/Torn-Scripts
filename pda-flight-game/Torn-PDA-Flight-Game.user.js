@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.10.1
+// @version      0.10.4
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -12,6 +12,9 @@
 
 /*
  * TORN PDA ARCADE - RELEASE NOTES
+ * v0.10.4 - Changed aircraft progression to 5,000-point stages with exit-right and reenter-left transformation animation.
+ * v0.10.3 - Ensured engine audio stops immediately on pause, leave prompts, game over, minimize, and exit.
+ * v0.10.2 - Reduced aircraft engine/movement sound volume while preserving effects volume.
  * v0.10.1 - Fixed literal escaped-newline parse errors introduced by the v0.10.0 aircraft/audio build.
  * v0.10.0 - Added 8-stage aircraft progression, faster maneuvering, and volume-controlled movement/explosion/healing audio.
  * v0.9.3 - Fixed two literal escape sequences that caused a fatal JavaScript parse error and prevented the Arcade launcher from loading.
@@ -36,7 +39,7 @@
 
     const GAME = {
         name: 'Torn PDA Flight Game',
-        version: '0.10.1',
+        version: '0.10.4',
         creator: 'RelaxSweety',
         creatorId: '4539436',
         creatorUrl: 'https://www.torn.com/profiles.php?XID=4539436',
@@ -163,14 +166,14 @@
         const out={}; keys.forEach(k=>out[k]=state[k]); return JSON.parse(JSON.stringify(out));
     }
     function saveCurrentGame(){try{localStorage.setItem(gameSaveKey('flight-arcade'),JSON.stringify({version:1,savedAt:Date.now(),state:snapshotGame()}));return true;}catch(_){return false;}}
-    function restoreGame(s){Object.assign(state,JSON.parse(JSON.stringify(s.state)));state.running=true;state.paused=false;state.over=false;state.lastTs=performance.now();state.keys={up:false,down:false,left:false,right:false,fire:false};state.stick={x:0,y:0};showGame();setTimeout(resize,0);updateHud();cancelAnimationFrame(raf);raf=requestAnimationFrame(loop);}
+    function restoreGame(s){Object.assign(state,JSON.parse(JSON.stringify(s.state)));shownStage=aircraftStage();transition=null;state.running=true;state.paused=false;state.over=false;state.lastTs=performance.now();state.keys={up:false,down:false,left:false,right:false,fire:false};state.stick={x:0,y:0};showGame();setTimeout(resize,0);updateHud();cancelAnimationFrame(raf);raf=requestAnimationFrame(loop);}
     function promptBox(title,message,buttons){
         const p=document.getElementById('tpfg-prompt');p.querySelector('h3').textContent=title;p.querySelector('p').textContent=message;
         const a=p.querySelector('#tpfg-prompt-actions');a.innerHTML='';buttons.forEach(x=>{const b=document.createElement('button');b.className='tpfg-resultbtn';b.textContent=x.label;b.onclick=()=>{p.style.display='none';x.action();};a.appendChild(b);});p.style.display='flex';
     }
     function launchGame(game){const s=getGameSave(game.id);if(s)promptBox('SAVED GAME','Continue your saved '+game.name+' game?',[{label:'CONTINUE SAVED GAME',action:()=>restoreGame(s)},{label:'START NEW GAME',action:()=>{clearGameSave(game.id);game.start();}},{label:'CANCEL',action:()=>{}}]);else game.start();}
-    function requestLeave(){if(!state.running||state.over){minimize();return;}state.paused=true;document.getElementById('tpfg-pause').textContent='RESUME';promptBox('SAVE YOUR GAME?','Save your current progress and continue from this point next time?',[{label:'SAVE & LEAVE',action:()=>{saveCurrentGame();closeActiveGame();}},{label:'LEAVE WITHOUT SAVING',action:()=>{clearGameSave('flight-arcade');closeActiveGame();}},{label:'CANCEL',action:()=>{state.paused=false;state.lastTs=performance.now();document.getElementById('tpfg-pause').textContent='PAUSE';}}]);}
-    function closeActiveGame(){state.running=false;state.paused=true;updateEngineSound(false);cancelAnimationFrame(raf);document.getElementById('tpfg-root').style.display='none';}
+    function requestLeave(){if(!state.running||state.over){updateEngineSound(false);minimize();return;}state.paused=true;updateEngineSound(false);document.getElementById('tpfg-pause').textContent='RESUME';promptBox('SAVE YOUR GAME?','Save your current progress and continue from this point next time?',[{label:'SAVE & LEAVE',action:()=>{saveCurrentGame();closeActiveGame();}},{label:'LEAVE WITHOUT SAVING',action:()=>{clearGameSave('flight-arcade');closeActiveGame();}},{label:'CANCEL',action:()=>{state.paused=false;state.lastTs=performance.now();document.getElementById('tpfg-pause').textContent='PAUSE';}}]);}
+    function closeActiveGame(){transition=null;state.running=false;state.paused=true;updateEngineSound(false);cancelAnimationFrame(raf);document.getElementById('tpfg-root').style.display='none';}
     function openManager(){document.getElementById('tpfg-manager').style.display='flex';renderManager('games');}
     function renderManager(tab){
         const body=document.getElementById('tpfg-manager-body');
@@ -278,7 +281,7 @@
     function tone(freq,dur,type='sine',gain=.12,endFreq=null){if(audioPrefs.muted||audioPrefs.volume<=0)return;const a=ensureAudio();if(!a)return;if(a.state==='suspended')a.resume();const o=a.createOscillator(),g=a.createGain(),t=a.currentTime;o.type=type;o.frequency.setValueAtTime(freq,t);if(endFreq)o.frequency.exponentialRampToValueAtTime(Math.max(20,endFreq),t+dur);g.gain.setValueAtTime(Math.max(.0001,gain*audioPrefs.volume),t);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g).connect(a.destination);o.start(t);o.stop(t+dur);}
     function explosionSound(){tone(110,.28,'sawtooth',.18,38);tone(62,.34,'square',.08,28);}
     function healSound(){tone(520,.12,'sine',.10,760);setTimeout(()=>tone(760,.16,'sine',.08,1040),70);}
-    function updateEngineSound(moving){if(audioPrefs.muted||audioPrefs.volume<=0||!state.running||state.paused||state.over)moving=false;const a=moving?ensureAudio():audioCtx;if(!a)return;if(moving){if(a.state==='suspended')a.resume();if(!engineOsc){engineOsc=a.createOscillator();engineGain=a.createGain();engineOsc.type='sawtooth';engineOsc.frequency.value=82;engineGain.gain.value=.0001;engineOsc.connect(engineGain).connect(a.destination);engineOsc.start();}engineOsc.frequency.setTargetAtTime(96,a.currentTime,.06);engineGain.gain.setTargetAtTime(.035*audioPrefs.volume,a.currentTime,.05);}else if(engineGain){engineGain.gain.setTargetAtTime(.0001,a.currentTime,.05);}}
+    function updateEngineSound(moving){if(audioPrefs.muted||audioPrefs.volume<=0||!state.running||state.paused||state.over)moving=false;const a=moving?ensureAudio():audioCtx;if(!a)return;if(moving){if(a.state==='suspended')a.resume();if(!engineOsc){engineOsc=a.createOscillator();engineGain=a.createGain();engineOsc.type='sawtooth';engineOsc.frequency.value=82;engineGain.gain.value=.0001;engineOsc.connect(engineGain).connect(a.destination);engineOsc.start();}engineOsc.frequency.setTargetAtTime(96,a.currentTime,.06);engineGain.gain.setTargetAtTime(.012*audioPrefs.volume,a.currentTime,.05);}else if(engineGain){engineGain.gain.setTargetAtTime(.0001,a.currentTime,.05);}}
 
     function resize() {
         if (!canvas) return;
@@ -358,7 +361,7 @@
         state.lastTs=performance.now(); state.spawnClock=0; state.shotClock=0; state.enemyShotClock=0;
         state.keys={up:false,down:false,left:false,right:false,fire:false};
         state.stick={x:0,y:0};
-        state.player={x:45,y:150,w:44,h:24,speed:270};
+        state.player={x:45,y:150,w:44,h:24,speed:270};shownStage=0;transition=null;
         state.bullets=[]; state.enemies=[]; state.enemyBullets=[]; state.particles=[]; state.healthDrops=[];
         showGame();
         setTimeout(resize, 0);
@@ -366,11 +369,12 @@
         raf=requestAnimationFrame(loop);
     }
 
-    function minimize(){if(state.running&&!state.over){requestLeave();return;}document.getElementById('tpfg-root').style.display='none';}
+    function minimize(){if(state.running&&!state.over){requestLeave();return;}updateEngineSound(false);document.getElementById('tpfg-root').style.display='none';}
 
     function togglePause() {
         if (!state.running || state.over) return;
         state.paused=!state.paused;
+        updateEngineSound(false);
         state.lastTs=performance.now();
         document.getElementById('tpfg-pause').textContent=state.paused?'RESUME':'PAUSE';
         document.getElementById('tpfg-message').textContent=state.paused?'PAUSED':'';
@@ -395,6 +399,7 @@
         let dt=Math.min((ts-state.lastTs)/1000, .05);
         state.lastTs=ts;
         if (!state.paused && !state.over) {
+            if(transition){advanceAircraftTransition(dt);draw();updateHud();raf=requestAnimationFrame(loop);return;}
             state.activeMs += dt*1000;
             update(dt);
             draw();
@@ -488,6 +493,7 @@
         state.particles=state.particles.filter(q=>q.life>0);
         state.score += 8*dt;
         if (state.hp<=0) finishGame(false);
+        else if(!transition&&aircraftStage()!==shownStage)startAircraftTransition(aircraftStage());
     }
 
     function spawnEnemy(difficulty) {
@@ -517,7 +523,20 @@
     }
     function rectHit(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;}
 
-    function aircraftStage(){return Math.floor(Math.max(0,state.score)/1000)%AIRCRAFT_COUNT;}
+    function aircraftStage(){return Math.floor(Math.max(0,state.score)/5000)%AIRCRAFT_COUNT;}
+    // Transition phases: old aircraft exits right, new aircraft enters from left.
+    const TRANSITION_SECONDS=1.4;
+    let transition=null,shownStage=0;
+    function startAircraftTransition(nextStage){
+        if(!state.player)return;
+        transition={elapsed:0,from:shownStage,to:nextStage,x:state.player.x,y:state.player.y};
+        updateEngineSound(false);
+    }
+    function advanceAircraftTransition(dt){
+        if(!transition)return;
+        transition.elapsed=Math.min(TRANSITION_SECONDS,transition.elapsed+dt);
+        if(transition.elapsed>=TRANSITION_SECONDS){shownStage=transition.to;transition=null;}
+    }
     function drawAircraft(x,y,w,h,design,enemy=false,tough=false){
         ctx.save();ctx.translate(x,y);if(enemy){ctx.translate(w,0);ctx.scale(-1,1);}
         const body=enemy?(tough?'#7d858d':'#626b74'):'#d8dde2',accent=enemy?'#c4544c':'#6fa8d8',dark=enemy?'#343b42':'#697580';
@@ -542,8 +561,14 @@
         ctx.clearRect(0,0,W,H);
         const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#071525');g.addColorStop(1,'#101820');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
         ctx.strokeStyle='rgba(255,255,255,.16)';ctx.lineWidth=1;for(let i=0;i<18;i++){const y=(i*47+(state.activeMs*.025))%H,x=(i*83)%W;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+16,y);ctx.stroke();}
-        const stage=aircraftStage(),enemyDesign=(stage+1)%AIRCRAFT_COUNT,p=state.player;
-        if(p)drawAircraft(p.x,p.y,p.w,p.h,stage,false,false);
+        const stage=shownStage,enemyDesign=(stage+1)%AIRCRAFT_COUNT,p=state.player;
+        if(p){
+            if(transition){
+                const t=transition.elapsed/TRANSITION_SECONDS;
+                const x=t<.5?transition.x+(W+80-transition.x)*(t/.5):(-p.w-12)+(transition.x+p.w+12)*((t-.5)/.5);
+                drawAircraft(x,transition.y,p.w,p.h,t<.5?transition.from:transition.to,false,false);
+            }else drawAircraft(p.x,p.y,p.w,p.h,stage,false,false);
+        }
         state.bullets.forEach(b=>{ctx.fillStyle='#f5e8a8';ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();});
         state.enemyBullets.forEach(b=>{ctx.fillStyle='#e46a5e';ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();});
         state.healthDrops.forEach(h=>{ctx.save();ctx.translate(h.x,h.y);ctx.fillStyle='#49c86b';ctx.fillRect(0,0,h.w,h.h);ctx.fillStyle='#fff';ctx.fillRect(7,3,4,12);ctx.fillRect(3,7,12,4);ctx.restore();});
@@ -564,7 +589,7 @@
 
     async function finishGame(manual) {
         if (!state.running || state.over) return;
-        state.over=true; state.paused=true;
+        state.over=true; state.paused=true; transition=null; updateEngineSound(false);
         clearGameSave('flight-arcade');
         const score=Math.floor(state.score);
         saved.highScore=Math.max(Number(saved.highScore||0),score);
