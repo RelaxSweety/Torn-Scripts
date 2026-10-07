@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.10.0
+// @version      0.10.1
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -12,6 +12,7 @@
 
 /*
  * TORN PDA ARCADE - RELEASE NOTES
+ * v0.10.1 - Fixed literal escaped-newline parse errors introduced by the v0.10.0 aircraft/audio build.
  * v0.10.0 - Added 8-stage aircraft progression, faster maneuvering, and volume-controlled movement/explosion/healing audio.
  * v0.9.3 - Fixed two literal escape sequences that caused a fatal JavaScript parse error and prevented the Arcade launcher from loading.
  * v0.9.2 - Fixed fatal initialization syntax error that prevented the userscript and launcher from loading.
@@ -35,7 +36,7 @@
 
     const GAME = {
         name: 'Torn PDA Flight Game',
-        version: '0.10.0',
+        version: '0.10.1',
         creator: 'RelaxSweety',
         creatorId: '4539436',
         creatorUrl: 'https://www.torn.com/profiles.php?XID=4539436',
@@ -96,11 +97,15 @@
 #tpfg-canvas{width:100%;height:100%;display:block}
 #tpfg-message{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;pointer-events:none;font-weight:800;text-shadow:0 2px 4px #000}
 #tpfg-controls{flex:0 0 auto;display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:9px 12px 12px;background:#11161c;border-top:1px solid #343a40;user-select:none;-webkit-user-select:none}
-#tpfg-stick{position:relative;width:150px;height:150px;margin:auto;border:1px solid #58616b;border-radius:50%;background:#1b222a;touch-action:none}\n#tpfg-stick-knob{position:absolute;left:50%;top:50%;width:58px;height:58px;margin:-29px;border:1px solid #8b949e;border-radius:50%;background:#39424c;pointer-events:none}\n#tpfg-stick-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#8b949e;font-size:10px;pointer-events:none}\n#tpfg-chatpick{position:fixed;inset:0;z-index:2147483700;background:#000b;display:none;align-items:center;justify-content:center;padding:16px}#tpfg-chatcard{width:min(440px,100%);max-height:80vh;overflow:auto;background:#151a20;border:1px solid #59616b;border-radius:12px;padding:14px}#tpfg-chatlist button{width:100%;min-height:44px;margin:5px 0;background:#252c34;color:#fff;border:1px solid #59616b;border-radius:8px}.tpfg-donate{margin-top:16px;padding-top:12px;border-top:1px solid #3a424b;font-size:12px;line-height:1.6;color:#aeb6bf}.tpfg-donate a{color:#ffd75a;font-weight:800}
+#tpfg-stick{position:relative;width:150px;height:150px;margin:auto;border:1px solid #58616b;border-radius:50%;background:#1b222a;touch-action:none}
+#tpfg-stick-knob{position:absolute;left:50%;top:50%;width:58px;height:58px;margin:-29px;border:1px solid #8b949e;border-radius:50%;background:#39424c;pointer-events:none}
+#tpfg-stick-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#8b949e;font-size:10px;pointer-events:none}
+#tpfg-chatpick{position:fixed;inset:0;z-index:2147483700;background:#000b;display:none;align-items:center;justify-content:center;padding:16px}#tpfg-chatcard{width:min(440px,100%);max-height:80vh;overflow:auto;background:#151a20;border:1px solid #59616b;border-radius:12px;padding:14px}#tpfg-chatlist button{width:100%;min-height:44px;margin:5px 0;background:#252c34;color:#fff;border:1px solid #59616b;border-radius:8px}.tpfg-donate{margin-top:16px;padding-top:12px;border-top:1px solid #3a424b;font-size:12px;line-height:1.6;color:#aeb6bf}.tpfg-donate a{color:#ffd75a;font-weight:800}
 #tpfg-fire{border:1px solid #58616b;background:#252c34;color:#fff;font-weight:900;border-radius:12px;touch-action:none}
 #tpfg-fire.on{background:#555f6b;transform:scale(.96)}
 
-#tpfg-actions{display:flex;flex-direction:column;justify-content:center;gap:8px}\n#tpfg-audio{display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;font:700 10px Arial,sans-serif;color:#aeb6bf}#tpfg-volume{width:100%;accent-color:#8b949e}#tpfg-mute{min-height:28px;border:1px solid #555;border-radius:7px;background:#242a31;color:#fff;font-weight:800}
+#tpfg-actions{display:flex;flex-direction:column;justify-content:center;gap:8px}
+#tpfg-audio{display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;font:700 10px Arial,sans-serif;color:#aeb6bf}#tpfg-volume{width:100%;accent-color:#8b949e}#tpfg-mute{min-height:28px;border:1px solid #555;border-radius:7px;background:#242a31;color:#fff;font-weight:800}
 #tpfg-fire{min-height:82px;font-size:20px}
 #tpfg-pause,#tpfg-end{min-height:40px;border:1px solid #555;border-radius:9px;background:#242a31;color:#fff;font-weight:800}
 #tpfg-results{position:absolute;inset:0;background:#0d1117;z-index:3;display:none;overflow:auto;padding:22px}
@@ -202,7 +207,8 @@
         root.innerHTML = `
 <div id="tpfg-shell">
   <div id="tpfg-top">
-    <div id="tpfg-title"><span>TORN PDA FLIGHT GAME <small>v${GAME.version}</small></span><button class="tpfg-topbtn" id="tpfg-min" type="button">—</button></div>\n    <div id="tpfg-condition">TORN STATUS: --</div>
+    <div id="tpfg-title"><span>TORN PDA FLIGHT GAME <small>v${GAME.version}</small></span><button class="tpfg-topbtn" id="tpfg-min" type="button">—</button></div>
+    <div id="tpfg-condition">TORN STATUS: --</div>
         <div id="tpfg-stats">
       <div class="tpfg-stat">TIME<b id="tpfg-time">00:00</b></div>
       <div class="tpfg-stat">SCORE<b id="tpfg-score">0</b></div>
@@ -233,7 +239,8 @@
   <div id="tpfg-controls">
     <div id="tpfg-stick"><div id="tpfg-stick-label">SLIDE TO MOVE</div><div id="tpfg-stick-knob"></div></div>
     <div id="tpfg-actions">
-      <button id="tpfg-fire" type="button">FIRE</button>\n      <div id="tpfg-audio"><span>VOL</span><input id="tpfg-volume" type="range" min="0" max="100" value="55"><button id="tpfg-mute" type="button">ON</button></div>
+      <button id="tpfg-fire" type="button">FIRE</button>
+      <div id="tpfg-audio"><span>VOL</span><input id="tpfg-volume" type="range" min="0" max="100" value="55"><button id="tpfg-mute" type="button">ON</button></div>
       <button id="tpfg-pause" type="button">PAUSE</button>
       <button id="tpfg-end" type="button">END GAME</button>
     </div>
@@ -260,7 +267,18 @@
         player:null, bullets:[], enemies:[], enemyBullets:[], particles:[]
     };
 
-    let canvas, ctx, raf = 0, W = 0, H = 0;\n\n    const AIRCRAFT_COUNT=8;\n    const AUDIO_KEY='tpfgAudio';\n    let audioCtx=null,engineOsc=null,engineGain=null;\n    let audioPrefs=(()=>{try{return {...{volume:.55,muted:false},...JSON.parse(localStorage.getItem(AUDIO_KEY)||'{}')}}catch(_){return {volume:.55,muted:false}}})();\n    function saveAudio(){try{localStorage.setItem(AUDIO_KEY,JSON.stringify(audioPrefs));}catch(_){}}\n    function ensureAudio(){if(audioCtx)return audioCtx;const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;audioCtx=new AC();return audioCtx;}\n    function tone(freq,dur,type='sine',gain=.12,endFreq=null){if(audioPrefs.muted||audioPrefs.volume<=0)return;const a=ensureAudio();if(!a)return;if(a.state==='suspended')a.resume();const o=a.createOscillator(),g=a.createGain(),t=a.currentTime;o.type=type;o.frequency.setValueAtTime(freq,t);if(endFreq)o.frequency.exponentialRampToValueAtTime(Math.max(20,endFreq),t+dur);g.gain.setValueAtTime(Math.max(.0001,gain*audioPrefs.volume),t);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g).connect(a.destination);o.start(t);o.stop(t+dur);}\n    function explosionSound(){tone(110,.28,'sawtooth',.18,38);tone(62,.34,'square',.08,28);}\n    function healSound(){tone(520,.12,'sine',.10,760);setTimeout(()=>tone(760,.16,'sine',.08,1040),70);}\n    function updateEngineSound(moving){if(audioPrefs.muted||audioPrefs.volume<=0||!state.running||state.paused||state.over)moving=false;const a=moving?ensureAudio():audioCtx;if(!a)return;if(moving){if(a.state==='suspended')a.resume();if(!engineOsc){engineOsc=a.createOscillator();engineGain=a.createGain();engineOsc.type='sawtooth';engineOsc.frequency.value=82;engineGain.gain.value=.0001;engineOsc.connect(engineGain).connect(a.destination);engineOsc.start();}engineOsc.frequency.setTargetAtTime(96,a.currentTime,.06);engineGain.gain.setTargetAtTime(.035*audioPrefs.volume,a.currentTime,.05);}else if(engineGain){engineGain.gain.setTargetAtTime(.0001,a.currentTime,.05);}}
+    let canvas, ctx, raf = 0, W = 0, H = 0;
+
+    const AIRCRAFT_COUNT=8;
+    const AUDIO_KEY='tpfgAudio';
+    let audioCtx=null,engineOsc=null,engineGain=null;
+    let audioPrefs=(()=>{try{return {...{volume:.55,muted:false},...JSON.parse(localStorage.getItem(AUDIO_KEY)||'{}')}}catch(_){return {volume:.55,muted:false}}})();
+    function saveAudio(){try{localStorage.setItem(AUDIO_KEY,JSON.stringify(audioPrefs));}catch(_){}}
+    function ensureAudio(){if(audioCtx)return audioCtx;const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;audioCtx=new AC();return audioCtx;}
+    function tone(freq,dur,type='sine',gain=.12,endFreq=null){if(audioPrefs.muted||audioPrefs.volume<=0)return;const a=ensureAudio();if(!a)return;if(a.state==='suspended')a.resume();const o=a.createOscillator(),g=a.createGain(),t=a.currentTime;o.type=type;o.frequency.setValueAtTime(freq,t);if(endFreq)o.frequency.exponentialRampToValueAtTime(Math.max(20,endFreq),t+dur);g.gain.setValueAtTime(Math.max(.0001,gain*audioPrefs.volume),t);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g).connect(a.destination);o.start(t);o.stop(t+dur);}
+    function explosionSound(){tone(110,.28,'sawtooth',.18,38);tone(62,.34,'square',.08,28);}
+    function healSound(){tone(520,.12,'sine',.10,760);setTimeout(()=>tone(760,.16,'sine',.08,1040),70);}
+    function updateEngineSound(moving){if(audioPrefs.muted||audioPrefs.volume<=0||!state.running||state.paused||state.over)moving=false;const a=moving?ensureAudio():audioCtx;if(!a)return;if(moving){if(a.state==='suspended')a.resume();if(!engineOsc){engineOsc=a.createOscillator();engineGain=a.createGain();engineOsc.type='sawtooth';engineOsc.frequency.value=82;engineGain.gain.value=.0001;engineOsc.connect(engineGain).connect(a.destination);engineOsc.start();}engineOsc.frequency.setTargetAtTime(96,a.currentTime,.06);engineGain.gain.setTargetAtTime(.035*audioPrefs.volume,a.currentTime,.05);}else if(engineGain){engineGain.gain.setTargetAtTime(.0001,a.currentTime,.05);}}
 
     function resize() {
         if (!canvas) return;
@@ -288,7 +306,8 @@
         document.getElementById('tpfg-copy').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(state.shareText);}catch(_){window.prompt('Copy results:',state.shareText);}});
 
         bindStick(document.getElementById('tpfg-stick'));
-        bindHold(document.getElementById('tpfg-fire'), 'fire');\n        const vol=document.getElementById('tpfg-volume'),mute=document.getElementById('tpfg-mute');vol.value=Math.round(audioPrefs.volume*100);mute.textContent=audioPrefs.muted?'OFF':'ON';vol.addEventListener('input',()=>{audioPrefs.volume=Number(vol.value)/100;saveAudio();});mute.addEventListener('click',()=>{audioPrefs.muted=!audioPrefs.muted;mute.textContent=audioPrefs.muted?'OFF':'ON';saveAudio();if(audioPrefs.muted)updateEngineSound(false);else ensureAudio();});
+        bindHold(document.getElementById('tpfg-fire'), 'fire');
+        const vol=document.getElementById('tpfg-volume'),mute=document.getElementById('tpfg-mute');vol.value=Math.round(audioPrefs.volume*100);mute.textContent=audioPrefs.muted?'OFF':'ON';vol.addEventListener('input',()=>{audioPrefs.volume=Number(vol.value)/100;saveAudio();});mute.addEventListener('click',()=>{audioPrefs.muted=!audioPrefs.muted;mute.textContent=audioPrefs.muted?'OFF':'ON';saveAudio();if(audioPrefs.muted)updateEngineSound(false);else ensureAudio();});
 
         window.addEventListener('resize', resize);
         window.addEventListener('keydown', e => {
@@ -391,7 +410,8 @@
         if(Math.abs(state.stick.x)>.04||Math.abs(state.stick.y)>.04){dx=state.stick.x;dy=state.stick.y;}
         const mag=Math.max(1,Math.hypot(dx,dy));
         p.x=Math.max(4,Math.min(W-p.w-4,p.x+dx/mag*p.speed*dt));
-        p.y=Math.max(4,Math.min(H-p.h-4,p.y+dy/mag*p.speed*dt));\n        updateEngineSound(Math.abs(dx)>.04||Math.abs(dy)>.04);
+        p.y=Math.max(4,Math.min(H-p.h-4,p.y+dy/mag*p.speed*dt));
+        updateEngineSound(Math.abs(dx)>.04||Math.abs(dy)>.04);
 
         state.shotClock-=dt;
         if (state.keys.fire && state.shotClock<=0) {
