@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.5.0
+// @version      0.6.0
 // @description  Modular Torn PDA arcade with context-aware games and Flight Arcade.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
