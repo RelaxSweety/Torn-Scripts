@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.11.2
+// @version      0.11.3
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -199,10 +199,10 @@
         }
         function tick(ts){if(!active)return;const dt=Math.min(.05,(ts-last)/1000||0);last=ts;if(!paused&&player.hp>0){swing=Math.max(0,swing-dt);elapsed+=dt;spawn-=dt;attack-=dt;
             let dx=joystick.x+(keys.has('ArrowRight')||keys.has('d')?1:0)-(keys.has('ArrowLeft')||keys.has('a')?1:0),dy=joystick.y+(keys.has('ArrowDown')||keys.has('s')?1:0)-(keys.has('ArrowUp')||keys.has('w')?1:0);let m=Math.hypot(dx,dy)||1;player.x=Math.max(18,Math.min(W-18,player.x+dx/m*145*dt));player.y=Math.max(38,Math.min(H-38,player.y+dy/m*145*dt));
-            if(spawn<=0){spawn=Math.max(.35,1.6-elapsed/100);const edge=Math.floor(rand(0,4));enemies.push({x:edge===0?-15:edge===1?W+15:rand(0,W),y:edge===2?-15:edge===3?H+15:rand(0,H),hp:weapon===3?2:1});}
-            for(const e of enemies){let d=dist(e,player)||1;e.x+=(player.x-e.x)/d*(35+Math.min(55,elapsed/5))*dt;e.y+=(player.y-e.y)/d*(35+Math.min(55,elapsed/5))*dt;if(d<21)player.hp=Math.max(0,player.hp-20*dt);}
-            const inRange=enemies.filter(e=>dist(e,player)<(weapon===0?60:weapon===1?80:weapon===2?115:240));const target=(aimPointer!==null?inRange.filter(e=>Math.cos(Math.atan2(e.y-player.y,e.x-player.x)-aim)>.45):inRange).sort((a,b)=>dist(a,player)-dist(b,player))[0];
-            if(aimPointer===null&&target){aim=Math.atan2(target.y-player.y,target.x-player.x);}if(target&&attack<=0){if(weapon<3)swing=.22;attack=[.27,.55,.42,.9,.18][weapon];if(weapon<3){const range=[60,80,115][weapon];const hits=enemies.filter(e=>dist(e,player)<range&&Math.cos(Math.atan2(e.y-player.y,e.x-player.x)-aim)>.35).slice(0,weapon===0?1:weapon===1?3:5);for(const e of hits){e.hp--;if(weapon===1){let d=dist(e,player)||1;e.x+=(e.x-player.x)/d*20;e.y+=(e.y-player.y)/d*20;}}}else{let a=aim;for(let i=0;i<(weapon===3?5:1);i++){let angle=a+(weapon===3?(i-2)*.16:0);shots.push({x:player.x,y:player.y,vx:Math.cos(angle)*350,vy:Math.sin(angle)*350,life:.8});}}}
+            if(spawn<=0){spawn=Math.max(.12,.65-elapsed/110);const edge=Math.floor(rand(0,4));enemies.push({x:edge===0?-15:edge===1?W+15:rand(0,W),y:edge===2?-15:edge===3?H+15:rand(0,H),hp:weapon===3?2:1});}
+            for(const e of enemies){let d=dist(e,player)||1;e.x+=(player.x-e.x)/d*(65+Math.min(85,elapsed/3))*dt;e.y+=(player.y-e.y)/d*(35+Math.min(55,elapsed/5))*dt;if(d<21)player.hp=Math.max(0,player.hp-20*dt);}
+            const inRange=enemies.filter(e=>dist(e,player)<(weapon===0?60:weapon===1?80:weapon===2?115:240));const target=inRange.filter(e=>Math.cos(Math.atan2(e.y-player.y,e.x-player.x)-aim)>.45).sort((a,b)=>dist(a,player)-dist(b,player))[0];
+            if(target&&attack<=0){if(weapon<3)swing=.22;attack=[.27,.55,.42,.9,.18][weapon];if(weapon<3){const range=[60,80,115][weapon];const hits=enemies.filter(e=>dist(e,player)<range&&Math.cos(Math.atan2(e.y-player.y,e.x-player.x)-aim)>.35).slice(0,weapon===0?1:weapon===1?3:5);for(const e of hits){e.hp--;if(weapon===1){let d=dist(e,player)||1;e.x+=(e.x-player.x)/d*20;e.y+=(e.y-player.y)/d*20;}}}else{let a=aim;for(let i=0;i<(weapon===3?5:1);i++){let angle=a+(weapon===3?(i-2)*.16:0);shots.push({x:player.x,y:player.y,vx:Math.cos(angle)*350,vy:Math.sin(angle)*350,life:.8});}}}
             for(const s of shots){s.x+=s.vx*dt;s.y+=s.vy*dt;s.life-=dt;for(const e of enemies){if(dist(s,e)<15){e.hp--;s.life=0;break;}}}shots=shots.filter(s=>s.life>0);
             for(const e of enemies.filter(e=>e.hp<=0)){score++;if(Math.random()<.12)pickups.push({x:e.x,y:e.y,type:'health'});if(Math.random()<.008)pickups.push({x:e.x,y:e.y,type:'weapon',weapon:Math.floor(rand(0,5))});}
             enemies=enemies.filter(e=>e.hp>0);
@@ -220,7 +220,7 @@
         function stop(){active=false;cancelAnimationFrame(frame);document.removeEventListener('keydown',onKeyDown);document.removeEventListener('keyup',onKeyUp);host?.remove();host=null;pointer=null;aimPointer=null;aimStick={x:0,y:0};joystick={x:0,y:0};keys.clear();}
         return {start,stop};
     })();
-    Arcade.registerGame({id:'stick-figure-fighter',name:'Stick Figure Fighter',version:'0.1.2',isAvailable(){return (localStorage.getItem('tpfgMode:stick-figure-fighter')||'always')==='always';},start:StickFighter.start,stop:StickFighter.stop});
+    Arcade.registerGame({id:'stick-figure-fighter',name:'Stick Figure Fighter',version:'0.1.3',isAvailable(){return (localStorage.getItem('tpfgMode:stick-figure-fighter')||'always')==='always';},start:StickFighter.start,stop:StickFighter.stop});
 
     function gameSaveKey(id){return SAVE_PREFIX+id;}
     function getGameSave(id){try{return JSON.parse(localStorage.getItem(gameSaveKey(id))||'null');}catch(_){return null;}}
