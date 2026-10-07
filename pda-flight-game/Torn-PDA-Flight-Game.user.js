@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.8.0
+// @version      0.9.0
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -12,7 +12,8 @@
 
 /*
  * TORN PDA ARCADE - RELEASE NOTES
- * v0.8.0 - Added per-game Show in Game List setting and persistent visibility preferences.
+ * v0.9.0 - Added condition timers/end prompts plus save-and-resume for unfinished games.
+ * v0.9.0 - Added per-game Show in Game List setting and persistent visibility preferences.
  * v0.7.0 - Added modular Arcade registry; Flight Arcade became a registered module.
  * v0.6.0 - Added selected-tab highlighting, escaped-enemy damage, and +10 health pickups.
  * v0.5.0 - Added crosshair Game Manager, Games/Settings tabs, and removed displayed flight status.
@@ -30,7 +31,7 @@
 
     const GAME = {
         name: 'Torn PDA Flight Game',
-        version: '0.8.0',
+        version: '0.9.0',
         creator: 'RelaxSweety',
         creatorId: '4539436',
         creatorUrl: 'https://www.torn.com/profiles.php?XID=4539436',
@@ -40,6 +41,7 @@
     const STORE_KEY = 'tornPdaFlightGame';
     const LAUNCH_MODE_KEY = 'tpfgLaunchMode';
     const LAUNCH_POS_KEY = 'tpfgLaunchPosition';
+    const SAVE_PREFIX = 'tpfgGameSave:';
     const launchMode = () => localStorage.getItem(LAUNCH_MODE_KEY) || 'flight';
     let saved = { highScore: 0, bestKills: 0, games: 0 };
 
@@ -71,7 +73,7 @@
         s.id = 'tpfg-style';
         s.textContent = `
 #tpfg-launcher{position:fixed;right:12px;bottom:88px;z-index:2147483000;width:42px;height:42px;border:1px solid #777;background:#171717;color:#eee;border-radius:50%;font-size:23px;font-weight:800;touch-action:none;box-shadow:0 2px 8px #0008}
-#tpfg-manager,#tpfg-game-settings{position:fixed;inset:0;z-index:2147483800;background:#000b;display:none;align-items:center;justify-content:center;padding:16px}
+#tpfg-manager,#tpfg-game-settings,#tpfg-prompt{position:fixed;inset:0;z-index:2147483800;background:#000b;display:none;align-items:center;justify-content:center;padding:16px}
 .tpfg-settings-card{width:min(420px,100%);background:#151a20;border:1px solid #59616b;border-radius:12px;padding:16px;color:#fff;font-family:Arial,sans-serif}
 .tpfg-settings-card label{display:block;padding:12px 4px;border-top:1px solid #343a40}.tpfg-manager-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.tpfg-manager-tabs button,.tpfg-game-card button{min-height:42px;border:1px solid #59616b;border-radius:8px;background:#252c34;color:#fff;font-weight:800}.tpfg-manager-tabs button.tpfg-selected{background:#596674;border-color:#aeb8c2;box-shadow:inset 0 0 0 1px #d7dde3}.tpfg-game-card{display:grid;gap:8px;padding:12px;border:1px solid #343a40;border-radius:9px}.tpfg-game-card span,.tpfg-empty{color:#9da6af;font-size:12px}.tpfg-setting-row{display:flex;justify-content:space-between;padding:8px 4px}.tpfg-settings-note{color:#9da6af;font-size:11px}
 #tpfg-launch{position:fixed;right:10px;bottom:88px;z-index:2147483000;border:1px solid #777;background:#171717;color:#eee;border-radius:10px;padding:10px 13px;font:700 12px Arial,sans-serif;box-shadow:0 2px 8px #0008;touch-action:manipulation}
@@ -81,7 +83,7 @@
 #tpfg-shell{height:100%;display:flex;flex-direction:column;max-width:900px;margin:0 auto;background:#0d1117}
 #tpfg-top{flex:0 0 auto;padding:8px 10px;background:#151a20;border-bottom:1px solid #343a40}
 #tpfg-title{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;font-weight:800}
-#tpfg-route{font-size:11px;color:#aeb6bf;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px}
+#tpfg-condition{font-size:11px;color:#aeb6bf;margin-top:3px;font-weight:700}
 .tpfg-topbtn{border:1px solid #555;background:#242a31;color:#fff;border-radius:7px;min-width:42px;min-height:34px;font-weight:800}
 #tpfg-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:7px}
 .tpfg-stat{background:#090c10;border:1px solid #30363d;border-radius:6px;text-align:center;padding:4px 2px;font-size:10px;color:#9da7b1}
@@ -137,13 +139,29 @@
         enabled(game){return localStorage.getItem('tpfgGameEnabled:'+game.id)!=='false';},
         setEnabled(game,value){localStorage.setItem('tpfgGameEnabled:'+game.id,value?'true':'false');},
         available(game){return this.enabled(game)&&(game.isAvailable?game.isAvailable():true);},
-        start(id){const game=this.games.get(id);if(game&&this.available(game))game.start();}
+        start(id){const game=this.games.get(id);if(game&&this.available(game))launchGame(game);}
     };
     const FlightArcade = Arcade.registerGame({
         id:'flight-arcade',name:'Flight Arcade',version:'1.0.0',
         isAvailable(){const mode=launchMode();return mode==='always'||(mode==='flight'&&detectFlight().flying);},
-        start(){startGame();},pause(){if(state.running&&!state.paused)togglePause();},resume(){if(state.running&&state.paused)togglePause();},stop(){if(state.running&&!state.over)finishGame(true);}
+        start(){startGame();},pause(){if(state.running&&!state.paused)togglePause();},resume(){if(state.running&&state.paused)togglePause();},stop(){if(state.running&&!state.over)requestLeave();}
     });
+    function gameSaveKey(id){return SAVE_PREFIX+id;}
+    function getGameSave(id){try{return JSON.parse(localStorage.getItem(gameSaveKey(id))||'null');}catch(_){return null;}}
+    function clearGameSave(id){try{localStorage.removeItem(gameSaveKey(id));}catch(_){}}
+    function snapshotGame(){
+        const keys=['score','kills','hp','activeMs','spawnClock','shotClock','enemyShotClock','player','bullets','enemies','enemyBullets','particles','healthDrops'];
+        const out={}; keys.forEach(k=>out[k]=state[k]); return JSON.parse(JSON.stringify(out));
+    }
+    function saveCurrentGame(){try{localStorage.setItem(gameSaveKey('flight-arcade'),JSON.stringify({version:1,savedAt:Date.now(),state:snapshotGame()}));return true;}catch(_){return false;}}
+    function restoreGame(s){Object.assign(state,JSON.parse(JSON.stringify(s.state)));state.running=true;state.paused=false;state.over=false;state.lastTs=performance.now();state.keys={up:false,down:false,left:false,right:false,fire:false};state.stick={x:0,y:0};showGame();setTimeout(resize,0);updateHud();cancelAnimationFrame(raf);raf=requestAnimationFrame(loop);}
+    function promptBox(title,message,buttons){
+        const p=document.getElementById('tpfg-prompt');p.querySelector('h3').textContent=title;p.querySelector('p').textContent=message;
+        const a=p.querySelector('#tpfg-prompt-actions');a.innerHTML='';buttons.forEach(x=>{const b=document.createElement('button');b.className='tpfg-resultbtn';b.textContent=x.label;b.onclick=()=>{p.style.display='none';x.action();};a.appendChild(b);});p.style.display='flex';
+    }
+    function launchGame(game){const s=getGameSave(game.id);if(s)promptBox('SAVED GAME','Continue your saved '+game.name+' game?',[{label:'CONTINUE SAVED GAME',action:()=>restoreGame(s)},{label:'START NEW GAME',action:()=>{clearGameSave(game.id);game.start();}},{label:'CANCEL',action:()=>{}}]);else game.start();}
+    function requestLeave(){if(!state.running||state.over){minimize();return;}state.paused=true;document.getElementById('tpfg-pause').textContent='RESUME';promptBox('SAVE YOUR GAME?','Save your current progress and continue from this point next time?',[{label:'SAVE & LEAVE',action:()=>{saveCurrentGame();closeActiveGame();}},{label:'LEAVE WITHOUT SAVING',action:()=>{clearGameSave('flight-arcade');closeActiveGame();}},{label:'CANCEL',action:()=>{state.paused=false;state.lastTs=performance.now();document.getElementById('tpfg-pause').textContent='PAUSE';}}]);}
+    function closeActiveGame(){state.running=false;state.paused=true;cancelAnimationFrame(raf);document.getElementById('tpfg-root').style.display='none';}
     function openManager(){document.getElementById('tpfg-manager').style.display='flex';renderManager('games');}
     function renderManager(tab){
         const body=document.getElementById('tpfg-manager-body');
@@ -180,7 +198,7 @@
         root.innerHTML = `
 <div id="tpfg-shell">
   <div id="tpfg-top">
-    <div id="tpfg-title"><span>TORN PDA FLIGHT GAME <small>v${GAME.version}</small></span><button class="tpfg-topbtn" id="tpfg-min" type="button">—</button></div>
+    <div id="tpfg-title"><span>TORN PDA FLIGHT GAME <small>v${GAME.version}</small></span><button class="tpfg-topbtn" id="tpfg-min" type="button">—</button></div>\n    <div id="tpfg-condition">TORN STATUS: --</div>
         <div id="tpfg-stats">
       <div class="tpfg-stat">TIME<b id="tpfg-time">00:00</b></div>
       <div class="tpfg-stat">SCORE<b id="tpfg-score">0</b></div>
@@ -218,6 +236,7 @@
   </div>
 </div>`;
         const manager=document.createElement('div');manager.id='tpfg-manager';manager.innerHTML='<div class="tpfg-settings-card"><h3>TORN PDA ARCADE</h3><div class="tpfg-manager-tabs"><button id="tpfg-tab-games">GAMES</button><button id="tpfg-tab-settings">SETTINGS</button></div><div id="tpfg-manager-body"></div><button class="tpfg-resultbtn" id="tpfg-manager-close">CLOSE</button></div>';document.body.appendChild(manager);
+        const prompt=document.createElement('div');prompt.id='tpfg-prompt';prompt.innerHTML='<div class="tpfg-settings-card"><h3></h3><p></p><div id="tpfg-prompt-actions"></div></div>';document.body.appendChild(prompt);
         const gameSettings=document.createElement('div');gameSettings.id='tpfg-game-settings';gameSettings.innerHTML='<div class="tpfg-settings-card"><h3>GAME SETTINGS</h3><div class="tpfg-setting-row"><b>Flight Arcade</b><span>Enabled</span></div><label><input type="radio" name="tpfg-mode" value="flight"> Flight only</label><label><input type="radio" name="tpfg-mode" value="always"> Always available</label><label><input type="radio" name="tpfg-mode" value="disabled"> Disabled</label><p class="tpfg-settings-note">Additional Torn games can be added here as modules.</p><button class="tpfg-resultbtn" id="tpfg-settings-close">CLOSE</button></div>';document.body.appendChild(gameSettings);
         gameSettings.querySelectorAll('input[name="tpfg-mode"]').forEach(r=>{r.checked=(launchMode()===r.value);r.addEventListener('change',()=>localStorage.setItem(LAUNCH_MODE_KEY,r.value));});
         document.getElementById('tpfg-settings-close').onclick=()=>gameSettings.style.display='none';
@@ -255,9 +274,9 @@
     function wireUI() {
         canvas = document.getElementById('tpfg-canvas');
         ctx = canvas.getContext('2d');
-                document.getElementById('tpfg-min').addEventListener('click', minimize);
+                document.getElementById('tpfg-min').addEventListener('click', requestLeave);
         document.getElementById('tpfg-pause').addEventListener('click', togglePause);
-        document.getElementById('tpfg-end').addEventListener('click', () => finishGame(true));
+        document.getElementById('tpfg-end').addEventListener('click', requestLeave);
         document.getElementById('tpfg-restart').addEventListener('click', startGame);
         document.getElementById('tpfg-close').addEventListener('click', minimize);
         document.getElementById('tpfg-share').addEventListener('click', showChatPicker);
@@ -307,33 +326,24 @@
         if (down && (k==='p'||k==='escape')) togglePause();
     }
 
+    function showGame(){document.getElementById('tpfg-root').style.display='block';document.getElementById('tpfg-results').style.display='none';document.getElementById('tpfg-message').textContent='';document.getElementById('tpfg-pause').textContent='PAUSE';document.getElementById('tpfg-high').textContent=Number(saved.highScore||0).toLocaleString();}
     async function startGame() {
         cancelAnimationFrame(raf);
         const flight = detectFlight();
-        state.running=true; state.paused=false; state.over=false;
+        state.running=true; state.paused=false; state.over=false; conditionWasActive=detectCondition(); conditionPrompted=false;
         state.score=0; state.kills=0; state.hp=100; state.activeMs=0;
         state.lastTs=performance.now(); state.spawnClock=0; state.shotClock=0; state.enemyShotClock=0;
         state.keys={up:false,down:false,left:false,right:false,fire:false};
         state.stick={x:0,y:0};
         state.player={x:45,y:150,w:44,h:24,speed:235};
         state.bullets=[]; state.enemies=[]; state.enemyBullets=[]; state.particles=[]; state.healthDrops=[];
-        document.getElementById('tpfg-root').style.display='block';
-        document.getElementById('tpfg-results').style.display='none';
-        document.getElementById('tpfg-message').textContent='';
-        document.getElementById('tpfg-pause').textContent='PAUSE';
-        document.getElementById('tpfg-high').textContent=Number(saved.highScore||0).toLocaleString();
+        showGame();
         setTimeout(resize, 0);
         updateHud();
         raf=requestAnimationFrame(loop);
     }
 
-    function minimize() {
-        if (state.running && !state.over) {
-            state.paused=true;
-            document.getElementById('tpfg-pause').textContent='RESUME';
-        }
-        document.getElementById('tpfg-root').style.display='none';
-    }
+    function minimize(){if(state.running&&!state.over){requestLeave();return;}document.getElementById('tpfg-root').style.display='none';}
 
     function togglePause() {
         if (!state.running || state.over) return;
@@ -343,9 +353,22 @@
         document.getElementById('tpfg-message').textContent=state.paused?'PAUSED':'';
     }
 
+    let conditionWasActive=null,conditionPrompted=false,lastConditionCheck=0;
+    function detectCondition(){
+        const f=detectFlight();if(f.flying)return {type:'flight',active:true,remaining:f.remaining,label:'FLIGHT'};
+        const text=(document.body?.innerText||'').replace(/\s+/g,' ');
+        let m=text.match(/(?:Hospital|Hospitalized).*?(\d{1,2}:\d{2}:\d{2})/i);if(m)return {type:'hospital',active:true,remaining:m[1],label:'HOSPITAL'};
+        m=text.match(/(?:Jail|Jailed).*?(\d{1,2}:\d{2}:\d{2})/i);if(m)return {type:'jail',active:true,remaining:m[1],label:'JAIL'};
+        return {type:null,active:false,remaining:'',label:'TORN'};
+    }
+    function monitorCondition(ts){
+        if(ts-lastConditionCheck<500)return;lastConditionCheck=ts;const q=detectCondition();const el=document.getElementById('tpfg-condition');if(el)el.textContent=q.active?q.label+' REMAINING: '+q.remaining:'TORN STATUS: FREE';
+        if(conditionWasActive&&conditionWasActive.active&&!q.active&&!conditionPrompted){conditionPrompted=true;state.paused=true;const type=conditionWasActive.type;const msg=type==='flight'?'Your flight has ended.':type==='jail'?'You have been released from jail.':'You have been released from the hospital.';promptBox(type==='flight'?'FLIGHT ENDED':type==='jail'?'RELEASED FROM JAIL':'RELEASED FROM HOSPITAL',msg+' Would you like to continue playing or leave the game?',[{label:'CONTINUE',action:()=>{state.paused=false;state.lastTs=performance.now();}},{label:'LEAVE GAME',action:requestLeave}]);}
+        if(q.active)conditionWasActive=q;
+    }
     function loop(ts) {
         if (!state.running) return;
-        let dt=Math.min((ts-state.lastTs)/1000, .05);
+        monitorCondition(ts);\n        let dt=Math.min((ts-state.lastTs)/1000, .05);
         state.lastTs=ts;
         if (!state.paused && !state.over) {
             state.activeMs += dt*1000;
@@ -528,7 +551,7 @@
 
     async function finishGame(manual) {
         if (!state.running || state.over) return;
-        state.over=true; state.paused=true;
+        state.over=true; state.paused=true;\n        clearGameSave('flight-arcade');
         const score=Math.floor(state.score);
         saved.highScore=Math.max(Number(saved.highScore||0),score);
         saved.bestKills=Math.max(Number(saved.bestKills||0),state.kills);
