@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.10.5
+// @version      0.10.6
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -12,6 +12,7 @@
 
 /*
  * TORN PDA ARCADE - RELEASE NOTES
+ * v0.10.6 - Fixed multitouch joystick pointer ownership and reset on release or lost capture.
  * v0.10.5 - Removed continuous engine audio and corrected aircraft transitions on score awards.
  * v0.10.4 - Changed aircraft progression to 5,000-point stages with exit-right and reenter-left transformation animation.
  * v0.10.3 - Ensured engine audio stops immediately on pause, leave prompts, game over, minimize, and exit.
@@ -40,7 +41,7 @@
 
     const GAME = {
         name: 'Torn PDA Flight Game',
-        version: '0.10.5',
+        version: '0.10.6',
         creator: 'RelaxSweety',
         creatorId: '4539436',
         creatorUrl: 'https://www.torn.com/profiles.php?XID=4539436',
@@ -323,10 +324,44 @@
     }
 
     function bindStick(stick) {
-        const knob=document.getElementById('tpfg-stick-knob');let pid=null;
-        const move=e=>{if(pid!==e.pointerId)return;e.preventDefault();const r=stick.getBoundingClientRect(),max=r.width*.32;let x=e.clientX-r.left-r.width/2,y=e.clientY-r.top-r.height/2,d=Math.hypot(x,y);if(d>max){x=x/d*max;y=y/d*max;}state.stick.x=x/max;state.stick.y=y/max;knob.style.transform='translate('+x+'px,'+y+'px)';};
-        const end=e=>{if(pid!==e.pointerId)return;pid=null;state.stick={x:0,y:0};knob.style.transform='translate(0,0)';};
-        stick.addEventListener('pointerdown',e=>{pid=e.pointerId;stick.setPointerCapture(pid);move(e);});stick.addEventListener('pointermove',move);stick.addEventListener('pointerup',end);stick.addEventListener('pointercancel',end);
+        const knob=document.getElementById('tpfg-stick-knob');
+        let pid=null;
+        const reset=()=>{
+            pid=null;
+            state.stick={x:0,y:0};
+            knob.style.transform='translate(0,0)';
+        };
+        const move=e=>{
+            if(pid!==e.pointerId)return;
+            if(!Number.isFinite(e.clientX)||!Number.isFinite(e.clientY))return;
+            e.preventDefault();
+            const r=stick.getBoundingClientRect(),max=r.width*.32;
+            if(max<=0)return;
+            let x=e.clientX-r.left-r.width/2,y=e.clientY-r.top-r.height/2;
+            const d=Math.hypot(x,y);
+            if(d>max){x=x/d*max;y=y/d*max;}
+            state.stick={x:x/max,y:y/max};
+            knob.style.transform='translate('+x+'px,'+y+'px)';
+        };
+        stick.addEventListener('pointerdown',e=>{
+            if(pid!==null)return; // Ignore other fingers, including the fire-button finger.
+            if(e.pointerType==='mouse'&&e.button!==0)return;
+            pid=e.pointerId;
+            try{stick.setPointerCapture(pid);}catch(_){}
+            move(e);
+        });
+        stick.addEventListener('pointermove',move);
+        const end=e=>{
+            if(pid!==e.pointerId)return;
+            reset();
+            if(stick.hasPointerCapture(e.pointerId)){
+                try{stick.releasePointerCapture(e.pointerId);}catch(_){}
+            }
+        };
+        stick.addEventListener('pointerup',end);
+        stick.addEventListener('pointercancel',end);
+        stick.addEventListener('lostpointercapture',end);
+        window.addEventListener('blur',reset);
     }
 
     function chatInputs(){return [...new Set([...document.querySelectorAll('textarea,[contenteditable="true"][role="textbox"],[contenteditable="true"][data-placeholder*="message" i],[contenteditable="true"][aria-label*="message" i]')])].filter(el=>!el.closest('#tpfg-root')&&!el.closest('#tpfg-chatpick')&&el.getBoundingClientRect().width>0);}
