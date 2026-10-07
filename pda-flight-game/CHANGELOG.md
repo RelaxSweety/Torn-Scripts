@@ -1,5 +1,12 @@
 # Torn PDA Arcade Changelog
 
+## v0.9.0
+- Added remaining-time status for flight, jail, and hospital conditions.
+- Games pause when the active Torn condition ends and prompt to continue or leave.
+- Manual exit prompts to save unfinished game progress.
+- Saved Flight Arcade state resumes from the saved position on the next launch.
+- Death/game over clears the saved run.
+
 ## v0.8.0
 - Added per-game **Show in Game List** setting.
 - Game visibility preferences persist independently.
