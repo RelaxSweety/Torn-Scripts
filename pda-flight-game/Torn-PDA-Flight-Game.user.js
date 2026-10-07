@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.7.0
+// @version      0.8.0
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -18,7 +18,7 @@
 
     const GAME = {
         name: 'Torn PDA Flight Game',
-        version: '0.7.0',
+        version: '0.8.0',
         creator: 'RelaxSweety',
         creatorId: '4539436',
         creatorUrl: 'https://www.torn.com/profiles.php?XID=4539436',
@@ -122,7 +122,9 @@
         games:new Map(),
         registerGame(game){if(!game?.id||typeof game.start!=='function')throw new Error('Invalid arcade game module');this.games.set(game.id,game);return game;},
         list(){return [...this.games.values()];},
-        available(game){return game.isAvailable?game.isAvailable():true;},
+        enabled(game){return localStorage.getItem('tpfgGameEnabled:'+game.id)!=='false';},
+        setEnabled(game,value){localStorage.setItem('tpfgGameEnabled:'+game.id,value?'true':'false');},
+        available(game){return this.enabled(game)&&(game.isAvailable?game.isAvailable():true);},
         start(id){const game=this.games.get(id);if(game&&this.available(game))game.start();}
     };
     const FlightArcade = Arcade.registerGame({
@@ -140,7 +142,8 @@
             body.innerHTML=games.length?games.map(g=>'<div class="tpfg-game-card"><b>'+g.name+'</b><span>Available now</span><button data-game="'+g.id+'">PLAY</button></div>').join(''):'<p class="tpfg-empty">No games are available in your current Torn situation.</p>';
             body.querySelectorAll('button[data-game]').forEach(btn=>btn.onclick=()=>{document.getElementById('tpfg-manager').style.display='none';Arcade.start(btn.dataset.game);});
         } else {
-            body.innerHTML=Arcade.list().map(g=>{const mode=launchMode();return '<div class="tpfg-game-card"><b>'+g.name+'</b><span>Availability</span><label><input type="radio" name="manager-mode-'+g.id+'" value="flight" '+(mode==='flight'?'checked':'')+'> Traveling</label><label><input type="radio" name="manager-mode-'+g.id+'" value="always" '+(mode==='always'?'checked':'')+'> Always</label><label><input type="radio" name="manager-mode-'+g.id+'" value="disabled" '+(mode==='disabled'?'checked':'')+'> Disabled</label></div>';}).join('');
+            body.innerHTML=Arcade.list().map(g=>{const mode=launchMode();return '<div class="tpfg-game-card"><b>'+g.name+'</b><label><input type="checkbox" data-enable-game="'+g.id+'" '+(Arcade.enabled(g)?'checked':'')+'> Show in Game List</label><span>Availability</span><label><input type="radio" name="manager-mode-'+g.id+'" value="flight" '+(mode==='flight'?'checked':'')+'> Traveling</label><label><input type="radio" name="manager-mode-'+g.id+'" value="always" '+(mode==='always'?'checked':'')+'> Always</label><label><input type="radio" name="manager-mode-'+g.id+'" value="disabled" '+(mode==='disabled'?'checked':'')+'> Disabled</label></div>';}).join('');
+            body.querySelectorAll('input[data-enable-game]').forEach(x=>x.onchange=()=>Arcade.setEnabled(Arcade.games.get(x.dataset.enableGame),x.checked));
             body.querySelectorAll('input[type="radio"]').forEach(r=>r.onchange=()=>localStorage.setItem(LAUNCH_MODE_KEY,r.value));
         }
     }
