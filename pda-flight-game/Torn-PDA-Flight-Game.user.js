@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.9.1
+// @version      0.9.2
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -12,9 +12,10 @@
 
 /*
  * TORN PDA ARCADE - RELEASE NOTES
- * v0.9.1 - Fixed launcher initialization regression that could prevent the Arcade icon from appearing.
- * v0.9.1 - Added condition timers/end prompts plus save-and-resume for unfinished games.
- * v0.9.1 - Added per-game Show in Game List setting and persistent visibility preferences.
+ * v0.9.2 - Fixed fatal initialization syntax error that prevented the userscript and launcher from loading.
+ * v0.9.2 - Fixed launcher initialization regression that could prevent the Arcade icon from appearing.
+ * v0.9.2 - Added condition timers/end prompts plus save-and-resume for unfinished games.
+ * v0.9.2 - Added per-game Show in Game List setting and persistent visibility preferences.
  * v0.7.0 - Added modular Arcade registry; Flight Arcade became a registered module.
  * v0.6.0 - Added selected-tab highlighting, escaped-enemy damage, and +10 health pickups.
  * v0.5.0 - Added crosshair Game Manager, Games/Settings tabs, and removed displayed flight status.
@@ -32,7 +33,7 @@
 
     const GAME = {
         name: 'Torn PDA Flight Game',
-        version: '0.9.1',
+        version: '0.9.2',
         creator: 'RelaxSweety',
         creatorId: '4539436',
         creatorUrl: 'https://www.torn.com/profiles.php?XID=4539436',
