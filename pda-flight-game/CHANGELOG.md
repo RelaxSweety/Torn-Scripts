@@ -1,5 +1,9 @@
 # Torn PDA Arcade Changelog
 
+## v0.10.5
+- Removed continuous engine sound; explosion and healing sounds remain.
+- Added immediate aircraft stage checks when kill points are awarded at 5,000-point intervals.
+
 ## v0.10.4
 - Aircraft designs now advance every 5,000 points, with exit-right and reentry-left transition animation.
 - Includes v0.10.3 fixes that silence the engine on pause, game over, minimize, and exit.
