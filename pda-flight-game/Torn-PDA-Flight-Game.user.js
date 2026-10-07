@@ -10,6 +10,18 @@
 // @grant        none
 // ==/UserScript==
 
+/*
+ * TORN PDA ARCADE - RELEASE NOTES
+ * v0.8.0 - Added per-game Show in Game List setting and persistent visibility preferences.
+ * v0.7.0 - Added modular Arcade registry; Flight Arcade became a registered module.
+ * v0.6.0 - Added selected-tab highlighting, escaped-enemy damage, and +10 health pickups.
+ * v0.5.0 - Added crosshair Game Manager, Games/Settings tabs, and removed displayed flight status.
+ * v0.4.0 - Added availability modes, strict flight detection, and draggable launcher persistence.
+ * v0.3.0 - Added analog controls, chat sharing, donation link, and auto-update metadata.
+ * v0.2.0 - Improved flight detection, mobile controls/layout, and update support.
+ * v0.1.0 - Initial release.
+ */
+
 (() => {
     'use strict';
 
