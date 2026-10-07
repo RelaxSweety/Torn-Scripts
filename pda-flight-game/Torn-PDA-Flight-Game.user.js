@@ -1,10 +1,12 @@
 // ==UserScript==
 // @name         Torn PDA Flight Game
 // @namespace    https://www.torn.com/
-// @version      0.2.0
+// @version      0.3.0
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
+// @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/pda-flight-game/Torn-PDA-Flight-Game.meta.js
+// @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/pda-flight-game/Torn-PDA-Flight-Game.user.js
 // @grant        none
 // ==/UserScript==
 
@@ -16,7 +18,7 @@
 
     const GAME = {
         name: 'Torn PDA Flight Game',
-        version: '0.2.0',
+        version: '0.3.0',
         creator: 'RelaxSweety',
         creatorId: '4539436',
         creatorUrl: 'https://www.torn.com/profiles.php?XID=4539436',
@@ -71,10 +73,10 @@
 #tpfg-canvas{width:100%;height:100%;display:block}
 #tpfg-message{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;pointer-events:none;font-weight:800;text-shadow:0 2px 4px #000}
 #tpfg-controls{flex:0 0 auto;display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:9px 12px 12px;background:#11161c;border-top:1px solid #343a40;user-select:none;-webkit-user-select:none}
-#tpfg-dpad{display:grid;grid-template-columns:52px 52px 52px;grid-template-rows:48px 48px 48px;justify-content:center}
-.tpfg-pad,#tpfg-fire{border:1px solid #58616b;background:#252c34;color:#fff;font-weight:900;border-radius:12px;touch-action:none}
-.tpfg-pad.on,#tpfg-fire.on{background:#555f6b;transform:scale(.96)}
-#tpfg-up{grid-column:2;grid-row:1}#tpfg-left{grid-column:1;grid-row:2}#tpfg-right{grid-column:3;grid-row:2}#tpfg-down{grid-column:2;grid-row:3}
+#tpfg-stick{position:relative;width:150px;height:150px;margin:auto;border:1px solid #58616b;border-radius:50%;background:#1b222a;touch-action:none}\n#tpfg-stick-knob{position:absolute;left:50%;top:50%;width:58px;height:58px;margin:-29px;border:1px solid #8b949e;border-radius:50%;background:#39424c;pointer-events:none}\n#tpfg-stick-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#8b949e;font-size:10px;pointer-events:none}\n#tpfg-chatpick{position:fixed;inset:0;z-index:2147483700;background:#000b;display:none;align-items:center;justify-content:center;padding:16px}#tpfg-chatcard{width:min(440px,100%);max-height:80vh;overflow:auto;background:#151a20;border:1px solid #59616b;border-radius:12px;padding:14px}#tpfg-chatlist button{width:100%;min-height:44px;margin:5px 0;background:#252c34;color:#fff;border:1px solid #59616b;border-radius:8px}.tpfg-donate{margin-top:16px;padding-top:12px;border-top:1px solid #3a424b;font-size:12px;line-height:1.6;color:#aeb6bf}.tpfg-donate a{color:#ffd75a;font-weight:800}
+#tpfg-fire{border:1px solid #58616b;background:#252c34;color:#fff;font-weight:900;border-radius:12px;touch-action:none}
+#tpfg-fire.on{background:#555f6b;transform:scale(.96)}
+
 #tpfg-actions{display:flex;flex-direction:column;justify-content:center;gap:8px}
 #tpfg-fire{min-height:82px;font-size:20px}
 #tpfg-pause,#tpfg-end{min-height:40px;border:1px solid #555;border-radius:9px;background:#242a31;color:#fff;font-weight:800}
@@ -89,7 +91,7 @@
 .tpfg-resultbtn{width:100%;min-height:46px;margin-top:9px;border:1px solid #59616b;border-radius:9px;background:#252c34;color:#fff;font-weight:800}
 #tpfg-by{margin-top:13px;font-size:10px;color:#7f8993}
 #tpfg-by a{color:#b9c1c9}
-@media(max-width:380px){#tpfg-stats{grid-template-columns:repeat(2,1fr)}#tpfg-controls{padding-left:6px;padding-right:6px;gap:4px}#tpfg-dpad{grid-template-columns:46px 46px 46px;grid-template-rows:44px 44px 44px}}
+@media(max-width:380px){#tpfg-stats{grid-template-columns:repeat(2,1fr)}#tpfg-controls{padding-left:6px;padding-right:6px;gap:4px}#tpfg-stick{width:132px;height:132px}}
 `;
         document.head.appendChild(s);
     }
@@ -141,8 +143,8 @@
         document.body.appendChild(settings);
         launch.style.right = '50px';
         const refreshLaunch = () => {
-            launch.style.display = (launchMode() === 'always' || detectFlight().flying) ? '' : 'none';
-            settings.title = 'Game button: ' + (launchMode() === 'always' ? 'Always visible' : 'Flight only');
+            launch.style.display = launchMode() === 'always' ? '' : 'none';
+            settings.title = 'Game button: ' + (launchMode() === 'always' ? 'Always visible' : 'Hidden');
         };
         settings.addEventListener('click', () => {
             const next = launchMode() === 'always' ? 'flight' : 'always';
@@ -182,19 +184,15 @@
           <div class="tpfg-result">HIGH SCORE<b id="tpfg-rhigh">0</b></div>
         </div>
         <div id="tpfg-sharetext"></div>
+        <button class="tpfg-resultbtn" id="tpfg-share" type="button">SHARE RESULTS</button>
         <button class="tpfg-resultbtn" id="tpfg-restart" type="button">PLAY AGAIN</button>
         <button class="tpfg-resultbtn" id="tpfg-close" type="button">RETURN TO TORN</button>
-        <div id="tpfg-by">Created by <a href="${GAME.creatorUrl}">${GAME.creator} [${GAME.creatorId}]</a> · <a href="${GAME.discordUrl}">Discord</a></div>
+        <div class="tpfg-donate"><b>Enjoying Torn PDA Flight Game?</b><br>Torn donations are appreciated.<br><a href="${GAME.creatorUrl}" target="_blank" rel="noopener noreferrer">RelaxSweety [4539436]</a></div><div id="tpfg-by">Created by <a href="${GAME.creatorUrl}">${GAME.creator} [${GAME.creatorId}]</a> · <a href="${GAME.discordUrl}">Discord</a></div>
       </div>
     </div>
   </div>
   <div id="tpfg-controls">
-    <div id="tpfg-dpad">
-      <button class="tpfg-pad" id="tpfg-up" data-key="up" type="button">▲</button>
-      <button class="tpfg-pad" id="tpfg-left" data-key="left" type="button">◀</button>
-      <button class="tpfg-pad" id="tpfg-right" data-key="right" type="button">▶</button>
-      <button class="tpfg-pad" id="tpfg-down" data-key="down" type="button">▼</button>
-    </div>
+    <div id="tpfg-stick"><div id="tpfg-stick-label">SLIDE TO MOVE</div><div id="tpfg-stick-knob"></div></div>
     <div id="tpfg-actions">
       <button id="tpfg-fire" type="button">FIRE</button>
       <button id="tpfg-pause" type="button">PAUSE</button>
@@ -202,6 +200,7 @@
     </div>
   </div>
 </div>`;
+        const picker=document.createElement('div');picker.id='tpfg-chatpick';picker.innerHTML='<div id="tpfg-chatcard"><b>Share Arcade Results</b><p>Select an open Torn chat. Results are inserted but not sent.</p><div id="tpfg-chatlist"></div><button class="tpfg-resultbtn" id="tpfg-copy">COPY RESULTS</button><button class="tpfg-resultbtn" id="tpfg-chatcancel">CANCEL</button></div>';document.body.appendChild(picker);
         document.body.appendChild(root);
         wireUI();
     }
@@ -211,6 +210,7 @@
         activeMs:0, lastTs:0, spawnClock:0, shotClock:0, enemyShotClock:0,
         route:{origin:'Unknown',destination:'Unknown'},
         keys:{up:false,down:false,left:false,right:false,fire:false},
+        stick:{x:0,y:0}, shareText:'',
         player:null, bullets:[], enemies:[], enemyBullets:[], particles:[]
     };
 
@@ -238,8 +238,11 @@
         document.getElementById('tpfg-end').addEventListener('click', () => finishGame(true));
         document.getElementById('tpfg-restart').addEventListener('click', startGame);
         document.getElementById('tpfg-close').addEventListener('click', minimize);
+        document.getElementById('tpfg-share').addEventListener('click', showChatPicker);
+        document.getElementById('tpfg-chatcancel').addEventListener('click',()=>document.getElementById('tpfg-chatpick').style.display='none');
+        document.getElementById('tpfg-copy').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(state.shareText);}catch(_){window.prompt('Copy results:',state.shareText);}});
 
-        document.querySelectorAll('.tpfg-pad').forEach(btn => bindHold(btn, btn.dataset.key));
+        bindStick(document.getElementById('tpfg-stick'));
         bindHold(document.getElementById('tpfg-fire'), 'fire');
 
         window.addEventListener('resize', resize);
@@ -250,6 +253,18 @@
         }, {passive:false});
         window.addEventListener('keyup', e => keyFromEvent(e, false));
     }
+
+    function bindStick(stick) {
+        const knob=document.getElementById('tpfg-stick-knob');let pid=null;
+        const move=e=>{if(pid!==e.pointerId)return;e.preventDefault();const r=stick.getBoundingClientRect(),max=r.width*.32;let x=e.clientX-r.left-r.width/2,y=e.clientY-r.top-r.height/2,d=Math.hypot(x,y);if(d>max){x=x/d*max;y=y/d*max;}state.stick.x=x/max;state.stick.y=y/max;knob.style.transform='translate('+x+'px,'+y+'px)';};
+        const end=e=>{if(pid!==e.pointerId)return;pid=null;state.stick={x:0,y:0};knob.style.transform='translate(0,0)';};
+        stick.addEventListener('pointerdown',e=>{pid=e.pointerId;stick.setPointerCapture(pid);move(e);});stick.addEventListener('pointermove',move);stick.addEventListener('pointerup',end);stick.addEventListener('pointercancel',end);
+    }
+
+    function chatInputs(){return [...new Set([...document.querySelectorAll('textarea,[contenteditable="true"][role="textbox"],[contenteditable="true"][data-placeholder*="message" i],[contenteditable="true"][aria-label*="message" i]')])].filter(el=>!el.closest('#tpfg-root')&&!el.closest('#tpfg-chatpick')&&el.getBoundingClientRect().width>0);}
+    function chatName(input,i){let el=input;for(let n=0;n<8&&el;n++,el=el.parentElement){const r=el.getBoundingClientRect();if(r.width>=200&&r.height>=120){const top=r.top+70;const candidates=[...el.querySelectorAll('[title],[aria-label],strong,b,h1,h2,h3,span')].filter(x=>{const q=x.getBoundingClientRect();return q.height>0&&q.top>=r.top-5&&q.top<top;}).map(x=>(x.getAttribute('title')||x.getAttribute('aria-label')||x.textContent||'').trim()).filter(x=>x.length>=2&&x.length<=40&&!/close|minimize|send|message|emoji|settings/i.test(x));if(candidates.length)return candidates[0];}}return 'Open Chat '+(i+1);}
+    function insertChat(input,text){input.focus();if('value'in input){const d=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input),'value');if(d&&d.set)d.set.call(input,text);else input.value=text;input.dispatchEvent(new Event('input',{bubbles:true}));return true;}input.textContent=text;input.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:text}));return true;}
+    function showChatPicker(){const picker=document.getElementById('tpfg-chatpick'),list=document.getElementById('tpfg-chatlist');list.innerHTML='';const chats=chatInputs();if(!chats.length)list.innerHTML='<p>No open Torn chats detected. Open a chat and try again.</p>';chats.forEach((input,i)=>{const b=document.createElement('button');b.textContent=chatName(input,i);b.onclick=()=>{if(insertChat(input,state.shareText))picker.style.display='none';};list.appendChild(b);});picker.style.display='flex';}
 
     function bindHold(btn, key) {
         const on = e => { e.preventDefault(); state.keys[key]=true; btn.classList.add('on'); };
@@ -278,6 +293,7 @@
         state.score=0; state.kills=0; state.hp=100; state.activeMs=0;
         state.lastTs=performance.now(); state.spawnClock=0; state.shotClock=0; state.enemyShotClock=0;
         state.keys={up:false,down:false,left:false,right:false,fire:false};
+        state.stick={x:0,y:0};
         state.player={x:45,y:150,w:44,h:24,speed:235};
         state.bullets=[]; state.enemies=[]; state.enemyBullets=[]; state.particles=[];
         document.getElementById('tpfg-root').style.display='block';
@@ -322,9 +338,10 @@
 
     function update(dt) {
         const p=state.player;
-        const dx=(state.keys.right?1:0)-(state.keys.left?1:0);
-        const dy=(state.keys.down?1:0)-(state.keys.up?1:0);
-        const mag=Math.hypot(dx,dy)||1;
+        let dx=(state.keys.right?1:0)-(state.keys.left?1:0);
+        let dy=(state.keys.down?1:0)-(state.keys.up?1:0);
+        if(Math.abs(state.stick.x)>.04||Math.abs(state.stick.y)>.04){dx=state.stick.x;dy=state.stick.y;}
+        const mag=Math.max(1,Math.hypot(dx,dy));
         p.x=Math.max(4,Math.min(W-p.w-4,p.x+dx/mag*p.speed*dt));
         p.y=Math.max(4,Math.min(H-p.h-4,p.y+dy/mag*p.speed*dt));
 
@@ -505,7 +522,8 @@
         document.getElementById('tpfg-rtime').textContent=formatTime(state.activeMs);
         document.getElementById('tpfg-rhigh').textContent=Number(saved.highScore).toLocaleString();
         document.getElementById('tpfg-high').textContent=Number(saved.highScore).toLocaleString();
-        document.getElementById('tpfg-sharetext').textContent=`${stamp}\n\n${share}`;
+        state.shareText=`${stamp} ${share.replace(/\n/g,' ') } Game Time: ${formatTime(state.activeMs)} | Kills: ${state.kills} | High Score: ${Number(saved.highScore).toLocaleString()}`;
+        document.getElementById('tpfg-sharetext').textContent=state.shareText;
         document.getElementById('tpfg-results').style.display='block';
         document.getElementById('tpfg-message').textContent=manual?'FLIGHT ENDED':'';
     }
