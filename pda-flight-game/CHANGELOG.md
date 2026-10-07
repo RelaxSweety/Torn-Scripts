@@ -1,5 +1,10 @@
 # Torn PDA Arcade Changelog
 
+## v0.10.8
+- Removed FIRE button; player aircraft now shoots automatically.
+- Added visibly distinct aircraft colors and stage indicator.
+- Simplified aircraft transition checks while preserving 5,000-point progression.
+
 ## v0.10.7
 - Reworked mobile joystick tracking to use touch identifiers independently from the FIRE button.
 - Corrected aircraft style selection and score-based transitions every 5,000 points.
