@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.4.0
+// @version      0.5.0
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -18,7 +18,7 @@
 
     const GAME = {
         name: 'Torn PDA Flight Game',
-        version: '0.4.0',
+        version: '0.5.0',
         creator: 'RelaxSweety',
         creatorId: '4539436',
         creatorUrl: 'https://www.torn.com/profiles.php?XID=4539436',
@@ -58,12 +58,10 @@
         const s = document.createElement('style');
         s.id = 'tpfg-style';
         s.textContent = `
-#tpfg-launcher{position:fixed;right:10px;bottom:88px;z-index:2147483000;display:flex;gap:5px;align-items:center;touch-action:none}
-#tpfg-launcher #tpfg-launch{position:static!important;right:auto!important;bottom:auto!important}
-#tpfg-launch-settings{width:38px;height:38px;border:1px solid #777;background:#171717;color:#eee;border-radius:10px;font-weight:800}
-#tpfg-game-settings{position:fixed;inset:0;z-index:2147483800;background:#000b;display:none;align-items:center;justify-content:center;padding:16px}
+#tpfg-launcher{position:fixed;right:12px;bottom:88px;z-index:2147483000;width:42px;height:42px;border:1px solid #777;background:#171717;color:#eee;border-radius:50%;font-size:23px;font-weight:800;touch-action:none;box-shadow:0 2px 8px #0008}
+#tpfg-manager,#tpfg-game-settings{position:fixed;inset:0;z-index:2147483800;background:#000b;display:none;align-items:center;justify-content:center;padding:16px}
 .tpfg-settings-card{width:min(420px,100%);background:#151a20;border:1px solid #59616b;border-radius:12px;padding:16px;color:#fff;font-family:Arial,sans-serif}
-.tpfg-settings-card label{display:block;padding:12px 4px;border-top:1px solid #343a40}.tpfg-setting-row{display:flex;justify-content:space-between;padding:8px 4px}.tpfg-settings-note{color:#9da6af;font-size:11px}
+.tpfg-settings-card label{display:block;padding:12px 4px;border-top:1px solid #343a40}.tpfg-manager-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.tpfg-manager-tabs button,.tpfg-game-card button{min-height:42px;border:1px solid #59616b;border-radius:8px;background:#252c34;color:#fff;font-weight:800}.tpfg-game-card{display:grid;gap:8px;padding:12px;border:1px solid #343a40;border-radius:9px}.tpfg-game-card span,.tpfg-empty{color:#9da6af;font-size:12px}.tpfg-setting-row{display:flex;justify-content:space-between;padding:8px 4px}.tpfg-settings-note{color:#9da6af;font-size:11px}
 #tpfg-launch{position:fixed;right:10px;bottom:88px;z-index:2147483000;border:1px solid #777;background:#171717;color:#eee;border-radius:10px;padding:10px 13px;font:700 12px Arial,sans-serif;box-shadow:0 2px 8px #0008;touch-action:manipulation}
 #tpfg-launch:active{transform:scale(.97)}
 #tpfg-root{position:fixed;inset:0;z-index:2147483600;background:#090b0e;color:#fff;font-family:Arial,sans-serif;display:none;overscroll-behavior:none;touch-action:none}
@@ -119,21 +117,37 @@
                    {flying:false,origin:'Unknown',destination:'Unknown',remaining:''};
     }
 
+    function gameAvailable(){
+        const mode=launchMode();
+        return mode==='always'||(mode==='flight'&&detectFlight().flying);
+    }
+    function openManager(){document.getElementById('tpfg-manager').style.display='flex';renderManager('games');}
+    function renderManager(tab){
+        const body=document.getElementById('tpfg-manager-body');
+        if(tab==='games'){
+            body.innerHTML=gameAvailable()?'<div class="tpfg-game-card"><b>Flight Arcade</b><span>Available now</span><button id="tpfg-play-flight">PLAY</button></div>':'<p class="tpfg-empty">No games are available in your current Torn situation.</p>';
+            const p=document.getElementById('tpfg-play-flight');if(p)p.onclick=()=>{document.getElementById('tpfg-manager').style.display='none';startGame();};
+        } else {
+            const mode=launchMode();
+            body.innerHTML='<div class="tpfg-game-card"><b>Flight Arcade</b><span>Availability</span><label><input type="radio" name="manager-mode" value="flight" '+(mode==='flight'?'checked':'')+'> Traveling</label><label><input type="radio" name="manager-mode" value="always" '+(mode==='always'?'checked':'')+'> Always</label><label><input type="radio" name="manager-mode" value="disabled" '+(mode==='disabled'?'checked':'')+'> Disabled</label></div>';
+            body.querySelectorAll('input[name="manager-mode"]').forEach(r=>r.onchange=()=>localStorage.setItem(LAUNCH_MODE_KEY,r.value));
+        }
+    }
+
     function buildUI() {
         if (document.getElementById('tpfg-root')) return;
-        const launcher=document.createElement('div');
+        const launcher=document.createElement('button');
         launcher.id='tpfg-launcher';
-        launcher.innerHTML='<button id="tpfg-launch" type="button">PLAY A GAME?</button><button id="tpfg-launch-settings" type="button" title="Game Settings">⚙</button>';
+        launcher.type='button';
+        launcher.textContent='⌖';
+        launcher.title='Torn PDA Arcade';
         document.body.appendChild(launcher);
-        const launch=document.getElementById('tpfg-launch'), settings=document.getElementById('tpfg-launch-settings');
-        const restorePos=()=>{try{const p=JSON.parse(localStorage.getItem(LAUNCH_POS_KEY)||'null');if(p){launcher.style.left=p.x+'px';launcher.style.top=p.y+'px';launcher.style.right='auto';launcher.style.bottom='auto';}}catch(_){}};
-        const refreshLaunch=()=>{const flight=detectFlight();launch.style.display=(launchMode()==='always'||(launchMode()==='flight'&&flight.flying))?'':'none';settings.textContent='⚙'+(launchMode()==='always'?'A':'F');settings.title='Game Settings — '+(launchMode()==='always'?'Always':'Flight only');};
-        restorePos();refreshLaunch();setInterval(refreshLaunch,1500);
+        const restorePos=()=>{try{const p=JSON.parse(localStorage.getItem(LAUNCH_POS_KEY)||'null');if(p){launcher.style.left=Math.max(0,Math.min(innerWidth-44,p.x))+'px';launcher.style.top=Math.max(0,Math.min(innerHeight-44,p.y))+'px';launcher.style.right='auto';launcher.style.bottom='auto';}}catch(_){}};
+        restorePos();
         let drag=null,moved=false;
         launcher.addEventListener('pointerdown',e=>{drag={id:e.pointerId,x:e.clientX,y:e.clientY,l:launcher.offsetLeft,t:launcher.offsetTop};moved=false;launcher.setPointerCapture(e.pointerId);});
-        launcher.addEventListener('pointermove',e=>{if(!drag||drag.id!==e.pointerId)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.hypot(dx,dy)>7)moved=true;if(moved){const x=Math.max(0,Math.min(innerWidth-launcher.offsetWidth,drag.l+dx)),y=Math.max(0,Math.min(innerHeight-launcher.offsetHeight,drag.t+dy));launcher.style.left=x+'px';launcher.style.top=y+'px';launcher.style.right='auto';launcher.style.bottom='auto';}});
-        launcher.addEventListener('pointerup',e=>{if(!drag||drag.id!==e.pointerId)return;if(moved)localStorage.setItem(LAUNCH_POS_KEY,JSON.stringify({x:launcher.offsetLeft,y:launcher.offsetTop}));drag=null;});
-        settings.addEventListener('click',e=>{if(moved){e.preventDefault();return;}document.getElementById('tpfg-game-settings').style.display='flex';});
+        launcher.addEventListener('pointermove',e=>{if(!drag||drag.id!==e.pointerId)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.hypot(dx,dy)>7)moved=true;if(moved){launcher.style.left=Math.max(0,Math.min(innerWidth-launcher.offsetWidth,drag.l+dx))+'px';launcher.style.top=Math.max(0,Math.min(innerHeight-launcher.offsetHeight,drag.t+dy))+'px';launcher.style.right='auto';launcher.style.bottom='auto';}});
+        launcher.addEventListener('pointerup',e=>{if(!drag||drag.id!==e.pointerId)return;if(moved)localStorage.setItem(LAUNCH_POS_KEY,JSON.stringify({x:launcher.offsetLeft,y:launcher.offsetTop}));else openManager();drag=null;});
 
         const root = document.createElement('div');
         root.id = 'tpfg-root';
@@ -141,8 +155,7 @@
 <div id="tpfg-shell">
   <div id="tpfg-top">
     <div id="tpfg-title"><span>TORN PDA FLIGHT GAME <small>v${GAME.version}</small></span><button class="tpfg-topbtn" id="tpfg-min" type="button">—</button></div>
-    <div id="tpfg-route">Checking flight…</div>
-    <div id="tpfg-stats">
+        <div id="tpfg-stats">
       <div class="tpfg-stat">TIME<b id="tpfg-time">00:00</b></div>
       <div class="tpfg-stat">SCORE<b id="tpfg-score">0</b></div>
       <div class="tpfg-stat">HP<b id="tpfg-hp">100</b></div>
@@ -155,8 +168,7 @@
     <div id="tpfg-results">
       <div id="tpfg-results-card">
         <h2>TORN PDA FLIGHT GAME</h2>
-        <div id="tpfg-results-route"></div>
-        <div id="tpfg-result-grid">
+                <div id="tpfg-result-grid">
           <div class="tpfg-result">SCORE<b id="tpfg-rscore">0</b></div>
           <div class="tpfg-result">KILLS<b id="tpfg-rkills">0</b></div>
           <div class="tpfg-result">GAME TIME<b id="tpfg-rtime">00:00</b></div>
@@ -179,9 +191,13 @@
     </div>
   </div>
 </div>`;
+        const manager=document.createElement('div');manager.id='tpfg-manager';manager.innerHTML='<div class="tpfg-settings-card"><h3>TORN PDA ARCADE</h3><div class="tpfg-manager-tabs"><button id="tpfg-tab-games">GAMES</button><button id="tpfg-tab-settings">SETTINGS</button></div><div id="tpfg-manager-body"></div><button class="tpfg-resultbtn" id="tpfg-manager-close">CLOSE</button></div>';document.body.appendChild(manager);
         const gameSettings=document.createElement('div');gameSettings.id='tpfg-game-settings';gameSettings.innerHTML='<div class="tpfg-settings-card"><h3>GAME SETTINGS</h3><div class="tpfg-setting-row"><b>Flight Arcade</b><span>Enabled</span></div><label><input type="radio" name="tpfg-mode" value="flight"> Flight only</label><label><input type="radio" name="tpfg-mode" value="always"> Always available</label><label><input type="radio" name="tpfg-mode" value="disabled"> Disabled</label><p class="tpfg-settings-note">Additional Torn games can be added here as modules.</p><button class="tpfg-resultbtn" id="tpfg-settings-close">CLOSE</button></div>';document.body.appendChild(gameSettings);
-        gameSettings.querySelectorAll('input[name="tpfg-mode"]').forEach(r=>{r.checked=(launchMode()===r.value);r.addEventListener('change',()=>{localStorage.setItem(LAUNCH_MODE_KEY,r.value);refreshLaunch();});});
+        gameSettings.querySelectorAll('input[name="tpfg-mode"]').forEach(r=>{r.checked=(launchMode()===r.value);r.addEventListener('change',()=>localStorage.setItem(LAUNCH_MODE_KEY,r.value));});
         document.getElementById('tpfg-settings-close').onclick=()=>gameSettings.style.display='none';
+        document.getElementById('tpfg-manager-close').onclick=()=>manager.style.display='none';
+        document.getElementById('tpfg-tab-games').onclick=()=>renderManager('games');
+        document.getElementById('tpfg-tab-settings').onclick=()=>renderManager('settings');
         const picker=document.createElement('div');picker.id='tpfg-chatpick';picker.innerHTML='<div id="tpfg-chatcard"><b>Share Arcade Results</b><p>Select an open Torn chat. Results are inserted but not sent.</p><div id="tpfg-chatlist"></div><button class="tpfg-resultbtn" id="tpfg-copy">COPY RESULTS</button><button class="tpfg-resultbtn" id="tpfg-chatcancel">CANCEL</button></div>';document.body.appendChild(picker);
         document.body.appendChild(root);
         wireUI();
@@ -190,7 +206,6 @@
     const state = {
         running:false, paused:false, over:false, score:0, kills:0, hp:100,
         activeMs:0, lastTs:0, spawnClock:0, shotClock:0, enemyShotClock:0,
-        route:{origin:'Unknown',destination:'Unknown'},
         keys:{up:false,down:false,left:false,right:false,fire:false},
         stick:{x:0,y:0}, shareText:'',
         player:null, bullets:[], enemies:[], enemyBullets:[], particles:[]
@@ -214,8 +229,7 @@
     function wireUI() {
         canvas = document.getElementById('tpfg-canvas');
         ctx = canvas.getContext('2d');
-        document.getElementById('tpfg-launch').addEventListener('click', startGame);
-        document.getElementById('tpfg-min').addEventListener('click', minimize);
+                document.getElementById('tpfg-min').addEventListener('click', minimize);
         document.getElementById('tpfg-pause').addEventListener('click', togglePause);
         document.getElementById('tpfg-end').addEventListener('click', () => finishGame(true));
         document.getElementById('tpfg-restart').addEventListener('click', startGame);
@@ -270,7 +284,6 @@
     async function startGame() {
         cancelAnimationFrame(raf);
         const flight = detectFlight();
-        state.route = flight;
         state.running=true; state.paused=false; state.over=false;
         state.score=0; state.kills=0; state.hp=100; state.activeMs=0;
         state.lastTs=performance.now(); state.spawnClock=0; state.shotClock=0; state.enemyShotClock=0;
@@ -280,8 +293,7 @@
         state.bullets=[]; state.enemies=[]; state.enemyBullets=[]; state.particles=[];
         document.getElementById('tpfg-root').style.display='block';
         document.getElementById('tpfg-results').style.display='none';
-        document.getElementById('tpfg-message').textContent = flight.flying ? '' : 'Flight status not detected — practice mode';
-        document.getElementById('tpfg-route').textContent = `${flight.origin} → ${flight.destination}`;
+        document.getElementById('tpfg-message').textContent='';
         document.getElementById('tpfg-pause').textContent='PAUSE';
         document.getElementById('tpfg-high').textContent=Number(saved.highScore||0).toLocaleString();
         setTimeout(resize, 0);
@@ -495,10 +507,7 @@
 
         const now=new Date();
         const stamp=now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'})+' - '+now.toLocaleDateString();
-        const route=`${state.route.origin} → ${state.route.destination}`;
-        const share=`Achieved a Torn PDA Flight Game score of ${score.toLocaleString()}\nwhile flying from ${state.route.origin} to ${state.route.destination}.`;
-
-        document.getElementById('tpfg-results-route').textContent=route;
+        const share=`Achieved a Torn PDA Arcade Flight Arcade score of ${score.toLocaleString()}.`;
         document.getElementById('tpfg-rscore').textContent=score.toLocaleString();
         document.getElementById('tpfg-rkills').textContent=state.kills.toLocaleString();
         document.getElementById('tpfg-rtime').textContent=formatTime(state.activeMs);
@@ -507,7 +516,7 @@
         state.shareText=`${stamp} ${share.replace(/\n/g,' ') } Game Time: ${formatTime(state.activeMs)} | Kills: ${state.kills} | High Score: ${Number(saved.highScore).toLocaleString()}`;
         document.getElementById('tpfg-sharetext').textContent=state.shareText;
         document.getElementById('tpfg-results').style.display='block';
-        document.getElementById('tpfg-message').textContent=manual?'FLIGHT ENDED':'';
+        document.getElementById('tpfg-message').textContent=manual?'GAME ENDED':'';
     }
 
     async function init() {
