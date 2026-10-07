@@ -1,5 +1,10 @@
 # Torn PDA Arcade Changelog
 
+## v0.10.4
+- Aircraft designs now advance every 5,000 points, with exit-right and reentry-left transition animation.
+- Includes v0.10.3 fixes that silence the engine on pause, game over, minimize, and exit.
+- Includes v0.10.2 reduced engine/movement sound volume.
+
 ## v0.10.1
 - Critical fix for literal escaped-newline sequences introduced in v0.10.0 that prevented the userscript from parsing and loading.
 
