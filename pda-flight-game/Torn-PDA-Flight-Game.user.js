@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.10.7
+// @version      0.10.8
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -42,7 +42,7 @@
 
     const GAME = {
         name: 'Torn PDA Flight Game',
-        version: '0.10.7',
+        version: '0.10.8',
         creator: 'RelaxSweety',
         creatorId: '4539436',
         creatorUrl: 'https://www.torn.com/profiles.php?XID=4539436',
@@ -245,7 +245,7 @@
   <div id="tpfg-controls">
     <div id="tpfg-stick"><div id="tpfg-stick-label">SLIDE TO MOVE</div><div id="tpfg-stick-knob"></div></div>
     <div id="tpfg-actions">
-      <button id="tpfg-fire" type="button">FIRE</button>
+      
       <div id="tpfg-audio"><span>VOL</span><input id="tpfg-volume" type="range" min="0" max="100" value="55"><button id="tpfg-mute" type="button">ON</button></div>
       <button id="tpfg-pause" type="button">PAUSE</button>
       <button id="tpfg-end" type="button">END GAME</button>
@@ -312,7 +312,6 @@
         document.getElementById('tpfg-copy').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(state.shareText);}catch(_){window.prompt('Copy results:',state.shareText);}});
 
         bindStick(document.getElementById('tpfg-stick'));
-        bindHold(document.getElementById('tpfg-fire'), 'fire');
         const vol=document.getElementById('tpfg-volume'),mute=document.getElementById('tpfg-mute');vol.value=Math.round(audioPrefs.volume*100);mute.textContent=audioPrefs.muted?'OFF':'ON';vol.addEventListener('input',()=>{audioPrefs.volume=Number(vol.value)/100;saveAudio();});mute.addEventListener('click',()=>{audioPrefs.muted=!audioPrefs.muted;mute.textContent=audioPrefs.muted?'OFF':'ON';saveAudio();if(audioPrefs.muted)updateEngineSound(false);else ensureAudio();});
 
         window.addEventListener('resize', resize);
@@ -466,7 +465,7 @@
         // Continuous engine audio removed.
 
         state.shotClock-=dt;
-        if (state.keys.fire && state.shotClock<=0) {
+        if (state.shotClock<=0) {
             state.bullets.push({x:p.x+p.w,y:p.y+p.h*.5,vx:510,r:3});
             state.shotClock=.14;
         }
@@ -509,7 +508,7 @@
                     if (e.hp<=0) {
                         explode(e.x+e.w/2,e.y+e.h/2); explosionSound();
                         state.score+=e.tough?300:120; state.kills++;
-                        if(!transition&&aircraftStage()!==shownStage)startAircraftTransition(aircraftStage());
+                        
                         state.healthDrops.push({x:e.x+e.w/2-8,y:e.y+e.h/2-8,w:18,h:18,speed:55});
                         state.enemies.splice(ei,1);
                     }
@@ -586,7 +585,9 @@
     }
     function drawAircraft(x,y,w,h,design,enemy=false,tough=false){
         ctx.save();ctx.translate(x,y);if(enemy){ctx.translate(w,0);ctx.scale(-1,1);}
-        const body=enemy?(tough?'#7d858d':'#626b74'):'#d8dde2',accent=enemy?'#c4544c':'#6fa8d8',dark=enemy?'#343b42':'#697580';
+        const paint=['#d8dde2','#313c50','#00c8ed','#7c8a68','#a3a6ae','#b77b42','#e6bd43','#e8e8e8'];
+        const trims=['#6fa8d8','#8d71e6','#ff4bd8','#d95444','#f0e5c1','#48d68a','#191919','#ff4d4d'];
+        const body=enemy?(tough?'#7d858d':'#626b74'):paint[design%AIRCRAFT_COUNT],accent=enemy?'#c4544c':trims[design%AIRCRAFT_COUNT],dark=enemy?'#343b42':'#18202a';
         ctx.fillStyle=body;ctx.strokeStyle=dark;ctx.lineWidth=1;
         const cy=h/2;
         if(design===0){ctx.beginPath();ctx.moveTo(w,cy);ctx.lineTo(w*.58,h*.30);ctx.lineTo(w*.38,0);ctx.lineTo(w*.30,h*.34);ctx.lineTo(0,h*.18);ctx.lineTo(w*.14,cy);ctx.lineTo(0,h*.82);ctx.lineTo(w*.30,h*.66);ctx.lineTo(w*.38,h);ctx.lineTo(w*.58,h*.70);ctx.closePath();}
@@ -598,6 +599,7 @@
         else if(design===6){ctx.beginPath();ctx.moveTo(w,cy);ctx.lineTo(w*.58,h*.20);ctx.lineTo(w*.28,0);ctx.lineTo(w*.24,h*.36);ctx.lineTo(0,h*.18);ctx.lineTo(w*.10,cy);ctx.lineTo(0,h*.82);ctx.lineTo(w*.24,h*.64);ctx.lineTo(w*.28,h);ctx.lineTo(w*.58,h*.80);ctx.closePath();}
         else {ctx.beginPath();ctx.moveTo(w,cy);ctx.lineTo(w*.52,h*.30);ctx.lineTo(w*.34,h*.08);ctx.lineTo(w*.28,h*.38);ctx.lineTo(0,h*.24);ctx.lineTo(w*.12,cy);ctx.lineTo(0,h*.76);ctx.lineTo(w*.28,h*.62);ctx.lineTo(w*.34,h*.92);ctx.lineTo(w*.52,h*.70);ctx.closePath();}
         ctx.fill();ctx.stroke();
+        if(!enemy){ctx.save();ctx.globalAlpha=.85;ctx.fillStyle=accent;ctx.fillRect(w*.18,h*.40,w*.25,h*.20);ctx.restore();}
         ctx.fillStyle=accent;ctx.beginPath();ctx.ellipse(w*.62,cy,w*.13,Math.max(2,h*.12),0,0,Math.PI*2);ctx.fill();
         if(design===2||design===3||design===6){ctx.fillStyle=dark;ctx.fillRect(w*.08,h*.18,w*.10,h*.18);ctx.fillRect(w*.08,h*.64,w*.10,h*.18);}
         if(design===4){ctx.strokeStyle='#d7d7d7';ctx.beginPath();ctx.moveTo(w*.70,cy-h*.32);ctx.lineTo(w*.70,cy+h*.32);ctx.stroke();}
@@ -608,7 +610,8 @@
         ctx.clearRect(0,0,W,H);
         const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#071525');g.addColorStop(1,'#101820');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
         ctx.strokeStyle='rgba(255,255,255,.16)';ctx.lineWidth=1;for(let i=0;i<18;i++){const y=(i*47+(state.activeMs*.025))%H,x=(i*83)%W;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+16,y);ctx.stroke();}
-        const stage=transition?transition.from:aircraftStage(),enemyDesign=((transition?transition.to:stage)+1)%AIRCRAFT_COUNT,p=state.player;
+        const stage=shownStage,enemyDesign=(stage+1)%AIRCRAFT_COUNT,p=state.player;
+        ctx.fillStyle='#d8dde2';ctx.font='bold 12px sans-serif';ctx.fillText('AIRCRAFT '+(transition?transition.to+1:stage+1)+' / '+AIRCRAFT_COUNT,12,18);
         if(p){
             if(transition){
                 const t=transition.elapsed/TRANSITION_SECONDS;
@@ -627,6 +630,7 @@
         document.getElementById('tpfg-time').textContent=formatTime(state.activeMs);
         document.getElementById('tpfg-score').textContent=Math.floor(state.score).toLocaleString();
         document.getElementById('tpfg-hp').textContent=Math.max(0,Math.ceil(state.hp));
+        const stageLabel=document.getElementById('tpfg-aircraft-stage');if(stageLabel)stageLabel.textContent='AIRCRAFT '+(shownStage+1)+' / '+AIRCRAFT_COUNT;
     }
 
     function formatTime(ms) {
