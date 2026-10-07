@@ -1,5 +1,8 @@
 # Torn PDA Arcade Changelog
 
+## v0.10.1
+- Critical fix for literal escaped-newline sequences introduced in v0.10.0 that prevented the userscript from parsing and loading.
+
 ## v0.10.0
 - Added eight-stage aircraft design progression, advancing every 1,000 points and looping after the final design.
 - Increased player aircraft maneuver speed from 235 to 270.
