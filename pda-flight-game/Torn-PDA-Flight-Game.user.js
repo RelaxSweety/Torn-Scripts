@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.11.6
+// @version      0.11.7
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -165,9 +165,10 @@
     // Stick Figure Fighter: self-contained arcade module.
     const StickFighter = (() => {
         let host=null, canvas=null, ctx=null, frame=0, last=0, active=false, keys=new Set(), joystick={x:0,y:0}, player, enemies, pickups, shots, score, elapsed, spawn, attack, weapon, pointer=null, aimPointer=null, aimStick={x:0,y:0}, swing=0, aim=0, paused=false, deathPrompted=false;
-        const W=360,H=600, names=['Knife','Bat','Sword','Shotgun','Dual Pistols'];
+        const W=360,H=600, names=['Knife','Bat','Sword','Shotgun','Dual Pistols','Chain Gun'];
         const rand=(a,b)=>a+Math.random()*(b-a);
         const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+        function randomWeaponDrop(){const choices=names.map((_,i)=>i).filter(i=>i!==weapon);return choices[Math.floor(Math.random()*choices.length)];}
         function reset(){player={x:W/2,y:H/2,hp:100};enemies=[];pickups=[];shots=[];score=0;elapsed=0;spawn=0;attack=0;weapon=0;swing=0;aim=0;paused=false;deathPrompted=false;aimPointer=null;aimStick={x:0,y:0};last=performance.now();}
         function stick(x,y,color){ctx.strokeStyle=color;ctx.lineWidth=4;ctx.lineCap='round';ctx.beginPath();ctx.arc(x,y-15,8,0,Math.PI*2);ctx.moveTo(x,y-7);ctx.lineTo(x,y+18);ctx.moveTo(x-12,y+5);ctx.lineTo(x+12,y+5);ctx.moveTo(x,y+18);ctx.lineTo(x-11,y+34);ctx.moveTo(x,y+18);ctx.lineTo(x+11,y+34);ctx.stroke();}
         function draw(){
@@ -175,7 +176,7 @@
             ctx.strokeStyle='#27313b';ctx.lineWidth=1;
             for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
             for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
-            for(const p of pickups){ctx.fillStyle=p.type==='health'?'#48d16a':'#e4c35c';ctx.fillRect(p.x-9,p.y-9,18,18);ctx.fillStyle='#101010';ctx.font='bold 14px sans-serif';ctx.fillText(p.type==='health'?'+':['K','B','S','G','P'][p.weapon],p.x-6,p.y+5);}
+            for(const p of pickups){ctx.fillStyle=p.type==='health'?'#48d16a':'#e4c35c';ctx.fillRect(p.x-(p.weapon===5?13:9),p.y-9,p.weapon===5?26:18,18);ctx.fillStyle='#101010';ctx.font='bold 14px sans-serif';ctx.fillText(p.type==='health'?'+':['K','B','S','G','P','CG'][p.weapon],p.x-6,p.y+5);}
             for(const e of enemies)stick(e.x,e.y,'#e64d54');
             for(const s of shots){ctx.fillStyle='#ffd35b';ctx.beginPath();ctx.arc(s.x,s.y,3,0,7);ctx.fill();}
             stick(player.x,player.y,'#55e879');
@@ -183,12 +184,12 @@
             ctx.save();ctx.translate(player.x,player.y+5);ctx.rotate(aim);
             ctx.strokeStyle=weapon===0?'#e9edf4':weapon===1?'#aa753f':weapon===2?'#c8e8ff':'#424b55';
             ctx.lineWidth=weapon===1?7:weapon===2?5:4;ctx.lineCap='round';
-            const reach=[26,38,53,30,24][weapon];
+            const reach=[26,38,53,30,24,38][weapon];
             const theta=weapon<3&&swing>0?Math.sin((1-swing/.22)*Math.PI)*.9:0;
             ctx.rotate(theta);ctx.beginPath();ctx.moveTo(9,0);ctx.lineTo(reach,0);ctx.stroke();
             if(weapon===2){ctx.strokeStyle='#f7fafc';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(24,-3);ctx.lineTo(reach+8,0);ctx.stroke();}
             if(weapon===0){ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(18,-3);ctx.lineTo(reach+5,0);ctx.stroke();}
-            if(weapon===4){ctx.strokeStyle='#8b949e';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(8,11);ctx.lineTo(27,11);ctx.stroke();}
+            if(weapon===5){ctx.strokeStyle='#8b949e';ctx.lineWidth=3;for(const off of [-6,0,6]){ctx.beginPath();ctx.moveTo(16,off);ctx.lineTo(42,off);ctx.stroke();}}if(weapon===4){ctx.strokeStyle='#8b949e';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(8,11);ctx.lineTo(27,11);ctx.stroke();}
             if(weapon<3&&swing>0){ctx.strokeStyle='#ffffff99';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,reach+6,-.55,.75);ctx.stroke();}
             ctx.restore();
             ctx.fillStyle='#fff';ctx.font='bold 15px sans-serif';ctx.fillText('HP '+Math.ceil(player.hp)+'   KILLS '+score,12,23);ctx.fillText(names[weapon],12,44);ctx.fillText(Math.floor(elapsed)+'s',W-52,23);
@@ -201,19 +202,19 @@
             let dx=joystick.x+(keys.has('ArrowRight')||keys.has('d')?1:0)-(keys.has('ArrowLeft')||keys.has('a')?1:0),dy=joystick.y+(keys.has('ArrowDown')||keys.has('s')?1:0)-(keys.has('ArrowUp')||keys.has('w')?1:0);let m=Math.hypot(dx,dy)||1;player.x=Math.max(18,Math.min(W-18,player.x+dx/m*145*dt));player.y=Math.max(38,Math.min(H-38,player.y+dy/m*145*dt));
             if(spawn<=0){spawn=Math.max(.12,.65-elapsed/110);const edge=Math.floor(rand(0,4));enemies.push({x:edge===0?-15:edge===1?W+15:rand(0,W),y:edge===2?-15:edge===3?H+15:rand(0,H),hp:weapon===3?2:1});}
             for(const e of enemies){let d=dist(e,player)||1;e.x+=(player.x-e.x)/d*(65+Math.min(85,elapsed/3))*dt;e.y+=(player.y-e.y)/d*(35+Math.min(55,elapsed/5))*dt;if(d<21)player.hp=Math.max(0,player.hp-20*dt);}
-            const inRange=enemies.filter(e=>dist(e,player)<(weapon===0?60:weapon===1?80:weapon===2?115:240));const target=inRange.filter(e=>Math.cos(Math.atan2(e.y-player.y,e.x-player.x)-aim)>.45).sort((a,b)=>dist(a,player)-dist(b,player))[0];
-            if(target&&attack<=0){if(weapon<3)swing=.22;attack=[.27,.55,.42,.9,.18][weapon];if(weapon<3){const range=[60,80,115][weapon];const hits=enemies.filter(e=>dist(e,player)<range&&Math.cos(Math.atan2(e.y-player.y,e.x-player.x)-aim)>.35).slice(0,weapon===0?1:weapon===1?3:5);for(const e of hits){e.hp--;if(weapon===1){let d=dist(e,player)||1;e.x+=(e.x-player.x)/d*20;e.y+=(e.y-player.y)/d*20;}}}else{let a=aim;for(let i=0;i<(weapon===3?5:1);i++){let angle=a+(weapon===3?(i-2)*.16:0);shots.push({x:player.x,y:player.y,vx:Math.cos(angle)*350,vy:Math.sin(angle)*350,life:.8});}}}
+            const inRange=enemies.filter(e=>dist(e,player)<(weapon===0?60:weapon===1?80:weapon===2?115:320));const target=inRange.filter(e=>Math.cos(Math.atan2(e.y-player.y,e.x-player.x)-aim)>.45).sort((a,b)=>dist(a,player)-dist(b,player))[0];
+            if(target&&attack<=0){if(weapon<3)swing=.22;attack=[.27,.55,.42,.9,.18,.045][weapon];if(weapon<3){const range=[60,80,115][weapon];const hits=enemies.filter(e=>dist(e,player)<range&&Math.cos(Math.atan2(e.y-player.y,e.x-player.x)-aim)>.35).slice(0,weapon===0?1:weapon===1?3:5);for(const e of hits){e.hp--;if(weapon===1){let d=dist(e,player)||1;e.x+=(e.x-player.x)/d*20;e.y+=(e.y-player.y)/d*20;}}}else{let a=aim;for(let i=0;i<(weapon===3?5:weapon===5?3:1);i++){let angle=a+(weapon===3?(i-2)*.16:0);const offset=weapon===5?(i-1)*8:0;shots.push({x:player.x-Math.sin(a)*offset,y:player.y+Math.cos(a)*offset,vx:Math.cos(angle)*(weapon===5?600:350),vy:Math.sin(angle)*(weapon===5?600:350),life:weapon===5?.55:.8});}}}
             for(const s of shots){s.x+=s.vx*dt;s.y+=s.vy*dt;s.life-=dt;for(const e of enemies){if(dist(s,e)<15){e.hp--;s.life=0;break;}}}shots=shots.filter(s=>s.life>0);
-            for(const e of enemies.filter(e=>e.hp<=0)){score++;if(Math.random()<.12)pickups.push({x:e.x,y:e.y,type:'health'});if(Math.random()<.008)pickups.push({x:e.x,y:e.y,type:'weapon',weapon:Math.floor(rand(0,5))});}
+            for(const e of enemies.filter(e=>e.hp<=0)){score++;if(Math.random()<.12)pickups.push({x:e.x,y:e.y,type:'health'});if(Math.random()<.008)pickups.push({x:e.x,y:e.y,type:'weapon',weapon:randomWeaponDrop(),spawnedAt:elapsed});}
             enemies=enemies.filter(e=>e.hp>0);
-            if(Math.random()<dt*.025)pickups.push({x:rand(25,W-25),y:rand(70,H-70),type:'weapon',weapon:Math.floor(rand(0,5))});
-            for(const p of pickups){if(dist(p,player)<23){if(p.type==='health')player.hp=Math.min(100,player.hp+25);else weapon=p.weapon;p.used=true;}}pickups=pickups.filter(p=>!p.used).slice(-35);
+            if(Math.random()<dt*.025)pickups.push({x:rand(25,W-25),y:rand(70,H-70),type:'weapon',weapon:randomWeaponDrop(),spawnedAt:elapsed});
+            for(const p of pickups){if(p.type==='weapon'&&p.weapon===weapon)p.used=true;if(!p.used&&dist(p,player)<23){if(p.type==='health')player.hp=Math.min(100,player.hp+25);else weapon=p.weapon;p.used=true;}}pickups=pickups.filter(p=>!p.used&&(p.type!=='weapon'||elapsed-(p.spawnedAt??elapsed)<10)).slice(-35);
         }draw();if(player.hp<=0&&!deathPrompted){deathPrompted=true;paused=true;try{localStorage.removeItem('sffSavedGame');}catch(_){}setTimeout(()=>arcadeEndPrompt('stick-figure-fighter',true),0);}if(host){const n=Math.floor(elapsed),t=host.querySelector('#sff-time');if(t)t.textContent=String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');host.querySelector('#sff-kills').textContent=score;host.querySelector('#sff-hp').textContent=Math.ceil(player.hp);try{const best=Math.max(score,Number(localStorage.getItem('sffBestKills')||0));host.querySelector('#sff-best').textContent=best;if(player.hp<=0)localStorage.setItem('sffBestKills',String(best));}catch(_){}}frame=requestAnimationFrame(tick);}
         function setPointer(e){if(pointer!==null&&e.pointerId!==pointer)return;const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;if(pointer===null&&Math.hypot(x-62,y-(H-68))>105)return;pointer=e.pointerId;let dx=x-62,dy=y-(H-68),m=Math.max(1,Math.hypot(dx,dy));joystick={x:dx/Math.max(43,m),y:dy/Math.max(43,m)};}
         function start(){stop();reset();host=document.createElement('div');host.id='tpfg-stick-fighter';host.style.cssText='position:fixed;inset:0;z-index:2147483646;background:#080b10;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px;box-sizing:border-box;font-family:Arial,sans-serif;color:white';
             host.innerHTML=`
             <div style="width:min(100%,420px);box-sizing:border-box;background:#151a20;border:1px solid #59616b;border-radius:9px 9px 0 0;padding:9px">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:700">STICK FIGURE FIGHTER <small>v0.1.4</small><button type="button" id="sff-min" class="tpfg-topbtn" aria-label="Leave game">—</button></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:700">STICK FIGURE FIGHTER <small>v0.1.6</small><button type="button" id="sff-min" class="tpfg-topbtn" aria-label="Leave game">—</button></div>
               <div style="display:flex;justify-content:space-around;margin-top:8px;text-align:center;font-size:12px"><span>TIME<br><b id="sff-time">00:00</b></span><span>KILLS<br><b id="sff-kills">0</b></span><span>HP<br><b id="sff-hp">100</b></span><span>BEST<br><b id="sff-best">0</b></span></div>
             </div>
             <div id="sff-stage" style="position:relative;width:min(100%,420px);min-height:0;display:flex;justify-content:center"></div>
