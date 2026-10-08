@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.11.5
+// @version      0.11.6
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -270,11 +270,17 @@
             {label:'EXIT WITHOUT SAVING',action:()=>{if(isStick)localStorage.removeItem('sffSavedGame');else clearGameSave('flight-arcade');close();}},
             {label:'CANCEL',action:()=>{if(isStick)StickFighter.resume();else{state.paused=false;state.lastTs=performance.now();document.getElementById('tpfg-pause').textContent='PAUSE';}}}
         ];
-        promptBox(died?'GAME OVER':'END GAME',donation,buttons,true);
+        const gameName=isStick?'Stick Figure Fighter':'Flight Arcade';
+        const kills=isStick?StickFighter.getScore():state.kills;
+        const score=isStick?StickFighter.getScore():Math.floor(state.score);
+        const time=isStick?formatTime(StickFighter.getTime()*1000):formatTime(state.activeMs);
+        const status=died?'Game Over':'Session Ended';
+        const summary='Torn Arcade — '+gameName+' | '+status+' | Score: '+Number(score).toLocaleString()+' | Kills: '+Number(kills).toLocaleString()+' | Time: '+time;
+        promptBox(died?'GAME OVER':'END GAME',donation,buttons,true,summary);
     }
-    function promptBox(title,message,buttons,showDonation=false){
+    function promptBox(title,message,buttons,showDonation=false,summary=''){
         const p=document.getElementById('tpfg-prompt');p.querySelector('h3').textContent=title;p.querySelector('p').textContent=message;
-        const a=p.querySelector('#tpfg-prompt-actions');a.innerHTML='';buttons.forEach(x=>{const b=document.createElement('button');b.className='tpfg-resultbtn';b.textContent=x.label;b.onclick=()=>{p.style.display='none';x.action();};a.appendChild(b);});if(showDonation){const info=document.createElement('div');info.style.cssText='margin-top:14px;padding-top:12px;border-top:1px solid #59616b;font-size:13px;text-align:center';info.innerHTML='Enjoying Torn PDA Arcade? <a href="https://www.torn.com/profiles.php?XID=4539436" target="_blank" rel="noopener noreferrer" style="color:#e2c778">Donate to RelaxSweety [4539436]</a>';a.appendChild(info);}p.style.display='flex';
+        const a=p.querySelector('#tpfg-prompt-actions');a.innerHTML='';buttons.forEach(x=>{const b=document.createElement('button');b.className='tpfg-resultbtn';b.textContent=x.label;b.onclick=()=>{p.style.display='none';x.action();};a.appendChild(b);});if(summary){const wrap=document.createElement('div');wrap.style.cssText='margin:12px 0;padding:12px;background:#10151b;border:1px solid #59616b;border-radius:8px;font-size:12px;line-height:1.5;white-space:normal;overflow-wrap:anywhere';const label=document.createElement('strong');label.textContent='GAME SUMMARY';const content=document.createElement('div');content.textContent=summary;content.style.margin='7px 0';const copy=document.createElement('button');copy.type='button';copy.className='tpfg-resultbtn';copy.textContent='COPY SUMMARY';copy.onclick=async()=>{try{await navigator.clipboard.writeText(summary);copy.textContent='COPIED';}catch(_){const input=document.createElement('textarea');input.value=summary;input.style.cssText='position:fixed;opacity:0';document.body.appendChild(input);input.select();const ok=document.execCommand('copy');input.remove();copy.textContent=ok?'COPIED':'SELECT TEXT TO COPY';if(!ok){const selection=document.createElement('textarea');selection.value=summary;wrap.appendChild(selection);selection.focus();selection.select();}}};wrap.append(label,content,copy);a.prepend(wrap);}if(showDonation){const info=document.createElement('div');info.style.cssText='margin-top:14px;padding-top:12px;border-top:1px solid #59616b;font-size:13px;text-align:center';info.innerHTML='Enjoying Torn PDA Arcade? <a href="https://www.torn.com/profiles.php?XID=4539436" target="_blank" rel="noopener noreferrer" style="color:#e2c778">Donate to RelaxSweety [4539436]</a>';a.appendChild(info);}p.style.display='flex';
     }
     function launchGame(game){if(game.id==='stick-figure-fighter'){const savedStick=localStorage.getItem('sffSavedGame');if(savedStick)promptBox('SAVED GAME','Continue your saved Stick Figure Fighter game?',[{label:'CONTINUE SAVED GAME',action:()=>{game.start();StickFighter.restore();}},{label:'START NEW GAME',action:()=>{localStorage.removeItem('sffSavedGame');game.start();}},{label:'CANCEL',action:()=>{}}]);else game.start();return;}if(game.id!=='flight-arcade'){game.start();return;}const s=getGameSave(game.id);if(s)promptBox('SAVED GAME','Continue your saved '+game.name+' game?',[{label:'CONTINUE SAVED GAME',action:()=>restoreGame(s)},{label:'START NEW GAME',action:()=>{clearGameSave(game.id);game.start();}},{label:'CANCEL',action:()=>{}}]);else game.start();}
     function requestLeave(){if(!state.running||state.over){updateEngineSound(false);minimize();return;}state.paused=true;updateEngineSound(false);document.getElementById('tpfg-pause').textContent='RESUME';arcadeEndPrompt('flight-arcade',false);}
