@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.11.7
+// @version      0.11.8
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -164,12 +164,12 @@
 
     // Stick Figure Fighter: self-contained arcade module.
     const StickFighter = (() => {
-        let host=null, canvas=null, ctx=null, frame=0, last=0, active=false, keys=new Set(), joystick={x:0,y:0}, player, enemies, pickups, shots, score, elapsed, spawn, attack, weapon, pointer=null, aimPointer=null, aimStick={x:0,y:0}, swing=0, aim=0, paused=false, deathPrompted=false;
+        let host=null, canvas=null, ctx=null, frame=0, last=0, active=false, weaponDropClock=0, keys=new Set(), joystick={x:0,y:0}, player, enemies, pickups, shots, score, elapsed, spawn, attack, weapon, pointer=null, aimPointer=null, aimStick={x:0,y:0}, swing=0, aim=0, paused=false, deathPrompted=false;
         const W=360,H=600, names=['Knife','Bat','Sword','Shotgun','Dual Pistols','Chain Gun'];
         const rand=(a,b)=>a+Math.random()*(b-a);
         const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
         function randomWeaponDrop(){const choices=names.map((_,i)=>i).filter(i=>i!==weapon);return choices[Math.floor(Math.random()*choices.length)];}
-        function reset(){player={x:W/2,y:H/2,hp:100};enemies=[];pickups=[];shots=[];score=0;elapsed=0;spawn=0;attack=0;weapon=0;swing=0;aim=0;paused=false;deathPrompted=false;aimPointer=null;aimStick={x:0,y:0};last=performance.now();}
+        function reset(){weaponDropClock=0;player={x:W/2,y:H/2,hp:100};enemies=[];pickups=[];shots=[];score=0;elapsed=0;spawn=0;attack=0;weapon=0;swing=0;aim=0;paused=false;deathPrompted=false;aimPointer=null;aimStick={x:0,y:0};last=performance.now();}
         function stick(x,y,color){ctx.strokeStyle=color;ctx.lineWidth=4;ctx.lineCap='round';ctx.beginPath();ctx.arc(x,y-15,8,0,Math.PI*2);ctx.moveTo(x,y-7);ctx.lineTo(x,y+18);ctx.moveTo(x-12,y+5);ctx.lineTo(x+12,y+5);ctx.moveTo(x,y+18);ctx.lineTo(x-11,y+34);ctx.moveTo(x,y+18);ctx.lineTo(x+11,y+34);ctx.stroke();}
         function draw(){
             ctx.fillStyle='#11151b';ctx.fillRect(0,0,W,H);
@@ -207,14 +207,15 @@
             for(const s of shots){s.x+=s.vx*dt;s.y+=s.vy*dt;s.life-=dt;for(const e of enemies){if(dist(s,e)<15){e.hp--;s.life=0;break;}}}shots=shots.filter(s=>s.life>0);
             for(const e of enemies.filter(e=>e.hp<=0)){score++;if(Math.random()<.12)pickups.push({x:e.x,y:e.y,type:'health'});if(Math.random()<.008)pickups.push({x:e.x,y:e.y,type:'weapon',weapon:randomWeaponDrop(),spawnedAt:elapsed});}
             enemies=enemies.filter(e=>e.hp>0);
-            if(Math.random()<dt*.025)pickups.push({x:rand(25,W-25),y:rand(70,H-70),type:'weapon',weapon:randomWeaponDrop(),spawnedAt:elapsed});
+            weaponDropClock+=dt;
+            if(weaponDropClock>=10){weaponDropClock=0;pickups.push({x:rand(25,W-25),y:rand(70,H-70),type:'weapon',weapon:randomWeaponDrop(),spawnedAt:elapsed});}
             for(const p of pickups){if(p.type==='weapon'&&p.weapon===weapon)p.used=true;if(!p.used&&dist(p,player)<23){if(p.type==='health')player.hp=Math.min(100,player.hp+25);else weapon=p.weapon;p.used=true;}}pickups=pickups.filter(p=>!p.used&&(p.type!=='weapon'||elapsed-(p.spawnedAt??elapsed)<10)).slice(-35);
         }draw();if(player.hp<=0&&!deathPrompted){deathPrompted=true;paused=true;try{localStorage.removeItem('sffSavedGame');}catch(_){}setTimeout(()=>arcadeEndPrompt('stick-figure-fighter',true),0);}if(host){const n=Math.floor(elapsed),t=host.querySelector('#sff-time');if(t)t.textContent=String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');host.querySelector('#sff-kills').textContent=score;host.querySelector('#sff-hp').textContent=Math.ceil(player.hp);try{const best=Math.max(score,Number(localStorage.getItem('sffBestKills')||0));host.querySelector('#sff-best').textContent=best;if(player.hp<=0)localStorage.setItem('sffBestKills',String(best));}catch(_){}}frame=requestAnimationFrame(tick);}
         function setPointer(e){if(pointer!==null&&e.pointerId!==pointer)return;const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;if(pointer===null&&Math.hypot(x-62,y-(H-68))>105)return;pointer=e.pointerId;let dx=x-62,dy=y-(H-68),m=Math.max(1,Math.hypot(dx,dy));joystick={x:dx/Math.max(43,m),y:dy/Math.max(43,m)};}
         function start(){stop();reset();host=document.createElement('div');host.id='tpfg-stick-fighter';host.style.cssText='position:fixed;inset:0;z-index:2147483646;background:#080b10;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px;box-sizing:border-box;font-family:Arial,sans-serif;color:white';
             host.innerHTML=`
             <div style="width:min(100%,420px);box-sizing:border-box;background:#151a20;border:1px solid #59616b;border-radius:9px 9px 0 0;padding:9px">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:700">STICK FIGURE FIGHTER <small>v0.1.6</small><button type="button" id="sff-min" class="tpfg-topbtn" aria-label="Leave game">—</button></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:700">STICK FIGURE FIGHTER <small>v0.1.7</small><button type="button" id="sff-min" class="tpfg-topbtn" aria-label="Leave game">—</button></div>
               <div style="display:flex;justify-content:space-around;margin-top:8px;text-align:center;font-size:12px"><span>TIME<br><b id="sff-time">00:00</b></span><span>KILLS<br><b id="sff-kills">0</b></span><span>HP<br><b id="sff-hp">100</b></span><span>BEST<br><b id="sff-best">0</b></span></div>
             </div>
             <div id="sff-stage" style="position:relative;width:min(100%,420px);min-height:0;display:flex;justify-content:center"></div>
@@ -234,7 +235,7 @@
             active=true;frame=requestAnimationFrame(tick);
         }
         function dialog(title,message,actions){const d=host.querySelector('#sff-dialog');d.querySelector('#sff-dialog-title').textContent=title;d.querySelector('#sff-dialog-text').textContent=message;const area=d.querySelector('#sff-dialog-actions');area.replaceChildren();for(const action of actions){const button=document.createElement('button');button.className='tpfg-resultbtn';button.textContent=action.label;button.onclick=()=>{d.style.display='none';action.run();};area.appendChild(button);}d.style.display='flex';}
-        function snapshot(){return JSON.stringify({player,enemies,pickups,shots,score,elapsed,spawn,attack,weapon,swing,aim});}
+        function snapshot(){return JSON.stringify({player,enemies,pickups,shots,score,elapsed,spawn,attack,weapon,swing,aim,weaponDropClock});}
         function save(){try{localStorage.setItem('sffSavedGame',snapshot());}catch(_){}}
         function restore(){try{const s=JSON.parse(localStorage.getItem('sffSavedGame'));if(!s)return;({player,enemies,pickups,shots,score,elapsed,spawn,attack,weapon,swing,aim}=s);paused=false;last=performance.now();}catch(_){}}
         function requestLeave(){if(!host)return;paused=true;arcadeEndPrompt('stick-figure-fighter',player.hp<=0);}
