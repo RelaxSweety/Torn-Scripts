@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.11.8
+// @version      0.11.9
 // @description  Modular Torn PDA arcade with Flight Arcade and Stick Figure Fighter.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
