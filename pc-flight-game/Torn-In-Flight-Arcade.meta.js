@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PC Arcade
 // @namespace    torn-inflight-arcade
-// @version      2.0.3
+// @version      2.0.4
 // @description  Desktop Torn Arcade with Flight Arcade, Stick Figure Fighter and shared game manager.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
