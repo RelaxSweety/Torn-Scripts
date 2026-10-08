@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PC Arcade
 // @namespace    https://www.torn.com/
-// @version      2.0.4
+// @version      2.0.5
 // @description  Desktop edition of Torn Arcade with Flight Arcade and Stick Figure Fighter, shared game manager and desktop controls.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -192,7 +192,7 @@
             if(weapon===5){ctx.strokeStyle='#8b949e';ctx.lineWidth=3;for(const off of [-6,0,6]){ctx.beginPath();ctx.moveTo(16,off);ctx.lineTo(42,off);ctx.stroke();}}if(weapon===4){ctx.strokeStyle='#8b949e';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(8,11);ctx.lineTo(27,11);ctx.stroke();}
             if(weapon<3&&swing>0){ctx.strokeStyle='#ffffff99';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,reach+6,-.55,.75);ctx.stroke();}
             ctx.restore();
-            ctx.fillStyle='#fff';ctx.font='bold 15px sans-serif';ctx.fillText('HP '+Math.ceil(player.hp)+'   KILLS '+score,12,23);ctx.fillText(names[weapon],12,44);ctx.fillText(Math.floor(elapsed)+'s',W-52,23);
+            ctx.fillStyle='#fff';ctx.font='bold 15px sans-serif';ctx.fillText('HP '+Math.ceil(player.hp)+'   KILLS '+score,12,23);ctx.fillText(names[weapon],12,44);ctx.fillText(Math.floor(elapsed)+'s',W-52,23);ctx.fillStyle='#ffda63';ctx.font='bold 12px sans-serif';ctx.fillText('NEXT GUN '+Math.max(0,Math.ceil(10-weaponDropClock))+'s',W-115,44);
             ctx.fillStyle='#4d2227';ctx.fillRect(12,53,140,9);ctx.fillStyle='#4bdf73';ctx.fillRect(12,53,140*Math.max(0,player.hp)/100,9);
             ctx.strokeStyle='#b8c1d0';ctx.lineWidth=2;ctx.beginPath();ctx.arc(62,H-68,43,0,7);ctx.stroke();ctx.fillStyle='#71879b';ctx.beginPath();ctx.arc(62+joystick.x*27,H-68+joystick.y*27,17,0,7);ctx.fill();
             ctx.strokeStyle='#b8c1d0';ctx.lineWidth=2;ctx.beginPath();ctx.arc(W-62,H-68,43,0,7);ctx.stroke();ctx.fillStyle='#b37d55';ctx.beginPath();ctx.arc(W-62+aimStick.x*27,H-68+aimStick.y*27,17,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.font='10px sans-serif';ctx.textAlign='center';ctx.fillText('WASD',62,H-115);ctx.fillText('MOUSE',W-62,H-115);ctx.textAlign='left';
@@ -208,8 +208,8 @@
             for(const e of enemies.filter(e=>e.hp<=0)){score++;if(Math.random()<.12)pickups.push({x:e.x,y:e.y,type:'health'});if(Math.random()<.008)pickups.push({x:e.x,y:e.y,type:'weapon',weapon:randomWeaponDrop(),spawnedAt:elapsed});}
             enemies=enemies.filter(e=>e.hp>0);
             weaponDropClock+=dt;
-            if(weaponDropClock>=10){weaponDropClock-=10;pickups.push({x:rand(35,W-35),y:rand(85,H-155),type:'weapon',weapon:randomWeaponDrop(),spawnedAt:elapsed});}
-            for(const p of pickups){if(p.type==='weapon'&&p.weapon===weapon)p.used=true;if(!p.used&&dist(p,player)<23){if(p.type==='health')player.hp=Math.min(100,player.hp+25);else weapon=p.weapon;p.used=true;}}pickups=pickups.filter(p=>!p.used&&(p.type!=='weapon'||elapsed-(p.spawnedAt??elapsed)<10)).slice(-35);
+            if(weaponDropClock>=10){weaponDropClock-=10;const nextWeapon=randomWeaponDrop();pickups.push({x:Math.max(35,Math.min(W-35,player.x+(player.x<W/2?85:-85))),y:Math.max(90,Math.min(H-160,player.y+(player.y<H/2?65:-65))),type:'weapon',weapon:nextWeapon,spawnedAt:elapsed,guaranteed:true});}
+            for(const p of pickups){if(p.type==='weapon'&&p.weapon===weapon&&!p.guaranteed)p.used=true;if(!p.used&&dist(p,player)<23){if(p.type==='health')player.hp=Math.min(100,player.hp+25);else weapon=p.weapon;p.used=true;}}pickups=pickups.filter(p=>!p.used&&(p.type!=='weapon'||elapsed-(p.spawnedAt??elapsed)<10)).slice(-35);
         }draw();if(player.hp<=0&&!deathPrompted){deathPrompted=true;paused=true;try{localStorage.removeItem('sffSavedGame');}catch(_){}setTimeout(()=>arcadeEndPrompt('stick-figure-fighter',true),0);}if(host){const n=Math.floor(elapsed),t=host.querySelector('#sff-time');if(t)t.textContent=String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');host.querySelector('#sff-kills').textContent=score;host.querySelector('#sff-hp').textContent=Math.ceil(player.hp);try{const best=Math.max(score,Number(localStorage.getItem('sffBestKills')||0));host.querySelector('#sff-best').textContent=best;if(player.hp<=0)localStorage.setItem('sffBestKills',String(best));}catch(_){}}frame=requestAnimationFrame(tick);}
         function setPointer(e){if(pointer!==null&&e.pointerId!==pointer)return;const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;if(pointer===null&&Math.hypot(x-62,y-(H-68))>105)return;pointer=e.pointerId;let dx=x-62,dy=y-(H-68),m=Math.max(1,Math.hypot(dx,dy));joystick={x:dx/Math.max(43,m),y:dy/Math.max(43,m)};}
         function start(){stop();reset();host=document.createElement('div');host.id='tpfg-stick-fighter';host.style.cssText='position:fixed;inset:0;z-index:2147483646;background:#080b10;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px;box-sizing:border-box;font-family:Arial,sans-serif;color:white';
