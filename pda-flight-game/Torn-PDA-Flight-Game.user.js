@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.11.8
+// @version      0.11.9
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -176,7 +176,7 @@
             ctx.strokeStyle='#27313b';ctx.lineWidth=1;
             for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
             for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
-            for(const p of pickups){ctx.fillStyle=p.type==='health'?'#48d16a':'#e4c35c';ctx.fillRect(p.x-(p.weapon===5?13:9),p.y-9,p.weapon===5?26:18,18);ctx.fillStyle='#101010';ctx.font='bold 14px sans-serif';ctx.fillText(p.type==='health'?'+':['K','B','S','G','P','CG'][p.weapon],p.x-6,p.y+5);}
+            for(const p of pickups){if(p.type==='weapon'){ctx.strokeStyle='#ffda63';ctx.lineWidth=2;ctx.strokeRect(p.x-17,p.y-15,34,30);}ctx.fillStyle=p.type==='health'?'#48d16a':'#e4c35c';ctx.fillRect(p.x-(p.weapon===5?13:9),p.y-9,p.weapon===5?26:18,18);ctx.fillStyle='#101010';ctx.font='bold 14px sans-serif';ctx.fillText(p.type==='health'?'+':['K','B','S','G','P','CG'][p.weapon],p.x-6,p.y+5);}
             for(const e of enemies)stick(e.x,e.y,'#e64d54');
             for(const s of shots){ctx.fillStyle='#ffd35b';ctx.beginPath();ctx.arc(s.x,s.y,3,0,7);ctx.fill();}
             stick(player.x,player.y,'#55e879');
@@ -208,7 +208,7 @@
             for(const e of enemies.filter(e=>e.hp<=0)){score++;if(Math.random()<.12)pickups.push({x:e.x,y:e.y,type:'health'});if(Math.random()<.008)pickups.push({x:e.x,y:e.y,type:'weapon',weapon:randomWeaponDrop(),spawnedAt:elapsed});}
             enemies=enemies.filter(e=>e.hp>0);
             weaponDropClock+=dt;
-            if(weaponDropClock>=10){weaponDropClock=0;pickups.push({x:rand(25,W-25),y:rand(70,H-70),type:'weapon',weapon:randomWeaponDrop(),spawnedAt:elapsed});}
+            if(weaponDropClock>=10){weaponDropClock-=10;pickups.push({x:rand(35,W-35),y:rand(85,H-155),type:'weapon',weapon:randomWeaponDrop(),spawnedAt:elapsed});}
             for(const p of pickups){if(p.type==='weapon'&&p.weapon===weapon)p.used=true;if(!p.used&&dist(p,player)<23){if(p.type==='health')player.hp=Math.min(100,player.hp+25);else weapon=p.weapon;p.used=true;}}pickups=pickups.filter(p=>!p.used&&(p.type!=='weapon'||elapsed-(p.spawnedAt??elapsed)<10)).slice(-35);
         }draw();if(player.hp<=0&&!deathPrompted){deathPrompted=true;paused=true;try{localStorage.removeItem('sffSavedGame');}catch(_){}setTimeout(()=>arcadeEndPrompt('stick-figure-fighter',true),0);}if(host){const n=Math.floor(elapsed),t=host.querySelector('#sff-time');if(t)t.textContent=String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');host.querySelector('#sff-kills').textContent=score;host.querySelector('#sff-hp').textContent=Math.ceil(player.hp);try{const best=Math.max(score,Number(localStorage.getItem('sffBestKills')||0));host.querySelector('#sff-best').textContent=best;if(player.hp<=0)localStorage.setItem('sffBestKills',String(best));}catch(_){}}frame=requestAnimationFrame(tick);}
         function setPointer(e){if(pointer!==null&&e.pointerId!==pointer)return;const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;if(pointer===null&&Math.hypot(x-62,y-(H-68))>105)return;pointer=e.pointerId;let dx=x-62,dy=y-(H-68),m=Math.max(1,Math.hypot(dx,dy));joystick={x:dx/Math.max(43,m),y:dy/Math.max(43,m)};}
@@ -237,7 +237,7 @@
         function dialog(title,message,actions){const d=host.querySelector('#sff-dialog');d.querySelector('#sff-dialog-title').textContent=title;d.querySelector('#sff-dialog-text').textContent=message;const area=d.querySelector('#sff-dialog-actions');area.replaceChildren();for(const action of actions){const button=document.createElement('button');button.className='tpfg-resultbtn';button.textContent=action.label;button.onclick=()=>{d.style.display='none';action.run();};area.appendChild(button);}d.style.display='flex';}
         function snapshot(){return JSON.stringify({player,enemies,pickups,shots,score,elapsed,spawn,attack,weapon,swing,aim,weaponDropClock});}
         function save(){try{localStorage.setItem('sffSavedGame',snapshot());}catch(_){}}
-        function restore(){try{const s=JSON.parse(localStorage.getItem('sffSavedGame'));if(!s)return;({player,enemies,pickups,shots,score,elapsed,spawn,attack,weapon,swing,aim}=s);paused=false;last=performance.now();}catch(_){}}
+        function restore(){try{const s=JSON.parse(localStorage.getItem('sffSavedGame'));if(!s)return;({player,enemies,pickups,shots,score,elapsed,spawn,attack,weapon,swing,aim}=s);weaponDropClock=Number.isFinite(s.weaponDropClock)?Math.max(0,Math.min(10,s.weaponDropClock)):elapsed%10;paused=false;last=performance.now();}catch(_){}}
         function requestLeave(){if(!host)return;paused=true;arcadeEndPrompt('stick-figure-fighter',player.hp<=0);}
         function setAim(e){const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height,dx=x-(W-62),dy=y-(H-68),m=Math.hypot(dx,dy);if(m>3){aim=Math.atan2(dy,dx);aimStick={x:dx/Math.max(43,m),y:dy/Math.max(43,m)};}}
         function onDown(e){if(player.hp<=0)return;if(paused)return;const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;if(Math.hypot(x-(W-62),y-(H-68))<105&&aimPointer===null){aimPointer=e.pointerId;setAim(e);}else setPointer(e);if(pointer===e.pointerId||aimPointer===e.pointerId){canvas.setPointerCapture(e.pointerId);e.preventDefault();}}
