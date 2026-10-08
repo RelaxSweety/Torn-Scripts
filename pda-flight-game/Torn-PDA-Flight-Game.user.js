@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.11.3
+// @version      0.11.4
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -208,19 +208,49 @@
             enemies=enemies.filter(e=>e.hp>0);
             if(Math.random()<dt*.025)pickups.push({x:rand(25,W-25),y:rand(70,H-70),type:'weapon',weapon:Math.floor(rand(0,5))});
             for(const p of pickups){if(dist(p,player)<23){if(p.type==='health')player.hp=Math.min(100,player.hp+25);else weapon=p.weapon;p.used=true;}}pickups=pickups.filter(p=>!p.used).slice(-35);
-        }draw();frame=requestAnimationFrame(tick);}
+        }draw();if(host){const n=Math.floor(elapsed),t=host.querySelector('#sff-time');if(t)t.textContent=String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');host.querySelector('#sff-kills').textContent=score;host.querySelector('#sff-hp').textContent=Math.ceil(player.hp);try{const best=Math.max(score,Number(localStorage.getItem('sffBestKills')||0));host.querySelector('#sff-best').textContent=best;if(player.hp<=0)localStorage.setItem('sffBestKills',String(best));}catch(_){}}frame=requestAnimationFrame(tick);}
         function setPointer(e){if(pointer!==null&&e.pointerId!==pointer)return;const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;if(pointer===null&&Math.hypot(x-62,y-(H-68))>105)return;pointer=e.pointerId;let dx=x-62,dy=y-(H-68),m=Math.max(1,Math.hypot(dx,dy));joystick={x:dx/Math.max(43,m),y:dy/Math.max(43,m)};}
-        function start(){stop();reset();host=document.createElement('div');host.id='tpfg-stick-fighter';host.style.cssText='position:fixed;inset:0;z-index:2147483646;background:#080b10;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px;box-sizing:border-box';host.innerHTML='<div style="width:min(100%,420px);display:flex;justify-content:space-between;align-items:center;gap:8px;color:white;font:600 14px sans-serif;padding:6px;box-sizing:border-box"><span>STICK FIGURE FIGHTER</span><span style="display:flex;gap:6px"><button type="button" id="sff-pause" style="padding:9px;background:#27384b;color:white;border:1px solid #8090a0;border-radius:5px">PAUSE</button><button type="button" id="sff-exit" style="padding:9px;background:#27384b;color:white;border:1px solid #8090a0;border-radius:5px">LEAVE</button></span></div><div id="sff-dialog" style="display:none;position:absolute;z-index:2;inset:0;background:#000c;align-items:center;justify-content:center"><div style="background:#17212c;color:white;border:1px solid #748399;padding:22px;text-align:center;max-width:290px"><h3>LEAVE GAME?</h3><p>End your current run?</p><button id="sff-confirm" style="padding:12px">LEAVE GAME</button> <button id="sff-cancel" style="padding:12px">CANCEL</button></div></div>';canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;canvas.style.cssText='width:min(100%,420px);height:auto;max-height:calc(100dvh - 62px);touch-action:none;object-fit:contain;border:1px solid #3b4652';host.appendChild(canvas);document.body.appendChild(host);ctx=canvas.getContext('2d');canvas.addEventListener('pointerdown',onDown);canvas.addEventListener('pointermove',onMove);canvas.addEventListener('pointerup',onUp);canvas.addEventListener('pointercancel',onUp);document.addEventListener('keydown',onKeyDown);document.addEventListener('keyup',onKeyUp);host.querySelector('#sff-pause').onclick=()=>{paused=!paused;last=performance.now();host.querySelector('#sff-pause').textContent=paused?'RESUME':'PAUSE';};host.querySelector('#sff-exit').onclick=()=>{paused=true;host.querySelector('#sff-dialog').style.display='flex';};host.querySelector('#sff-confirm').onclick=stop;host.querySelector('#sff-cancel').onclick=()=>{host.querySelector('#sff-dialog').style.display='none';paused=false;last=performance.now();host.querySelector('#sff-pause').textContent='PAUSE';};active=true;frame=requestAnimationFrame(tick);}
+        function start(){stop();reset();host=document.createElement('div');host.id='tpfg-stick-fighter';host.style.cssText='position:fixed;inset:0;z-index:2147483646;background:#080b10;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px;box-sizing:border-box;font-family:Arial,sans-serif;color:white';
+            host.innerHTML=`
+            <div style="width:min(100%,420px);box-sizing:border-box;background:#151a20;border:1px solid #59616b;border-radius:9px 9px 0 0;padding:9px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:700">STICK FIGURE FIGHTER <small>v0.1.4</small><button type="button" id="sff-min" class="tpfg-topbtn" aria-label="Leave game">—</button></div>
+              <div style="display:flex;justify-content:space-around;margin-top:8px;text-align:center;font-size:12px"><span>TIME<br><b id="sff-time">00:00</b></span><span>KILLS<br><b id="sff-kills">0</b></span><span>HP<br><b id="sff-hp">100</b></span><span>BEST<br><b id="sff-best">0</b></span></div>
+            </div>
+            <div id="sff-stage" style="position:relative;width:min(100%,420px);min-height:0;display:flex;justify-content:center"></div>
+            <div style="width:min(100%,420px);box-sizing:border-box;display:flex;justify-content:space-between;align-items:center;background:#151a20;border:1px solid #59616b;padding:8px;gap:10px">
+              <span style="font-size:11px;color:#aaa">LEFT: MOVE<br>RIGHT: AIM</span>
+              <span style="display:flex;gap:7px"><button id="sff-pause" type="button" class="tpfg-resultbtn">PAUSE</button><button id="sff-exit" type="button" class="tpfg-resultbtn">END GAME</button></span>
+            </div>
+            <div id="sff-dialog" style="display:none;position:absolute;z-index:2;inset:0;background:#000c;align-items:center;justify-content:center;padding:16px">
+              <div class="tpfg-settings-card"><h3 id="sff-dialog-title">SAVE YOUR GAME?</h3><p id="sff-dialog-text">Save your current progress and continue next time?</p><div id="sff-dialog-actions" style="display:grid;gap:8px"></div></div>
+            </div>`;
+            canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;canvas.style.cssText='width:100%;height:auto;max-height:calc(100dvh - 175px);touch-action:none;object-fit:contain;border:1px solid #3b4652';host.querySelector('#sff-stage').appendChild(canvas);document.body.appendChild(host);ctx=canvas.getContext('2d');
+            canvas.addEventListener('pointerdown',onDown);canvas.addEventListener('pointermove',onMove);canvas.addEventListener('pointerup',onUp);canvas.addEventListener('pointercancel',onUp);
+            document.addEventListener('keydown',onKeyDown);document.addEventListener('keyup',onKeyUp);
+            host.querySelector('#sff-pause').onclick=()=>{if(player.hp<=0)return;paused=!paused;last=performance.now();host.querySelector('#sff-pause').textContent=paused?'RESUME':'PAUSE';};
+            host.querySelector('#sff-exit').onclick=host.querySelector('#sff-min').onclick=requestLeave;
+            try{host.querySelector('#sff-best').textContent=localStorage.getItem('sffBestKills')||'0';}catch(_){}
+            active=true;frame=requestAnimationFrame(tick);
+        }
+        function dialog(title,message,actions){const d=host.querySelector('#sff-dialog');d.querySelector('#sff-dialog-title').textContent=title;d.querySelector('#sff-dialog-text').textContent=message;const area=d.querySelector('#sff-dialog-actions');area.replaceChildren();for(const action of actions){const button=document.createElement('button');button.className='tpfg-resultbtn';button.textContent=action.label;button.onclick=()=>{d.style.display='none';action.run();};area.appendChild(button);}d.style.display='flex';}
+        function snapshot(){return JSON.stringify({player,enemies,pickups,shots,score,elapsed,spawn,attack,weapon,swing,aim});}
+        function save(){try{localStorage.setItem('sffSavedGame',snapshot());}catch(_){}}
+        function restore(){try{const s=JSON.parse(localStorage.getItem('sffSavedGame'));if(!s)return;({player,enemies,pickups,shots,score,elapsed,spawn,attack,weapon,swing,aim}=s);paused=false;last=performance.now();}catch(_){}}
+        function requestLeave(){if(!host)return;const wasPaused=paused;paused=true;dialog('SAVE YOUR GAME?','Save your progress and continue from this point next time?',[
+            {label:'SAVE & LEAVE',run:()=>{save();stop();}},
+            {label:'LEAVE WITHOUT SAVING',run:()=>{try{localStorage.removeItem('sffSavedGame');}catch(_){}stop();}},
+            {label:'CANCEL',run:()=>{paused=wasPaused;last=performance.now();host.querySelector('#sff-pause').textContent=paused?'RESUME':'PAUSE';}}
+        ]);}
         function setAim(e){const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height,dx=x-(W-62),dy=y-(H-68),m=Math.hypot(dx,dy);if(m>3){aim=Math.atan2(dy,dx);aimStick={x:dx/Math.max(43,m),y:dy/Math.max(43,m)};}}
-        function onDown(e){if(player.hp<=0){reset();return;}if(paused)return;const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;if(Math.hypot(x-(W-62),y-(H-68))<105&&aimPointer===null){aimPointer=e.pointerId;setAim(e);}else setPointer(e);if(pointer===e.pointerId||aimPointer===e.pointerId){canvas.setPointerCapture(e.pointerId);e.preventDefault();}}
+        function onDown(e){if(player.hp<=0){try{localStorage.removeItem('sffSavedGame');}catch(_){}reset();return;}if(paused)return;const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;if(Math.hypot(x-(W-62),y-(H-68))<105&&aimPointer===null){aimPointer=e.pointerId;setAim(e);}else setPointer(e);if(pointer===e.pointerId||aimPointer===e.pointerId){canvas.setPointerCapture(e.pointerId);e.preventDefault();}}
         function onMove(e){if(pointer===e.pointerId)setPointer(e);if(aimPointer===e.pointerId)setAim(e);}
         function onUp(e){if(pointer===e.pointerId){pointer=null;joystick={x:0,y:0};}if(aimPointer===e.pointerId){aimPointer=null;aimStick={x:0,y:0};}}
         function onKeyDown(e){keys.add(e.key);}
         function onKeyUp(e){keys.delete(e.key);}
         function stop(){active=false;cancelAnimationFrame(frame);document.removeEventListener('keydown',onKeyDown);document.removeEventListener('keyup',onKeyUp);host?.remove();host=null;pointer=null;aimPointer=null;aimStick={x:0,y:0};joystick={x:0,y:0};keys.clear();}
-        return {start,stop};
+        return {start,stop,restore};
     })();
-    Arcade.registerGame({id:'stick-figure-fighter',name:'Stick Figure Fighter',version:'0.1.3',isAvailable(){return (localStorage.getItem('tpfgMode:stick-figure-fighter')||'always')==='always';},start:StickFighter.start,stop:StickFighter.stop});
+    Arcade.registerGame({id:'stick-figure-fighter',name:'Stick Figure Fighter',version:'0.1.4',isAvailable(){return (localStorage.getItem('tpfgMode:stick-figure-fighter')||'always')==='always';},start:StickFighter.start,stop:StickFighter.stop});
 
     function gameSaveKey(id){return SAVE_PREFIX+id;}
     function getGameSave(id){try{return JSON.parse(localStorage.getItem(gameSaveKey(id))||'null');}catch(_){return null;}}
@@ -235,7 +265,7 @@
         const p=document.getElementById('tpfg-prompt');p.querySelector('h3').textContent=title;p.querySelector('p').textContent=message;
         const a=p.querySelector('#tpfg-prompt-actions');a.innerHTML='';buttons.forEach(x=>{const b=document.createElement('button');b.className='tpfg-resultbtn';b.textContent=x.label;b.onclick=()=>{p.style.display='none';x.action();};a.appendChild(b);});p.style.display='flex';
     }
-    function launchGame(game){if(game.id!=='flight-arcade'){game.start();return;}const s=getGameSave(game.id);if(s)promptBox('SAVED GAME','Continue your saved '+game.name+' game?',[{label:'CONTINUE SAVED GAME',action:()=>restoreGame(s)},{label:'START NEW GAME',action:()=>{clearGameSave(game.id);game.start();}},{label:'CANCEL',action:()=>{}}]);else game.start();}
+    function launchGame(game){if(game.id==='stick-figure-fighter'){const savedStick=localStorage.getItem('sffSavedGame');if(savedStick)promptBox('SAVED GAME','Continue your saved Stick Figure Fighter game?',[{label:'CONTINUE SAVED GAME',action:()=>{game.start();StickFighter.restore();}},{label:'START NEW GAME',action:()=>{localStorage.removeItem('sffSavedGame');game.start();}},{label:'CANCEL',action:()=>{}}]);else game.start();return;}if(game.id!=='flight-arcade'){game.start();return;}const s=getGameSave(game.id);if(s)promptBox('SAVED GAME','Continue your saved '+game.name+' game?',[{label:'CONTINUE SAVED GAME',action:()=>restoreGame(s)},{label:'START NEW GAME',action:()=>{clearGameSave(game.id);game.start();}},{label:'CANCEL',action:()=>{}}]);else game.start();}
     function requestLeave(){if(!state.running||state.over){updateEngineSound(false);minimize();return;}state.paused=true;updateEngineSound(false);document.getElementById('tpfg-pause').textContent='RESUME';promptBox('SAVE YOUR GAME?','Save your current progress and continue from this point next time?',[{label:'SAVE & LEAVE',action:()=>{saveCurrentGame();closeActiveGame();}},{label:'LEAVE WITHOUT SAVING',action:()=>{clearGameSave('flight-arcade');closeActiveGame();}},{label:'CANCEL',action:()=>{state.paused=false;state.lastTs=performance.now();document.getElementById('tpfg-pause').textContent='PAUSE';}}]);}
     function closeActiveGame(){transition=null;state.running=false;state.paused=true;updateEngineSound(false);cancelAnimationFrame(raf);document.getElementById('tpfg-root').style.display='none';}
     function openManager(){document.getElementById('tpfg-manager').style.display='flex';renderManager('games');}
