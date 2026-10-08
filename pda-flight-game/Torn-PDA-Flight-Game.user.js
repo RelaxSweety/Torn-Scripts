@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.11.4
+// @version      0.11.5
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -164,11 +164,11 @@
 
     // Stick Figure Fighter: self-contained arcade module.
     const StickFighter = (() => {
-        let host=null, canvas=null, ctx=null, frame=0, last=0, active=false, keys=new Set(), joystick={x:0,y:0}, player, enemies, pickups, shots, score, elapsed, spawn, attack, weapon, pointer=null, aimPointer=null, aimStick={x:0,y:0}, swing=0, aim=0, paused=false;
+        let host=null, canvas=null, ctx=null, frame=0, last=0, active=false, keys=new Set(), joystick={x:0,y:0}, player, enemies, pickups, shots, score, elapsed, spawn, attack, weapon, pointer=null, aimPointer=null, aimStick={x:0,y:0}, swing=0, aim=0, paused=false, deathPrompted=false;
         const W=360,H=600, names=['Knife','Bat','Sword','Shotgun','Dual Pistols'];
         const rand=(a,b)=>a+Math.random()*(b-a);
         const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
-        function reset(){player={x:W/2,y:H/2,hp:100};enemies=[];pickups=[];shots=[];score=0;elapsed=0;spawn=0;attack=0;weapon=0;swing=0;aim=0;paused=false;aimPointer=null;aimStick={x:0,y:0};last=performance.now();}
+        function reset(){player={x:W/2,y:H/2,hp:100};enemies=[];pickups=[];shots=[];score=0;elapsed=0;spawn=0;attack=0;weapon=0;swing=0;aim=0;paused=false;deathPrompted=false;aimPointer=null;aimStick={x:0,y:0};last=performance.now();}
         function stick(x,y,color){ctx.strokeStyle=color;ctx.lineWidth=4;ctx.lineCap='round';ctx.beginPath();ctx.arc(x,y-15,8,0,Math.PI*2);ctx.moveTo(x,y-7);ctx.lineTo(x,y+18);ctx.moveTo(x-12,y+5);ctx.lineTo(x+12,y+5);ctx.moveTo(x,y+18);ctx.lineTo(x-11,y+34);ctx.moveTo(x,y+18);ctx.lineTo(x+11,y+34);ctx.stroke();}
         function draw(){
             ctx.fillStyle='#11151b';ctx.fillRect(0,0,W,H);
@@ -195,7 +195,7 @@
             ctx.fillStyle='#4d2227';ctx.fillRect(12,53,140,9);ctx.fillStyle='#4bdf73';ctx.fillRect(12,53,140*Math.max(0,player.hp)/100,9);
             ctx.strokeStyle='#b8c1d0';ctx.lineWidth=2;ctx.beginPath();ctx.arc(62,H-68,43,0,7);ctx.stroke();ctx.fillStyle='#71879b';ctx.beginPath();ctx.arc(62+joystick.x*27,H-68+joystick.y*27,17,0,7);ctx.fill();
             ctx.strokeStyle='#b8c1d0';ctx.lineWidth=2;ctx.beginPath();ctx.arc(W-62,H-68,43,0,7);ctx.stroke();ctx.fillStyle='#b37d55';ctx.beginPath();ctx.arc(W-62+aimStick.x*27,H-68+aimStick.y*27,17,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.font='10px sans-serif';ctx.textAlign='center';ctx.fillText('MOVE',62,H-115);ctx.fillText('AIM',W-62,H-115);ctx.textAlign='left';
-            if(player.hp<=0){ctx.fillStyle='#000c';ctx.fillRect(0,0,W,H);ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold 30px sans-serif';ctx.fillText('GAME OVER',W/2,H/2-30);ctx.font='18px sans-serif';ctx.fillText('Kills: '+score+' · Time: '+Math.floor(elapsed)+'s',W/2,H/2+5);ctx.fillText('Tap screen to restart',W/2,H/2+38);ctx.textAlign='left';}
+            if(player.hp<=0){ctx.fillStyle='#000c';ctx.fillRect(0,0,W,H);ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold 30px sans-serif';ctx.fillText('GAME OVER',W/2,H/2-30);ctx.font='18px sans-serif';ctx.fillText('Kills: '+score+' · Time: '+Math.floor(elapsed)+'s',W/2,H/2+5);ctx.fillText('Use the results menu',W/2,H/2+38);ctx.textAlign='left';}
         }
         function tick(ts){if(!active)return;const dt=Math.min(.05,(ts-last)/1000||0);last=ts;if(!paused&&player.hp>0){swing=Math.max(0,swing-dt);elapsed+=dt;spawn-=dt;attack-=dt;
             let dx=joystick.x+(keys.has('ArrowRight')||keys.has('d')?1:0)-(keys.has('ArrowLeft')||keys.has('a')?1:0),dy=joystick.y+(keys.has('ArrowDown')||keys.has('s')?1:0)-(keys.has('ArrowUp')||keys.has('w')?1:0);let m=Math.hypot(dx,dy)||1;player.x=Math.max(18,Math.min(W-18,player.x+dx/m*145*dt));player.y=Math.max(38,Math.min(H-38,player.y+dy/m*145*dt));
@@ -208,7 +208,7 @@
             enemies=enemies.filter(e=>e.hp>0);
             if(Math.random()<dt*.025)pickups.push({x:rand(25,W-25),y:rand(70,H-70),type:'weapon',weapon:Math.floor(rand(0,5))});
             for(const p of pickups){if(dist(p,player)<23){if(p.type==='health')player.hp=Math.min(100,player.hp+25);else weapon=p.weapon;p.used=true;}}pickups=pickups.filter(p=>!p.used).slice(-35);
-        }draw();if(host){const n=Math.floor(elapsed),t=host.querySelector('#sff-time');if(t)t.textContent=String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');host.querySelector('#sff-kills').textContent=score;host.querySelector('#sff-hp').textContent=Math.ceil(player.hp);try{const best=Math.max(score,Number(localStorage.getItem('sffBestKills')||0));host.querySelector('#sff-best').textContent=best;if(player.hp<=0)localStorage.setItem('sffBestKills',String(best));}catch(_){}}frame=requestAnimationFrame(tick);}
+        }draw();if(player.hp<=0&&!deathPrompted){deathPrompted=true;paused=true;try{localStorage.removeItem('sffSavedGame');}catch(_){}setTimeout(()=>arcadeEndPrompt('stick-figure-fighter',true),0);}if(host){const n=Math.floor(elapsed),t=host.querySelector('#sff-time');if(t)t.textContent=String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');host.querySelector('#sff-kills').textContent=score;host.querySelector('#sff-hp').textContent=Math.ceil(player.hp);try{const best=Math.max(score,Number(localStorage.getItem('sffBestKills')||0));host.querySelector('#sff-best').textContent=best;if(player.hp<=0)localStorage.setItem('sffBestKills',String(best));}catch(_){}}frame=requestAnimationFrame(tick);}
         function setPointer(e){if(pointer!==null&&e.pointerId!==pointer)return;const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;if(pointer===null&&Math.hypot(x-62,y-(H-68))>105)return;pointer=e.pointerId;let dx=x-62,dy=y-(H-68),m=Math.max(1,Math.hypot(dx,dy));joystick={x:dx/Math.max(43,m),y:dy/Math.max(43,m)};}
         function start(){stop();reset();host=document.createElement('div');host.id='tpfg-stick-fighter';host.style.cssText='position:fixed;inset:0;z-index:2147483646;background:#080b10;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px;box-sizing:border-box;font-family:Arial,sans-serif;color:white';
             host.innerHTML=`
@@ -236,21 +236,17 @@
         function snapshot(){return JSON.stringify({player,enemies,pickups,shots,score,elapsed,spawn,attack,weapon,swing,aim});}
         function save(){try{localStorage.setItem('sffSavedGame',snapshot());}catch(_){}}
         function restore(){try{const s=JSON.parse(localStorage.getItem('sffSavedGame'));if(!s)return;({player,enemies,pickups,shots,score,elapsed,spawn,attack,weapon,swing,aim}=s);paused=false;last=performance.now();}catch(_){}}
-        function requestLeave(){if(!host)return;const wasPaused=paused;paused=true;dialog('SAVE YOUR GAME?','Save your progress and continue from this point next time?',[
-            {label:'SAVE & LEAVE',run:()=>{save();stop();}},
-            {label:'LEAVE WITHOUT SAVING',run:()=>{try{localStorage.removeItem('sffSavedGame');}catch(_){}stop();}},
-            {label:'CANCEL',run:()=>{paused=wasPaused;last=performance.now();host.querySelector('#sff-pause').textContent=paused?'RESUME':'PAUSE';}}
-        ]);}
+        function requestLeave(){if(!host)return;paused=true;arcadeEndPrompt('stick-figure-fighter',player.hp<=0);}
         function setAim(e){const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height,dx=x-(W-62),dy=y-(H-68),m=Math.hypot(dx,dy);if(m>3){aim=Math.atan2(dy,dx);aimStick={x:dx/Math.max(43,m),y:dy/Math.max(43,m)};}}
-        function onDown(e){if(player.hp<=0){try{localStorage.removeItem('sffSavedGame');}catch(_){}reset();return;}if(paused)return;const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;if(Math.hypot(x-(W-62),y-(H-68))<105&&aimPointer===null){aimPointer=e.pointerId;setAim(e);}else setPointer(e);if(pointer===e.pointerId||aimPointer===e.pointerId){canvas.setPointerCapture(e.pointerId);e.preventDefault();}}
+        function onDown(e){if(player.hp<=0)return;if(paused)return;const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;if(Math.hypot(x-(W-62),y-(H-68))<105&&aimPointer===null){aimPointer=e.pointerId;setAim(e);}else setPointer(e);if(pointer===e.pointerId||aimPointer===e.pointerId){canvas.setPointerCapture(e.pointerId);e.preventDefault();}}
         function onMove(e){if(pointer===e.pointerId)setPointer(e);if(aimPointer===e.pointerId)setAim(e);}
         function onUp(e){if(pointer===e.pointerId){pointer=null;joystick={x:0,y:0};}if(aimPointer===e.pointerId){aimPointer=null;aimStick={x:0,y:0};}}
         function onKeyDown(e){keys.add(e.key);}
         function onKeyUp(e){keys.delete(e.key);}
         function stop(){active=false;cancelAnimationFrame(frame);document.removeEventListener('keydown',onKeyDown);document.removeEventListener('keyup',onKeyUp);host?.remove();host=null;pointer=null;aimPointer=null;aimStick={x:0,y:0};joystick={x:0,y:0};keys.clear();}
-        return {start,stop,restore};
+        return {start,stop,restore,save,reset,resume(){paused=false;last=performance.now();if(host)host.querySelector('#sff-pause').textContent='PAUSE';},getScore(){return score;},getTime(){return elapsed;}};
     })();
-    Arcade.registerGame({id:'stick-figure-fighter',name:'Stick Figure Fighter',version:'0.1.4',isAvailable(){return (localStorage.getItem('tpfgMode:stick-figure-fighter')||'always')==='always';},start:StickFighter.start,stop:StickFighter.stop});
+    Arcade.registerGame({id:'stick-figure-fighter',name:'Stick Figure Fighter',version:'0.1.5',isAvailable(){return (localStorage.getItem('tpfgMode:stick-figure-fighter')||'always')==='always';},start:StickFighter.start,stop:StickFighter.stop});
 
     function gameSaveKey(id){return SAVE_PREFIX+id;}
     function getGameSave(id){try{return JSON.parse(localStorage.getItem(gameSaveKey(id))||'null');}catch(_){return null;}}
@@ -261,12 +257,27 @@
     }
     function saveCurrentGame(){try{localStorage.setItem(gameSaveKey('flight-arcade'),JSON.stringify({version:1,savedAt:Date.now(),state:snapshotGame()}));return true;}catch(_){return false;}}
     function restoreGame(s){Object.assign(state,JSON.parse(JSON.stringify(s.state)));shownStage=aircraftStage();transition=null;state.running=true;state.paused=false;state.over=false;state.lastTs=performance.now();state.keys={up:false,down:false,left:false,right:false,fire:false};state.stick={x:0,y:0};showGame();setTimeout(resize,0);updateHud();cancelAnimationFrame(raf);raf=requestAnimationFrame(loop);}
-    function promptBox(title,message,buttons){
+    function arcadeEndPrompt(id,died=false){
+        const isStick=id==='stick-figure-fighter';
+        const donation='Torn donations are appreciated. Send cash or items to RelaxSweety [4539436].';
+        const close=()=>{if(isStick)StickFighter.stop();else closeActiveGame();};
+        const replay=()=>{if(isStick){StickFighter.start();}else startGame();};
+        const buttons=died?[
+            {label:'REPLAY',action:replay},
+            {label:'EXIT',action:close}
+        ]:[
+            {label:'SAVE & EXIT',action:()=>{if(isStick)StickFighter.save();else saveCurrentGame();close();}},
+            {label:'EXIT WITHOUT SAVING',action:()=>{if(isStick)localStorage.removeItem('sffSavedGame');else clearGameSave('flight-arcade');close();}},
+            {label:'CANCEL',action:()=>{if(isStick)StickFighter.resume();else{state.paused=false;state.lastTs=performance.now();document.getElementById('tpfg-pause').textContent='PAUSE';}}}
+        ];
+        promptBox(died?'GAME OVER':'END GAME',donation,buttons,true);
+    }
+    function promptBox(title,message,buttons,showDonation=false){
         const p=document.getElementById('tpfg-prompt');p.querySelector('h3').textContent=title;p.querySelector('p').textContent=message;
-        const a=p.querySelector('#tpfg-prompt-actions');a.innerHTML='';buttons.forEach(x=>{const b=document.createElement('button');b.className='tpfg-resultbtn';b.textContent=x.label;b.onclick=()=>{p.style.display='none';x.action();};a.appendChild(b);});p.style.display='flex';
+        const a=p.querySelector('#tpfg-prompt-actions');a.innerHTML='';buttons.forEach(x=>{const b=document.createElement('button');b.className='tpfg-resultbtn';b.textContent=x.label;b.onclick=()=>{p.style.display='none';x.action();};a.appendChild(b);});if(showDonation){const info=document.createElement('div');info.style.cssText='margin-top:14px;padding-top:12px;border-top:1px solid #59616b;font-size:13px;text-align:center';info.innerHTML='Enjoying Torn PDA Arcade? <a href="https://www.torn.com/profiles.php?XID=4539436" target="_blank" rel="noopener noreferrer" style="color:#e2c778">Donate to RelaxSweety [4539436]</a>';a.appendChild(info);}p.style.display='flex';
     }
     function launchGame(game){if(game.id==='stick-figure-fighter'){const savedStick=localStorage.getItem('sffSavedGame');if(savedStick)promptBox('SAVED GAME','Continue your saved Stick Figure Fighter game?',[{label:'CONTINUE SAVED GAME',action:()=>{game.start();StickFighter.restore();}},{label:'START NEW GAME',action:()=>{localStorage.removeItem('sffSavedGame');game.start();}},{label:'CANCEL',action:()=>{}}]);else game.start();return;}if(game.id!=='flight-arcade'){game.start();return;}const s=getGameSave(game.id);if(s)promptBox('SAVED GAME','Continue your saved '+game.name+' game?',[{label:'CONTINUE SAVED GAME',action:()=>restoreGame(s)},{label:'START NEW GAME',action:()=>{clearGameSave(game.id);game.start();}},{label:'CANCEL',action:()=>{}}]);else game.start();}
-    function requestLeave(){if(!state.running||state.over){updateEngineSound(false);minimize();return;}state.paused=true;updateEngineSound(false);document.getElementById('tpfg-pause').textContent='RESUME';promptBox('SAVE YOUR GAME?','Save your current progress and continue from this point next time?',[{label:'SAVE & LEAVE',action:()=>{saveCurrentGame();closeActiveGame();}},{label:'LEAVE WITHOUT SAVING',action:()=>{clearGameSave('flight-arcade');closeActiveGame();}},{label:'CANCEL',action:()=>{state.paused=false;state.lastTs=performance.now();document.getElementById('tpfg-pause').textContent='PAUSE';}}]);}
+    function requestLeave(){if(!state.running||state.over){updateEngineSound(false);minimize();return;}state.paused=true;updateEngineSound(false);document.getElementById('tpfg-pause').textContent='RESUME';arcadeEndPrompt('flight-arcade',false);}
     function closeActiveGame(){transition=null;state.running=false;state.paused=true;updateEngineSound(false);cancelAnimationFrame(raf);document.getElementById('tpfg-root').style.display='none';}
     function openManager(){document.getElementById('tpfg-manager').style.display='flex';renderManager('games');}
     function renderManager(tab){
@@ -750,7 +761,7 @@
         state.shareText=`${stamp} ${share.replace(/\n/g,' ') } Game Time: ${formatTime(state.activeMs)} | Kills: ${state.kills} | High Score: ${Number(saved.highScore).toLocaleString()}`;
         document.getElementById('tpfg-sharetext').textContent=state.shareText;
         document.getElementById('tpfg-results').style.display='block';
-        document.getElementById('tpfg-message').textContent=manual?'GAME ENDED':'';
+        document.getElementById('tpfg-message').textContent=manual?'GAME ENDED':'';if(!manual)arcadeEndPrompt('flight-arcade',true);
     }
 
     async function init() {
