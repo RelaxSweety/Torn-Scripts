@@ -42,19 +42,17 @@
     for(let i=0;i<3;i++)if(aa[i]!==bb[i])return (aa[i]||0)-(bb[i]||0);
     return 0;
   };
-  function refreshRegistry(){
-    registryStatus='Refreshing catalog';if(typeof render==='function')render(currentTab);
+  async function refreshRegistry(){
+    registryStatus='Refreshing catalog';render(currentTab);
     if(typeof PDA_httpGet!=='function'){registryStatus='Offline · using cached catalog';render(currentTab);return;}
     try{
-      PDA_httpGet(REGISTRY_URL+'?t='+Date.now(),function(response){
-        try{
-          const raw=typeof response==='string'?response:(response?.responseText??response?.response);
-          const next=validateRegistry(JSON.parse(raw));
-          registry=next;localStorage.setItem(CACHE_KEY,JSON.stringify(next));
-          registryStatus='GitHub catalog updated';render(currentTab);
-        }catch(e){registryStatus='Catalog unavailable · using cached list';render(currentTab);}
-      },function(){registryStatus='Catalog unavailable · using cached list';render(currentTab);});
-    }catch(e){registryStatus='Catalog unavailable · using cached list';render(currentTab);}
+      const response=await PDA_httpGet(REGISTRY_URL+'?t='+Date.now());
+      const raw=typeof response==='string'?response:(response?.responseText??response?.response);
+      const next=validateRegistry(typeof raw==='string'?JSON.parse(raw):raw);
+      registry=next;localStorage.setItem(CACHE_KEY,JSON.stringify(next));
+      registryStatus='GitHub catalog updated';
+    }catch(e){registryStatus='Catalog unavailable · using cached list';}
+    render(currentTab);
   }
   // Lifecycle API: modules register inert factories; only this manager calls activate().
   const registered = new Map();
