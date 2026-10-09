@@ -34,6 +34,7 @@
           typeof def.activate !== 'function' || typeof def.deactivate !== 'function' ||
           registered.has(def.id)) return false;
       registered.set(def.id, Object.freeze({id:def.id, activate:def.activate, deactivate:def.deactivate}));
+      if (typeof render === 'function') render('modules');
       return true;
     },
     isRegistered(id) { return registered.has(id); },
@@ -53,6 +54,11 @@
     if (!mod) return false;
     stopModule();
     moduleHost.hidden=false;
+    const exit=document.createElement('button');
+    exit.textContent='TU ×'; exit.setAttribute('aria-label','Close module and return to Torn Utilities');
+    exit.style.cssText='position:fixed;top:12px;right:12px;z-index:2147483647;background:#15191c;color:#f1ce72;border:1px solid #dfb952;border-radius:14px;padding:8px 12px;font:bold 15px Georgia';
+    exit.addEventListener('click',()=>{stopModule();panel.hidden=false;launcher.hidden=true;render('modules');});
+    moduleHost.appendChild(exit);
     try {
       active=id;
       mod.activate(Object.freeze({mount:moduleHost, close:stopModule}));
@@ -137,7 +143,7 @@
   render('modules');
   window.addEventListener('torn-utilities-ready',()=>render('modules'));
   // A module script can be installed separately, but remains inert until Open is pressed.
-  const originalRegister=api.register;
+
   const closePanel = () => { panel.hidden = true; launcher.hidden = false; };
   const togglePanel = () => { panel.hidden = !panel.hidden; launcher.hidden = !panel.hidden; };
   panel.querySelector('.tu-close').addEventListener('click', () => { stopModule(); closePanel(); });
