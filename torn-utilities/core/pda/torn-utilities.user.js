@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.3.1
+// @version      0.4.0
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -15,16 +15,47 @@
   if (window.__RELAX_TORN_UTILITIES_PDA__) return;
   window.__RELAX_TORN_UTILITIES_PDA__ = true;
   const KEY = 'relaxsweety_tu_pda_v1';
-  const catalog = [
-    {id:'business',name:'Business Tools',desc:'Market Scanner, Bazaar Manager, Trade Calculator and more',icon:'▥',modules:[]},
-    {id:'games',name:'Games',desc:'Flight Game, Stick Fighter',icon:'♜',modules:['flight-game']},
-    {id:'chat',name:'Chat Tools',desc:'Chat Archiver and chat utilities',icon:'◉',modules:['chat-archiver']},
-    {id:'other',name:'Other Tools',desc:'Additional Torn utilities',icon:'⚙',modules:[]}
-  ];
-  const available = [
-    {id:'flight-game',name:'Flight Game',category:'games',url:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/pda-flight-game/Torn-PDA-Flight-Game.user.js'},
-    {id:'chat-archiver',name:'Chat Archiver',category:'chat',url:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/chat-archiver/pda/src/torn-multi-chat-archiver-pda.user.js'}
-  ];
+  const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
+  const CACHE_KEY='tu:registry:v1';
+  const FALLBACK={schemaVersion:1,categories:[
+    {id:'business',name:'Business Tools',icon:'▥',order:10},
+    {id:'games',name:'Games',icon:'♜',order:20},
+    {id:'chat',name:'Chat Tools',icon:'◉',order:30},
+    {id:'other',name:'Other Tools',icon:'⚙',order:40}
+  ],modules:[
+    {id:'flight-game',name:'Flight Game',category:'games',version:'0.11.12',description:'Flight arcade and Stick Fighter',scriptUrl:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/pda-flight-game/Torn-PDA-Flight-Game.user.js'},
+    {id:'chat-archiver',name:'Chat Archiver',category:'chat',version:'0.1.6',description:'Archive Torn chat conversations',scriptUrl:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/chat-archiver/pda/src/torn-multi-chat-archiver-pda.user.js'}
+  ]};
+  const validId=/^[a-z0-9-]{1,64}$/;
+  const safeScriptUrl=url=>typeof url==='string'&&/^https:\/\/raw\.githubusercontent\.com\/RelaxSweety\/Torn-Scripts\/main\/[a-zA-Z0-9/_-]+\.user\.js$/.test(url);
+  function validateRegistry(data){
+    if(data?.schemaVersion!==1||!Array.isArray(data.categories)||!Array.isArray(data.modules)||data.modules.length>250||data.categories.length>50)throw Error('Invalid module catalog');
+    const categories=data.categories.filter(c=>validId.test(c.id)&&typeof c.name==='string'&&c.name.length<=70).map(c=>({id:c.id,name:c.name,icon:String(c.icon||'•').slice(0,3),order:Number(c.order)||100}));
+    const ids=new Set(categories.map(c=>c.id));
+    const modules=data.modules.filter(m=>validId.test(m.id)&&ids.has(m.category)&&typeof m.name==='string'&&m.name.length<=90&&safeScriptUrl(m.scriptUrl)&&/^\d+\.\d+\.\d+(?:[-+][a-zA-Z0-9.-]+)?$/.test(m.version)).map(m=>({id:m.id,name:m.name,category:m.category,version:m.version,description:String(m.description||'').slice(0,250),scriptUrl:m.scriptUrl}));
+    return {schemaVersion:1,categories,modules};
+  }
+  let registry=FALLBACK,registryStatus='Built-in catalog';
+  try{const cached=localStorage.getItem(CACHE_KEY);if(cached){registry=validateRegistry(JSON.parse(cached));registryStatus='Cached catalog';}}catch(_){}
+  const versionCompare=(a,b)=>{
+    const aa=String(a||'0').split('.').map(v=>parseInt(v,10)||0),bb=String(b||'0').split('.').map(v=>parseInt(v,10)||0);
+    for(let i=0;i<3;i++)if(aa[i]!==bb[i])return (aa[i]||0)-(bb[i]||0);
+    return 0;
+  };
+  function refreshRegistry(){
+    registryStatus='Refreshing catalog';if(typeof render==='function')render(currentTab);
+    if(typeof PDA_httpGet!=='function'){registryStatus='Offline · using cached catalog';render(currentTab);return;}
+    try{
+      PDA_httpGet(REGISTRY_URL+'?t='+Date.now(),function(response){
+        try{
+          const raw=typeof response==='string'?response:(response?.responseText??response?.response);
+          const next=validateRegistry(JSON.parse(raw));
+          registry=next;localStorage.setItem(CACHE_KEY,JSON.stringify(next));
+          registryStatus='GitHub catalog updated';render(currentTab);
+        }catch(e){registryStatus='Catalog unavailable · using cached list';render(currentTab);}
+      },function(){registryStatus='Catalog unavailable · using cached list';render(currentTab);});
+    }catch(e){registryStatus='Catalog unavailable · using cached list';render(currentTab);}
+  }
   // Lifecycle API: modules register inert factories; only this manager calls activate().
   const registered = new Map();
   let active = null;
@@ -96,7 +127,7 @@
       if (!def || typeof def.id !== 'string' || !/^[a-z0-9-]+$/.test(def.id) ||
           typeof def.activate !== 'function' || typeof def.deactivate !== 'function' ||
           registered.has(def.id)) return false;
-      registered.set(def.id, Object.freeze({id:def.id, activate:def.activate, deactivate:def.deactivate}));
+      registered.set(def.id, Object.freeze({id:def.id, version:typeof def.version==='string'?def.version:null, activate:def.activate, deactivate:def.deactivate}));
       if (typeof render === 'function') render(currentTab);
       return true;
     },
@@ -172,7 +203,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.3.1 (PDA)</footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.4.0 (PDA)</footer>';
   document.body.appendChild(panel);
   const content = panel.querySelector('.tu-content');
   function makeButton(label,handler,disabled=false) {
@@ -182,53 +213,74 @@
     if(handler)btn.addEventListener('click',handler);
     return btn;
   }
+  let viewCategory=null,viewModule=null;
+  const goModules=()=>{viewCategory=null;viewModule=null;render('modules');};
+  const addLink=(label,url)=>{
+    const a=document.createElement('a');a.href=url;a.textContent=label;a.target='_blank';a.rel='noopener noreferrer';
+    a.style.cssText='color:#f1ce72;text-decoration:underline;display:inline-block;margin:8px 10px 8px 0';content.append(a);
+  };
   function render(tab) {
     currentTab=tab;
     panel.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===tab)));
     content.replaceChildren();
     if(tab==='modules'){
-      for(const group of catalog){
-        const card=document.createElement('div');card.className='tu-card';
-        const symbol=document.createElement('span');symbol.className='tu-symbol';symbol.textContent=group.icon;
-        const body=document.createElement('div');body.style.flex='1';
-        const title=document.createElement('strong');title.textContent=group.name;
-        const desc=document.createElement('small');desc.textContent=group.desc;
-        body.append(title,desc);card.append(symbol,body);
-        const loaded=group.modules.filter(id=>registered.has(id)&&!saved.disabled?.[id]);
-        if(loaded.length){
-          card.append(makeButton('Open',()=>{
-            if(loaded.length===1){if(openModule(loaded[0])){panel.hidden=true;launcher.hidden=true;}}
-            else renderGroup(group);
+      if(viewModule){
+        const m=registry.modules.find(x=>x.id===viewModule);
+        if(!m){viewModule=null;return render('modules');}
+        content.append(makeButton('← Back',()=>{viewModule=null;render('modules');}));
+        const title=document.createElement('h3');title.textContent=m.name;content.append(title);
+        const p=document.createElement('p');p.textContent=m.description;content.append(p);
+        const reg=registered.get(m.id),loaded=!!reg,disabled=!!saved.disabled?.[m.id];
+        const installed=reg?.version||'Unknown (module does not report version)';
+        const status=document.createElement('p');
+        status.textContent='Status: '+(!loaded?'Not loaded':disabled?'Loaded · disabled':'Ready')+' | Installed: '+(loaded?installed:'Not installed')+' | Latest: '+m.version;
+        content.append(status);
+        if(loaded&&reg.version&&versionCompare(reg.version,m.version)<0){const u=document.createElement('p');u.textContent='Update available';content.append(u);}
+        if(loaded){
+          content.append(makeButton(disabled?'Enable module':'Disable module',()=>{
+            saved.disabled ||= {};saved.disabled[m.id]=!disabled;
+            if(!disabled&&active===m.id)stopModule();
+            persist();render('modules');
           }));
-        } else {
-          const status=document.createElement('span');status.className='tu-status';status.textContent='Not loaded';
-          card.append(status);
+          if(!disabled)content.append(makeButton('Launch',()=>{if(openModule(m.id)){panel.hidden=true;launcher.hidden=true;}}));
         }
-        content.append(card);
+        content.append(makeButton(loaded?'Copy update URL':'Copy install URL',()=>{
+          if(navigator.clipboard?.writeText)navigator.clipboard.writeText(m.scriptUrl).then(()=>alert('Script URL copied')).catch(()=>prompt('Copy script URL',m.scriptUrl));
+          else prompt('Copy script URL',m.scriptUrl);
+        }));
+        addLink('View script on GitHub',m.scriptUrl.replace('raw.githubusercontent.com/','github.com/').replace('/main/','/blob/main/'));
+        const help=document.createElement('p');help.textContent='Copy the script URL, add or update it in Torn PDA Scripts, then reload Torn. TU cannot install scripts automatically.';content.append(help);
+      }else if(viewCategory){
+        const category=registry.categories.find(x=>x.id===viewCategory);
+        if(!category){viewCategory=null;return render('modules');}
+        content.append(makeButton('← Categories',goModules));
+        const title=document.createElement('h3');title.textContent=category.name;content.append(title);
+        const modules=registry.modules.filter(m=>m.category===viewCategory);
+        if(!modules.length){const p=document.createElement('p');p.textContent='No published modules yet';content.append(p);}
+        for(const m of modules){
+          const card=document.createElement('div');card.className='tu-card';
+          const body=document.createElement('div');body.style.flex='1;min-width:0';
+          const name=document.createElement('strong');name.textContent=m.name;
+          const loaded=registered.get(m.id);
+          const state=document.createElement('small');
+          state.textContent=(loaded?(saved.disabled?.[m.id]?'Loaded · disabled':'Ready'):'Not loaded')+' · Latest v'+m.version+(loaded?.version?' · Installed v'+loaded.version:'');
+          body.append(name,state);card.append(body,makeButton('Details →',()=>{viewModule=m.id;render('modules');}));content.append(card);
+        }
+      }else{
+        const status=document.createElement('p');status.textContent=registryStatus;content.append(status);
+        content.append(makeButton('Refresh catalog',refreshRegistry));
+        const categories=[...registry.categories].sort((a,b)=>a.order-b.order);
+        for(const group of categories){
+          const card=document.createElement('div');card.className='tu-card';
+          const icon=document.createElement('span');icon.className='tu-symbol';icon.textContent=group.icon;
+          const body=document.createElement('div');body.style.flex='1';
+          const title=document.createElement('strong');title.textContent=group.name;
+          const count=document.createElement('small');const mods=registry.modules.filter(m=>m.category===group.id);
+          count.textContent=mods.length+' available · '+mods.filter(m=>registered.has(m.id)).length+' loaded';
+          body.append(title,count);card.append(icon,body,makeButton('Open →',()=>{viewCategory=group.id;render('modules');}));content.append(card);
+        }
       }
     }else if(tab==='settings'){
-      const hint=document.createElement('p');
-      hint.textContent='Install modules in Torn PDA Scripts, then reload Torn. Enable modules here to make them available in the Modules tab.';
-      content.append(hint);
-      for(const mod of available){
-        const card=document.createElement('div');card.className='tu-card';
-        const body=document.createElement('div');body.style.flex='1;min-width:0';
-        const title=document.createElement('strong');title.textContent=mod.name;
-        const state=document.createElement('small');
-        const loaded=registered.has(mod.id),enabled=!saved.disabled?.[mod.id];
-        state.textContent=loaded?(enabled?'Loaded · enabled':'Loaded · disabled'):'Not loaded · install in PDA Scripts';
-        body.append(title,state);card.append(body);
-        const controls=document.createElement('div');controls.style.cssText='display:flex;flex-direction:column;gap:5px';
-        if(loaded)controls.append(makeButton(enabled?'Disable':'Activate',()=>{
-          saved.disabled ||= {};saved.disabled[mod.id]=enabled;
-          if(enabled&&active===mod.id)stopModule();
-          persist();render('settings');
-        }));
-        card.append(controls);content.append(card);
-      }
-      const note=document.createElement('p');
-      note.textContent='Install or update module scripts separately in Torn PDA Scripts. TU detects installed modules and controls activation. Disabling a module preserves its data.';
-      content.append(note);
       const heading=document.createElement('strong');heading.textContent='Storage & Backups';content.append(heading);
       const summary=document.createElement('p');
       const spaces=storage.namespaces();
@@ -236,57 +288,34 @@
       content.append(summary);
       const backup=makeButton('Export backup',()=>{
         try{
-          const json=exportData();
-          const blob=new Blob([json],{type:'application/json'});
-          const url=URL.createObjectURL(blob);
+          const json=exportData(),blob=new Blob([json],{type:'application/json'}),url=URL.createObjectURL(blob);
           const a=document.createElement('a');a.href=url;a.download='torn-utilities-backup-'+new Date().toISOString().slice(0,10)+'.json';
           document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
-          setStatus('storage','Backup file prepared');
-        }catch(e){setStatus('storage','Export failed: '+e.message);}
-      });
-      content.append(backup);
-      const importBtn=makeButton('Restore backup',()=>{
+        }catch(e){alert('Export failed: '+e.message);}
+      });content.append(backup);
+      content.append(makeButton('Restore backup',()=>{
         const input=document.createElement('input');input.type='file';input.accept='.json,application/json';
         input.addEventListener('change',async()=>{
           const file=input.files?.[0];if(!file)return;
-          try{
-            if(!confirm('Restore TU backup? Existing keys in the backup will be overwritten.'))return;
-            const count=importData(await file.text());
-            alert('Restored '+count+' entries. Reload Torn to apply restored settings.');
-            render('settings');
+          try{if(!confirm('Restore TU backup? Matching keys will be overwritten.'))return;
+            const count=importData(await file.text());alert('Restored '+count+' entries. Reload Torn to apply settings.');render('settings');
           }catch(e){alert('Restore failed: '+e.message);}
-        });
-        input.click();
-      });
-      content.append(importBtn);
-      if(statusText.storage){const msg=document.createElement('p');msg.textContent=statusText.storage;content.append(msg);}
-      const privacy=document.createElement('p');privacy.textContent='Backups contain TU-managed settings and module data only. Large archives and legacy module storage are not included. Do not store API keys in TU backups.';content.append(privacy);
+        });input.click();
+      }));
+      const privacy=document.createElement('p');privacy.textContent='Backups contain TU-managed settings and module data only. Large archives and legacy storage are not included.';content.append(privacy);
       for(const id of spaces){
         const line=document.createElement('div');line.className='tu-card';
         const name=document.createElement('span');name.textContent=id+' ('+storage.keys(id).length+' keys)';name.style.flex='1';
-        line.append(name,makeButton('Clear data',()=>{
-          if(confirm('Permanently delete all TU data for '+id+'? This cannot be undone.')){storage.clear(id);render('settings');}
-        }));content.append(line);
+        line.append(name,makeButton('Clear data',()=>{if(confirm('Delete all TU data for '+id+'?')){storage.clear(id);render('settings');}}));content.append(line);
       }
     }else{
-      const p=document.createElement('p');
-      p.textContent='Torn Utilities by RelaxSweety [4539436]. Drag the TU button to reposition it. Modules are managed through Settings.';
-      content.append(p);
-    }
-  }
-  function renderGroup(group){
-    content.replaceChildren();
-    content.append(makeButton('← Back',()=>render('modules')));
-    for(const id of group.modules){
-      if(!registered.has(id)||saved.disabled?.[id])continue;
-      const mod=available.find(x=>x.id===id);
-      const card=document.createElement('div');card.className='tu-card';
-      const label=document.createElement('strong');label.textContent=mod?.name||id;
-      card.append(label,makeButton('Open',()=>{if(openModule(id)){panel.hidden=true;launcher.hidden=true;}}));
-      content.append(card);
+      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.0 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      addLink('RelaxSweety on Torn','https://www.torn.com/profiles.php?XID=4539436');
+      addLink('RelaxSweety on Discord','https://discord.com/users/relaxsweety');
     }
   }
   render('modules');
+  refreshRegistry();
   window.addEventListener('torn-utilities-ready',()=>render(currentTab));
   // A module script can be installed separately, but remains inert until Open is pressed.
 
