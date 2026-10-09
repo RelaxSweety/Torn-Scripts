@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.0
+// @version      0.4.1
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -201,7 +201,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.4.0 (PDA)</footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.4.1 (PDA)</footer>';
   document.body.appendChild(panel);
   const content = panel.querySelector('.tu-content');
   function makeButton(label,handler,disabled=false) {
@@ -217,6 +217,19 @@
     const a=document.createElement('a');a.href=url;a.textContent=label;a.target='_blank';a.rel='noopener noreferrer';
     a.style.cssText='color:#f1ce72;text-decoration:underline;display:inline-block;margin:8px 10px 8px 0';content.append(a);
   };
+  const addSocialIcon=(name,url,svgPath,viewBox='0 0 24 24')=>{
+    const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener noreferrer';
+    a.title=name;a.setAttribute('aria-label',name);
+    a.style.cssText='display:inline-flex;align-items:center;justify-content:center;width:50px;height:48px;margin:12px 14px 4px 0;background:#252a2e;border:1px solid #806a3e;border-radius:12px;color:#f1ce72';
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.setAttribute('viewBox',viewBox);svg.setAttribute('width','30');svg.setAttribute('height','30');svg.setAttribute('fill','currentColor');
+    const path=document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d',svgPath);svg.append(path);a.append(svg);content.append(a);
+  };
+  const addSectionHeader=(back,label)=>{
+    const bar=document.createElement('div');bar.style.cssText='display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:10px 0 14px';
+    const btn=makeButton('← '+back.label,back.action);btn.style.marginLeft='0';btn.style.flex='0 0 auto';bar.append(btn);
+    const h=document.createElement('h3');h.textContent=label;h.style.cssText='margin:0;font-size:18px;min-width:0;overflow-wrap:anywhere';bar.append(h);content.append(bar);
+  };
   function render(tab) {
     currentTab=tab;
     panel.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===tab)));
@@ -225,8 +238,7 @@
       if(viewModule){
         const m=registry.modules.find(x=>x.id===viewModule);
         if(!m){viewModule=null;return render('modules');}
-        content.append(makeButton('← Back',()=>{viewModule=null;render('modules');}));
-        const title=document.createElement('h3');title.textContent=m.name;content.append(title);
+        addSectionHeader({label:'Back',action:()=>{viewModule=null;render('modules');}},m.name);
         const p=document.createElement('p');p.textContent=m.description;content.append(p);
         const reg=registered.get(m.id),loaded=!!reg,disabled=!!saved.disabled?.[m.id];
         const installed=reg?.version||'Unknown (module does not report version)';
@@ -240,7 +252,6 @@
             if(!disabled&&active===m.id)stopModule();
             persist();render('modules');
           }));
-          if(!disabled)content.append(makeButton('Launch',()=>{if(openModule(m.id)){panel.hidden=true;launcher.hidden=true;}}));
         }
         content.append(makeButton(loaded?'Copy update URL':'Copy install URL',()=>{
           if(navigator.clipboard?.writeText)navigator.clipboard.writeText(m.scriptUrl).then(()=>alert('Script URL copied')).catch(()=>prompt('Copy script URL',m.scriptUrl));
@@ -251,8 +262,7 @@
       }else if(viewCategory){
         const category=registry.categories.find(x=>x.id===viewCategory);
         if(!category){viewCategory=null;return render('modules');}
-        content.append(makeButton('← Categories',goModules));
-        const title=document.createElement('h3');title.textContent=category.name;content.append(title);
+        addSectionHeader({label:'Categories',action:goModules},category.name);
         const modules=registry.modules.filter(m=>m.category===viewCategory);
         if(!modules.length){const p=document.createElement('p');p.textContent='No published modules yet';content.append(p);}
         for(const m of modules){
@@ -262,11 +272,16 @@
           const loaded=registered.get(m.id);
           const state=document.createElement('small');
           state.textContent=(loaded?(saved.disabled?.[m.id]?'Loaded · disabled':'Ready'):'Not loaded')+' · Latest v'+m.version+(loaded?.version?' · Installed v'+loaded.version:'');
-          body.append(name,state);card.append(body,makeButton('Details →',()=>{viewModule=m.id;render('modules');}));content.append(card);
+          body.append(name,state);
+          const ready=!!loaded&&!saved.disabled?.[m.id];
+          const go=()=>{if(ready){if(openModule(m.id)){panel.hidden=true;launcher.hidden=true;}}else{viewModule=m.id;render('modules');}};
+          card.style.cursor='pointer';card.setAttribute('role','button');card.tabIndex=0;
+          card.addEventListener('click',e=>{if(e.target.closest('button'))return;go();});
+          card.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go();}});
+          card.append(body,makeButton(ready?'Open →':'Details →',go));content.append(card);
         }
       }else{
         const status=document.createElement('p');status.textContent=registryStatus;content.append(status);
-        content.append(makeButton('Refresh catalog',refreshRegistry));
         const categories=[...registry.categories].sort((a,b)=>a.order-b.order);
         for(const group of categories){
           const card=document.createElement('div');card.className='tu-card';
@@ -277,6 +292,8 @@
           count.textContent=mods.length+' available · '+mods.filter(m=>registered.has(m.id)).length+' loaded';
           body.append(title,count);card.append(icon,body,makeButton('Open →',()=>{viewCategory=group.id;render('modules');}));content.append(card);
         }
+        const refreshRow=document.createElement('div');refreshRow.style.cssText='display:flex;justify-content:flex-end;margin:16px 0 4px';
+        const refresh=makeButton('↻ Refresh catalog',refreshRegistry);refresh.style.marginLeft='0';refreshRow.append(refresh);content.append(refreshRow);
       }
     }else if(tab==='settings'){
       const heading=document.createElement('strong');heading.textContent='Storage & Backups';content.append(heading);
@@ -307,9 +324,12 @@
         line.append(name,makeButton('Clear data',()=>{if(confirm('Delete all TU data for '+id+'?')){storage.clear(id);render('settings');}}));content.append(line);
       }
     }else{
-      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.0 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
-      addLink('RelaxSweety on Torn','https://www.torn.com/profiles.php?XID=4539436');
-      addLink('RelaxSweety on Discord','https://discord.com/users/relaxsweety');
+      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.1 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      // Official-style vector marks; no remote image dependencies.
+      addSocialIcon('RelaxSweety on Discord','https://discord.com/users/relaxsweety','M20.317 4.369a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.211.375-.445.865-.608 1.25a18.27 18.27 0 0 0-5.49 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037 19.736 19.736 0 0 0-4.885 1.515.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.1 18.057a.083.083 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.077.077 0 0 0 .084-.028c.462-.63.873-1.295 1.226-1.994a.075.075 0 0 0-.041-.104 13.1 13.1 0 0 1-1.872-.89.076.076 0 0 1-.008-.127c.126-.095.252-.193.372-.292a.074.074 0 0 1 .077-.01c3.929 1.793 8.185 1.793 12.068 0a.074.074 0 0 1 .078.01c.12.099.246.197.373.292a.076.076 0 0 1-.007.127c-.598.35-1.224.65-1.873.89a.076.076 0 0 0-.04.105c.36.698.77 1.363 1.225 1.993a.076.076 0 0 0 .084.028 19.83 19.83 0 0 0 6.003-3.03.077.077 0 0 0 .031-.056c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028ZM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.42 0-1.334.955-2.42 2.157-2.42 1.211 0 2.176 1.095 2.157 2.42 0 1.335-.955 2.42-2.157 2.42Zm7.96 0c-1.183 0-2.157-1.085-2.157-2.42 0-1.334.955-2.42 2.157-2.42 1.211 0 2.176 1.095 2.157 2.42 0 1.335-.946 2.42-2.157 2.42Z');
+      const tornLink=document.createElement('a');tornLink.href='https://www.torn.com/profiles.php?XID=4539436';tornLink.target='_blank';tornLink.rel='noopener noreferrer';tornLink.title='RelaxSweety on Torn';tornLink.setAttribute('aria-label','RelaxSweety on Torn');
+      tornLink.style.cssText='display:inline-flex;align-items:center;justify-content:center;width:50px;height:48px;margin:12px 14px 4px 0;background:#252a2e;border:1px solid #806a3e;border-radius:12px';
+      const tornLogo=document.createElement('img');tornLogo.src='https://www.torn.com/favicon.ico';tornLogo.alt='Torn';tornLogo.width=30;tornLogo.height=30;tornLink.append(tornLogo);content.append(tornLink);
     }
   }
   render('modules');
