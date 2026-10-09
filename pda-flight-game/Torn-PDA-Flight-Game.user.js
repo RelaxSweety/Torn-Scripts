@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.11.11
+// @version      0.11.12
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -36,6 +36,45 @@
 
 (() => {
     'use strict';
+    // TU v0.3 storage bridge. Existing legacy keys remain readable and are migrated
+    // on first access; modules continue to work if TU loads later or is absent.
+    const TU_NAMESPACE = 'flight-game';
+    const legacyStore = window.localStorage;
+    const tuStorage = () => window.TornUtilities?.storage;
+    const moduleStore = {
+        getItem(key) {
+            const name = String(key);
+            const tu = tuStorage();
+            if (tu) {
+                try {
+                    const value = tu.get(TU_NAMESPACE, name, null);
+                    if (typeof value === 'string') return value;
+                } catch (_) {}
+            }
+            const old = legacyStore.getItem(name);
+            if (old !== null && tu) {
+                try { tu.set(TU_NAMESPACE, name, old); } catch (_) {}
+            }
+            return old;
+        },
+        setItem(key, value) {
+            const name = String(key), text = String(value);
+            const tu = tuStorage();
+            if (tu) {
+                // Preserve existing legacy data until the shared write succeeds.
+                tu.set(TU_NAMESPACE, name, text);
+            } else {
+                legacyStore.setItem(name, text);
+            }
+        },
+        removeItem(key) {
+            const name = String(key);
+            const tu = tuStorage();
+            if (tu) tu.remove(TU_NAMESPACE, name);
+            legacyStore.removeItem(name);
+        }
+    };
+
 
     if (window.__TORN_PDA_FLIGHT_GAME__) return;
     window.__TORN_PDA_FLIGHT_GAME__ = true;
@@ -53,7 +92,7 @@
     const LAUNCH_MODE_KEY = 'tpfgLaunchMode';
     const LAUNCH_POS_KEY = 'tpfgLaunchPosition';
     const SAVE_PREFIX = 'tpfgGameSave:';
-    const launchMode = () => localStorage.getItem(LAUNCH_MODE_KEY) || 'flight';
+    const launchMode = () => moduleStore.getItem(LAUNCH_MODE_KEY) || 'flight';
     let saved = { highScore: 0, bestKills: 0, games: 0 };
 
     async function storageGet() {
@@ -64,7 +103,7 @@
             }
         } catch (_) {}
         try {
-            return JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+            return JSON.parse(moduleStore.getItem(STORE_KEY) || 'null');
         } catch (_) { return null; }
     }
 
@@ -75,7 +114,7 @@
                 return;
             }
         } catch (_) {}
-        try { localStorage.setItem(STORE_KEY, JSON.stringify(value)); } catch (_) {}
+        try { moduleStore.setItem(STORE_KEY, JSON.stringify(value)); } catch (_) {}
     }
 
     function injectStyle() {
@@ -151,8 +190,8 @@
         games:new Map(),
         registerGame(game){if(!game?.id||typeof game.start!=='function')throw new Error('Invalid arcade game module');this.games.set(game.id,game);return game;},
         list(){return [...this.games.values()];},
-        enabled(game){return localStorage.getItem('tpfgGameEnabled:'+game.id)!=='false';},
-        setEnabled(game,value){localStorage.setItem('tpfgGameEnabled:'+game.id,value?'true':'false');},
+        enabled(game){return moduleStore.getItem('tpfgGameEnabled:'+game.id)!=='false';},
+        setEnabled(game,value){moduleStore.setItem('tpfgGameEnabled:'+game.id,value?'true':'false');},
         available(game){return this.enabled(game)&&(game.isAvailable?game.isAvailable():true);},
         start(id){const game=this.games.get(id);if(game&&this.available(game))launchGame(game);}
     };
@@ -210,7 +249,7 @@
             weaponDropClock+=dt;
             if(weaponDropClock>=10){weaponDropClock-=10;const nextWeapon=randomWeaponDrop();pickups.push({x:Math.max(35,Math.min(W-35,player.x+(player.x<W/2?85:-85))),y:Math.max(90,Math.min(H-160,player.y+(player.y<H/2?65:-65))),type:'weapon',weapon:nextWeapon,spawnedAt:elapsed,guaranteed:true});}
             for(const p of pickups){if(p.type==='weapon'&&p.weapon===weapon&&!p.guaranteed)p.used=true;if(!p.used&&dist(p,player)<23){if(p.type==='health')player.hp=Math.min(100,player.hp+25);else weapon=p.weapon;p.used=true;}}pickups=pickups.filter(p=>!p.used&&(p.type!=='weapon'||elapsed-(p.spawnedAt??elapsed)<10)).slice(-35);
-        }draw();if(player.hp<=0&&!deathPrompted){deathPrompted=true;paused=true;try{localStorage.removeItem('sffSavedGame');}catch(_){}setTimeout(()=>arcadeEndPrompt('stick-figure-fighter',true),0);}if(host){const n=Math.floor(elapsed),t=host.querySelector('#sff-time');if(t)t.textContent=String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');host.querySelector('#sff-kills').textContent=score;host.querySelector('#sff-hp').textContent=Math.ceil(player.hp);try{const best=Math.max(score,Number(localStorage.getItem('sffBestKills')||0));host.querySelector('#sff-best').textContent=best;if(player.hp<=0)localStorage.setItem('sffBestKills',String(best));}catch(_){}}frame=requestAnimationFrame(tick);}
+        }draw();if(player.hp<=0&&!deathPrompted){deathPrompted=true;paused=true;try{moduleStore.removeItem('sffSavedGame');}catch(_){}setTimeout(()=>arcadeEndPrompt('stick-figure-fighter',true),0);}if(host){const n=Math.floor(elapsed),t=host.querySelector('#sff-time');if(t)t.textContent=String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');host.querySelector('#sff-kills').textContent=score;host.querySelector('#sff-hp').textContent=Math.ceil(player.hp);try{const best=Math.max(score,Number(moduleStore.getItem('sffBestKills')||0));host.querySelector('#sff-best').textContent=best;if(player.hp<=0)moduleStore.setItem('sffBestKills',String(best));}catch(_){}}frame=requestAnimationFrame(tick);}
         function setPointer(e){if(pointer!==null&&e.pointerId!==pointer)return;const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;if(pointer===null&&Math.hypot(x-62,y-(H-68))>105)return;pointer=e.pointerId;let dx=x-62,dy=y-(H-68),m=Math.max(1,Math.hypot(dx,dy));joystick={x:dx/Math.max(43,m),y:dy/Math.max(43,m)};}
         function start(){stop();reset();host=document.createElement('div');host.id='tpfg-stick-fighter';host.style.cssText='position:fixed;inset:0;z-index:2147483646;background:#080b10;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px;box-sizing:border-box;font-family:Arial,sans-serif;color:white';
             host.innerHTML=`
@@ -231,13 +270,13 @@
             document.addEventListener('keydown',onKeyDown);document.addEventListener('keyup',onKeyUp);
             host.querySelector('#sff-pause').onclick=()=>{if(player.hp<=0)return;paused=!paused;last=performance.now();host.querySelector('#sff-pause').textContent=paused?'RESUME':'PAUSE';};
             host.querySelector('#sff-exit').onclick=host.querySelector('#sff-min').onclick=requestLeave;
-            try{host.querySelector('#sff-best').textContent=localStorage.getItem('sffBestKills')||'0';}catch(_){}
+            try{host.querySelector('#sff-best').textContent=moduleStore.getItem('sffBestKills')||'0';}catch(_){}
             active=true;frame=requestAnimationFrame(tick);
         }
         function dialog(title,message,actions){const d=host.querySelector('#sff-dialog');d.querySelector('#sff-dialog-title').textContent=title;d.querySelector('#sff-dialog-text').textContent=message;const area=d.querySelector('#sff-dialog-actions');area.replaceChildren();for(const action of actions){const button=document.createElement('button');button.className='tpfg-resultbtn';button.textContent=action.label;button.onclick=()=>{d.style.display='none';action.run();};area.appendChild(button);}d.style.display='flex';}
         function snapshot(){return JSON.stringify({player,enemies,pickups,shots,score,elapsed,spawn,attack,weapon,swing,aim,weaponDropClock});}
-        function save(){try{localStorage.setItem('sffSavedGame',snapshot());}catch(_){}}
-        function restore(){try{const s=JSON.parse(localStorage.getItem('sffSavedGame'));if(!s)return;({player,enemies,pickups,shots,score,elapsed,spawn,attack,weapon,swing,aim}=s);weaponDropClock=Number.isFinite(s.weaponDropClock)?Math.max(0,Math.min(10,s.weaponDropClock)):elapsed%10;paused=false;last=performance.now();}catch(_){}}
+        function save(){try{moduleStore.setItem('sffSavedGame',snapshot());}catch(_){}}
+        function restore(){try{const s=JSON.parse(moduleStore.getItem('sffSavedGame'));if(!s)return;({player,enemies,pickups,shots,score,elapsed,spawn,attack,weapon,swing,aim}=s);weaponDropClock=Number.isFinite(s.weaponDropClock)?Math.max(0,Math.min(10,s.weaponDropClock)):elapsed%10;paused=false;last=performance.now();}catch(_){}}
         function requestLeave(){if(!host)return;paused=true;arcadeEndPrompt('stick-figure-fighter',player.hp<=0);}
         function setAim(e){const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height,dx=x-(W-62),dy=y-(H-68),m=Math.hypot(dx,dy);if(m>3){aim=Math.atan2(dy,dx);aimStick={x:dx/Math.max(43,m),y:dy/Math.max(43,m)};}}
         function onDown(e){if(player.hp<=0)return;if(paused)return;const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;if(Math.hypot(x-(W-62),y-(H-68))<105&&aimPointer===null){aimPointer=e.pointerId;setAim(e);}else setPointer(e);if(pointer===e.pointerId||aimPointer===e.pointerId){canvas.setPointerCapture(e.pointerId);e.preventDefault();}}
@@ -248,16 +287,16 @@
         function stop(){active=false;cancelAnimationFrame(frame);document.removeEventListener('keydown',onKeyDown);document.removeEventListener('keyup',onKeyUp);host?.remove();host=null;pointer=null;aimPointer=null;aimStick={x:0,y:0};joystick={x:0,y:0};keys.clear();}
         return {start,stop,restore,save,reset,resume(){paused=false;last=performance.now();if(host)host.querySelector('#sff-pause').textContent='PAUSE';},getScore(){return score;},getTime(){return elapsed;}};
     })();
-    Arcade.registerGame({id:'stick-figure-fighter',name:'Stick Figure Fighter',version:'0.1.5',isAvailable(){return (localStorage.getItem('tpfgMode:stick-figure-fighter')||'always')==='always';},start:StickFighter.start,stop:StickFighter.stop});
+    Arcade.registerGame({id:'stick-figure-fighter',name:'Stick Figure Fighter',version:'0.1.5',isAvailable(){return (moduleStore.getItem('tpfgMode:stick-figure-fighter')||'always')==='always';},start:StickFighter.start,stop:StickFighter.stop});
 
     function gameSaveKey(id){return SAVE_PREFIX+id;}
-    function getGameSave(id){try{return JSON.parse(localStorage.getItem(gameSaveKey(id))||'null');}catch(_){return null;}}
-    function clearGameSave(id){try{localStorage.removeItem(gameSaveKey(id));}catch(_){}}
+    function getGameSave(id){try{return JSON.parse(moduleStore.getItem(gameSaveKey(id))||'null');}catch(_){return null;}}
+    function clearGameSave(id){try{moduleStore.removeItem(gameSaveKey(id));}catch(_){}}
     function snapshotGame(){
         const keys=['score','kills','hp','activeMs','spawnClock','shotClock','enemyShotClock','player','bullets','enemies','enemyBullets','particles','healthDrops'];
         const out={}; keys.forEach(k=>out[k]=state[k]); return JSON.parse(JSON.stringify(out));
     }
-    function saveCurrentGame(){try{localStorage.setItem(gameSaveKey('flight-arcade'),JSON.stringify({version:1,savedAt:Date.now(),state:snapshotGame()}));return true;}catch(_){return false;}}
+    function saveCurrentGame(){try{moduleStore.setItem(gameSaveKey('flight-arcade'),JSON.stringify({version:1,savedAt:Date.now(),state:snapshotGame()}));return true;}catch(_){return false;}}
     function restoreGame(s){Object.assign(state,JSON.parse(JSON.stringify(s.state)));shownStage=aircraftStage();transition=null;state.running=true;state.paused=false;state.over=false;state.lastTs=performance.now();state.keys={up:false,down:false,left:false,right:false,fire:false};state.stick={x:0,y:0};showGame();setTimeout(resize,0);updateHud();cancelAnimationFrame(raf);raf=requestAnimationFrame(loop);}
     function arcadeEndPrompt(id,died=false){
         const isStick=id==='stick-figure-fighter';
@@ -269,7 +308,7 @@
             {label:'EXIT',action:close}
         ]:[
             {label:'SAVE & EXIT',action:()=>{if(isStick)StickFighter.save();else saveCurrentGame();close();}},
-            {label:'EXIT WITHOUT SAVING',action:()=>{if(isStick)localStorage.removeItem('sffSavedGame');else clearGameSave('flight-arcade');close();}},
+            {label:'EXIT WITHOUT SAVING',action:()=>{if(isStick)moduleStore.removeItem('sffSavedGame');else clearGameSave('flight-arcade');close();}},
             {label:'CANCEL',action:()=>{if(isStick)StickFighter.resume();else{state.paused=false;state.lastTs=performance.now();document.getElementById('tpfg-pause').textContent='PAUSE';}}}
         ];
         const gameName=isStick?'Stick Figure Fighter':'Flight Arcade';
@@ -284,7 +323,7 @@
         const p=document.getElementById('tpfg-prompt');p.querySelector('h3').textContent=title;p.querySelector('p').textContent=message;
         const a=p.querySelector('#tpfg-prompt-actions');a.innerHTML='';buttons.forEach(x=>{const b=document.createElement('button');b.className='tpfg-resultbtn';b.textContent=x.label;b.onclick=()=>{p.style.display='none';x.action();};a.appendChild(b);});if(summary){const wrap=document.createElement('div');wrap.style.cssText='margin:12px 0;padding:12px;background:#10151b;border:1px solid #59616b;border-radius:8px;font-size:12px;line-height:1.5;white-space:normal;overflow-wrap:anywhere';const label=document.createElement('strong');label.textContent='GAME SUMMARY';const content=document.createElement('div');content.textContent=summary;content.style.margin='7px 0';const copy=document.createElement('button');copy.type='button';copy.className='tpfg-resultbtn';copy.textContent='COPY SUMMARY';copy.onclick=async()=>{try{await navigator.clipboard.writeText(summary);copy.textContent='COPIED';}catch(_){const input=document.createElement('textarea');input.value=summary;input.style.cssText='position:fixed;opacity:0';document.body.appendChild(input);input.select();const ok=document.execCommand('copy');input.remove();copy.textContent=ok?'COPIED':'SELECT TEXT TO COPY';if(!ok){const selection=document.createElement('textarea');selection.value=summary;wrap.appendChild(selection);selection.focus();selection.select();}}};wrap.append(label,content,copy);a.prepend(wrap);}if(showDonation){const info=document.createElement('div');info.style.cssText='margin-top:14px;padding-top:12px;border-top:1px solid #59616b;font-size:13px;text-align:center';info.innerHTML='Enjoying Torn PDA Arcade? <a href="https://www.torn.com/profiles.php?XID=4539436" target="_blank" rel="noopener noreferrer" style="color:#e2c778">Donate to RelaxSweety [4539436]</a>';a.appendChild(info);}p.style.display='flex';
     }
-    function launchGame(game){if(game.id==='stick-figure-fighter'){const savedStick=localStorage.getItem('sffSavedGame');if(savedStick)promptBox('SAVED GAME','Continue your saved Stick Figure Fighter game?',[{label:'CONTINUE SAVED GAME',action:()=>{game.start();StickFighter.restore();}},{label:'START NEW GAME',action:()=>{localStorage.removeItem('sffSavedGame');game.start();}},{label:'CANCEL',action:()=>{}}]);else game.start();return;}if(game.id!=='flight-arcade'){game.start();return;}const s=getGameSave(game.id);if(s)promptBox('SAVED GAME','Continue your saved '+game.name+' game?',[{label:'CONTINUE SAVED GAME',action:()=>restoreGame(s)},{label:'START NEW GAME',action:()=>{clearGameSave(game.id);game.start();}},{label:'CANCEL',action:()=>{}}]);else game.start();}
+    function launchGame(game){if(game.id==='stick-figure-fighter'){const savedStick=moduleStore.getItem('sffSavedGame');if(savedStick)promptBox('SAVED GAME','Continue your saved Stick Figure Fighter game?',[{label:'CONTINUE SAVED GAME',action:()=>{game.start();StickFighter.restore();}},{label:'START NEW GAME',action:()=>{moduleStore.removeItem('sffSavedGame');game.start();}},{label:'CANCEL',action:()=>{}}]);else game.start();return;}if(game.id!=='flight-arcade'){game.start();return;}const s=getGameSave(game.id);if(s)promptBox('SAVED GAME','Continue your saved '+game.name+' game?',[{label:'CONTINUE SAVED GAME',action:()=>restoreGame(s)},{label:'START NEW GAME',action:()=>{clearGameSave(game.id);game.start();}},{label:'CANCEL',action:()=>{}}]);else game.start();}
     function requestLeave(){if(!state.running||state.over){updateEngineSound(false);minimize();return;}state.paused=true;updateEngineSound(false);document.getElementById('tpfg-pause').textContent='RESUME';arcadeEndPrompt('flight-arcade',false);}
     function closeActiveGame(){transition=null;state.running=false;state.paused=true;updateEngineSound(false);cancelAnimationFrame(raf);document.getElementById('tpfg-root').style.display='none';}
     function openManager(){document.getElementById('tpfg-manager').style.display='flex';renderManager('games');}
@@ -297,9 +336,9 @@
             body.innerHTML=games.length?games.map(g=>'<div class="tpfg-game-card"><b>'+g.name+'</b><span>Available now</span><button data-game="'+g.id+'">PLAY</button></div>').join(''):'<p class="tpfg-empty">No games are available in your current Torn situation.</p>';
             body.querySelectorAll('button[data-game]').forEach(btn=>btn.onclick=()=>{document.getElementById('tpfg-manager').style.display='none';Arcade.start(btn.dataset.game);});
         } else {
-            body.innerHTML=Arcade.list().map(g=>{const mode=g.id==='flight-arcade'?launchMode():(localStorage.getItem('tpfgMode:'+g.id)||'always');return '<div class="tpfg-game-card"><b>'+g.name+'</b><label><input type="checkbox" data-enable-game="'+g.id+'" '+(Arcade.enabled(g)?'checked':'')+'> Show in Game List</label><span>Availability</span><label><input type="radio" name="manager-mode-'+g.id+'" value="flight" '+(mode==='flight'?'checked':'')+'> Traveling</label><label><input type="radio" name="manager-mode-'+g.id+'" value="always" '+(mode==='always'?'checked':'')+'> Always</label><label><input type="radio" name="manager-mode-'+g.id+'" value="disabled" '+(mode==='disabled'?'checked':'')+'> Disabled</label></div>';}).join('');
+            body.innerHTML=Arcade.list().map(g=>{const mode=g.id==='flight-arcade'?launchMode():(moduleStore.getItem('tpfgMode:'+g.id)||'always');return '<div class="tpfg-game-card"><b>'+g.name+'</b><label><input type="checkbox" data-enable-game="'+g.id+'" '+(Arcade.enabled(g)?'checked':'')+'> Show in Game List</label><span>Availability</span><label><input type="radio" name="manager-mode-'+g.id+'" value="flight" '+(mode==='flight'?'checked':'')+'> Traveling</label><label><input type="radio" name="manager-mode-'+g.id+'" value="always" '+(mode==='always'?'checked':'')+'> Always</label><label><input type="radio" name="manager-mode-'+g.id+'" value="disabled" '+(mode==='disabled'?'checked':'')+'> Disabled</label></div>';}).join('');
             body.querySelectorAll('input[data-enable-game]').forEach(x=>x.onchange=()=>Arcade.setEnabled(Arcade.games.get(x.dataset.enableGame),x.checked));
-            body.querySelectorAll('input[type="radio"]').forEach(r=>r.onchange=()=>{const id=r.name.replace('manager-mode-','');localStorage.setItem(id==='flight-arcade'?LAUNCH_MODE_KEY:'tpfgMode:'+id,r.value);});
+            body.querySelectorAll('input[type="radio"]').forEach(r=>r.onchange=()=>{const id=r.name.replace('manager-mode-','');moduleStore.setItem(id==='flight-arcade'?LAUNCH_MODE_KEY:'tpfgMode:'+id,r.value);});
         }
     }
 
@@ -311,12 +350,12 @@
         launcher.textContent='⌖';
         launcher.title='Torn PDA Arcade';
         document.body.appendChild(launcher);
-        const restorePos=()=>{try{const p=JSON.parse(localStorage.getItem(LAUNCH_POS_KEY)||'null');if(p){launcher.style.left=Math.max(0,Math.min(innerWidth-44,p.x))+'px';launcher.style.top=Math.max(0,Math.min(innerHeight-44,p.y))+'px';launcher.style.right='auto';launcher.style.bottom='auto';}}catch(_){}};
+        const restorePos=()=>{try{const p=JSON.parse(moduleStore.getItem(LAUNCH_POS_KEY)||'null');if(p){launcher.style.left=Math.max(0,Math.min(innerWidth-44,p.x))+'px';launcher.style.top=Math.max(0,Math.min(innerHeight-44,p.y))+'px';launcher.style.right='auto';launcher.style.bottom='auto';}}catch(_){}};
         restorePos();
         let drag=null,moved=false;
         launcher.addEventListener('pointerdown',e=>{drag={id:e.pointerId,x:e.clientX,y:e.clientY,l:launcher.offsetLeft,t:launcher.offsetTop};moved=false;launcher.setPointerCapture(e.pointerId);});
         launcher.addEventListener('pointermove',e=>{if(!drag||drag.id!==e.pointerId)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.hypot(dx,dy)>7)moved=true;if(moved){launcher.style.left=Math.max(0,Math.min(innerWidth-launcher.offsetWidth,drag.l+dx))+'px';launcher.style.top=Math.max(0,Math.min(innerHeight-launcher.offsetHeight,drag.t+dy))+'px';launcher.style.right='auto';launcher.style.bottom='auto';}});
-        launcher.addEventListener('pointerup',e=>{if(!drag||drag.id!==e.pointerId)return;if(moved)localStorage.setItem(LAUNCH_POS_KEY,JSON.stringify({x:launcher.offsetLeft,y:launcher.offsetTop}));else openManager();drag=null;});
+        launcher.addEventListener('pointerup',e=>{if(!drag||drag.id!==e.pointerId)return;if(moved)moduleStore.setItem(LAUNCH_POS_KEY,JSON.stringify({x:launcher.offsetLeft,y:launcher.offsetTop}));else openManager();drag=null;});
 
         const root = document.createElement('div');
         root.id = 'tpfg-root';
@@ -365,7 +404,7 @@
         const manager=document.createElement('div');manager.id='tpfg-manager';manager.style.display='none';manager.innerHTML='<div class="tpfg-settings-card"><h3>TORN PDA ARCADE</h3><div class="tpfg-manager-tabs"><button id="tpfg-tab-games">GAMES</button><button id="tpfg-tab-settings">SETTINGS</button></div><div id="tpfg-manager-body"></div><button class="tpfg-resultbtn" id="tpfg-manager-close">CLOSE</button></div>';document.body.appendChild(manager);
         const prompt=document.createElement('div');prompt.id='tpfg-prompt';prompt.style.display='none';prompt.innerHTML='<div class="tpfg-settings-card"><h3></h3><p></p><div id="tpfg-prompt-actions"></div></div>';document.body.appendChild(prompt);
         const gameSettings=document.createElement('div');gameSettings.id='tpfg-game-settings';gameSettings.style.display='none';gameSettings.innerHTML='<div class="tpfg-settings-card"><h3>GAME SETTINGS</h3><div class="tpfg-setting-row"><b>Flight Arcade</b><span>Enabled</span></div><label><input type="radio" name="tpfg-mode" value="flight"> Flight only</label><label><input type="radio" name="tpfg-mode" value="always"> Always available</label><label><input type="radio" name="tpfg-mode" value="disabled"> Disabled</label><p class="tpfg-settings-note">Additional Torn games can be added here as modules.</p><button class="tpfg-resultbtn" id="tpfg-settings-close">CLOSE</button></div>';document.body.appendChild(gameSettings);
-        gameSettings.querySelectorAll('input[name="tpfg-mode"]').forEach(r=>{r.checked=(launchMode()===r.value);r.addEventListener('change',()=>localStorage.setItem(LAUNCH_MODE_KEY,r.value));});
+        gameSettings.querySelectorAll('input[name="tpfg-mode"]').forEach(r=>{r.checked=(launchMode()===r.value);r.addEventListener('change',()=>moduleStore.setItem(LAUNCH_MODE_KEY,r.value));});
         document.getElementById('tpfg-settings-close').onclick=()=>gameSettings.style.display='none';
         document.getElementById('tpfg-manager-close').onclick=()=>manager.style.display='none';
         document.getElementById('tpfg-tab-games').onclick=()=>renderManager('games');
@@ -388,8 +427,8 @@
     const AIRCRAFT_COUNT=8;
     const AUDIO_KEY='tpfgAudio';
     let audioCtx=null,engineOsc=null,engineGain=null;
-    let audioPrefs=(()=>{try{return {...{volume:.55,muted:false},...JSON.parse(localStorage.getItem(AUDIO_KEY)||'{}')}}catch(_){return {volume:.55,muted:false}}})();
-    function saveAudio(){try{localStorage.setItem(AUDIO_KEY,JSON.stringify(audioPrefs));}catch(_){}}
+    let audioPrefs=(()=>{try{return {...{volume:.55,muted:false},...JSON.parse(moduleStore.getItem(AUDIO_KEY)||'{}')}}catch(_){return {volume:.55,muted:false}}})();
+    function saveAudio(){try{moduleStore.setItem(AUDIO_KEY,JSON.stringify(audioPrefs));}catch(_){}}
     function ensureAudio(){if(audioCtx)return audioCtx;const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;audioCtx=new AC();return audioCtx;}
     function tone(freq,dur,type='sine',gain=.12,endFreq=null){if(audioPrefs.muted||audioPrefs.volume<=0)return;const a=ensureAudio();if(!a)return;if(a.state==='suspended')a.resume();const o=a.createOscillator(),g=a.createGain(),t=a.currentTime;o.type=type;o.frequency.setValueAtTime(freq,t);if(endFreq)o.frequency.exponentialRampToValueAtTime(Math.max(20,endFreq),t+dur);g.gain.setValueAtTime(Math.max(.0001,gain*audioPrefs.volume),t);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g).connect(a.destination);o.start(t);o.stop(t+dur);}
     function explosionSound(){tone(110,.28,'sawtooth',.18,38);tone(62,.34,'square',.08,28);}
