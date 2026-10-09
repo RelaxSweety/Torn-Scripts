@@ -1,0 +1,21 @@
+{
+  "name": "Torn Multi-Chat Archiver",
+  "slug": "chat-archiver",
+  "repository": "RelaxSweety/Torn-Scripts-Dev",
+  "platforms": {
+    "tampermonkey": {
+      "status": "stable",
+      "version": "1.10",
+      "entry": "tampermonkey/torn-multi-chat-archiver.user.js"
+    },
+    "pda": {
+      "status": "experimental-untested",
+      "version": "0.1.1",
+      "entry": "pda/src/torn-multi-chat-archiver-pda.user.js"
+    }
+  },
+  "shared": "shared/",
+  "archive": "archive/",
+  "releases": "releases/",
+  "tests": "tests/"
+}
