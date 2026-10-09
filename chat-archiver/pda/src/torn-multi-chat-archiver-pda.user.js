@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Multi-Chat Archiver PDA
 // @namespace    RelaxSweety.Torn
-// @version      0.1.1
+// @version      0.1.2
 // @description  Mobile/PDA chat archiver based on desktop v1.9; touch-friendly controls
 // @match        https://www.torn.com/*
 // @grant        none
@@ -536,6 +536,49 @@
         }
     }
 
+    /*
+     * PDA can omit desktop sender link IDs. Use the existing desktop
+     * extractor first, then discover messages from their body nodes.
+     * Only accept a message when a nearby profile link identifies
+     * its sender. Stable DOM identifiers prevent duplicate capture.
+     */
+    function extractPdaStandardFallback(chat, existing) {
+        const seen = new Set(existing.map(m => m.messageId));
+        const bodies = chat.querySelectorAll('[class*="message___"]');
+        const recovered = [];
+        for (const body of bodies) {
+            const message = body.textContent?.trim();
+            if (!message) continue;
+            const box = body.closest('[class*="virtualItem"]') ||
+                        body.closest('[class*="messageContainer"]') ||
+                        body.parentElement?.parentElement;
+            if (!box) continue;
+            const sender = box.querySelector('a[href*="profiles.php?XID="]') ||
+                           body.parentElement?.parentElement?.querySelector('a[href*="profiles.php?XID="]');
+            if (!sender) continue;
+            let playerId;
+            try {
+                playerId = new URL(sender.href, location.origin).searchParams.get('XID');
+            } catch { continue; }
+            if (!playerId) continue;
+            const rawId = sender.id?.split(':')[0] ||
+                          box.getAttribute('data-message-id') ||
+                          box.getAttribute('data-id') ||
+                          box.id;
+            if (!rawId) continue;
+            const messageId = String(rawId);
+            if (seen.has(messageId)) continue;
+            seen.add(messageId);
+            recovered.push({
+                messageId, player: sender.textContent?.trim().replace(/:$/, '') || 'Unknown',
+                playerId, isSelf: false, message,
+                virtualItem: box, wrapper: box, body, box,
+                top: getTop(box)
+            });
+        }
+        return recovered;
+    }
+
     function buildStandardRenderedMessages() {
         const chat = getSelectedChat();
 
@@ -554,6 +597,7 @@
             if (msg) messages.push(msg);
         }
 
+        messages.push(...extractPdaStandardFallback(chat, messages));
         messages.sort((a, b) => a.top - b.top);
 
         return messages;
@@ -573,12 +617,21 @@
 
         const items =
             [...chat.querySelectorAll('[class*="virtualItem"]')];
+        if (!items.length) {
+            for (const body of chat.querySelectorAll('[class*="message___"]')) {
+                const container = body.closest('[class*="messageContainer"]') ||
+                                  body.parentElement?.parentElement;
+                if (container && !items.includes(container)) items.push(container);
+            }
+        }
 
         const messages = [];
 
         for (const item of items) {
             const body =
-                item.querySelector('[class*="message___"]');
+                item.matches('[class*="message___"]')
+                    ? item
+                    : item.querySelector('[class*="message___"]');
 
             if (!body) continue;
 
@@ -2028,6 +2081,8 @@
              * direction of wheel event produced by manual
              * upward scrolling and THEN changes scrollTop.
              */
+            // Capture the outgoing virtualized window before it disappears.
+            scan();
             performAutoScrollStep(
                 scroller
             );
@@ -2054,6 +2109,8 @@
                 continue;
             }
 
+            // PDA virtual lists may change without emitting a scroll event.
+            scan();
             const now =
                 performance.now();
 
