@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.3.0
+// @version      0.3.1
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -106,42 +106,7 @@
   Object.defineProperty(window, 'TornUtilities', {value:api, configurable:false, writable:false});
   window.dispatchEvent(new Event('torn-utilities-ready'));
   let currentTab='modules';
-  const STORE_PREFIX='tu-module-v1:';
-  const installed={};
-  const statusText={};
-  for(const mod of available){try{const raw=localStorage.getItem(STORE_PREFIX+mod.id);if(raw)installed[mod.id]=JSON.parse(raw);}catch{}}
-  function setStatus(id,message){statusText[id]=message;if(currentTab==='settings')render('settings');}
-  async function installModule(mod){
-    setStatus(mod.id,'Downloading via PDA…');
-    try{
-      if(typeof window.PDA_httpGet!=='function')throw new Error('PDA_httpGet unavailable');
-      const response=await Promise.race([
-        Promise.resolve(window.PDA_httpGet(mod.url)),
-        new Promise((_,reject)=>setTimeout(()=>reject(new Error('Download timed out')),20000))
-      ]);
-      const code=typeof response==='string'?response:
-        typeof response?.responseText==='string'?response.responseText:
-        typeof response?.data==='string'?response.data:
-        typeof response?.body==='string'?response.body:'';
-      const status=response?.status??response?.statusCode??200;
-      if(status>=400)throw new Error('HTTP '+status);
-      if(!code||!code.includes("id:'"+mod.id+"'"))throw new Error('Invalid module response');
-      const version=code.match(/@version\s+([^\s]+)/)?.[1]||'unknown';
-      const record={id:mod.id,version,code,source:mod.url,downloadedAt:Date.now()};
-      localStorage.setItem(STORE_PREFIX+mod.id,JSON.stringify(record));
-      installed[mod.id]=record;
-      setStatus(mod.id,'Downloaded v'+version+' · install in PDA Scripts to run');
-    }catch(error){setStatus(mod.id,'Download failed: '+(error?.message||String(error)));}
-  }
-  function removeModule(id){
-    if(active===id)stopModule();
-    localStorage.removeItem(STORE_PREFIX+id);
-    delete installed[id];
-    saved.disabled ||= {};saved.disabled[id]=true;persist();
-    setStatus(id,'Downloaded copy removed; native PDA script (if installed) remains managed separately');
-  }
-  // CSP forbids evaluating downloaded source. PDA's native Scripts installer
-  // must execute each module independently; it registers with this manager.
+  // PDA Scripts installs modules independently; TU only manages registered modules.
   function stopModule() {
     if (!active) return;
     const id=active; active=null;
@@ -207,7 +172,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.3.0 (PDA)</footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.3.1 (PDA)</footer>';
   document.body.appendChild(panel);
   const content = panel.querySelector('.tu-content');
   function makeButton(label,handler,disabled=false) {
@@ -250,21 +215,19 @@
         const body=document.createElement('div');body.style.flex='1;min-width:0';
         const title=document.createElement('strong');title.textContent=mod.name;
         const state=document.createElement('small');
-        const loaded=registered.has(mod.id),enabled=!saved.disabled?.[mod.id],record=installed[mod.id];
-        state.textContent=statusText[mod.id]||(loaded?(enabled?'Loaded · enabled':'Loaded · disabled'):(record?'Downloaded v'+record.version+' · not loaded':'Not downloaded'));
+        const loaded=registered.has(mod.id),enabled=!saved.disabled?.[mod.id];
+        state.textContent=loaded?(enabled?'Loaded · enabled':'Loaded · disabled'):'Not loaded · install in PDA Scripts';
         body.append(title,state);card.append(body);
         const controls=document.createElement('div');controls.style.cssText='display:flex;flex-direction:column;gap:5px';
-        controls.append(makeButton(record?'Update download':'Download',()=>installModule(mod)));
         if(loaded)controls.append(makeButton(enabled?'Disable':'Activate',()=>{
           saved.disabled ||= {};saved.disabled[mod.id]=enabled;
           if(enabled&&active===mod.id)stopModule();
           persist();render('settings');
         }));
-        if(record)controls.append(makeButton('Remove',()=>removeModule(mod.id)));
         card.append(controls);content.append(card);
       }
       const note=document.createElement('p');
-      note.textContent='Download saves source using PDA_httpGet. Torn CSP prevents running downloaded JavaScript directly: install each module in PDA Scripts to activate it. The manager never bundles modules.';
+      note.textContent='Install or update module scripts separately in Torn PDA Scripts. TU detects installed modules and controls activation. Disabling a module preserves its data.';
       content.append(note);
       const heading=document.createElement('strong');heading.textContent='Storage & Backups';content.append(heading);
       const summary=document.createElement('p');
