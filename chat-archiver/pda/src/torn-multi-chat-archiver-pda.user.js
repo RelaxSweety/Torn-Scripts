@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Multi-Chat Archiver PDA
 // @namespace    RelaxSweety.Torn
-// @version      0.1.6
+// @version      0.1.7
 // @description  Mobile/PDA chat archiver based on desktop v1.9; touch-friendly controls
 // @match        https://www.torn.com/*
 // @grant        none
@@ -2716,17 +2716,15 @@
     function showFullPanel() {
         const panel = document.getElementById('tca-panel');
         const launcher = document.getElementById('tca-launcher');
-        if (!panel || !launcher) return;
+        if (!panel) return;
         panel.style.display = 'block';
-        launcher.style.display = 'none';
     }
 
     function hideFullPanel() {
         const panel = document.getElementById('tca-panel');
         const launcher = document.getElementById('tca-launcher');
-        if (!panel || !launcher) return;
+        if (!panel) return;
         panel.style.display = 'none';
-        launcher.style.display = 'block';
         updatePlayBar();
     }
 
@@ -3503,33 +3501,7 @@
             )
         );
 
-        // Separate movable compact launcher and transport bar.
-        const launcher = document.createElement('div');
-        launcher.id = 'tca-launcher';
-        launcher.textContent = '^';
-        launcher.title = 'Open chat archiver';
-        launcher.style.cssText = 'position:fixed;right:10px;bottom:10px;z-index:1000001;width:23px;height:23px;line-height:21px;text-align:center;background:#202020;color:#fff;border:1px solid #888;border-radius:5px;font:bold 17px Arial;touch-action:none;user-select:none;cursor:move;';
-        document.body.appendChild(launcher);
-        let launcherStart = null;
-        launcher.addEventListener('pointerdown', e => {
-            launcherStart = { x:e.clientX, y:e.clientY, left:launcher.getBoundingClientRect().left, top:launcher.getBoundingClientRect().top, moved:false, id:e.pointerId };
-            launcher.setPointerCapture(e.pointerId);
-        });
-        launcher.addEventListener('pointermove', e => {
-            if (!launcherStart || launcherStart.id !== e.pointerId) return;
-            const dx=e.clientX-launcherStart.x, dy=e.clientY-launcherStart.y;
-            if (Math.abs(dx)+Math.abs(dy)>6) launcherStart.moved=true;
-            if (!launcherStart.moved) return;
-            launcher.style.right='auto'; launcher.style.bottom='auto';
-            launcher.style.left=Math.max(0,Math.min(innerWidth-23,launcherStart.left+dx))+'px';
-            launcher.style.top=Math.max(0,Math.min(innerHeight-23,launcherStart.top+dy))+'px';
-        });
-        launcher.addEventListener('pointerup', e => {
-            if (!launcherStart || launcherStart.id !== e.pointerId) return;
-            const moved=launcherStart.moved;
-            launcherStart=null;
-            if (!moved) showFullPanel();
-        });
+        // TU is the only launcher; preserve the capture transport bar.
         const bar = document.createElement('div');
         bar.id = 'tca-playbar';
         bar.style.cssText = 'position:fixed;right:10px;bottom:44px;z-index:1000000;display:none;align-items:center;gap:4px;padding:5px;background:#202020;border:1px solid #777;border-radius:6px;touch-action:none;user-select:none;';
@@ -3564,10 +3536,9 @@
     function deactivateFromTU(){
       stopCapture('Closed by Torn Utilities'); stopAutoRun(false);
       const panel=document.getElementById('tca-panel'); if(panel) panel.style.display='none';
-      const launcher=document.getElementById('tca-launcher'); if(launcher) launcher.style.display='none';
       const playbar=document.getElementById('tca-playbar'); if(playbar) playbar.style.display='none';
     }
-    const definition={id:'chat-archiver',version:'0.1.6',activate:activateFromTU,deactivate:deactivateFromTU};
+    const definition={id:'chat-archiver',version:'0.1.7',activate:activateFromTU,deactivate:deactivateFromTU};
     function registerTU(){if(window.TornUtilities?.register) window.TornUtilities.register(definition);}
     window.addEventListener('torn-utilities-ready',registerTU); registerTU();
 
