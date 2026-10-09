@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.1.4
+// @version      0.2.0
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -47,6 +47,46 @@
   Object.defineProperty(window, 'TornUtilities', {value:api, configurable:false, writable:false});
   window.dispatchEvent(new Event('torn-utilities-ready'));
   let currentTab='modules';
+  const STORE_PREFIX='tu-module-v1:';
+  const installed={};
+  const statusText={};
+  for(const mod of available){try{const raw=localStorage.getItem(STORE_PREFIX+mod.id);if(raw)installed[mod.id]=JSON.parse(raw);}catch{}}
+  function setStatus(id,message){statusText[id]=message;if(currentTab==='settings')render('settings');}
+  async function installModule(mod){
+    setStatus(mod.id,'Downloading…');
+    try{
+      const response=await fetch(mod.url,{cache:'no-store'});
+      if(!response.ok)throw new Error('HTTP '+response.status);
+      const code=await response.text();
+      if(!code.includes("id:'"+mod.id+"'")&&!code.includes('id: \' '+mod.id)) {
+        if(!code.includes("id:'"+mod.id+"'"))throw new Error('Module ID mismatch');
+      }
+      const version=code.match(/@version\s+([^\s]+)/)?.[1]||'unknown';
+      const record={id:mod.id,version,code,source:mod.url,installedAt:Date.now()};
+      localStorage.setItem(STORE_PREFIX+mod.id,JSON.stringify(record));
+      installed[mod.id]=record;
+      setStatus(mod.id,'Installed v'+version+' · reload to activate');
+    }catch(error){setStatus(mod.id,'Install failed: '+error.message);}
+  }
+  function removeModule(id){
+    if(active===id)stopModule();
+    localStorage.removeItem(STORE_PREFIX+id);
+    delete installed[id];
+    saved.disabled ||= {};saved.disabled[id]=true;persist();
+    setStatus(id,'Removed · reload to unload');
+  }
+  function executeInstalled(mod){
+    if(!installed[mod.id]||registered.has(mod.id))return;
+    try{
+      // Execute only explicitly installed modules from this fixed GitHub allowlist.
+      const source=installed[mod.id].code;
+      const run=new Function(source+'\n//# sourceURL=tu-installed-'+mod.id+'.js');
+      run();
+      if(!registered.has(mod.id))throw new Error('Module did not register');
+    }catch(error){setStatus(mod.id,'Load failed: '+error.message);}
+  }
+  // Register a listener before executing cached modules; no module starts until Open.
+  for(const mod of available)executeInstalled(mod);
   function stopModule() {
     if (!active) return;
     const id=active; active=null;
@@ -112,7 +152,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.1.4 (PDA)</footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.2.0 (PDA)</footer>';
   document.body.appendChild(panel);
   const content = panel.querySelector('.tu-content');
   function makeButton(label,handler,disabled=false) {
@@ -152,28 +192,24 @@
       content.append(hint);
       for(const mod of available){
         const card=document.createElement('div');card.className='tu-card';
-        const body=document.createElement('div');body.style.flex='1';
+        const body=document.createElement('div');body.style.flex='1;min-width:0';
         const title=document.createElement('strong');title.textContent=mod.name;
         const state=document.createElement('small');
-        const installed=registered.has(mod.id),enabled=!saved.disabled?.[mod.id];
-        state.textContent=installed?(enabled?'Loaded · enabled':'Loaded · disabled'):'Not loaded';
+        const loaded=registered.has(mod.id),enabled=!saved.disabled?.[mod.id],record=installed[mod.id];
+        state.textContent=statusText[mod.id]||(record?'Installed v'+record.version+(enabled?' · enabled':' · disabled'):(loaded?'Loaded externally':'Not installed'));
         body.append(title,state);card.append(body);
-        if(installed){
-          card.append(makeButton(enabled?'Disable':'Activate',()=>{
-            saved.disabled ||= {};saved.disabled[mod.id]=enabled;
-            if(enabled&&active===mod.id)stopModule();
-            persist();render('settings');
-          }));
-        }else{
-          card.append(makeButton('Download',()=>{
-            // PDA controls installation; this opens the trusted source rather than executing remote code.
-            window.open(mod.url,'_blank','noopener,noreferrer');
-          }));
-        }
-        content.append(card);
+        const controls=document.createElement('div');controls.style.cssText='display:flex;flex-direction:column;gap:5px';
+        controls.append(makeButton(record?'Update':'Install',()=>installModule(mod)));
+        if(record||loaded)controls.append(makeButton(enabled?'Disable':'Activate',()=>{
+          saved.disabled ||= {};saved.disabled[mod.id]=enabled;
+          if(enabled&&active===mod.id)stopModule();
+          persist();render('settings');
+        }));
+        if(record)controls.append(makeButton('Remove',()=>removeModule(mod.id)));
+        card.append(controls);content.append(card);
       }
       const note=document.createElement('p');
-      note.textContent='Download opens the script source. Add it using Torn PDA’s script installer; web pages cannot silently install PDA scripts.';
+      note.textContent='Install saves a module locally from the approved GitHub repository. Reload Torn to load or unload installed modules. PDA WebView restrictions may prevent dynamic execution.';
       content.append(note);
     }else{
       const p=document.createElement('p');
