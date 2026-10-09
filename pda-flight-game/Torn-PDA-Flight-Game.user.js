@@ -821,7 +821,7 @@
     let initialized=false;
     async function activateFromTU() { if (!initialized) { await init(); initialized=true; } openManager(); }
     function deactivateFromTU() { closeActiveGame(); document.getElementById('tpfg-manager').style.display='none'; }
-    const definition={id:'flight-game',activate:activateFromTU,deactivate:deactivateFromTU};
+    const definition={id:'flight-game',version:'0.11.12',activate:activateFromTU,deactivate:deactivateFromTU};
     function registerTU(){ if(window.TornUtilities?.register) window.TornUtilities.register(definition); }
     window.addEventListener('torn-utilities-ready',registerTU); registerTU();
 })();
