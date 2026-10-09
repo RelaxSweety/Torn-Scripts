@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Multi-Chat Archiver PDA
 // @namespace    RelaxSweety.Torn
-// @version      0.1.2
+// @version      0.1.3
 // @description  Mobile/PDA chat archiver based on desktop v1.9; touch-friendly controls
 // @match        https://www.torn.com/*
 // @grant        none
@@ -1717,6 +1717,7 @@
 
         captureActive = true;
         currentScroller = scroller;
+        hideFullPanel();
 
         scan();
 
@@ -2027,6 +2028,7 @@
         setStatus(
             'Scanning older history'
         );
+        updatePlayBar();
 
         while (
             autoRunning &&
@@ -2652,6 +2654,71 @@
             '0 1px 2px #000';
     }
 
+    function updatePlayBar() {
+        const bar = document.getElementById('tca-playbar');
+        if (!bar) return;
+        bar.style.display = captureActive ? 'flex' : 'none';
+        const state = {
+            play: captureActive && autoRunning && !autoPaused && !completionPromptOpen,
+            pause: captureActive && (!autoRunning || autoPaused || completionPromptOpen),
+            stop: !captureActive
+        };
+        for (const [key, active] of Object.entries(state)) {
+            const btn = document.getElementById('tca-bar-' + key);
+            if (!btn) continue;
+            btn.style.background = active ? '#187b38' : '#922b2b';
+            btn.style.color = '#fff';
+            btn.setAttribute('aria-pressed', String(active));
+        }
+    }
+
+    function showFullPanel() {
+        const panel = document.getElementById('tca-panel');
+        const launcher = document.getElementById('tca-launcher');
+        if (!panel || !launcher) return;
+        panel.style.display = 'block';
+        launcher.style.display = 'none';
+    }
+
+    function hideFullPanel() {
+        const panel = document.getElementById('tca-panel');
+        const launcher = document.getElementById('tca-launcher');
+        if (!panel || !launcher) return;
+        panel.style.display = 'none';
+        launcher.style.display = 'block';
+        updatePlayBar();
+    }
+
+    function pausePlayBar() {
+        if (!captureActive) return;
+        autoPaused = true;
+        stopAutoRun(false);
+        setStatus('Paused — capture remains active');
+        updateIndicators();
+    }
+
+    function resumePlayBar() {
+        if (!captureActive) {
+            startCapture();
+        }
+        if (!captureActive) return;
+        autoEnabled = true;
+        autoPaused = false;
+        archiveComplete = false;
+        completionPromptOpen = false;
+        lastHistoricalProgressAt = performance.now();
+        startAutoRun();
+        updateIndicators();
+    }
+
+    function stopPlayBar() {
+        stopCapture('Stopped — archive available for export');
+        autoEnabled = false;
+        autoPaused = false;
+        updateIndicators();
+        showFullPanel();
+    }
+
     function updateIndicators() {
         setStateButton(
             'tca-capture-state',
@@ -2666,6 +2733,7 @@
             'AUTO ON',
             'AUTO OFF'
         );
+        updatePlayBar();
     }
 
     function getAutoStatus() {
@@ -2936,6 +3004,7 @@
                 ? '1'
                 : '0'
         );
+        if (minimized) hideFullPanel();
     }
 
     /* =========================================================
@@ -3392,16 +3461,50 @@
             )
         );
 
+        // Separate movable compact launcher and transport bar.
+        const launcher = document.createElement('div');
+        launcher.id = 'tca-launcher';
+        launcher.textContent = '^';
+        launcher.title = 'Open chat archiver';
+        launcher.style.cssText = 'position:fixed;right:10px;bottom:10px;z-index:1000001;width:23px;height:23px;line-height:21px;text-align:center;background:#202020;color:#fff;border:1px solid #888;border-radius:5px;font:bold 17px Arial;touch-action:none;user-select:none;cursor:move;';
+        document.body.appendChild(launcher);
+        let launcherStart = null;
+        launcher.addEventListener('pointerdown', e => {
+            launcherStart = { x:e.clientX, y:e.clientY, left:launcher.getBoundingClientRect().left, top:launcher.getBoundingClientRect().top, moved:false, id:e.pointerId };
+            launcher.setPointerCapture(e.pointerId);
+        });
+        launcher.addEventListener('pointermove', e => {
+            if (!launcherStart || launcherStart.id !== e.pointerId) return;
+            const dx=e.clientX-launcherStart.x, dy=e.clientY-launcherStart.y;
+            if (Math.abs(dx)+Math.abs(dy)>6) launcherStart.moved=true;
+            if (!launcherStart.moved) return;
+            launcher.style.right='auto'; launcher.style.bottom='auto';
+            launcher.style.left=Math.max(0,Math.min(innerWidth-23,launcherStart.left+dx))+'px';
+            launcher.style.top=Math.max(0,Math.min(innerHeight-23,launcherStart.top+dy))+'px';
+        });
+        launcher.addEventListener('pointerup', e => {
+            if (!launcherStart || launcherStart.id !== e.pointerId) return;
+            const moved=launcherStart.moved;
+            launcherStart=null;
+            if (!moved) showFullPanel();
+        });
+        const bar = document.createElement('div');
+        bar.id = 'tca-playbar';
+        bar.style.cssText = 'position:fixed;right:10px;bottom:44px;z-index:1000000;display:none;align-items:center;gap:4px;padding:5px;background:#202020;border:1px solid #777;border-radius:6px;touch-action:none;user-select:none;';
+        bar.innerHTML = '<span id="tca-bar-handle" style="padding:4px 6px;color:#ccc;cursor:move;touch-action:none">⋮⋮</span>' +
+          ['play','pause','stop'].map(k => '<button id="tca-bar-'+k+'" style="border:1px solid #ccc;border-radius:4px;padding:7px 9px;font:bold 12px Arial;color:white">'+k.toUpperCase()+'</button>').join('');
+        document.body.appendChild(bar);
+        makeDraggable(bar, document.getElementById('tca-bar-handle'));
+        document.getElementById('tca-bar-play').onclick = resumePlayBar;
+        document.getElementById('tca-bar-pause').onclick = pausePlayBar;
+        document.getElementById('tca-bar-stop').onclick = stopPlayBar;
+
         loadPanelPosition(panel);
 
         refreshChatSelector(false);
 
-        setMinimized(
-            localStorage.getItem(
-                PANEL_MIN_KEY
-            ) === '1'
-        );
-
+        setMinimized(false);
+        hideFullPanel();
         updateIndicators();
         updateStatus();
     }
