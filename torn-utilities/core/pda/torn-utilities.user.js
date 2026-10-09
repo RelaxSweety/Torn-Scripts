@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.1.2
+// @version      0.1.3
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -40,6 +40,8 @@
     isActive(id) { return active === id; }
   });
   Object.defineProperty(window, 'TornUtilities', {value:api, configurable:false, writable:false});
+  window.dispatchEvent(new Event('torn-utilities-ready'));
+  const moduleList=[['flight-game','Flight Game'],['chat-archiver','Chat Archiver']];
   function stopModule() {
     if (!active) return;
     const id=active; active=null;
@@ -52,8 +54,8 @@
     stopModule();
     moduleHost.hidden=false;
     try {
-      mod.activate(Object.freeze({mount:moduleHost, close:stopModule}));
       active=id;
+      mod.activate(Object.freeze({mount:moduleHost, close:stopModule}));
       return true;
     } catch(e) {
       console.error('[TU] module activation failed', id, e);
@@ -100,13 +102,22 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.1.2 (PDA)</footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.1.3 (PDA)</footer>';
   document.body.appendChild(panel);
   const content = panel.querySelector('.tu-content');
   function render(tab) {
     panel.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
     content.replaceChildren();
     if (tab === 'modules') {
+      for (const [id,name] of moduleList) {
+        const card=document.createElement('div'); card.className='tu-card';
+        const label=document.createElement('strong'); label.textContent=name;
+        const launch=document.createElement('button'); launch.textContent=registered.has(id)?'Open':'Not loaded';
+        launch.disabled=!registered.has(id);
+        launch.style.cssText='margin-left:auto;padding:8px;border-radius:8px;border:0;background:#dfb952;color:#111';
+        launch.addEventListener('click',()=>{if(openModule(id)){panel.hidden=true;launcher.hidden=true;}});
+        card.append(label,launch);content.appendChild(card);
+      }
       for (const [name, description, symbol] of catalog) {
         const card = document.createElement('div'); card.className = 'tu-card';
         const icon = document.createElement('span'); icon.className = 'tu-symbol'; icon.textContent = symbol;
@@ -124,6 +135,9 @@
     }
   }
   render('modules');
+  window.addEventListener('torn-utilities-ready',()=>render('modules'));
+  // A module script can be installed separately, but remains inert until Open is pressed.
+  const originalRegister=api.register;
   const closePanel = () => { panel.hidden = true; launcher.hidden = false; };
   const togglePanel = () => { panel.hidden = !panel.hidden; launcher.hidden = !panel.hidden; };
   panel.querySelector('.tu-close').addEventListener('click', () => { stopModule(); closePanel(); });
