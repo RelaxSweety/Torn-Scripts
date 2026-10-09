@@ -85,8 +85,7 @@
       if(!registered.has(mod.id))throw new Error('Module did not register');
     }catch(error){setStatus(mod.id,'Load failed: '+error.message);}
   }
-  // Register a listener before executing cached modules; no module starts until Open.
-  for(const mod of available)executeInstalled(mod);
+
   function stopModule() {
     if (!active) return;
     const id=active; active=null;
@@ -229,6 +228,8 @@
       content.append(card);
     }
   }
+  render('modules');
+  for(const mod of available)executeInstalled(mod);
   render('modules');
   window.addEventListener('torn-utilities-ready',()=>render(currentTab));
   // A module script can be installed separately, but remains inert until Open is pressed.
