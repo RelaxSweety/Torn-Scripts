@@ -63,6 +63,7 @@
       const record={id:mod.id,version,code,source:mod.url,installedAt:Date.now()};
       localStorage.setItem(STORE_PREFIX+mod.id,JSON.stringify(record));
       installed[mod.id]=record;
+      saved.disabled ||= {};saved.disabled[mod.id]=false;persist();
       setStatus(mod.id,'Installed v'+version+' · reload to activate');
     }catch(error){setStatus(mod.id,'Install failed: '+error.message);}
   }
