@@ -3567,7 +3567,7 @@
       const launcher=document.getElementById('tca-launcher'); if(launcher) launcher.style.display='none';
       const playbar=document.getElementById('tca-playbar'); if(playbar) playbar.style.display='none';
     }
-    const definition={id:'chat-archiver',activate:activateFromTU,deactivate:deactivateFromTU};
+    const definition={id:'chat-archiver',version:'0.1.6',activate:activateFromTU,deactivate:deactivateFromTU};
     function registerTU(){if(window.TornUtilities?.register) window.TornUtilities.register(definition);}
     window.addEventListener('torn-utilities-ready',registerTU); registerTU();
 
