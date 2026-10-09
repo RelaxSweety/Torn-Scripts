@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Multi-Chat Archiver PDA
 // @namespace    RelaxSweety.Torn
-// @version      0.1.5
+// @version      0.1.6
 // @description  Mobile/PDA chat archiver based on desktop v1.9; touch-friendly controls
 // @match        https://www.torn.com/*
 // @grant        none
@@ -10,6 +10,45 @@
 
 (function () {
     'use strict';
+    // TU v0.3 storage bridge. Existing legacy keys remain readable and are migrated
+    // on first access; modules continue to work if TU loads later or is absent.
+    const TU_NAMESPACE = 'chat-archiver';
+    const legacyStore = window.localStorage;
+    const tuStorage = () => window.TornUtilities?.storage;
+    const moduleStore = {
+        getItem(key) {
+            const name = String(key);
+            const tu = tuStorage();
+            if (tu) {
+                try {
+                    const value = tu.get(TU_NAMESPACE, name, null);
+                    if (typeof value === 'string') return value;
+                } catch (_) {}
+            }
+            const old = legacyStore.getItem(name);
+            if (old !== null && tu) {
+                try { tu.set(TU_NAMESPACE, name, old); } catch (_) {}
+            }
+            return old;
+        },
+        setItem(key, value) {
+            const name = String(key), text = String(value);
+            const tu = tuStorage();
+            if (tu) {
+                // Preserve existing legacy data until the shared write succeeds.
+                tu.set(TU_NAMESPACE, name, text);
+            } else {
+                legacyStore.setItem(name, text);
+            }
+        },
+        removeItem(key) {
+            const name = String(key);
+            const tu = tuStorage();
+            if (tu) tu.remove(TU_NAMESPACE, name);
+            legacyStore.removeItem(name);
+        }
+    };
+
 
     /* =========================================================
        CONFIG
@@ -2233,7 +2272,7 @@
     function loadSettings() {
         try {
             let raw =
-                localStorage.getItem(
+                moduleStore.getItem(
                     SETTINGS_KEY
                 );
 
@@ -2248,7 +2287,7 @@
 
                 for (const key of oldKeys) {
                     raw =
-                        localStorage.getItem(
+                        moduleStore.getItem(
                             key
                         );
 
@@ -2353,7 +2392,7 @@
                 scrollDelay;
         }
 
-        localStorage.setItem(
+        moduleStore.setItem(
             SETTINGS_KEY,
 
             JSON.stringify({
@@ -2892,7 +2931,7 @@
         const rect =
             panel.getBoundingClientRect();
 
-        localStorage.setItem(
+        moduleStore.setItem(
             PANEL_POS_KEY,
 
             JSON.stringify({
@@ -2905,7 +2944,7 @@
     function loadPanelPosition(panel) {
         try {
             const raw =
-                localStorage.getItem(
+                moduleStore.getItem(
                     PANEL_POS_KEY
                 );
 
@@ -3001,7 +3040,7 @@
                 ? '+'
                 : '−';
 
-        localStorage.setItem(
+        moduleStore.setItem(
             PANEL_MIN_KEY,
             minimized
                 ? '1'
