@@ -46,8 +46,8 @@
     registryStatus='Refreshing catalog';render(currentTab);
     if(typeof PDA_httpGet!=='function'){registryStatus='Offline · using cached catalog';render(currentTab);return;}
     try{
-      const response=await PDA_httpGet(REGISTRY_URL+'?t='+Date.now());
-      const raw=typeof response==='string'?response:(response?.responseText??response?.response);
+      const response=await Promise.race([PDA_httpGet(REGISTRY_URL+'?t='+Date.now()),new Promise((_,reject)=>setTimeout(()=>reject(new Error('Catalog timeout')),12000))]);
+      const raw=typeof response==='string'?response:(response?.responseText??response?.data??response?.body??response?.response);
       const next=validateRegistry(typeof raw==='string'?JSON.parse(raw):raw);
       registry=next;localStorage.setItem(CACHE_KEY,JSON.stringify(next));
       registryStatus='GitHub catalog updated';
