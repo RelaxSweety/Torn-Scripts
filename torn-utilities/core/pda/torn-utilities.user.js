@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.1
+// @version      0.4.2
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -23,8 +23,9 @@
     {id:'chat',name:'Chat Tools',icon:'◉',order:30},
     {id:'other',name:'Other Tools',icon:'⚙',order:40}
   ],modules:[
-    {id:'flight-game',name:'Flight Game',category:'games',version:'0.11.12',description:'Flight arcade and Stick Fighter',scriptUrl:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/pda-flight-game/Torn-PDA-Flight-Game.user.js'},
-    {id:'chat-archiver',name:'Chat Archiver',category:'chat',version:'0.1.6',description:'Archive Torn chat conversations',scriptUrl:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/chat-archiver/pda/src/torn-multi-chat-archiver-pda.user.js'}
+    {id:'flight-game',name:'Flight Game',category:'games',version:'0.11.13',description:'Flight arcade and Stick Fighter',scriptUrl:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/pda-flight-game/Torn-PDA-Flight-Game.user.js'},
+    {id:'stick-fighter',name:'Stick Fighter',category:'games',version:'0.1.6',description:'Stick Fighter arcade game',scriptUrl:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/pda-flight-game/Torn-PDA-Flight-Game.user.js'},
+    {id:'chat-archiver',name:'Chat Archiver',category:'chat',version:'0.1.7',description:'Archive Torn chat conversations',scriptUrl:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/chat-archiver/pda/src/torn-multi-chat-archiver-pda.user.js'}
   ]};
   const validId=/^[a-z0-9-]{1,64}$/;
   const safeScriptUrl=url=>typeof url==='string'&&/^https:\/\/raw\.githubusercontent\.com\/RelaxSweety\/Torn-Scripts\/main\/[a-zA-Z0-9/_-]+\.user\.js$/.test(url);
@@ -147,11 +148,6 @@
     if (!mod || saved.disabled?.[id]) return false;
     stopModule();
     moduleHost.hidden=false;
-    const exit=document.createElement('button');
-    exit.textContent='TU ×'; exit.setAttribute('aria-label','Close module and return to Torn Utilities');
-    exit.style.cssText='position:fixed;top:12px;right:12px;z-index:2147483647;background:#15191c;color:#f1ce72;border:1px solid #dfb952;border-radius:14px;padding:8px 12px;font:bold 15px Georgia';
-    exit.addEventListener('click',()=>{stopModule();panel.hidden=false;launcher.hidden=true;render('modules');});
-    moduleHost.appendChild(exit);
     try {
       active=id;
       mod.activate(Object.freeze({mount:moduleHost, close:stopModule}));
@@ -201,7 +197,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.4.1 (PDA)</footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.4.2 (PDA)</footer>';
   document.body.appendChild(panel);
   const content = panel.querySelector('.tu-content');
   function makeButton(label,handler,disabled=false) {
@@ -274,7 +270,7 @@
           state.textContent=(loaded?(saved.disabled?.[m.id]?'Loaded · disabled':'Ready'):'Not loaded')+' · Latest v'+m.version+(loaded?.version?' · Installed v'+loaded.version:'');
           body.append(name,state);
           const ready=!!loaded&&!saved.disabled?.[m.id];
-          const go=()=>{if(ready){if(openModule(m.id)){panel.hidden=true;launcher.hidden=true;}}else{viewModule=m.id;render('modules');}};
+          const go=()=>{if(ready){if(openModule(m.id)){panel.hidden=true;launcher.hidden=false;}}else{viewModule=m.id;render('modules');}};
           card.style.cursor='pointer';card.setAttribute('role','button');card.tabIndex=0;
           card.addEventListener('click',e=>{if(e.target.closest('button'))return;go();});
           card.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go();}});
@@ -324,7 +320,7 @@
         line.append(name,makeButton('Clear data',()=>{if(confirm('Delete all TU data for '+id+'?')){storage.clear(id);render('settings');}}));content.append(line);
       }
     }else{
-      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.1 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.2 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
       // Official-style vector marks; no remote image dependencies.
       addSocialIcon('RelaxSweety on Discord','https://discord.com/users/relaxsweety','M20.317 4.369a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.211.375-.445.865-.608 1.25a18.27 18.27 0 0 0-5.49 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037 19.736 19.736 0 0 0-4.885 1.515.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.1 18.057a.083.083 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.077.077 0 0 0 .084-.028c.462-.63.873-1.295 1.226-1.994a.075.075 0 0 0-.041-.104 13.1 13.1 0 0 1-1.872-.89.076.076 0 0 1-.008-.127c.126-.095.252-.193.372-.292a.074.074 0 0 1 .077-.01c3.929 1.793 8.185 1.793 12.068 0a.074.074 0 0 1 .078.01c.12.099.246.197.373.292a.076.076 0 0 1-.007.127c-.598.35-1.224.65-1.873.89a.076.076 0 0 0-.04.105c.36.698.77 1.363 1.225 1.993a.076.076 0 0 0 .084.028 19.83 19.83 0 0 0 6.003-3.03.077.077 0 0 0 .031-.056c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028ZM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.42 0-1.334.955-2.42 2.157-2.42 1.211 0 2.176 1.095 2.157 2.42 0 1.335-.955 2.42-2.157 2.42Zm7.96 0c-1.183 0-2.157-1.085-2.157-2.42 0-1.334.955-2.42 2.157-2.42 1.211 0 2.176 1.095 2.157 2.42 0 1.335-.946 2.42-2.157 2.42Z');
       const tornLink=document.createElement('a');tornLink.href='https://www.torn.com/profiles.php?XID=4539436';tornLink.target='_blank';tornLink.rel='noopener noreferrer';tornLink.title='RelaxSweety on Torn';tornLink.setAttribute('aria-label','RelaxSweety on Torn');
@@ -338,8 +334,8 @@
   // A module script can be installed separately, but remains inert until Open is pressed.
 
   const closePanel = () => { panel.hidden = true; launcher.hidden = false; };
-  const togglePanel = () => { panel.hidden = !panel.hidden; launcher.hidden = !panel.hidden; };
-  panel.querySelector('.tu-close').addEventListener('click', () => { stopModule(); closePanel(); });
+  const togglePanel = () => { if(active){stopModule();panel.hidden=false;viewModule=null;render('modules');}else panel.hidden=!panel.hidden; launcher.hidden=false; };
+  panel.querySelector('.tu-close').addEventListener('click', () => { closePanel(); });
   panel.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => render(b.dataset.tab)));
   const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
   const setPos = (x, y) => {
