@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Multi-Chat Archiver PDA
 // @namespace    RelaxSweety.Torn
-// @version      0.1.3
+// @version      0.1.4
 // @description  Mobile/PDA chat archiver based on desktop v1.9; touch-friendly controls
 // @match        https://www.torn.com/*
 // @grant        none
@@ -2657,6 +2657,8 @@
     function updatePlayBar() {
         const bar = document.getElementById('tca-playbar');
         if (!bar) return;
+        const copied = document.getElementById('tca-bar-copied');
+        if (copied) copied.textContent = 'Copied: ' + archive.size.toLocaleString();
         bar.style.display = captureActive ? 'flex' : 'none';
         const state = {
             play: captureActive && autoRunning && !autoPaused && !completionPromptOpen,
@@ -2806,6 +2808,7 @@
 
         const stats =
             getStats();
+        updatePlayBar();
 
         status.innerHTML = `
             <div style="
@@ -3492,7 +3495,8 @@
         bar.id = 'tca-playbar';
         bar.style.cssText = 'position:fixed;right:10px;bottom:44px;z-index:1000000;display:none;align-items:center;gap:4px;padding:5px;background:#202020;border:1px solid #777;border-radius:6px;touch-action:none;user-select:none;';
         bar.innerHTML = '<span id="tca-bar-handle" style="padding:4px 6px;color:#ccc;cursor:move;touch-action:none">⋮⋮</span>' +
-          ['play','pause','stop'].map(k => '<button id="tca-bar-'+k+'" style="border:1px solid #ccc;border-radius:4px;padding:7px 9px;font:bold 12px Arial;color:white">'+k.toUpperCase()+'</button>').join('');
+          ['play','pause','stop'].map(k => '<button id="tca-bar-'+k+'" style="border:1px solid #ccc;border-radius:4px;padding:7px 9px;font:bold 12px Arial;color:white">'+k.toUpperCase()+'</button>').join('') +
+          '<span id="tca-bar-copied" style="color:#fff;font:bold 12px Arial;white-space:nowrap;padding:0 4px">Copied: 0</span>';
         document.body.appendChild(bar);
         makeDraggable(bar, document.getElementById('tca-bar-handle'));
         document.getElementById('tca-bar-play').onclick = resumePlayBar;
