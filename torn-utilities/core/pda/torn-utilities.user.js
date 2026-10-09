@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.1.0
+// @version      0.1.1
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -26,8 +26,9 @@
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch {} };
   const style = document.createElement('style');
   style.textContent = `
-#tu-pda-launcher{position:fixed;left:12px;top:38%;z-index:2147483645;touch-action:none;width:43px;height:43px;border-radius:50%;border:2px solid #e3bb57;background:radial-gradient(circle at 35% 25%,#293b45,#07090b 70%);color:#f5d87e;box-shadow:0 2px 9px #000b,inset 0 0 4px #f5d87e66;font:bold italic 23px 'Palatino Linotype','Book Antiqua',Georgia,serif;letter-spacing:-4px;padding-right:6px;cursor:grab;user-select:none;-webkit-user-select:none}
+#tu-pda-launcher{position:fixed;left:12px;top:38%;z-index:2147483645;touch-action:none;width:43px;height:43px;border-radius:50%;border:2px solid #e3bb57;background:radial-gradient(circle at 35% 25%,#293b45,#07090b 70%);color:#f5d87e;box-shadow:0 2px 9px #000b,inset 0 0 4px #f5d87e66;font:bold italic 23px 'Palatino Linotype','Book Antiqua',Georgia,serif;letter-spacing:-2px;padding:0 2px 0 0;display:flex;align-items:center;justify-content:center;line-height:1;cursor:grab;user-select:none;-webkit-user-select:none}
 #tu-pda-launcher:active{cursor:grabbing}
+#tu-pda-launcher[hidden]{display:none!important}
 #tu-pda-panel{position:fixed;z-index:2147483644;inset:8% 3% auto 3%;max-width:440px;margin:auto;max-height:82vh;overflow:auto;background:#101417;color:#eee;border:1px solid #c49a46;border-radius:18px;box-shadow:0 10px 35px #000d;font:14px system-ui,Arial,sans-serif}
 #tu-pda-panel[hidden]{display:none}
 #tu-pda-panel *{box-sizing:border-box}
@@ -58,7 +59,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.1.0 (PDA) · Drag TU to move</footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.1.1 (PDA)</footer>';
   document.body.appendChild(panel);
   const content = panel.querySelector('.tu-content');
   function render(tab) {
@@ -82,7 +83,9 @@
     }
   }
   render('modules');
-  panel.querySelector('.tu-close').addEventListener('click', () => { panel.hidden = true; });
+  const closePanel = () => { panel.hidden = true; launcher.hidden = false; };
+  const togglePanel = () => { panel.hidden = !panel.hidden; launcher.hidden = !panel.hidden; };
+  panel.querySelector('.tu-close').addEventListener('click', closePanel);
   panel.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => render(b.dataset.tab)));
   const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
   const setPos = (x, y) => {
@@ -106,7 +109,7 @@
     if (!gesture || gesture.id !== e.pointerId) return;
     const moved=gesture.moved; gesture=null;
     if (moved) { saved.x=launcher.offsetLeft; saved.y=launcher.offsetTop; persist(); }
-    else panel.hidden=!panel.hidden;
+    else togglePanel();
   });
   launcher.addEventListener('pointercancel', () => { gesture=null; });
   window.addEventListener('resize', () => {
