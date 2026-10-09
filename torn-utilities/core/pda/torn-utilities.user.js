@@ -58,9 +58,7 @@
       const response=await fetch(mod.url,{cache:'no-store'});
       if(!response.ok)throw new Error('HTTP '+response.status);
       const code=await response.text();
-      if(!code.includes("id:'"+mod.id+"'")&&!code.includes('id: \' '+mod.id)) {
-        if(!code.includes("id:'"+mod.id+"'"))throw new Error('Module ID mismatch');
-      }
+      if(!code.includes("id:'"+mod.id+"'"))throw new Error('Module ID mismatch');
       const version=code.match(/@version\s+([^\s]+)/)?.[1]||'unknown';
       const record={id:mod.id,version,code,source:mod.url,installedAt:Date.now()};
       localStorage.setItem(STORE_PREFIX+mod.id,JSON.stringify(record));
