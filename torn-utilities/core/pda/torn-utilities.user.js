@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.2.3
+// @version      0.3.0
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -32,7 +32,66 @@
   moduleHost.id = 'tu-pda-module-host';
   moduleHost.hidden = true;
   document.body.appendChild(moduleHost);
+  // v0.3 storage: synchronous, namespaced, JSON values; available to independently installed modules.
+  const DATA_PREFIX='tu:data:v1:';
+  const VALID_ID=/^[a-z0-9-]{1,64}$/;
+  const VALID_KEY=/^[a-zA-Z0-9_.-]{1,100}$/;
+  const storageKey=(id,key)=>{
+    if(!VALID_ID.test(id)||!VALID_KEY.test(key))throw new Error('Invalid TU storage namespace/key');
+    return DATA_PREFIX+id+':'+key;
+  };
+  const storage=Object.freeze({
+    get(id,key,fallback=null){
+      const raw=localStorage.getItem(storageKey(id,key));
+      if(raw===null)return fallback;
+      try{return JSON.parse(raw);}catch{return fallback;}
+    },
+    set(id,key,value){
+      if(value===undefined)throw new Error('Cannot store undefined');
+      localStorage.setItem(storageKey(id,key),JSON.stringify(value));
+      return true;
+    },
+    remove(id,key){localStorage.removeItem(storageKey(id,key));},
+    keys(id){
+      if(!VALID_ID.test(id))throw new Error('Invalid namespace');
+      const prefix=DATA_PREFIX+id+':';
+      return Object.keys(localStorage).filter(k=>k.startsWith(prefix)).map(k=>k.slice(prefix.length)).sort();
+    },
+    clear(id){for(const key of this.keys(id))localStorage.removeItem(storageKey(id,key));},
+    namespaces(){
+      return [...new Set(Object.keys(localStorage).filter(k=>k.startsWith(DATA_PREFIX))
+        .map(k=>k.slice(DATA_PREFIX.length).split(':')[0]))].sort();
+    }
+  });
+  function exportData(){
+    const data={format:'torn-utilities-backup',schema:1,createdAt:new Date().toISOString(),managerSettings:saved,modules:{}};
+    for(const id of storage.namespaces()){
+      data.modules[id]={};
+      for(const key of storage.keys(id))data.modules[id][key]=storage.get(id,key);
+    }
+    return JSON.stringify(data,null,2);
+  }
+  function importData(text){
+    if(text.length>3_000_000)throw new Error('Backup exceeds 3 MB limit');
+    const data=JSON.parse(text);
+    if(data?.format!=='torn-utilities-backup'||data.schema!==1||
+       !data.modules||typeof data.modules!=='object'||Array.isArray(data.modules))throw new Error('Invalid backup format');
+    const pending=[];
+    for(const [id,records] of Object.entries(data.modules)){
+      if(!VALID_ID.test(id)||!records||typeof records!=='object'||Array.isArray(records))throw new Error('Invalid module data');
+      for(const [key,value] of Object.entries(records))pending.push([storageKey(id,key),JSON.stringify(value)]);
+    }
+    if(pending.length>2000)throw new Error('Too many backup entries');
+    // Additive restore: existing keys not in the backup are preserved.
+    for(const [key,value] of pending)localStorage.setItem(key,value);
+    if(data.managerSettings&&typeof data.managerSettings==='object'&&!Array.isArray(data.managerSettings)){
+      saved.disabled={...(saved.disabled||{}),...(data.managerSettings.disabled||{})};
+      persist();
+    }
+    return pending.length;
+  }
   const api = Object.freeze({
+    storage,
     register(def) {
       if (!def || typeof def.id !== 'string' || !/^[a-z0-9-]+$/.test(def.id) ||
           typeof def.activate !== 'function' || typeof def.deactivate !== 'function' ||
@@ -148,7 +207,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.2.3 (PDA)</footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.3.0 (PDA)</footer>';
   document.body.appendChild(panel);
   const content = panel.querySelector('.tu-content');
   function makeButton(label,handler,disabled=false) {
@@ -207,6 +266,45 @@
       const note=document.createElement('p');
       note.textContent='Download saves source using PDA_httpGet. Torn CSP prevents running downloaded JavaScript directly: install each module in PDA Scripts to activate it. The manager never bundles modules.';
       content.append(note);
+      const heading=document.createElement('strong');heading.textContent='Storage & Backups';content.append(heading);
+      const summary=document.createElement('p');
+      const spaces=storage.namespaces();
+      summary.textContent=spaces.length+' module data namespace(s): '+(spaces.join(', ')||'none')+'. Data remains when modules are disabled or removed.';
+      content.append(summary);
+      const backup=makeButton('Export backup',()=>{
+        try{
+          const json=exportData();
+          const blob=new Blob([json],{type:'application/json'});
+          const url=URL.createObjectURL(blob);
+          const a=document.createElement('a');a.href=url;a.download='torn-utilities-backup-'+new Date().toISOString().slice(0,10)+'.json';
+          document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
+          setStatus('storage','Backup file prepared');
+        }catch(e){setStatus('storage','Export failed: '+e.message);}
+      });
+      content.append(backup);
+      const importBtn=makeButton('Restore backup',()=>{
+        const input=document.createElement('input');input.type='file';input.accept='.json,application/json';
+        input.addEventListener('change',async()=>{
+          const file=input.files?.[0];if(!file)return;
+          try{
+            if(!confirm('Restore TU backup? Existing keys in the backup will be overwritten.'))return;
+            const count=importData(await file.text());
+            alert('Restored '+count+' entries. Reload Torn to apply restored settings.');
+            render('settings');
+          }catch(e){alert('Restore failed: '+e.message);}
+        });
+        input.click();
+      });
+      content.append(importBtn);
+      if(statusText.storage){const msg=document.createElement('p');msg.textContent=statusText.storage;content.append(msg);}
+      const privacy=document.createElement('p');privacy.textContent='Backups contain TU-managed settings and module data only. Large archives and legacy module storage are not included. Do not store API keys in TU backups.';content.append(privacy);
+      for(const id of spaces){
+        const line=document.createElement('div');line.className='tu-card';
+        const name=document.createElement('span');name.textContent=id+' ('+storage.keys(id).length+' keys)';name.style.flex='1';
+        line.append(name,makeButton('Clear data',()=>{
+          if(confirm('Permanently delete all TU data for '+id+'? This cannot be undone.')){storage.clear(id);render('settings');}
+        }));content.append(line);
+      }
     }else{
       const p=document.createElement('p');
       p.textContent='Torn Utilities by RelaxSweety [4539436]. Drag the TU button to reposition it. Modules are managed through Settings.';
@@ -225,7 +323,6 @@
       content.append(card);
     }
   }
-  render('modules');
   render('modules');
   window.addEventListener('torn-utilities-ready',()=>render(currentTab));
   // A module script can be installed separately, but remains inert until Open is pressed.
