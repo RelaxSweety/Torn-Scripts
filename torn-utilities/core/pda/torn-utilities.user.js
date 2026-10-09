@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.1.1
+// @version      0.1.2
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -21,6 +21,47 @@
     ['Chat Tools', 'Chat Archiver and chat utilities', '◉'],
     ['Other Tools', 'Additional Torn utilities', '⚙']
   ];
+  // Lifecycle API: modules register inert factories; only this manager calls activate().
+  const registered = new Map();
+  let active = null;
+  const moduleHost = document.createElement('div');
+  moduleHost.id = 'tu-pda-module-host';
+  moduleHost.hidden = true;
+  document.body.appendChild(moduleHost);
+  const api = Object.freeze({
+    register(def) {
+      if (!def || typeof def.id !== 'string' || !/^[a-z0-9-]+$/.test(def.id) ||
+          typeof def.activate !== 'function' || typeof def.deactivate !== 'function' ||
+          registered.has(def.id)) return false;
+      registered.set(def.id, Object.freeze({id:def.id, activate:def.activate, deactivate:def.deactivate}));
+      return true;
+    },
+    isRegistered(id) { return registered.has(id); },
+    isActive(id) { return active === id; }
+  });
+  Object.defineProperty(window, 'TornUtilities', {value:api, configurable:false, writable:false});
+  function stopModule() {
+    if (!active) return;
+    const id=active; active=null;
+    try { registered.get(id)?.deactivate(); } catch(e) { console.error('[TU] module cleanup failed', id, e); }
+    moduleHost.replaceChildren(); moduleHost.hidden=true;
+  }
+  function openModule(id) {
+    const mod=registered.get(id);
+    if (!mod) return false;
+    stopModule();
+    moduleHost.hidden=false;
+    try {
+      mod.activate(Object.freeze({mount:moduleHost, close:stopModule}));
+      active=id;
+      return true;
+    } catch(e) {
+      console.error('[TU] module activation failed', id, e);
+      try { mod.deactivate(); } catch {}
+      moduleHost.replaceChildren(); moduleHost.hidden=true;
+      return false;
+    }
+  }
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch {}
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch {} };
@@ -59,7 +100,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.1.1 (PDA)</footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.1.2 (PDA)</footer>';
   document.body.appendChild(panel);
   const content = panel.querySelector('.tu-content');
   function render(tab) {
@@ -85,7 +126,7 @@
   render('modules');
   const closePanel = () => { panel.hidden = true; launcher.hidden = false; };
   const togglePanel = () => { panel.hidden = !panel.hidden; launcher.hidden = !panel.hidden; };
-  panel.querySelector('.tu-close').addEventListener('click', closePanel);
+  panel.querySelector('.tu-close').addEventListener('click', () => { stopModule(); closePanel(); });
   panel.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => render(b.dataset.tab)));
   const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
   const setPos = (x, y) => {
@@ -109,7 +150,7 @@
     if (!gesture || gesture.id !== e.pointerId) return;
     const moved=gesture.moved; gesture=null;
     if (moved) { saved.x=launcher.offsetLeft; saved.y=launcher.offsetTop; persist(); }
-    else togglePanel();
+    else { if (!panel.hidden) stopModule(); togglePanel(); }
   });
   launcher.addEventListener('pointercancel', () => { gesture=null; });
   window.addEventListener('resize', () => {
