@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "categories": [
+    {
+      "id": "business",
+      "name": "Business Tools",
+      "icon": "▥",
+      "order": 10
+    },
+    {
+      "id": "games",
+      "name": "Games",
+      "icon": "♜",
+      "order": 20
+    },
+    {
+      "id": "chat",
+      "name": "Chat Tools",
+      "icon": "◉",
+      "order": 30
+    },
+    {
+      "id": "other",
+      "name": "Other Tools",
+      "icon": "⚙",
+      "order": 40
+    }
+  ],
+  "modules": [
+    {
+      "id": "flight-game",
+      "name": "Flight Game",
+      "category": "games",
+      "version": "0.11.12",
+      "description": "Flight arcade and Stick Fighter",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/pda-flight-game/Torn-PDA-Flight-Game.user.js"
+    },
+    {
+      "id": "chat-archiver",
+      "name": "Chat Archiver",
+      "category": "chat",
+      "version": "0.1.6",
+      "description": "Archive Torn chat conversations",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/chat-archiver/pda/src/torn-multi-chat-archiver-pda.user.js"
+    }
+  ]
+}
