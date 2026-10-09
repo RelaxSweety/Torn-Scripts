@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.11.12
+// @version      0.11.13
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -344,19 +344,7 @@
 
     function buildUI() {
         if (document.getElementById('tpfg-root')) return;
-        const launcher=document.createElement('button');
-        launcher.id='tpfg-launcher';
-        launcher.type='button';
-        launcher.textContent='⌖';
-        launcher.title='Torn PDA Arcade';
-        document.body.appendChild(launcher);
-        const restorePos=()=>{try{const p=JSON.parse(moduleStore.getItem(LAUNCH_POS_KEY)||'null');if(p){launcher.style.left=Math.max(0,Math.min(innerWidth-44,p.x))+'px';launcher.style.top=Math.max(0,Math.min(innerHeight-44,p.y))+'px';launcher.style.right='auto';launcher.style.bottom='auto';}}catch(_){}};
-        restorePos();
-        let drag=null,moved=false;
-        launcher.addEventListener('pointerdown',e=>{drag={id:e.pointerId,x:e.clientX,y:e.clientY,l:launcher.offsetLeft,t:launcher.offsetTop};moved=false;launcher.setPointerCapture(e.pointerId);});
-        launcher.addEventListener('pointermove',e=>{if(!drag||drag.id!==e.pointerId)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.hypot(dx,dy)>7)moved=true;if(moved){launcher.style.left=Math.max(0,Math.min(innerWidth-launcher.offsetWidth,drag.l+dx))+'px';launcher.style.top=Math.max(0,Math.min(innerHeight-launcher.offsetHeight,drag.t+dy))+'px';launcher.style.right='auto';launcher.style.bottom='auto';}});
-        launcher.addEventListener('pointerup',e=>{if(!drag||drag.id!==e.pointerId)return;if(moved)moduleStore.setItem(LAUNCH_POS_KEY,JSON.stringify({x:launcher.offsetLeft,y:launcher.offsetTop}));else openManager();drag=null;});
-
+        // TU owns the only persistent launcher; no game-specific floating button.
         const root = document.createElement('div');
         root.id = 'tpfg-root';
         root.innerHTML = `
@@ -819,9 +807,17 @@
     }
 
     let initialized=false;
-    async function activateFromTU() { if (!initialized) { await init(); initialized=true; } openManager(); }
-    function deactivateFromTU() { closeActiveGame(); document.getElementById('tpfg-manager').style.display='none'; }
-    const definition={id:'flight-game',version:'0.11.12',activate:activateFromTU,deactivate:deactivateFromTU};
-    function registerTU(){ if(window.TornUtilities?.register) window.TornUtilities.register(definition); }
-    window.addEventListener('torn-utilities-ready',registerTU); registerTU();
+    async function ensureInitialized(){if(!initialized){await init();initialized=true;}}
+    async function activateFlight(){await ensureInitialized();launchGame(Arcade.games.get('flight-arcade'));}
+    async function activateStick(){await ensureInitialized();launchGame(Arcade.games.get('stick-figure-fighter'));}
+    function deactivateFromTU(){
+      StickFighter.stop();closeActiveGame();
+      for(const id of ['tpfg-manager','tpfg-prompt','tpfg-game-settings']){const el=document.getElementById(id);if(el)el.style.display='none';}
+    }
+    const definitions=[
+      {id:'flight-game',version:'0.11.13',activate:activateFlight,deactivate:deactivateFromTU},
+      {id:'stick-fighter',version:'0.1.6',activate:activateStick,deactivate:deactivateFromTU}
+    ];
+    function registerTU(){if(window.TornUtilities?.register)for(const definition of definitions)window.TornUtilities.register(definition);}
+    window.addEventListener('torn-utilities-ready',registerTU);registerTU();
 })();
