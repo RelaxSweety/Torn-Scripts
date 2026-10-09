@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Multi-Chat Archiver PDA
 // @namespace    RelaxSweety.Torn
-// @version      0.1.4
+// @version      0.1.5
 // @description  Mobile/PDA chat archiver based on desktop v1.9; touch-friendly controls
 // @match        https://www.torn.com/*
 // @grant        none
@@ -3517,19 +3517,19 @@
        INITIALIZATION
        ========================================================= */
 
-    loadSettings();
-
-    function mountWhenReady() {
-        if (!document.body) {
-            setTimeout(mountWhenReady, 250);
-            return;
-        }
-        createPanel();
+    let initialized=false;
+    function activateFromTU(){
+      if(!initialized){ loadSettings(); createPanel(); initialized=true; }
+      showFullPanel();
     }
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => setTimeout(mountWhenReady, 1000), { once: true });
-    } else {
-        setTimeout(mountWhenReady, 1000);
+    function deactivateFromTU(){
+      stopCapture('Closed by Torn Utilities'); stopAutoRun(false);
+      const panel=document.getElementById('tca-panel'); if(panel) panel.style.display='none';
+      const launcher=document.getElementById('tca-launcher'); if(launcher) launcher.style.display='none';
+      const playbar=document.getElementById('tca-playbar'); if(playbar) playbar.style.display='none';
     }
+    const definition={id:'chat-archiver',activate:activateFromTU,deactivate:deactivateFromTU};
+    function registerTU(){if(window.TornUtilities?.register) window.TornUtilities.register(definition);}
+    window.addEventListener('torn-utilities-ready',registerTU); registerTU();
 
 })();
