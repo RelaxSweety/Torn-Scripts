@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.11.10
+// @version      0.11.11
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -779,6 +779,10 @@
         buildUI();
     }
 
-    if (document.readyState==='loading') document.addEventListener('DOMContentLoaded',init,{once:true});
-    else init();
+    let initialized=false;
+    async function activateFromTU() { if (!initialized) { await init(); initialized=true; } openManager(); }
+    function deactivateFromTU() { closeActiveGame(); document.getElementById('tpfg-manager').style.display='none'; }
+    const definition={id:'flight-game',activate:activateFromTU,deactivate:deactivateFromTU};
+    function registerTU(){ if(window.TornUtilities?.register) window.TornUtilities.register(definition); }
+    window.addEventListener('torn-utilities-ready',registerTU); registerTU();
 })();
