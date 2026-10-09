@@ -28,6 +28,14 @@
   ],
   "modules": [
     {
+      "id": "alerts-calculations",
+      "name": "Alerts and Calculations",
+      "category": "business",
+      "version": "0.1.0",
+      "description": "Stock cash-target quantity entry, foreign item availability alerts, and math/percentage calculator",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/alerts-and-calculations.user.js"
+    },
+    {
       "id": "flight-game",
       "name": "Flight Game",
       "category": "games",
