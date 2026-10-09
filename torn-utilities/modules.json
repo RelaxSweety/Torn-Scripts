@@ -31,15 +31,23 @@
       "id": "flight-game",
       "name": "Flight Game",
       "category": "games",
-      "version": "0.11.12",
-      "description": "Flight arcade and Stick Fighter",
+      "version": "0.11.13",
+      "description": "Flight Arcade",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/pda-flight-game/Torn-PDA-Flight-Game.user.js"
+    },
+    {
+      "id": "stick-fighter",
+      "name": "Stick Fighter",
+      "category": "games",
+      "version": "0.1.6",
+      "description": "Stick Fighter arcade game (included in the PDA Arcade script)",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/pda-flight-game/Torn-PDA-Flight-Game.user.js"
     },
     {
       "id": "chat-archiver",
       "name": "Chat Archiver",
       "category": "chat",
-      "version": "0.1.6",
+      "version": "0.1.7",
       "description": "Archive Torn chat conversations",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/chat-archiver/pda/src/torn-multi-chat-archiver-pda.user.js"
     }
