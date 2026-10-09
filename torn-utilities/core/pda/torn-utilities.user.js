@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.1.3
+// @version      0.1.4
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -16,10 +16,14 @@
   window.__RELAX_TORN_UTILITIES_PDA__ = true;
   const KEY = 'relaxsweety_tu_pda_v1';
   const catalog = [
-    ['Business Tools', 'Market Scanner, Bazaar Manager, Trade Calculator and more', '▥'],
-    ['Games', 'Flight Game, Stick Fighter', '♜'],
-    ['Chat Tools', 'Chat Archiver and chat utilities', '◉'],
-    ['Other Tools', 'Additional Torn utilities', '⚙']
+    {id:'business',name:'Business Tools',desc:'Market Scanner, Bazaar Manager, Trade Calculator and more',icon:'▥',modules:[]},
+    {id:'games',name:'Games',desc:'Flight Game, Stick Fighter',icon:'♜',modules:['flight-game']},
+    {id:'chat',name:'Chat Tools',desc:'Chat Archiver and chat utilities',icon:'◉',modules:['chat-archiver']},
+    {id:'other',name:'Other Tools',desc:'Additional Torn utilities',icon:'⚙',modules:[]}
+  ];
+  const available = [
+    {id:'flight-game',name:'Flight Game',category:'games',url:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/pda-flight-game/Torn-PDA-Flight-Game.user.js'},
+    {id:'chat-archiver',name:'Chat Archiver',category:'chat',url:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/chat-archiver/pda/src/torn-multi-chat-archiver-pda.user.js'}
   ];
   // Lifecycle API: modules register inert factories; only this manager calls activate().
   const registered = new Map();
@@ -34,7 +38,7 @@
           typeof def.activate !== 'function' || typeof def.deactivate !== 'function' ||
           registered.has(def.id)) return false;
       registered.set(def.id, Object.freeze({id:def.id, activate:def.activate, deactivate:def.deactivate}));
-      if (typeof render === 'function') render('modules');
+      if (typeof render === 'function') render(currentTab);
       return true;
     },
     isRegistered(id) { return registered.has(id); },
@@ -42,7 +46,7 @@
   });
   Object.defineProperty(window, 'TornUtilities', {value:api, configurable:false, writable:false});
   window.dispatchEvent(new Event('torn-utilities-ready'));
-  const moduleList=[['flight-game','Flight Game'],['chat-archiver','Chat Archiver']];
+  let currentTab='modules';
   function stopModule() {
     if (!active) return;
     const id=active; active=null;
@@ -51,7 +55,7 @@
   }
   function openModule(id) {
     const mod=registered.get(id);
-    if (!mod) return false;
+    if (!mod || saved.disabled?.[id]) return false;
     stopModule();
     moduleHost.hidden=false;
     const exit=document.createElement('button');
@@ -108,40 +112,89 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.1.3 (PDA)</footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.1.4 (PDA)</footer>';
   document.body.appendChild(panel);
   const content = panel.querySelector('.tu-content');
+  function makeButton(label,handler,disabled=false) {
+    const btn=document.createElement('button');btn.type='button';btn.textContent=label;
+    btn.disabled=disabled;
+    btn.style.cssText='margin-left:auto;padding:8px 10px;border-radius:8px;border:0;background:#dfb952;color:#111;white-space:nowrap;font-weight:600;'+(disabled?'opacity:.5;':'');
+    if(handler)btn.addEventListener('click',handler);
+    return btn;
+  }
   function render(tab) {
-    panel.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
+    currentTab=tab;
+    panel.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===tab)));
     content.replaceChildren();
-    if (tab === 'modules') {
-      for (const [id,name] of moduleList) {
-        const card=document.createElement('div'); card.className='tu-card';
-        const label=document.createElement('strong'); label.textContent=name;
-        const launch=document.createElement('button'); launch.textContent=registered.has(id)?'Open':'Not loaded';
-        launch.disabled=!registered.has(id);
-        launch.style.cssText='margin-left:auto;padding:8px;border-radius:8px;border:0;background:#dfb952;color:#111';
-        launch.addEventListener('click',()=>{if(openModule(id)){panel.hidden=true;launcher.hidden=true;}});
-        card.append(label,launch);content.appendChild(card);
+    if(tab==='modules'){
+      for(const group of catalog){
+        const card=document.createElement('div');card.className='tu-card';
+        const symbol=document.createElement('span');symbol.className='tu-symbol';symbol.textContent=group.icon;
+        const body=document.createElement('div');body.style.flex='1';
+        const title=document.createElement('strong');title.textContent=group.name;
+        const desc=document.createElement('small');desc.textContent=group.desc;
+        body.append(title,desc);card.append(symbol,body);
+        const loaded=group.modules.filter(id=>registered.has(id)&&!saved.disabled?.[id]);
+        if(loaded.length){
+          card.append(makeButton('Open',()=>{
+            if(loaded.length===1){if(openModule(loaded[0])){panel.hidden=true;launcher.hidden=true;}}
+            else renderGroup(group);
+          }));
+        } else {
+          const status=document.createElement('span');status.className='tu-status';status.textContent='Not loaded';
+          card.append(status);
+        }
+        content.append(card);
       }
-      for (const [name, description, symbol] of catalog) {
-        const card = document.createElement('div'); card.className = 'tu-card';
-        const icon = document.createElement('span'); icon.className = 'tu-symbol'; icon.textContent = symbol;
-        const body = document.createElement('div');
-        const title = document.createElement('strong'); title.textContent = name;
-        const subtitle = document.createElement('small'); subtitle.textContent = description;
-        body.append(title, subtitle);
-        const status = document.createElement('span'); status.className = 'tu-status'; status.textContent = 'Coming soon';
-        card.append(icon, body, status); content.appendChild(card);
+    }else if(tab==='settings'){
+      const hint=document.createElement('p');
+      hint.textContent='Install modules in Torn PDA Scripts, then reload Torn. Enable modules here to make them available in the Modules tab.';
+      content.append(hint);
+      for(const mod of available){
+        const card=document.createElement('div');card.className='tu-card';
+        const body=document.createElement('div');body.style.flex='1';
+        const title=document.createElement('strong');title.textContent=mod.name;
+        const state=document.createElement('small');
+        const installed=registered.has(mod.id),enabled=!saved.disabled?.[mod.id];
+        state.textContent=installed?(enabled?'Loaded · enabled':'Loaded · disabled'):'Not loaded';
+        body.append(title,state);card.append(body);
+        if(installed){
+          card.append(makeButton(enabled?'Disable':'Activate',()=>{
+            saved.disabled ||= {};saved.disabled[mod.id]=enabled;
+            if(enabled&&active===mod.id)stopModule();
+            persist();render('settings');
+          }));
+        }else{
+          card.append(makeButton('Download',()=>{
+            // PDA controls installation; this opens the trusted source rather than executing remote code.
+            window.open(mod.url,'_blank','noopener,noreferrer');
+          }));
+        }
+        content.append(card);
       }
-    } else {
-      const p = document.createElement('p');
-      p.textContent = tab === 'settings' ? 'Drag the TU button anywhere on screen. Its position is saved on this device.' : 'Torn Utilities by RelaxSweety [4539436]. This is the initial PDA launcher preview. Modules are not installed or active yet.';
-      content.appendChild(p);
+      const note=document.createElement('p');
+      note.textContent='Download opens the script source. Add it using Torn PDA’s script installer; web pages cannot silently install PDA scripts.';
+      content.append(note);
+    }else{
+      const p=document.createElement('p');
+      p.textContent='Torn Utilities by RelaxSweety [4539436]. Drag the TU button to reposition it. Modules are managed through Settings.';
+      content.append(p);
+    }
+  }
+  function renderGroup(group){
+    content.replaceChildren();
+    content.append(makeButton('← Back',()=>render('modules')));
+    for(const id of group.modules){
+      if(!registered.has(id)||saved.disabled?.[id])continue;
+      const mod=available.find(x=>x.id===id);
+      const card=document.createElement('div');card.className='tu-card';
+      const label=document.createElement('strong');label.textContent=mod?.name||id;
+      card.append(label,makeButton('Open',()=>{if(openModule(id)){panel.hidden=true;launcher.hidden=true;}}));
+      content.append(card);
     }
   }
   render('modules');
-  window.addEventListener('torn-utilities-ready',()=>render('modules'));
+  window.addEventListener('torn-utilities-ready',()=>render(currentTab));
   // A module script can be installed separately, but remains inert until Open is pressed.
 
   const closePanel = () => { panel.hidden = true; launcher.hidden = false; };
