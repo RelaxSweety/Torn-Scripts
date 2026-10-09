@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Torn Utilities PDA Diagnostic
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.1.0
-// @description  Tests PDA networking, storage, and dynamic execution without installing modules.
+// @version      0.2.0
+// @description  Tests native PDA and GM network requests, storage, execution, and script interfaces.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
 // @grant        none
@@ -27,14 +27,14 @@
   document.head.append(style);
   const toggle=el('button','DIAG');toggle.id='tu-diag-toggle';document.body.append(toggle);
   const panel=el('section');panel.id='tu-diag-panel';panel.hidden=true;
-  const header=el('h3','Torn PDA Diagnostic v0.1.0');header.style.margin='0 0 8px';
-  const info=el('p','Tests connectivity, available PDA APIs, local storage, and dynamic code execution. Does not download or run modules.');
+  const header=el('h3','Torn PDA Diagnostic v0.2.0');header.style.margin='0 0 8px';
+  const info=el('p','Tests PDA_httpGet and GM_xmlhttpRequest against Chat Archiver, storage, and script interfaces. No modules are executed or installed.');
   const run=el('button','Run tests'),copy=el('button','Copy report'),close=el('button','Close');
   const output=el('pre','Press Run tests to begin.');
   panel.append(header,info,run,copy,close,output);document.body.append(panel);
   toggle.addEventListener('click',()=>{panel.hidden=!panel.hidden;});
   close.addEventListener('click',()=>{panel.hidden=true;});
-  const report=()=>['Torn Utilities PDA Diagnostic v0.1.0','Timestamp: '+new Date().toISOString(),'User agent: '+navigator.userAgent,'Origin: '+location.origin,...results].join('\n');
+  const report=()=>['Torn Utilities PDA Diagnostic v0.2.0','Timestamp: '+new Date().toISOString(),'User agent: '+navigator.userAgent,'Origin: '+location.origin,...results].join('\n');
   const record=(name,status,detail='')=>{results.push(name+': '+status+(detail?' | '+detail:''));output.textContent=report();};
   const withTimeout=(promise,ms=8500)=>Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error('Timeout after '+ms+'ms')),ms))]);
   async function testFetch(name,url){
@@ -43,6 +43,48 @@
       const body=await withTimeout(r.text());
       record(name,r.ok?'PASS':'HTTP '+r.status,'status='+r.status+'; bytes='+body.length+'; content-type='+(r.headers.get('content-type')||'unknown'));
     }catch(e){record(name,'FAIL',String(e.message||e));}
+  }
+  const target='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/chat-archiver/pda/src/torn-multi-chat-archiver-pda.user.js';
+  function describeResponse(value){
+    const body=typeof value==='string'?value:typeof value?.responseText==='string'?value.responseText:typeof value?.data==='string'?value.data:typeof value?.body==='string'?value.body:'';
+    return {body,status:value?.status??value?.statusCode??'unknown',kind:typeof value};
+  }
+  async function testPDAGet(){
+    if(typeof window.PDA_httpGet!=='function'){record('PDA_httpGet module','UNAVAILABLE');return;}
+    try{
+      // PDA_httpGet commonly accepts a URL and resolves to text or response object.
+      const result=await withTimeout(Promise.resolve(window.PDA_httpGet(target)),12000);
+      const data=describeResponse(result);
+      record('PDA_httpGet module',data.body.includes('Torn Multi-Chat Archiver')?'PASS':'RESPONSE RECEIVED',
+        'status='+data.status+'; bytes='+data.body.length+'; response type='+data.kind);
+    }catch(e){record('PDA_httpGet module','FAIL',String(e.message||e));}
+  }
+  async function testGMRequest(){
+    const gm=window.GM_xmlhttpRequest;
+    if(typeof gm!=='function'){record('GM_xmlhttpRequest module','UNAVAILABLE');return;}
+    try{
+      const response=await withTimeout(new Promise((resolve,reject)=>{
+        let settled=false;
+        try{
+          const handle=gm({
+            method:'GET',url:target,timeout:11000,
+            onload:r=>{settled=true;resolve(r);},
+            onerror:r=>{settled=true;reject(new Error('Network error '+(r?.status||'')));},
+            ontimeout:()=>{settled=true;reject(new Error('Request timeout'));}
+          });
+          // The timeout wrapper ensures we do not wait indefinitely for an unsupported callback.
+        }catch(e){reject(e);}
+      }),12000);
+      const data=describeResponse(response);
+      record('GM_xmlhttpRequest module',data.body.includes('Torn Multi-Chat Archiver')?'PASS':'RESPONSE RECEIVED',
+        'status='+data.status+'; bytes='+data.body.length);
+    }catch(e){record('GM_xmlhttpRequest module','FAIL',String(e.message||e));}
+  }
+  function testScriptInterfaces(){
+    const candidates=['PDA_installScript','PDA_addScript','PDA_saveScript','PDA_scripts','PDA_scriptManager','PDA_openUrl','PDA_openBrowser','GM_registerMenuCommand','GM_addElement','GM_getResourceText','GM_download'];
+    for(const key of candidates)record('Script API '+key,typeof window[key]);
+    try{record('GM_info metadata',JSON.stringify({scriptHandler:window.GM_info?.scriptHandler,version:window.GM_info?.version,scriptName:window.GM_info?.script?.name}));}
+    catch(e){record('GM_info metadata','ERROR',e.message);}
   }
   async function tests(){
     results.length=0;run.disabled=true;output.textContent='Running tests…';
@@ -75,6 +117,9 @@
       const ok=window[marker]===true;delete window[marker];
       record('Inline script injection',ok?'PASS':'BLOCKED');
     }catch(e){record('Inline script injection','BLOCKED',String(e.message||e));}
+    testScriptInterfaces();
+    await testPDAGet();
+    await testGMRequest();
     await testFetch('same-origin Torn','https://www.torn.com/');
     await testFetch('raw.githubusercontent.com','https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/core/pda/torn-utilities.user.js');
     await testFetch('cdn.jsdelivr.net','https://cdn.jsdelivr.net/gh/RelaxSweety/Torn-Scripts@main/README.md');
