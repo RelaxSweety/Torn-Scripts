@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Multiplayer Arcade - Tic-Tac-Toe (PDA)
 // @namespace    https://www.torn.com/
-// @version      0.2.0
+// @version      0.2.1
 // @description  Torn PDA mobile multiplayer Tic-Tac-Toe
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -10,7 +10,7 @@
 (()=>{
 "use strict";
 if(window.__TU_TTT_PDA__)return;window.__TU_TTT_PDA__=true;
-const API="https://tu-multiplayer-server.tyler-a-wood.workers.dev",STORE="tu-ttt-pda-session-v1";
+const API="",STORE="tu-ttt-pda-session-v1";
 let session=null,timer=null,busy=false;
 try{session=JSON.parse(localStorage.getItem(STORE));}catch{}
 const el=(tag,props={},parent)=>{const n=document.createElement(tag);Object.assign(n,props);parent?.appendChild(n);return n;};
@@ -21,7 +21,7 @@ const panel=el("div",{},document.body);panel.hidden=true;
 Object.assign(panel.style,{position:"fixed",right:"12px",bottom:"150px",maxHeight:"70vh",overflowY:"auto",boxSizing:"border-box",zIndex:"2147483647",width:"min(340px,90vw)",padding:"15px",background:"#20252e",color:"#fff",border:"1px solid #888",borderRadius:"12px",font:"14px system-ui"});
 el("h3",{textContent:"TU Tic-Tac-Toe"},panel);
 const status=el("div",{textContent:"Create or join a room"},panel);
-const nameInput=el("input",{placeholder:"Your Torn username",value:localStorage.getItem("tu-ttt-player-name")||""},panel);Object.assign(nameInput.style,{width:"95%",boxSizing:"border-box",margin:"8px 0",padding:"8px",background:"#fff",color:"#111",borderRadius:"5px"});nameInput.addEventListener("change",()=>localStorage.setItem("tu-ttt-player-name",nameInput.value.trim()));
+const nameInput=el("input",{placeholder:"Names disabled for privacy",value:""},panel);Object.assign(nameInput.style,{width:"95%",boxSizing:"border-box",margin:"8px 0",padding:"8px",background:"#fff",color:"#111",borderRadius:"5px"});nameInput.addEventListener("change",()=>void 0);
 const controls=el("div",{},panel);
 controls.style.display="flex";controls.style.gap="6px";controls.style.flexWrap="wrap";
 const roomInput=el("input",{placeholder:"ROOM CODE",maxLength:6},controls);Object.assign(roomInput.style,{width:"110px",background:"#fff",color:"#111",borderRadius:"4px",padding:"6px"});
@@ -32,18 +32,18 @@ const roomText=el("div",{},panel);
 const opponentText=el("div",{},panel);
 const summaryBtn=btn("Copy game summary",()=>copySummary(),panel);
 let latestGame=null;
-function playerName(){const name=nameInput.value.trim().slice(0,32);if(name)localStorage.setItem("tu-ttt-player-name",name);return name||"Anonymous";}
+function playerName(){const name=nameInput.value.trim().slice(0,32);return "Player";}
 function copySummary(){if(!latestGame||!session)return notice("No game to summarize");const g=latestGame,n=g.names||{},x=n.X||"Player X",o=n.O||"Player O",result=!g.ready?"Waiting for opponent":g.winner==="draw"?"Draw":g.winner?((g.winner==="X"?x:o)+" wins"):"In progress";const rows=[0,3,6].map(i=>g.board.slice(i,i+3).map(v=>v||"-").join(" "));const message="TU Tic-Tac-Toe | "+x+" (X) vs "+o+" (O) | "+result+" | Moves: "+(g.moves??g.board.filter(Boolean).length)+" | Room: "+g.room+" | "+rows.join(" / ");if(navigator.clipboard?.writeText){navigator.clipboard.writeText(message).then(()=>notice("Summary copied - paste into Torn chat")).catch(()=>fallbackCopy(message));}else fallbackCopy(message);}
 function fallbackCopy(message){const t=el("textarea",{value:message},panel);t.select();try{document.execCommand("copy");notice("Summary copied - paste into Torn chat");}catch{notice("Select and copy the summary below");}setTimeout(()=>t.remove(),12000);}
 btn("Copy invite",()=>{if(session)navigator.clipboard?.writeText("Join TU Tic-Tac-Toe room "+session.room);},panel);
 const board=el("div",{},panel);Object.assign(board.style,{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"6px",marginTop:"12px"});
 const squares=Array.from({length:9},(_,i)=>{const b=btn("",()=>{if(session)action("/api/rooms/"+session.room+"/move","POST",{index:i});},board);Object.assign(b.style,{height:"65px",touchAction:"manipulation",fontSize:"30px",background:"#333c49",color:"#fff"});return b;});
 function notice(msg){status.textContent=msg;}
-function render(g){latestGame=g;const n=g?.names||{};opponentText.textContent=g&&session?"You: "+(n[session.symbol]||"Player "+session.symbol)+" | Opponent: "+(n[session.symbol==="X"?"O":"X"]||"Waiting for opponent"):"";summaryBtn.disabled=!g;squares.forEach((b,i)=>{b.textContent=g?.board[i]||"";b.disabled=!g||!session||!g.ready||!!g.winner||g.turn!==session.symbol||!!g.board[i]||busy;});roomText.textContent=session?"Room: "+session.room+" | You: "+session.symbol:"";if(g)notice(g.winner?(g.winner==="draw"?"Draw":g.winner===session.symbol?"You won!":"Opponent won"):!g.ready?"Waiting for opponent":g.turn===session.symbol?"Your turn":"Opponent turn");else notice("Create or join a room");}
+function render(g){latestGame=g;opponentText.textContent=g&&session?"You: Player "+session.symbol+" | Opponent: Player "+(session.symbol==="X"?"O":"X"):"";summaryBtn.disabled=!g;squares.forEach((b,i)=>{b.textContent=g?.board[i]||"";b.disabled=!g||!session||!g.ready||!!g.winner||g.turn!==session.symbol||!!g.board[i]||busy;});roomText.textContent=session?"Room: "+session.room+" | You: "+session.symbol:"";if(g)notice(g.winner?(g.winner==="draw"?"Draw":g.winner===session.symbol?"You won!":"Opponent won"):!g.ready?"Waiting for opponent":g.turn===session.symbol?"Your turn":"Opponent turn");else notice("Create or join a room");}
 function req(path,method="GET",body){
  const headers={"Content-Type":"application/json"};
  if(session?.token)headers.Authorization="Bearer "+session.token;
- const url=API+path;
+ if(!API)return Promise.reject(Error("Game temporarily disabled pending privacy-safe server URL"));const url=API+path;
  const data=method==="POST"?JSON.stringify(body||{}):undefined;
  const parse=(status,raw)=>{let obj;try{obj=JSON.parse(raw);}catch{throw Error("Invalid server response (HTTP "+status+")");}if(status<200||status>=300)throw Error((obj.error||"Server error")+" (HTTP "+status+")");return obj;};
  const native=()=>fetch(url,{method,headers,body:data,mode:"cors",cache:"no-store"}).then(async res=>parse(res.status,await res.text()));
