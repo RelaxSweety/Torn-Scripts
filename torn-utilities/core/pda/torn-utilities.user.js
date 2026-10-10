@@ -161,7 +161,7 @@
       for(const cell of document.querySelectorAll('td,th,div,span')){
         if(cell.children.length>2||cell.textContent.trim()!=='Name')continue;
         const row=cell.closest('tr')||cell.parentElement;
-        if(!row||!/Relax|Name/i.test(row.textContent))continue;
+        if(!row||!row.textContent.includes('Name'))continue;
         const value=row.querySelector('a[href*="profiles.php?XID="]')||row.querySelector('a');
         const match=value?.textContent?.trim().match(/^([a-zA-Z0-9_-]{2,32})\s*\[(\d+)\]$/);
         if(match&&validPlayerName(match[1]))return make(match[2],match[1]);
