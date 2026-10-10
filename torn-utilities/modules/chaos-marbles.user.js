@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Chaos Marbles
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.2.0
+// @version      0.2.1
 // @description  Online multiplayer marble race for 2-4 players
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -29,13 +29,16 @@ function recordResult(){if(game?.winner===null||!session)return;const h=read(HIS
 async function action(path,method="GET",body,join=false){if(busy)return;busy=true;try{const r=await req(path,method,body);if(join){session={room:r.room,token:r.token,player:r.player};save()}game=r.game;recordResult();notice="Room "+session.room+" updated";render()}catch(e){notice=e.message;render()}finally{busy=false}}
 function roll(){if(session&&game?.turn===session.player&&game.roll===null)action("/"+session.room+"/roll","POST")}
 function move(i){if(session&&game?.turn===session.player&&legal(session.player,i,game.roll))action("/"+session.room+"/move","POST",{index:i})}
-function drawBoard(parent){const wrap=E("div",parent);wrap.style.cssText="border:3px solid #d6b96a;background:#121b25;border-radius:10px;padding:5px;margin:10px auto;max-width:420px;box-sizing:border-box";const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");svg.setAttribute("viewBox","0 0 400 400");svg.style.cssText="display:block;width:100%;aspect-ratio:1";wrap.append(svg);
+function drawBoard(parent){const wrap=E("div",parent);wrap.style.cssText="border:3px solid #d6b96a;background:#121b25;border-radius:10px;padding:5px;margin:10px auto;max-width:420px;box-sizing:border-box";const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");svg.setAttribute("viewBox","0 0 480 480");svg.style.cssText="display:block;width:100%;aspect-ratio:1";wrap.append(svg);
 const node=(name,attrs)=>{const n=document.createElementNS("http://www.w3.org/2000/svg",name);for(const [k,v] of Object.entries(attrs))n.setAttribute(k,v);svg.append(n);return n};
-node("circle",{cx:200,cy:200,r:153,fill:"none",stroke:"#455363","stroke-width":2});
-for(let i=0;i<32;i++){const a=-Math.PI/2+i*Math.PI*2/32,x=200+153*Math.cos(a),y=200+153*Math.sin(a);node("circle",{cx:x,cy:y,r:15,fill:i%8===0?COLORS[i/8]:"#293747",stroke:"#708092","stroke-width":1.5})}
-for(let p=0;p<game.count;p++){const a=-Math.PI/2+p*Math.PI/2;for(let j=0;j<4;j++){const r=120-j*24;node("circle",{cx:200+r*Math.cos(a),cy:200+r*Math.sin(a),r:10,fill:COLORS[p],opacity:.35,stroke:"#ddd","stroke-width":1})}}
-node("circle",{cx:200,cy:200,r:31,fill:"#253344",stroke:"#d6b96a","stroke-width":2});const t=node("text",{x:200,y:205,"text-anchor":"middle",fill:"#f0d68d","font-size":13,"font-weight":"bold"});t.textContent="CHAOS";
-for(let p=0;p<game.count;p++){for(let i=0;i<3;i++){const v=game.marbles[p][i];let x,y;if(v===-1){const a=-Math.PI/2+p*Math.PI/2;const bx=200+100*Math.cos(a),by=200+100*Math.sin(a);x=bx+(i-1)*13*Math.cos(a+Math.PI/2);y=by+(i-1)*13*Math.sin(a+Math.PI/2)}else if(v<32){const a=-Math.PI/2+((p*8+v)%32)*Math.PI*2/32;x=200+153*Math.cos(a);y=200+153*Math.sin(a)}else{const a=-Math.PI/2+p*Math.PI/2,r=120-(v-32)*24;x=200+r*Math.cos(a);y=200+r*Math.sin(a)}
+node("circle",{cx:240,cy:240,r:155,fill:"none",stroke:"#455363","stroke-width":2});
+for(let i=0;i<32;i++){const a=-Math.PI/2+i*Math.PI*2/32,x=240+155*Math.cos(a),y=240+155*Math.sin(a);node("circle",{cx:x,cy:y,r:15,fill:i%8===0?COLORS[i/8]:"#293747",stroke:"#708092","stroke-width":1.5})}
+for(let p=0;p<game.count;p++){const a=-Math.PI/2+p*Math.PI/2;for(let j=0;j<4;j++){const r=120-j*24;node("circle",{cx:240+r*Math.cos(a),cy:240+r*Math.sin(a),r:10,fill:COLORS[p],opacity:.35,stroke:"#ddd","stroke-width":1})}}
+node("circle",{cx:240,cy:240,r:31,fill:"#253344",stroke:"#d6b96a","stroke-width":2});const t=node("text",{x:240,y:245,"text-anchor":"middle",fill:"#f0d68d","font-size":13,"font-weight":"bold"});t.textContent="CHAOS";
+// Distinct outer corner holding zones: never overlap home lanes or track.
+const WAIT=[{x:65,y:65},{x:415,y:65},{x:415,y:415},{x:65,y:415}];
+for(let p=0;p<game.count;p++){const zone=WAIT[p],a=-Math.PI/2+p*Math.PI/2;node("rect",{x:zone.x-43,y:zone.y-32,width:86,height:69,rx:10,fill:"#253344",stroke:COLORS[p],"stroke-width":2});const title=node("text",{x:zone.x,y:zone.y-42,"text-anchor":"middle",fill:COLORS[p],"font-size":11,"font-weight":"bold"});title.textContent="WAITING FOR";const sub=node("text",{x:zone.x,y:zone.y-31,"text-anchor":"middle",fill:COLORS[p],"font-size":11,"font-weight":"bold"});sub.textContent="CHAOS";for(let i=0;i<3;i++)node("circle",{cx:zone.x+(i-1)*24,cy:zone.y+9,r:11,fill:"#111a23",stroke:COLORS[p],"stroke-width":1.5})}
+for(let p=0;p<game.count;p++){for(let i=0;i<3;i++){const v=game.marbles[p][i];let x,y;if(v===-1){const zone=WAIT[p];x=zone.x+(i-1)*24;y=zone.y+9}else if(v<32){const a=-Math.PI/2+((p*8+v)%32)*Math.PI*2/32;x=240+155*Math.cos(a);y=240+155*Math.sin(a)}else{const a=-Math.PI/2+p*Math.PI/2,r=120-(v-32)*24;x=240+r*Math.cos(a);y=240+r*Math.sin(a)}
 const c=node("circle",{cx:x,cy:y,r:9,fill:COLORS[p],stroke:"#fff","stroke-width":2});if(session&&p===session.player&&p===game.turn&&game.roll!==null&&legal(p,i,game.roll)){c.style.cursor="pointer";c.setAttribute("stroke-width","4");c.addEventListener("click",()=>move(i))}
 const label=node("text",{x,y:y+3.5,"text-anchor":"middle",fill:"#121820","font-size":10,"font-weight":"bold","pointer-events":"none"});label.textContent=i+1}}
 }
@@ -46,7 +49,7 @@ if(!session){E("p",body,"Online multiplayer for 2–4 players. Each player joins
 const header=E("div",body);header.style.cssText="padding:8px;background:#293747;border-radius:6px";header.textContent="Room: "+session.room+" | You: "+NAMES[session.player];const controls=E("div",body);controls.style.cssText="display:flex;gap:7px;flex-wrap:wrap;margin:8px 0";B(controls,"Copy Invite",()=>{const text="Join TU Chaos Marbles room "+session.room; if(navigator.clipboard?.writeText)navigator.clipboard.writeText(text).catch(()=>{});else notice=text});B(controls,"Leave",()=>{session=null;game=null;save();render()});B(controls,"Refresh",()=>action("/"+session.room+"/state"));
 if(!game){E("p",body,"Loading room...");return}
 const ready=game.ready;const status=E("div",body);status.style.cssText="padding:8px;border-radius:6px;background:#293747";status.textContent=game.winner!==null?NAMES[game.winner]+" wins!":!ready?"Waiting for Chaos: "+game.players.filter(Boolean).length+"/"+game.count+" players joined":game.turn===session.player?"Your turn — "+(game.roll===null?"roll the die":"move a marble (roll "+game.roll+")"):NAMES[game.turn]+"'s turn";
-E("p",body,notice).style.fontSize="12px";E("div",body,"Waiting for Chaos — marbles staged outside the home lanes").style.cssText="font-size:12px;color:#d6b96a;text-align:center";drawBoard(body);
+E("p",body,notice).style.fontSize="12px";E("div",body,"Waiting for Chaos — unplayed and captured marbles occupy the corner holding zones").style.cssText="font-size:12px;color:#d6b96a;text-align:center";drawBoard(body);
 const moves=E("div",body);moves.style.cssText="display:flex;gap:6px;flex-wrap:wrap";const die=B(moves,"Roll die",roll);die.disabled=!ready||game.winner!==null||game.turn!==session.player||game.roll!==null||busy;
 if(ready&&game.turn===session.player&&game.roll!==null)for(const i of choices())B(moves,"Move marble "+(i+1),()=>move(i));
 E("p",body,"Moves: "+game.moves+" | Rolls: "+game.rolls+" | Home: "+game.marbles.map((a,p)=>NAMES[p]+" "+a.filter(x=>x===35).length+"/3").join(" · ")).style.fontSize="12px";
@@ -57,6 +60,6 @@ let drag=null;bar.addEventListener("pointerdown",e=>{if(e.target.closest("button
 const grip=E("div",panel,"◢");grip.style.cssText="position:absolute;right:3px;bottom:2px;width:30px;height:30px;display:flex;align-items:end;justify-content:end;padding:3px;box-sizing:border-box;cursor:nwse-resize;touch-action:none;color:#d6b96a;font-size:21px";let resize=null;grip.onpointerdown=e=>{e.preventDefault();const r=panel.getBoundingClientRect();resize={x:e.clientX,y:e.clientY,w:r.width,h:r.height,l:r.left,t:r.top};panel.style.transform="none";panel.style.left=r.left+"px";panel.style.top=r.top+"px";grip.setPointerCapture(e.pointerId)};grip.onpointermove=e=>{if(!resize)return;panel.style.width=Math.max(260,Math.min(innerWidth-resize.l-8,resize.w+e.clientX-resize.x))+"px";panel.style.height=Math.max(320,Math.min(innerHeight-resize.t-8,resize.h+e.clientY-resize.y))+"px"};grip.onpointerup=()=>resize=null;grip.onpointercancel=()=>resize=null;
 E("div",panel).className="body";session=read(SESSION,null);render();if(session)action("/"+session.room+"/state");timer=setInterval(()=>{if(session&&!busy&&panel)action("/"+session.room+"/state")},2500)}
 function deactivate(){clearInterval(timer);timer=null;panel?.remove();panel=null}
-function register(){return window.TornUtilities?.register({id:ID,version:"0.2.0",activate,deactivate})}
+function register(){return window.TornUtilities?.register({id:ID,version:"0.2.1",activate,deactivate})}
 if(!register())window.addEventListener("torn-utilities-ready",register,{once:true});
 })();
