@@ -85,7 +85,7 @@
       "id": "torn-four",
       "name": "Torn Four",
       "category": "multiplayer",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "description": "Connect Four: two-player multiplayer with private room codes",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/torn-four.user.js"
     },
@@ -93,7 +93,7 @@
       "id": "torn-fleet",
       "name": "Torn Fleet",
       "category": "multiplayer",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "description": "Battleship: fleet placement and turn-based naval combat",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/torn-fleet.user.js"
     },
