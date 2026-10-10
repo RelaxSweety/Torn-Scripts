@@ -66,6 +66,30 @@
       "version": "0.3.1",
       "description": "Two-player online Tic-Tac-Toe with room codes, anonymous opponents and copyable Torn chat summaries",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/tic-tac-toe.user.js"
+    },
+    {
+      "id": "torn-four",
+      "name": "Torn Four",
+      "category": "games",
+      "version": "0.1.0",
+      "description": "Connect Four: two-player multiplayer with private room codes",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/torn-four.user.js"
+    },
+    {
+      "id": "torn-fleet",
+      "name": "Torn Fleet",
+      "category": "games",
+      "version": "0.1.0",
+      "description": "Battleship: fleet placement and turn-based naval combat",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/torn-fleet.user.js"
+    },
+    {
+      "id": "torn-snake",
+      "name": "Slithering Streets",
+      "category": "games",
+      "version": "0.1.0",
+      "description": "Single-player Snake with touch controls and local high scores",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/torn-snake.user.js"
     }
   ]
 }
