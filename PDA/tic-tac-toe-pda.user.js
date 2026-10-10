@@ -1,18 +1,18 @@
 // ==UserScript==
 // @name         TU Multiplayer Arcade - Tic-Tac-Toe (PDA)
 // @namespace    https://www.torn.com/
-// @version      0.2.1
+// @version      0.2.2
 // @description  Torn PDA mobile multiplayer Tic-Tac-Toe
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
-// @connect      tu-multiplayer-server.tyler-a-wood.workers.dev
+// @connect      tu-multiplayer-server.tuserver.workers.dev
 // ==/UserScript==
 (()=>{
 "use strict";
 if(window.__TU_TTT_PDA__)return;window.__TU_TTT_PDA__=true;
-const API="",STORE="tu-ttt-pda-session-v1";
+const API="https://tu-multiplayer-server.tuserver.workers.dev",STORE="tu-ttt-pda-session-v1";
 let session=null,timer=null,busy=false;
-try{session=JSON.parse(localStorage.getItem(STORE));}catch{}
+try{localStorage.removeItem("tu-ttt-player-name");session=JSON.parse(localStorage.getItem(STORE));}catch{}
 const el=(tag,props={},parent)=>{const n=document.createElement(tag);Object.assign(n,props);parent?.appendChild(n);return n;};
 const btn=(label,fn,parent)=>{const b=el("button",{textContent:label},parent);Object.assign(b.style,{background:"#344154",color:"#fff",border:"1px solid #657184",borderRadius:"6px",padding:"8px",cursor:"pointer"});b.addEventListener("click",fn);return b;};
 const toggle=btn("TU XO",()=>{panel.hidden=!panel.hidden;if(!panel.hidden)refresh();},document.body);
@@ -21,7 +21,7 @@ const panel=el("div",{},document.body);panel.hidden=true;
 Object.assign(panel.style,{position:"fixed",right:"12px",bottom:"150px",maxHeight:"70vh",overflowY:"auto",boxSizing:"border-box",zIndex:"2147483647",width:"min(340px,90vw)",padding:"15px",background:"#20252e",color:"#fff",border:"1px solid #888",borderRadius:"12px",font:"14px system-ui"});
 el("h3",{textContent:"TU Tic-Tac-Toe"},panel);
 const status=el("div",{textContent:"Create or join a room"},panel);
-const nameInput=el("input",{placeholder:"Names disabled for privacy",value:""},panel);Object.assign(nameInput.style,{width:"95%",boxSizing:"border-box",margin:"8px 0",padding:"8px",background:"#fff",color:"#111",borderRadius:"5px"});nameInput.addEventListener("change",()=>void 0);
+const nameInput=el("input",{placeholder:"Names disabled for privacy",value:""},panel);Object.assign(nameInput.style,{width:"95%",boxSizing:"border-box",margin:"8px 0",padding:"8px",background:"#fff",color:"#111",borderRadius:"5px"});
 const controls=el("div",{},panel);
 controls.style.display="flex";controls.style.gap="6px";controls.style.flexWrap="wrap";
 const roomInput=el("input",{placeholder:"ROOM CODE",maxLength:6},controls);Object.assign(roomInput.style,{width:"110px",background:"#fff",color:"#111",borderRadius:"4px",padding:"6px"});
@@ -43,7 +43,7 @@ function render(g){latestGame=g;opponentText.textContent=g&&session?"You: Player
 function req(path,method="GET",body){
  const headers={"Content-Type":"application/json"};
  if(session?.token)headers.Authorization="Bearer "+session.token;
- if(!API)return Promise.reject(Error("Game temporarily disabled pending privacy-safe server URL"));const url=API+path;
+ const url=API+path;
  const data=method==="POST"?JSON.stringify(body||{}):undefined;
  const parse=(status,raw)=>{let obj;try{obj=JSON.parse(raw);}catch{throw Error("Invalid server response (HTTP "+status+")");}if(status<200||status>=300)throw Error((obj.error||"Server error")+" (HTTP "+status+")");return obj;};
  const native=()=>fetch(url,{method,headers,body:data,mode:"cors",cache:"no-store"}).then(async res=>parse(res.status,await res.text()));
