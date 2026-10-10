@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Multiplayer Arcade - Tic-Tac-Toe (PDA)
 // @namespace    https://www.torn.com/
-// @version      0.1.2
+// @version      0.1.3
 // @description  Torn PDA mobile multiplayer Tic-Tac-Toe
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -32,7 +32,16 @@ const board=el("div",{},panel);Object.assign(board.style,{display:"grid",gridTem
 const squares=Array.from({length:9},(_,i)=>{const b=btn("",()=>{if(session)action("/api/rooms/"+session.room+"/move","POST",{index:i});},board);Object.assign(b.style,{height:"65px",touchAction:"manipulation",fontSize:"30px",background:"#333c49",color:"#fff"});return b;});
 function notice(msg){status.textContent=msg;}
 function render(g){squares.forEach((b,i)=>{b.textContent=g?.board[i]||"";b.disabled=!g||!session||!g.ready||!!g.winner||g.turn!==session.symbol||!!g.board[i]||busy;});roomText.textContent=session?"Room: "+session.room+" | You: "+session.symbol:"";if(g)notice(g.winner?(g.winner==="draw"?"Draw":g.winner===session.symbol?"You won!":"Opponent won"):!g.ready?"Waiting for opponent":g.turn===session.symbol?"Your turn":"Opponent turn");else notice("Create or join a room");}
-function req(path,method="GET",body){return new Promise((resolve,reject)=>{const headers={"Content-Type":"application/json"};if(session?.token)headers.Authorization="Bearer "+session.token;const finish=(s,t)=>{let obj;try{obj=JSON.parse(t);}catch{return reject(Error("Invalid server response"));}s>=200&&s<300?resolve(obj):reject(Error(obj.error||"Server error"));};if(typeof GM_xmlhttpRequest==="function")GM_xmlhttpRequest({method,url:API+path,headers,data:method==="POST"?JSON.stringify(body||{}):undefined,onload:r=>finish(r.status,r.responseText),onerror:()=>reject(Error("Network error"))});else fetch(API+path,{method,headers,body:method==="POST"?JSON.stringify(body||{}):undefined}).then(async r=>finish(r.status,await r.text())).catch(reject);});}
+function req(path,method="GET",body){
+ const headers={"Content-Type":"application/json"};
+ if(session?.token)headers.Authorization="Bearer "+session.token;
+ const url=API+path;
+ const data=method==="POST"?JSON.stringify(body||{}):undefined;
+ const parse=(status,raw)=>{let obj;try{obj=JSON.parse(raw);}catch{throw Error("Invalid server response (HTTP "+status+")");}if(status<200||status>=300)throw Error((obj.error||"Server error")+" (HTTP "+status+")");return obj;};
+ const native=()=>fetch(url,{method,headers,body:data,mode:"cors",cache:"no-store"}).then(async res=>parse(res.status,await res.text()));
+ const gm=()=>new Promise((resolve,reject)=>{if(typeof GM_xmlhttpRequest!=="function")return reject(Error("PDA request bridge unavailable"));try{GM_xmlhttpRequest({method,url,headers,data,onload:res=>{try{resolve(parse(res.status,res.responseText));}catch(e){reject(e);}},onerror:()=>reject(Error("PDA request bridge network error")),ontimeout:()=>reject(Error("PDA request bridge timed out")),timeout:12000});}catch(e){reject(Error("PDA request bridge failed: "+e.message));}});
+ return native().catch(e=>{if(typeof GM_xmlhttpRequest!=="function")throw Error("Browser request failed: "+e.message);return gm().catch(g=>{throw Error("Browser: "+e.message+"; PDA: "+g.message);});});
+}
 async function action(path,method,body,newSession=false){if(busy)return;busy=true;try{const result=await req(path,method,body);if(newSession){session={room:result.room,token:result.token,symbol:result.symbol};localStorage.setItem(STORE,JSON.stringify(session));}render(result.game);startPolling();}catch(e){notice(e.message);}finally{busy=false;if(session)refresh();}}
 async function refresh(){if(!session)return;try{const r=await req("/api/rooms/"+session.room+"/state");render(r.game);}catch(e){notice(e.message);}}
 function startPolling(){if(timer)clearInterval(timer);if(session)timer=setInterval(()=>{if(!busy)refresh();},2500);}
