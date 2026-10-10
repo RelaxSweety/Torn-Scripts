@@ -109,7 +109,7 @@
       "id": "chaos-marbles",
       "name": "Chaos Marbles",
       "category": "multiplayer",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "description": "Online 2–4 player marble race with private player sessions, Waiting for Chaos staging, and game history",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/chaos-marbles.user.js"
     }
