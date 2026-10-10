@@ -17,7 +17,7 @@ let panel=null,game=null,notice="",view="play",active=false,session=null,timer=n
 const E=(tag,parent,text)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;parent.append(e);return e};
 const B=(parent,label,fn)=>{const b=E("button",parent,label);b.type="button";b.onclick=fn;b.style.cssText="background:#344154;color:#fff;border:1px solid #657184;border-radius:6px;padding:8px 10px;cursor:pointer;font:inherit";return b};
 const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))||fallback}catch{return fallback}};
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(game))}catch{}};
+
 
 const save=()=>{if(session)localStorage.setItem(SESSION,JSON.stringify(session));else localStorage.removeItem(SESSION)};
 function legal(p,i,roll){if(!game||roll===null)return false;const v=game.marbles[p][i];if(v===35)return false;const dest=v===-1?(roll===6?0:-1):v+roll;return dest>=0&&dest<=35&&!game.marbles[p].some((x,j)=>j!==i&&x===dest)}
