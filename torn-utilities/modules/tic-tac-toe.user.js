@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Tic-Tac-Toe Module
 // @namespace    https://www.torn.com/
-// @version      0.3.1
+// @version      0.4.0
 // @description  Torn PDA mobile multiplayer Tic-Tac-Toe
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -17,6 +17,13 @@ let session=null,timer=null,busy=false,latestGame=null;
 try{localStorage.removeItem("tu-ttt-player-name");session=JSON.parse(localStorage.getItem(STORE));}catch{}
 const el=(tag,props={},parent)=>{const n=document.createElement(tag);Object.assign(n,props);parent?.appendChild(n);return n;};
 const btn=(label,fn,parent)=>{const b=el("button",{textContent:label},parent);Object.assign(b.style,{background:"#344154",color:"#fff",border:"1px solid #657184",borderRadius:"6px",padding:"8px",cursor:"pointer"});b.addEventListener("click",fn);return b;};
+
+const HISTORY_KEY="tu:history:"+ID;
+function historyRead(){try{const h=JSON.parse(localStorage.getItem(HISTORY_KEY)||"[]");return Array.isArray(h)?h:[]}catch{return []}}
+function recordResult(g){if(!g?.winner||!session?.room)return;const h=historyRead();if(h.some(x=>x.room===session.room))return;h.unshift({room:session.room,symbol:session.symbol,winner:g.winner,moves:g.moves||0,completed:new Date().toISOString()});try{localStorage.setItem(HISTORY_KEY,JSON.stringify(h.slice(0,200)))}catch{}}
+function buildHistoryUI(parent){const wrap=el("div",{},parent);wrap.style.cssText="margin:10px 0;border-top:1px solid #657184;padding-top:8px";const bar=el("div",{},wrap);bar.style.cssText="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap";el("strong",{textContent:"Game statistics"},bar);const open=btn("Game History",()=>{page.hidden=!page.hidden;open.textContent=page.hidden?"Game History":"Hide History";update()},bar);const summary=el("div",{},wrap);summary.style.cssText="font-size:12px;line-height:1.6;color:#d8dde5;margin-top:6px";const page=el("div",{},wrap);page.hidden=true;page.style.cssText="margin-top:10px;max-height:240px;overflow:auto;border:1px solid #657184;border-radius:6px;padding:8px";
+function update(){const h=historyRead();const rows=["X","O"].map(s=>{const wins=h.filter(x=>x.winner===s).length,draws=h.filter(x=>x.winner==="draw").length,losses=h.length-wins-draws;return "Player "+s+": "+wins+"W / "+losses+"L / "+draws+"D ("+(h.length?Math.round(wins/h.length*100):0)+"% wins)"});summary.textContent="Completed: "+h.length+" | "+rows.join(" | ");if(!page.hidden){page.replaceChildren();if(!h.length)el("p",{textContent:"No completed matches recorded on this device."},page);for(const x of h){const row=el("div",{textContent:new Date(x.completed).toLocaleString()+" | Room "+x.room+" | "+(x.winner==="draw"?"Draw":"Player "+x.winner+" won")+" | "+x.moves+" moves | You: "+x.symbol},page);row.style.cssText="border-bottom:1px solid #485463;padding:6px 0;font-size:12px"}}}update();return update}
+
 function activate(context){host=context.mount;panel=el("div",{},host);panel.hidden=false;
 Object.assign(panel.style,{position:"fixed",left:"50%",top:"50%",transform:"translate(-50%,-50%)",maxHeight:"82vh",overflowY:"auto",boxSizing:"border-box",zIndex:"2147483647",width:"min(360px,94vw)",padding:"15px",background:"#20252e",color:"#fff",border:"1px solid #888",borderRadius:"12px",font:"14px system-ui"});
 const bar=el("div",{},panel);
@@ -56,9 +63,10 @@ function copySummary(){if(!latestGame||!session)return notice("No game to summar
 function fallbackCopy(message){const t=el("textarea",{value:message},panel);t.select();try{document.execCommand("copy");notice("Summary copied - paste into Torn chat");}catch{notice("Select and copy the summary below");}setTimeout(()=>t.remove(),12000);}
 btn("Copy invite",()=>{if(session)navigator.clipboard?.writeText("Join TU Tic-Tac-Toe room "+session.room);},panel);
 const board=el("div",{},panel);Object.assign(board.style,{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"6px",marginTop:"12px"});
+panel._historyUpdate=buildHistoryUI(panel);
 const squares=Array.from({length:9},(_,i)=>{const b=btn("",()=>{if(session)action("/api/rooms/"+session.room+"/move","POST",{index:i});},board);Object.assign(b.style,{height:"65px",touchAction:"manipulation",fontSize:"30px",background:"#333c49",color:"#fff"});return b;});
 function notice(msg){status.textContent=msg;}
-function render(g){latestGame=g;opponentText.textContent=g&&session?"You: Player "+session.symbol+" | Opponent: Player "+(session.symbol==="X"?"O":"X"):"";summaryBtn.disabled=!g;squares.forEach((b,i)=>{b.textContent=g?.board[i]||"";b.disabled=!g||!session||!g.ready||!!g.winner||g.turn!==session.symbol||!!g.board[i]||busy;});roomText.textContent=session?"Room: "+session.room+" | You: "+session.symbol:"";if(g)notice(g.winner?(g.winner==="draw"?"Draw":g.winner===session.symbol?"You won!":"Opponent won"):!g.ready?"Waiting for opponent":g.turn===session.symbol?"Your turn":"Opponent turn");else notice("Create or join a room");}
+function render(g){latestGame=g;recordResult(g);panel._historyUpdate?.();opponentText.textContent=g&&session?"You: Player "+session.symbol+" | Opponent: Player "+(session.symbol==="X"?"O":"X"):"";summaryBtn.disabled=!g;squares.forEach((b,i)=>{b.textContent=g?.board[i]||"";b.disabled=!g||!session||!g.ready||!!g.winner||g.turn!==session.symbol||!!g.board[i]||busy;});roomText.textContent=session?"Room: "+session.room+" | You: "+session.symbol:"";if(g)notice(g.winner?(g.winner==="draw"?"Draw":g.winner===session.symbol?"You won!":"Opponent won"):!g.ready?"Waiting for opponent":g.turn===session.symbol?"Your turn":"Opponent turn");else notice("Create or join a room");}
 function req(path,method="GET",body){
  const headers={"Content-Type":"application/json"};
  if(session?.token)headers.Authorization="Bearer "+session.token;
@@ -75,6 +83,6 @@ function startPolling(){if(timer)clearInterval(timer);if(session)timer=setInterv
 render(null);if(session){startPolling();refresh();}
 }
 function deactivate(){dragCleanup?.();dragCleanup=null;clearInterval(timer);timer=null;panel?.remove();panel=null;host=null;latestGame=null;}
-function register(){if(window.TornUtilities?.register){window.TornUtilities.register({id:ID,version:"0.3.1",activate,deactivate});return true;}return false;}
+function register(){if(window.TornUtilities?.register){window.TornUtilities.register({id:ID,version:"0.4.0",activate,deactivate});return true;}return false;}
 if(!register())window.addEventListener("torn-utilities-ready",register,{once:true});
 })();
