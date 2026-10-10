@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.8
+// @version      0.4.9
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -15,7 +15,7 @@
   if (window.__RELAX_TORN_UTILITIES_PDA__) return;
   window.__RELAX_TORN_UTILITIES_PDA__ = true;
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.4.8';
+  const TU_VERSION='0.4.9';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -146,8 +146,55 @@
     }
     return pending.length;
   }
+  // Shared player identity: only Torn-provided data, never manual username entry.
+  const PLAYER_KEY='tu:manager:player:v1';
+  const profilePattern=/\/profiles\.php(?:\?|$)/i;
+  const playerIdFrom=url=>{try{const u=new URL(url,location.origin);const id=u.searchParams.get('XID');return /^\d+$/.test(id||'')?id:null}catch{return null}};
+  const validPlayerName=name=>{name=String(name||'').trim();return /^[a-zA-Z0-9_-]{2,32}$/.test(name)&&!(/^(view|profile|player|viewprofile)$/i.test(name))?name:null};
+  let playerInfo=null;
+  try{const cached=JSON.parse(localStorage.getItem(PLAYER_KEY)||'null');if(cached?.id&&validPlayerName(cached.name))playerInfo=cached}catch{}
+  const playerFromPage=()=>{
+    const isProfile=profilePattern.test(location.pathname);
+    if(!isProfile)return null;
+    const id=playerIdFrom(location.href);
+    if(!id)return null;
+    const candidates=[
+      document.querySelector('h1[class*="name"],h1[class*="title"],[class*="profile"] h1,[class*="profile"] h2')?.textContent,
+      document.querySelector('meta[property="og:title"]')?.content,
+      document.title.split('|')[0].split(' - ')[0]
+    ];
+    for(let candidate of candidates){
+      candidate=String(candidate||'').trim().replace(/\s*\|.*$/,'').replace(/\s*\(.*$/,'');
+      const name=validPlayerName(candidate);
+      if(name)return {id,name,profileUrl:'https://www.torn.com/profiles.php?XID='+id,updatedAt:Date.now()};
+    }
+    return null;
+  };
+  const updatePlayer=()=>{
+    const next=playerFromPage();
+    if(!next)return false;
+    if(playerInfo?.id===next.id&&playerInfo?.name===next.name)return true;
+    playerInfo=next;localStorage.setItem(PLAYER_KEY,JSON.stringify(next));
+    window.dispatchEvent(new CustomEvent('tu-player-updated',{detail:{...next}}));
+    return true;
+  };
+  const getPlayer=()=>playerInfo?Object.freeze({...playerInfo}):null;
+  const openProfileHelp=()=>{
+    if(playerInfo)return;
+    if(document.getElementById('tu-profile-help'))return;
+    const notice=document.createElement('div');notice.id='tu-profile-help';
+    notice.style.cssText='position:fixed;bottom:70px;right:12px;z-index:2147483647;background:#20252e;color:white;border:1px solid #d6b96a;border-radius:10px;padding:12px;max-width:290px;font:13px system-ui;box-shadow:0 4px 20px #0009';
+    const title=document.createElement('div');title.textContent='TU could not identify your Torn player. Open your own Torn profile to allow TU to read your name and ID.';notice.append(title);
+    const link=document.createElement('a');link.textContent='Open My Torn Profile';link.href='https://www.torn.com/profiles.php';link.style.cssText='display:inline-block;color:#f1ce72;margin-top:10px;text-decoration:underline';notice.append(link);
+    const dismiss=document.createElement('button');dismiss.textContent='Later';dismiss.style.cssText='margin-left:12px;padding:5px';dismiss.onclick=()=>notice.remove();notice.append(dismiss);document.body.append(notice);
+  };
+  updatePlayer();
+  window.addEventListener('popstate',()=>setTimeout(updatePlayer,200));
+  let profileChecks=0;const profilePoll=setInterval(()=>{updatePlayer();if(++profileChecks>=20)clearInterval(profilePoll)},1500);
   const api = Object.freeze({
     storage,
+    getPlayer,
+    requestPlayerProfile:openProfileHelp,
     register(def) {
       if (!def || typeof def.id !== 'string' || !/^[a-z0-9-]+$/.test(def.id) ||
           typeof def.activate !== 'function' || typeof def.deactivate !== 'function' ||
@@ -223,7 +270,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.4.8 (PDA)</footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.4.9 (PDA)</footer>';
   document.body.appendChild(panel);
   const content = panel.querySelector('.tu-content');
   function makeButton(label,handler,disabled=false) {
@@ -357,7 +404,7 @@
         line.append(name,makeButton('Clear data',()=>{if(confirm('Delete all TU data for '+id+'?')){storage.clear(id);render('settings');}}));content.append(line);
       }
     }else{
-      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.8 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.9 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
       // Official-style vector marks; no remote image dependencies.
       addSocialIcon('RelaxSweety on Discord','https://discord.com/users/relaxsweety','M20.317 4.369a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.211.375-.445.865-.608 1.25a18.27 18.27 0 0 0-5.49 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037 19.736 19.736 0 0 0-4.885 1.515.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.1 18.057a.083.083 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.077.077 0 0 0 .084-.028c.462-.63.873-1.295 1.226-1.994a.075.075 0 0 0-.041-.104 13.1 13.1 0 0 1-1.872-.89.076.076 0 0 1-.008-.127c.126-.095.252-.193.372-.292a.074.074 0 0 1 .077-.01c3.929 1.793 8.185 1.793 12.068 0a.074.074 0 0 1 .078.01c.12.099.246.197.373.292a.076.076 0 0 1-.007.127c-.598.35-1.224.65-1.873.89a.076.076 0 0 0-.04.105c.36.698.77 1.363 1.225 1.993a.076.076 0 0 0 .084.028 19.83 19.83 0 0 0 6.003-3.03.077.077 0 0 0 .031-.056c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028ZM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.42 0-1.334.955-2.42 2.157-2.42 1.211 0 2.176 1.095 2.157 2.42 0 1.335-.955 2.42-2.157 2.42Zm7.96 0c-1.183 0-2.157-1.085-2.157-2.42 0-1.334.955-2.42 2.157-2.42 1.211 0 2.176 1.095 2.157 2.42 0 1.335-.946 2.42-2.157 2.42Z');
       const tornLink=document.createElement('a');tornLink.href='https://www.torn.com/profiles.php?XID=4539436';tornLink.target='_blank';tornLink.rel='noopener noreferrer';tornLink.title='RelaxSweety on Torn';tornLink.setAttribute('aria-label','RelaxSweety on Torn');
@@ -367,6 +414,7 @@
   }
   render('modules');
   refreshRegistry();
+  if(!getPlayer())setTimeout(openProfileHelp,1800);
   window.addEventListener('torn-utilities-ready',()=>render(currentTab));
   // A module script can be installed separately, but remains inert until Open is pressed.
 
