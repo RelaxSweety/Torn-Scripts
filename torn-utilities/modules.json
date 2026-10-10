@@ -101,7 +101,7 @@
       "id": "torn-snake",
       "name": "Slithering Streets",
       "category": "single-player",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "description": "Single-player Snake with touch controls and local high scores",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/torn-snake.user.js"
     },
