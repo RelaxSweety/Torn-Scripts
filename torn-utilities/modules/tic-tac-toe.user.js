@@ -22,7 +22,6 @@ Object.assign(panel.style,{position:"fixed",left:"50%",top:"50%",transform:"tran
 btn("Close",()=>context.close(),panel);
 el("h3",{textContent:"TU Tic-Tac-Toe"},panel);
 const status=el("div",{textContent:"Create or join a room"},panel);
-const nameInput=el("input",{placeholder:"Names disabled for privacy",value:""},panel);Object.assign(nameInput.style,{width:"95%",boxSizing:"border-box",margin:"8px 0",padding:"8px",background:"#fff",color:"#111",borderRadius:"5px"});
 const controls=el("div",{},panel);
 controls.style.display="flex";controls.style.gap="6px";controls.style.flexWrap="wrap";
 const roomInput=el("input",{placeholder:"ROOM CODE",maxLength:6},controls);Object.assign(roomInput.style,{width:"110px",background:"#fff",color:"#111",borderRadius:"4px",padding:"6px"});
