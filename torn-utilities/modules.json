@@ -104,6 +104,14 @@
       "version": "0.2.0",
       "description": "Single-player Snake with touch controls and local high scores",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/torn-snake.user.js"
+    },
+    {
+      "id": "chaos-marbles",
+      "name": "Chaos Marbles",
+      "category": "multiplayer",
+      "version": "0.1.0",
+      "description": "Original marble-race board game for 2–4 local pass-and-play players, with captures, dice, high scores and game history",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/chaos-marbles.user.js"
     }
   ]
 }
