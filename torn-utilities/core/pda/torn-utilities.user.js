@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.6
+// @version      0.4.7
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -20,19 +20,21 @@
   const FALLBACK={schemaVersion:1,categories:[
     {id:'business',name:'Business Tools',icon:'▥',order:10},
     {id:'games',name:'Games',icon:'♜',order:20},
+    {id:'single-player',name:'Single Player',icon:'▣',order:21,parent:'games'},
+    {id:'multiplayer',name:'Multiplayer',icon:'♟',order:22,parent:'games'},
     {id:'chat',name:'Chat Tools',icon:'◉',order:30},
     {id:'other',name:'Other Tools',icon:'⚙',order:40}
   ],modules:[
     {id:'alerts-calculations',name:'Alerts and Calculations',category:'business',version:'0.2.0',description:'Stock cash targets, foreign item alerts and calculator',scriptUrl:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/alerts-and-calculations.user.js'},
-    {id:'flight-game',name:'Flight Game',category:'games',version:'0.11.13',description:'Flight arcade and Stick Fighter',scriptUrl:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/pda-flight-game/Torn-PDA-Flight-Game.user.js'},
-    {id:'stick-fighter',name:'Stick Fighter',category:'games',version:'0.1.6',description:'Stick Fighter arcade game',scriptUrl:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/pda-flight-game/Torn-PDA-Flight-Game.user.js'},
+    {id:'flight-game',name:'Flight Game',category:'single-player',version:'0.11.13',description:'Flight arcade and Stick Fighter',scriptUrl:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/pda-flight-game/Torn-PDA-Flight-Game.user.js'},
+    {id:'stick-fighter',name:'Stick Fighter',category:'single-player',version:'0.1.6',description:'Stick Fighter arcade game',scriptUrl:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/pda-flight-game/Torn-PDA-Flight-Game.user.js'},
     {id:'chat-archiver',name:'Chat Archiver',category:'chat',version:'0.1.7',description:'Archive Torn chat conversations',scriptUrl:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/chat-archiver/pda/src/torn-multi-chat-archiver-pda.user.js'}
   ]};
   const validId=/^[a-z0-9-]{1,64}$/;
   const safeScriptUrl=url=>typeof url==='string'&&/^https:\/\/raw\.githubusercontent\.com\/RelaxSweety\/Torn-Scripts\/main\/[a-zA-Z0-9/_-]+\.user\.js$/.test(url);
   function validateRegistry(data){
     if(data?.schemaVersion!==1||!Array.isArray(data.categories)||!Array.isArray(data.modules)||data.modules.length>250||data.categories.length>50)throw Error('Invalid module catalog');
-    const categories=data.categories.filter(c=>validId.test(c.id)&&typeof c.name==='string'&&c.name.length<=70).map(c=>({id:c.id,name:c.name,icon:String(c.icon||'•').slice(0,3),order:Number(c.order)||100}));
+    const categories=data.categories.filter(c=>validId.test(c.id)&&typeof c.name==='string'&&c.name.length<=70).map(c=>({id:c.id,name:c.name,icon:String(c.icon||'•').slice(0,3),order:Number(c.order)||100,parent:typeof c.parent==='string'?c.parent:null}));
     const ids=new Set(categories.map(c=>c.id));
     const modules=data.modules.filter(m=>validId.test(m.id)&&ids.has(m.category)&&typeof m.name==='string'&&m.name.length<=90&&safeScriptUrl(m.scriptUrl)&&/^\d+\.\d+\.\d+(?:[-+][a-zA-Z0-9.-]+)?$/.test(m.version)).map(m=>({id:m.id,name:m.name,category:m.category,version:m.version,description:String(m.description||'').slice(0,250),scriptUrl:m.scriptUrl}));
     return {schemaVersion:1,categories,modules};
@@ -210,7 +212,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.4.6 (PDA)</footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.4.7 (PDA)</footer>';
   document.body.appendChild(panel);
   const content = panel.querySelector('.tu-content');
   function makeButton(label,handler,disabled=false) {
@@ -271,9 +273,20 @@
       }else if(viewCategory){
         const category=registry.categories.find(x=>x.id===viewCategory);
         if(!category){viewCategory=null;return render('modules');}
-        addSectionHeader({label:'Categories',action:goModules},category.name);
+        addSectionHeader({label:category.parent?'Games':'Categories',action:()=>{viewCategory=category.parent||null;render('modules');}},category.name);
+        const subcategories=registry.categories.filter(c=>c.parent===viewCategory).sort((a,b)=>a.order-b.order);
+        for(const group of subcategories){
+          const card=document.createElement('div');card.className='tu-card';
+          const symbol=document.createElement('span');symbol.className='tu-symbol';symbol.textContent=group.icon;
+          const body=document.createElement('div');body.style.flex='1';
+          const name=document.createElement('strong');name.textContent=group.name;
+          const mods=registry.modules.filter(m=>m.category===group.id);
+          const count=document.createElement('small');count.textContent=mods.length+' available · '+mods.filter(m=>registered.has(m.id)).length+' loaded';
+          body.append(name,count);const go=()=>{viewCategory=group.id;render('modules');};
+          card.append(symbol,body,makeButton('Open →',go));content.append(card);
+        }
         const modules=registry.modules.filter(m=>m.category===viewCategory);
-        if(!modules.length){const p=document.createElement('p');p.textContent='No published modules yet';content.append(p);}
+        if(!modules.length&&!subcategories.length){const p=document.createElement('p');p.textContent='No published modules yet';content.append(p);}
         for(const m of modules){
           const card=document.createElement('div');card.className='tu-card';
           const body=document.createElement('div');body.style.flex='1;min-width:0';
@@ -291,13 +304,13 @@
         }
       }else{
         const status=document.createElement('p');status.textContent=registryStatus;content.append(status);
-        const categories=[...registry.categories].sort((a,b)=>a.order-b.order);
+        const categories=registry.categories.filter(c=>!c.parent).sort((a,b)=>a.order-b.order);
         for(const group of categories){
           const card=document.createElement('div');card.className='tu-card';
           const icon=document.createElement('span');icon.className='tu-symbol';icon.textContent=group.icon;
           const body=document.createElement('div');body.style.flex='1';
           const title=document.createElement('strong');title.textContent=group.name;
-          const count=document.createElement('small');const mods=registry.modules.filter(m=>m.category===group.id);
+          const count=document.createElement('small');const children=registry.categories.filter(c=>c.parent===group.id).map(c=>c.id);const mods=registry.modules.filter(m=>m.category===group.id||children.includes(m.category));
           count.textContent=mods.length+' available · '+mods.filter(m=>registered.has(m.id)).length+' loaded';
           body.append(title,count);card.append(icon,body,makeButton('Open →',()=>{viewCategory=group.id;render('modules');}));content.append(card);
         }
@@ -333,7 +346,7 @@
         line.append(name,makeButton('Clear data',()=>{if(confirm('Delete all TU data for '+id+'?')){storage.clear(id);render('settings');}}));content.append(line);
       }
     }else{
-      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.6 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.7 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
       // Official-style vector marks; no remote image dependencies.
       addSocialIcon('RelaxSweety on Discord','https://discord.com/users/relaxsweety','M20.317 4.369a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.211.375-.445.865-.608 1.25a18.27 18.27 0 0 0-5.49 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037 19.736 19.736 0 0 0-4.885 1.515.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.1 18.057a.083.083 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.077.077 0 0 0 .084-.028c.462-.63.873-1.295 1.226-1.994a.075.075 0 0 0-.041-.104 13.1 13.1 0 0 1-1.872-.89.076.076 0 0 1-.008-.127c.126-.095.252-.193.372-.292a.074.074 0 0 1 .077-.01c3.929 1.793 8.185 1.793 12.068 0a.074.074 0 0 1 .078.01c.12.099.246.197.373.292a.076.076 0 0 1-.007.127c-.598.35-1.224.65-1.873.89a.076.076 0 0 0-.04.105c.36.698.77 1.363 1.225 1.993a.076.076 0 0 0 .084.028 19.83 19.83 0 0 0 6.003-3.03.077.077 0 0 0 .031-.056c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028ZM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.42 0-1.334.955-2.42 2.157-2.42 1.211 0 2.176 1.095 2.157 2.42 0 1.335-.955 2.42-2.157 2.42Zm7.96 0c-1.183 0-2.157-1.085-2.157-2.42 0-1.334.955-2.42 2.157-2.42 1.211 0 2.176 1.095 2.157 2.42 0 1.335-.946 2.42-2.157 2.42Z');
       const tornLink=document.createElement('a');tornLink.href='https://www.torn.com/profiles.php?XID=4539436';tornLink.target='_blank';tornLink.rel='noopener noreferrer';tornLink.title='RelaxSweety on Torn';tornLink.setAttribute('aria-label','RelaxSweety on Torn');
