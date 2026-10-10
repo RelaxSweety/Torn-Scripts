@@ -58,6 +58,14 @@
       "version": "0.1.7",
       "description": "Archive Torn chat conversations",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/chat-archiver/pda/src/torn-multi-chat-archiver-pda.user.js"
+    },
+    {
+      "id": "tic-tac-toe",
+      "name": "Tic-Tac-Toe",
+      "category": "games",
+      "version": "0.3.0",
+      "description": "Two-player online Tic-Tac-Toe with room codes, anonymous opponents and copyable Torn chat summaries",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/tic-tac-toe.user.js"
     }
   ]
 }
