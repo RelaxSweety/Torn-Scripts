@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Multiplayer Arcade - Tic-Tac-Toe (PDA)
 // @namespace    https://www.torn.com/
-// @version      0.1.1
+// @version      0.1.2
 // @description  Torn PDA mobile multiplayer Tic-Tac-Toe
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -14,7 +14,7 @@ const API="https://tu-multiplayer-server.tyler-a-wood.workers.dev",STORE="tu-ttt
 let session=null,timer=null,busy=false;
 try{session=JSON.parse(localStorage.getItem(STORE));}catch{}
 const el=(tag,props={},parent)=>{const n=document.createElement(tag);Object.assign(n,props);parent?.appendChild(n);return n;};
-const btn=(label,fn,parent)=>{const b=el("button",{textContent:label},parent);b.addEventListener("click",fn);return b;};
+const btn=(label,fn,parent)=>{const b=el("button",{textContent:label},parent);Object.assign(b.style,{background:"#344154",color:"#fff",border:"1px solid #657184",borderRadius:"6px",padding:"8px",cursor:"pointer"});b.addEventListener("click",fn);return b;};
 const toggle=btn("TU XO",()=>{panel.hidden=!panel.hidden;if(!panel.hidden)refresh();},document.body);
 Object.assign(toggle.style,{position:"fixed",right:"12px",bottom:"100px",touchAction:"manipulation",zIndex:"2147483646",padding:"9px",background:"#242b35",color:"#fff",borderRadius:"10px"});
 const panel=el("div",{},document.body);panel.hidden=true;
@@ -22,7 +22,7 @@ Object.assign(panel.style,{position:"fixed",right:"12px",bottom:"150px",maxHeigh
 el("h3",{textContent:"TU Tic-Tac-Toe"},panel);
 const status=el("div",{textContent:"Create or join a room"},panel),controls=el("div",{},panel);
 controls.style.display="flex";controls.style.gap="6px";controls.style.flexWrap="wrap";
-const roomInput=el("input",{placeholder:"ROOM CODE",maxLength:6},controls);roomInput.style.width="110px";
+const roomInput=el("input",{placeholder:"ROOM CODE",maxLength:6},controls);Object.assign(roomInput.style,{width:"110px",background:"#fff",color:"#111",borderRadius:"4px",padding:"6px"});
 btn("Join",()=>{const room=roomInput.value.trim().toUpperCase();if(!/^[A-HJ-NP-Z2-9]{6}$/.test(room))return notice("Invalid room code");action("/api/rooms/"+room+"/join","POST",{},true);},controls);
 btn("Create",()=>action("/api/rooms","POST",{},true),controls);
 btn("Leave",()=>{session=null;localStorage.removeItem(STORE);clearInterval(timer);timer=null;render(null);},controls);
