@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Chaos Marbles
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.2.1
+// @version      0.2.2
 // @description  Online multiplayer marble race for 2-4 players
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -13,7 +13,7 @@
 (()=>{'use strict';
 const ID="chaos-marbles",KEY="tu:chaos-marbles:game",HISTORY="tu:chaos-marbles:history";
 const COLORS=["#dc6059","#e4b951","#5fb2da","#8fd17b"],NAMES=["Crimson","Gold","Azure","Emerald"];
-let panel=null,game=null,notice="",view="play",active=false,session=null,timer=null,busy=false;const API="https://tu-multiplayer-server.tuserver.workers.dev/api/marbles",SESSION="tu:chaos-marbles:session";
+let panel=null,game=null,notice="",view="play",active=false,session=null,timer=null,busy=false,rolling=false,dieValue=1,rollTimer=null;const API="https://tu-multiplayer-server.tuserver.workers.dev/api/marbles",SESSION="tu:chaos-marbles:session";
 const E=(tag,parent,text)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;parent.append(e);return e};
 const B=(parent,label,fn)=>{const b=E("button",parent,label);b.type="button";b.onclick=fn;b.style.cssText="background:#344154;color:#fff;border:1px solid #657184;border-radius:6px;padding:8px 10px;cursor:pointer;font:inherit";return b};
 const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))||fallback}catch{return fallback}};
@@ -27,7 +27,7 @@ const parse=(status,raw)=>{let o;try{o=JSON.parse(raw)}catch{throw Error("Invali
 return new Promise((resolve,reject)=>{if(typeof GM_xmlhttpRequest==="function"){GM_xmlhttpRequest({method,url,headers,data,timeout:12000,onload:r=>{try{resolve(parse(r.status,r.responseText))}catch(e){reject(e)}},onerror:()=>reject(Error("Network error")),ontimeout:()=>reject(Error("Request timed out"))})}else fetch(url,{method,headers,body:data,cache:"no-store"}).then(async r=>parse(r.status,await r.text())).then(resolve,reject)})}
 function recordResult(){if(game?.winner===null||!session)return;const h=read(HISTORY,[]);if(h.some(x=>x.room===session.room))return;h.unshift({room:session.room,winner:game.winner,player:session.player,count:game.count,moves:game.moves,rolls:game.rolls,ended:new Date().toISOString()});localStorage.setItem(HISTORY,JSON.stringify(h.slice(0,100)))}
 async function action(path,method="GET",body,join=false){if(busy)return;busy=true;try{const r=await req(path,method,body);if(join){session={room:r.room,token:r.token,player:r.player};save()}game=r.game;recordResult();notice="Room "+session.room+" updated";render()}catch(e){notice=e.message;render()}finally{busy=false}}
-function roll(){if(session&&game?.turn===session.player&&game.roll===null)action("/"+session.room+"/roll","POST")}
+async function roll(){if(!session||!game||game.turn!==session.player||game.roll!==null||busy||rolling)return;rolling=true;dieValue=1;render();const begin=Date.now();rollTimer=setInterval(()=>{dieValue=1+Math.floor(Math.random()*6);const face=panel?.querySelector(".chaos-die");if(face)face.textContent=String(dieValue)},70);await action("/"+session.room+"/roll","POST");await new Promise(resolve=>setTimeout(resolve,Math.max(0,850-(Date.now()-begin))));clearInterval(rollTimer);rollTimer=null;rolling=false;dieValue=game?.roll||dieValue;render()}
 function move(i){if(session&&game?.turn===session.player&&legal(session.player,i,game.roll))action("/"+session.room+"/move","POST",{index:i})}
 function drawBoard(parent){const wrap=E("div",parent);wrap.style.cssText="border:3px solid #d6b96a;background:#121b25;border-radius:10px;padding:5px;margin:10px auto;max-width:420px;box-sizing:border-box";const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");svg.setAttribute("viewBox","0 0 480 480");svg.style.cssText="display:block;width:100%;aspect-ratio:1";wrap.append(svg);
 const node=(name,attrs)=>{const n=document.createElementNS("http://www.w3.org/2000/svg",name);for(const [k,v] of Object.entries(attrs))n.setAttribute(k,v);svg.append(n);return n};
@@ -50,7 +50,7 @@ const header=E("div",body);header.style.cssText="padding:8px;background:#293747;
 if(!game){E("p",body,"Loading room...");return}
 const ready=game.ready;const status=E("div",body);status.style.cssText="padding:8px;border-radius:6px;background:#293747";status.textContent=game.winner!==null?NAMES[game.winner]+" wins!":!ready?"Waiting for Chaos: "+game.players.filter(Boolean).length+"/"+game.count+" players joined":game.turn===session.player?"Your turn — "+(game.roll===null?"roll the die":"move a marble (roll "+game.roll+")"):NAMES[game.turn]+"'s turn";
 E("p",body,notice).style.fontSize="12px";E("div",body,"Waiting for Chaos — unplayed and captured marbles occupy the corner holding zones").style.cssText="font-size:12px;color:#d6b96a;text-align:center";drawBoard(body);
-const moves=E("div",body);moves.style.cssText="display:flex;gap:6px;flex-wrap:wrap";const die=B(moves,"Roll die",roll);die.disabled=!ready||game.winner!==null||game.turn!==session.player||game.roll!==null||busy;
+const moves=E("div",body);moves.style.cssText="display:flex;gap:6px;flex-wrap:wrap";const face=E("div",moves,rolling?String(dieValue):game.roll===null?"⚀":String(game.roll));face.className="chaos-die";face.style.cssText="display:grid;place-items:center;width:50px;height:50px;border-radius:9px;background:#f4ebd6;color:#182330;border:2px solid #d6b96a;font-size:30px;font-weight:bold;"+(rolling?"animation:chaosSpin .16s ease-in-out infinite alternate;":"");const die=B(moves,rolling?"Rolling…":"Roll die",roll);die.disabled=!ready||game.winner!==null||game.turn!==session.player||game.roll!==null||busy||rolling;
 if(ready&&game.turn===session.player&&game.roll!==null)for(const i of choices())B(moves,"Move marble "+(i+1),()=>move(i));
 E("p",body,"Moves: "+game.moves+" | Rolls: "+game.rolls+" | Home: "+game.marbles.map((a,p)=>NAMES[p]+" "+a.filter(x=>x===35).length+"/3").join(" · ")).style.fontSize="12px";
 E("p",body,"Rules: Roll 6 to enter. Exact roll required to finish. Capture opponents by landing on them. A 6 earns another roll.").style.fontSize="12px"}
@@ -58,8 +58,8 @@ function activate({mount,close}){if(panel)return;panel=E("section",mount);panel.
 const bar=E("div",panel);bar.style.cssText="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;touch-action:none;user-select:none;cursor:move";E("strong",bar,"Chaos Marbles");const min=B(bar,"−",close);min.title="Minimize to TU";min.style.cssText+=";font-size:22px;font-weight:bold;padding:0 12px;line-height:30px";
 let drag=null;bar.addEventListener("pointerdown",e=>{if(e.target.closest("button"))return;const r=panel.getBoundingClientRect();drag={x:e.clientX,y:e.clientY,l:r.left,t:r.top};panel.style.transform="none";panel.style.left=r.left+"px";panel.style.top=r.top+"px";bar.setPointerCapture(e.pointerId)});bar.addEventListener("pointermove",e=>{if(!drag)return;panel.style.left=Math.max(0,Math.min(innerWidth-100,drag.l+e.clientX-drag.x))+"px";panel.style.top=Math.max(0,Math.min(innerHeight-60,drag.t+e.clientY-drag.y))+"px"});bar.addEventListener("pointerup",()=>drag=null);bar.addEventListener("pointercancel",()=>drag=null);
 const grip=E("div",panel,"◢");grip.style.cssText="position:absolute;right:3px;bottom:2px;width:30px;height:30px;display:flex;align-items:end;justify-content:end;padding:3px;box-sizing:border-box;cursor:nwse-resize;touch-action:none;color:#d6b96a;font-size:21px";let resize=null;grip.onpointerdown=e=>{e.preventDefault();const r=panel.getBoundingClientRect();resize={x:e.clientX,y:e.clientY,w:r.width,h:r.height,l:r.left,t:r.top};panel.style.transform="none";panel.style.left=r.left+"px";panel.style.top=r.top+"px";grip.setPointerCapture(e.pointerId)};grip.onpointermove=e=>{if(!resize)return;panel.style.width=Math.max(260,Math.min(innerWidth-resize.l-8,resize.w+e.clientX-resize.x))+"px";panel.style.height=Math.max(320,Math.min(innerHeight-resize.t-8,resize.h+e.clientY-resize.y))+"px"};grip.onpointerup=()=>resize=null;grip.onpointercancel=()=>resize=null;
-E("div",panel).className="body";session=read(SESSION,null);render();if(session)action("/"+session.room+"/state");timer=setInterval(()=>{if(session&&!busy&&panel)action("/"+session.room+"/state")},2500)}
-function deactivate(){clearInterval(timer);timer=null;panel?.remove();panel=null}
-function register(){return window.TornUtilities?.register({id:ID,version:"0.2.1",activate,deactivate})}
+E("style",panel,"@keyframes chaosSpin{from{transform:rotate(-14deg) scale(.9)}to{transform:rotate(14deg) scale(1.1)}}");E("div",panel).className="body";session=read(SESSION,null);render();if(session)action("/"+session.room+"/state");timer=setInterval(()=>{if(session&&!busy&&panel)action("/"+session.room+"/state")},2500)}
+function deactivate(){clearInterval(timer);clearInterval(rollTimer);timer=null;rollTimer=null;panel?.remove();panel=null}
+function register(){return window.TornUtilities?.register({id:ID,version:"0.2.2",activate,deactivate})}
 if(!register())window.addEventListener("torn-utilities-ready",register,{once:true});
 })();
