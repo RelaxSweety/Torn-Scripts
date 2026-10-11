@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn PDA Arcade
 // @namespace    https://www.torn.com/
-// @version      0.11.13
+// @version      0.11.14
 // @description  Touch-first in-flight arcade game built for Torn PDA.
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -92,7 +92,7 @@
     const LAUNCH_MODE_KEY = 'tpfgLaunchMode';
     const LAUNCH_POS_KEY = 'tpfgLaunchPosition';
     const SAVE_PREFIX = 'tpfgGameSave:';
-    const launchMode = () => moduleStore.getItem(LAUNCH_MODE_KEY) || 'flight';
+    const launchMode = () => 'always';
     let saved = { highScore: 0, bestKills: 0, games: 0 };
 
     async function storageGet() {
@@ -192,12 +192,12 @@
         list(){return [...this.games.values()];},
         enabled(game){return moduleStore.getItem('tpfgGameEnabled:'+game.id)!=='false';},
         setEnabled(game,value){moduleStore.setItem('tpfgGameEnabled:'+game.id,value?'true':'false');},
-        available(game){return this.enabled(game)&&(game.isAvailable?game.isAvailable():true);},
+        available(game){return game.isAvailable?game.isAvailable():true;},
         start(id){const game=this.games.get(id);if(game&&this.available(game))launchGame(game);}
     };
     const FlightArcade = Arcade.registerGame({
         id:'flight-arcade',name:'Flight Arcade',version:'1.0.0',
-        isAvailable(){const mode=launchMode();return mode==='always'||(mode==='flight'&&detectFlight().flying);},
+        isAvailable(){return true;},
         start(){startGame();},pause(){if(state.running&&!state.paused)togglePause();},resume(){if(state.running&&state.paused)togglePause();},stop(){if(state.running&&!state.over)requestLeave();}
     });
 
@@ -287,7 +287,7 @@
         function stop(){active=false;cancelAnimationFrame(frame);document.removeEventListener('keydown',onKeyDown);document.removeEventListener('keyup',onKeyUp);host?.remove();host=null;pointer=null;aimPointer=null;aimStick={x:0,y:0};joystick={x:0,y:0};keys.clear();}
         return {start,stop,restore,save,reset,resume(){paused=false;last=performance.now();if(host)host.querySelector('#sff-pause').textContent='PAUSE';},getScore(){return score;},getTime(){return elapsed;}};
     })();
-    Arcade.registerGame({id:'stick-figure-fighter',name:'Stick Figure Fighter',version:'0.1.5',isAvailable(){return (moduleStore.getItem('tpfgMode:stick-figure-fighter')||'always')==='always';},start:StickFighter.start,stop:StickFighter.stop});
+    Arcade.registerGame({id:'stick-figure-fighter',name:'Stick Figure Fighter',version:'0.1.5',isAvailable(){return true;},start:StickFighter.start,stop:StickFighter.stop});
 
     function gameSaveKey(id){return SAVE_PREFIX+id;}
     function getGameSave(id){try{return JSON.parse(moduleStore.getItem(gameSaveKey(id))||'null');}catch(_){return null;}}
@@ -815,7 +815,7 @@
       for(const id of ['tpfg-manager','tpfg-prompt','tpfg-game-settings']){const el=document.getElementById(id);if(el)el.style.display='none';}
     }
     const definitions=[
-      {id:'flight-game',version:'0.11.13',activate:activateFlight,deactivate:deactivateFromTU},
+      {id:'flight-game',version:'0.11.14',activate:activateFlight,deactivate:deactivateFromTU},
       {id:'stick-fighter',version:'0.1.6',activate:activateStick,deactivate:deactivateFromTU}
     ];
     function registerTU(){if(window.TornUtilities?.register)for(const definition of definitions)window.TornUtilities.register(definition);}
