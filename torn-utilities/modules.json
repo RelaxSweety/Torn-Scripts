@@ -53,8 +53,8 @@
       "id": "flight-game",
       "name": "Flight Game",
       "category": "single-player",
-      "version": "0.11.13",
-      "description": "Flight Arcade",
+      "version": "0.11.14",
+      "description": "Flight arcade playable during any Torn activity",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/pda-flight-game/Torn-PDA-Flight-Game.user.js"
     },
     {
@@ -62,7 +62,7 @@
       "name": "Stick Fighter",
       "category": "single-player",
       "version": "0.1.6",
-      "description": "Stick Fighter arcade game (included in the PDA Arcade script)",
+      "description": "Stick Fighter arcade playable during any Torn activity",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/pda-flight-game/Torn-PDA-Flight-Game.user.js"
     },
     {
