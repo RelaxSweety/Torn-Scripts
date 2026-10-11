@@ -53,17 +53,17 @@
       "id": "flight-game",
       "name": "Flight Game",
       "category": "single-player",
-      "version": "0.11.14",
-      "description": "Flight arcade playable during any Torn activity",
-      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/pda-flight-game/Torn-PDA-Flight-Game.user.js"
+      "version": "0.12.0",
+      "description": "Standalone Flight Game arcade module, playable anytime",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/flight-game.user.js"
     },
     {
       "id": "stick-fighter",
       "name": "Stick Fighter",
       "category": "single-player",
-      "version": "0.1.6",
-      "description": "Stick Fighter arcade playable during any Torn activity",
-      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/pda-flight-game/Torn-PDA-Flight-Game.user.js"
+      "version": "0.2.0",
+      "description": "Standalone Stick Fighter arcade module, playable anytime",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/stick-fighter.user.js"
     },
     {
       "id": "chat-archiver",
