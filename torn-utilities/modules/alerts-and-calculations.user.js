@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Alerts and Calculations
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.3.0
+// @version      0.3.1
 // @description  Stock cash targets, foreign stock alerts and calculator
 // @match        https://www.torn.com/*
 // @grant        none
@@ -14,8 +14,10 @@ const save=()=>{try{localStorage.setItem('tuac-settings',JSON.stringify(cfg));wi
 try{Object.assign(cfg,JSON.parse(localStorage.getItem('tuac-settings')||'{}'))}catch{}
 const saved=()=>{try{return JSON.parse(localStorage.getItem('tuac-watches')||'[]')}catch{return []}};
 const persist=()=>{try{localStorage.setItem('tuac-watches',JSON.stringify([...state.watches.values()].map(w=>({key:w.key,name:w.name,min:w.min}))))}catch{}};
-const itemName=row=>(row?.innerText||'').split('\n').map(x=>x.trim()).find(Boolean)?.slice(0,70)||'';
-const itemKey=row=>{const name=itemName(row);const country=new URLSearchParams(location.search).get('country')||document.querySelector('[class*=countryName]')?.textContent?.trim()||location.pathname;return country+'|'+name.toLowerCase()};
+const normalize=x=>String(x||'').toLowerCase().replace(/\s+/g,' ').trim();
+const itemName=row=>{const el=row?.querySelector?.('[data-item-name],[class*=itemName],[class*=ItemName],[class*=name],[class*=Name]');return (el?.getAttribute('data-item-name')||el?.textContent||row?.innerText||'').split('\n').map(x=>x.trim()).find(Boolean)?.slice(0,70)||''};
+const itemKey=row=>normalize(itemName(row));
+const itemMatches=(row,w)=>{const text=normalize(row?.innerText);return !!text&&(itemKey(row)===w.key||text.split(/\n/).some(line=>normalize(line)===w.key)||text.includes(w.key))};
 
 const num=x=>Number(String(x??'').replace(/[$,\s]/g,''));const cash=x=>'$'+x.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const E=(tag,parent,text)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;parent?.append(e);return e};
@@ -65,8 +67,8 @@ function stopWatch(key){
 function scan(){
   const rows=[...document.querySelectorAll('tr,[role=row],li,[class*=row],[class*=Row],[class*=card],[class*=Card]')];
   for(const w of state.watches.values()){
-    if(!w.row?.isConnected||itemKey(w.row)!==w.key)w.row=null;
-    if(!w.row)w.row=rows.find(row=>itemKey(row)===w.key)||null;
+    if(!w.row?.isConnected||!itemMatches(w.row,w))w.row=null;
+    if(!w.row)w.row=rows.filter(row=>itemMatches(row,w)).sort((a,b)=>(a.innerText||'').length-(b.innerText||'').length)[0]||null;
     if(!w.row){w.status='Waiting for item screen';w.fired=false;continue}
     const q=quantity(w.row);w.status=Number.isFinite(q)?'Available: '+q:'Quantity unavailable';
     w.row.classList.add('tuac-monitored');
@@ -80,7 +82,7 @@ function scan(){
 function ensureObserver(){
   if(state.observer)return;
   let timer=null;state.observer=new MutationObserver(()=>{if(timer)return;timer=setTimeout(()=>{timer=null;scan()},350)});
-  state.observer.observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['data-stock','data-quantity']});
+  state.observer.observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['data-stock','data-quantity','class','style']});
 }
 function restoreWatches(){
   for(const w of saved())if(w.key&&Number.isFinite(Number(w.min))&&Number(w.min)>0&&!state.watches.has(w.key))
@@ -126,5 +128,8 @@ else{const a=F(root,'First / original value','mathA','');const b=F(root,'Second 
 function activate(ctx){state.context=ctx; if(!state.panel){const style=E('style',document.head);style.textContent='#tuac-panel{position:fixed;z-index:2147483642;top:10vh;left:4vw;width:min(92vw,440px);max-height:80vh;overflow:auto;background:#11191d;color:#eee;border:1px solid #cba953;border-radius:14px;padding:14px;font:14px system-ui;box-shadow:0 10px 30px #000c}#tuac-panel[hidden]{display:none!important}#tuac-panel button{margin:4px;padding:9px;background:#d6b65c;color:#111;border:0;border-radius:6px;font-weight:700}#tuac-panel nav{display:flex}#tuac-panel nav button{flex:1}#tuac-panel label{display:block;margin-top:10px}#tuac-panel input,#tuac-panel select{display:block;width:100%;box-sizing:border-box;background:#283239;color:#fff;border:1px solid #647077;border-radius:5px;padding:9px;font-size:16px}#tuac-panel pre{white-space:pre-wrap}.tuac-monitored{outline:3px solid #1ce15e!important;outline-offset:-2px!important}.tuac-alert{outline:4px solid #00ff69!important;outline-offset:-2px!important}';state.panel=E('section',document.body);state.panel.id='tuac-panel'}state.panel.hidden=false;restoreWatches();render()}
 function deactivate(){stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 restoreWatches();
-const definition={id:ID,version:'0.3.0',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+window.addEventListener('pageshow',()=>{restoreWatches();scan()});
+window.addEventListener('popstate',()=>setTimeout(scan,250));
+setInterval(()=>{if(state.watches.size)scan()},2000);
+const definition={id:ID,version:'0.3.1',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
