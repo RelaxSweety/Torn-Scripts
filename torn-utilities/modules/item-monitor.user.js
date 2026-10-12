@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.1.1
+// @version      1.1.2
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -16,7 +16,38 @@ const saveCfg=()=>localStorage.setItem('tuac-settings',JSON.stringify(state.cfg)
 const norm=s=>String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
 const text=e=>e?.innerText||e?.textContent||'';
 const money=v=>{const m=String(v||'').match(/\$\s*([\d,]+(?:\.\d+)?)/);return m?Number(m[1].replaceAll(',','')):NaN};
-const pageItem=()=>{const params=new URLSearchParams(location.search);const id=params.get('itemID')||params.get('itemId')||params.get('item_id')||params.get('ID');const heading=document.querySelector('h1,h2,[class*=itemTitle],[class*=ItemTitle]');const name=(text(heading)||document.title.replace(/\s*\|.*$/,'')).trim();return {key:id?'id:'+id:'name:'+norm(name),name:name||'Selected market item'}};
+const pageItem=()=>{
+ const params=new URLSearchParams(location.search);
+ const id=params.get('itemID')||params.get('itemId')||params.get('item_id')||params.get('ID');
+ const visible=e=>e&&e.getClientRects().length>0;
+ const exact=e=>text(e).trim().replace(/\s+/g,' ');
+ const invalid=/^(item market|owner|cost|qty|buy|search for an item|text based rpg\s*-\s*torn)$/i;
+ let name='';
+ // The active item name is the bar immediately above the Owner / Cost / Qty / Buy listing headers.
+ const owner=[...document.querySelectorAll('th,div,span')].find(e=>visible(e)&&exact(e)==='Owner'&&e.children.length===0);
+ if(owner){
+   let table=owner.parentElement;
+   for(let i=0;i<5&&table;i++,table=table.parentElement){
+     const t=exact(table);
+     if(/\bCost\b/.test(t)&&/\bQty\b/.test(t)){
+       const prev=table.previousElementSibling;
+       const candidates=[prev,table.parentElement?.previousElementSibling,table.parentElement?.parentElement?.previousElementSibling];
+       for(const el of candidates){
+         if(!visible(el))continue;
+         const leaves=[...el.querySelectorAll('div,span,strong,h2,h3,h4')].filter(x=>visible(x)&&x.children.length===0).map(exact);
+         const val=leaves.find(x=>x.length>0&&x.length<90&&!invalid.test(x)&&!x.includes('$'))||exact(el);
+         if(val&&val.length<90&&!invalid.test(val)&&!val.includes('$')){name=val;break}
+       }
+       if(name)break;
+     }
+   }
+ }
+ if(!name){
+   const el=[...document.querySelectorAll('[class*=itemName],[class*=ItemName],[class*=itemTitle],[class*=ItemTitle],h3,h4')].find(e=>visible(e)&&exact(e).length>0&&exact(e).length<90&&!invalid.test(exact(e))&&e.closest('[class*=market],[class*=Market],main'));
+   if(el)name=exact(el);
+ }
+ return name?{key:'name:'+norm(name),name}:null;
+};
 const listingSelector='[data-listing-id],[data-seller-id],tr,[role=row],[class*=sellerRow],[class*=SellerRow],[class*=listingRow],[class*=ListingRow],[class*=marketRow],[class*=MarketRow]';
 const listings=()=>[...document.querySelectorAll(listingSelector)].filter(e=>!e.closest('#tuim-panel,#tu-pda-panel')&&Number.isFinite(listingPrice(e))&&(!e.parentElement?.closest(listingSelector)));
 const listingPrice=row=>{const unit=row.querySelector('[data-unit-price],[class*=unitPrice],[class*=UnitPrice],[class*=pricePer],[class*=PricePer]');if(unit){const n=money(unit.getAttribute('data-unit-price')||text(unit));if(Number.isFinite(n))return n}for(const el of row.querySelectorAll('[data-price],[class*=price],[class*=Price]')){const n=money(el.getAttribute('data-price')||text(el));if(Number.isFinite(n))return n}return money(text(row))};
@@ -41,7 +72,7 @@ function scan(){
     if(cat==='Item Market'){
       previous?.classList.remove('tuim-watch','tuim-trigger','tuim-wait');w.row=null;
       const active=pageItem();
-      const matching=w.key===active.key||norm(w.name)===norm(active.name);
+      const matching=active&&(w.key===active.key||norm(w.name)===norm(active.name));
       if(!matching){w.status='Waiting for '+w.name;w.fired=false;continue}
       const found=listings(),qualifying=[];
       for(const row of found){
@@ -73,11 +104,34 @@ function scan(){
 }
 function stopPick(){if(!state.picking)return;state.picking=false;for(const event of ['pointerdown','touchstart','mousedown','click'])document.removeEventListener(event,intercept,true);document.getElementById('tuim-tip')?.remove()}
 function intercept(e){if(e.target.closest('#tuim-tip,#tuim-panel,#tu-pda-panel'))return;const row=e.target.closest(candidates);if(!row&&category()!=='Item Market')return;e.preventDefault();e.stopImmediatePropagation();if(e.type==='click'){state.selected=category()==='Item Market'?{category:'Item Market',...pageItem()}: {category:category(),name:nameOf(row),key:keyOf(row),row};stopPick();state.panel.hidden=false;render()}else if(e.type==='pointerdown'||e.type==='touchstart'){state.selected={category:category(),name:nameOf(row),key:keyOf(row),row};setTimeout(()=>{if(state.picking){stopPick();state.panel.hidden=false;render()}},500)}}
-function pick(){stopPick();if(category()==='Item Market'){state.selected={category:'Item Market',...pageItem()};render();return}state.picking=true;state.panel.hidden=true;const tip=E('div',document.body,'Tap an item to monitor. Tap here to cancel.');tip.id='tuim-tip';tip.style.cssText='position:fixed;z-index:2147483646;top:10px;left:5%;width:90%;padding:12px;background:#3a2c16;color:white;border:2px solid gold';tip.onclick=()=>{stopPick();state.panel.hidden=false};for(const event of ['pointerdown','touchstart','mousedown','click'])document.addEventListener(event,intercept,{capture:true,passive:false})}
+function pick(){
+ stopPick();
+ if(category()==='Item Market'){
+   state.picking=true;
+   state.panel.hidden=true;
+   const tip=E('button',document.body,'Select displayed market item');
+   tip.id='tuim-tip';
+   tip.type='button';
+   tip.style.cssText='position:fixed;z-index:2147483646;top:18%;right:12px;max-width:220px;padding:10px 14px;background:#d6b65c;color:#111;border:2px solid #fff;border-radius:9px;font:600 14px system-ui;box-shadow:0 3px 12px #000';
+   tip.onclick=()=>{
+     const item=pageItem();
+     if(!item){alert('Could not identify the displayed market item. Open an item listing and try again.');return}
+     state.selected={category:'Item Market',...item};
+     stopPick();state.panel.hidden=false;render();
+   };
+   return;
+ }
+ state.picking=true;state.panel.hidden=true;
+ const tip=E('div',document.body,'Tap an item to monitor. Tap here to cancel.');
+ tip.id='tuim-tip';
+ tip.style.cssText='position:fixed;z-index:2147483646;top:10px;left:5%;width:90%;padding:12px;background:#3a2c16;color:white;border:2px solid gold';
+ tip.onclick=()=>{stopPick();state.panel.hidden=false};
+ for(const event of ['pointerdown','touchstart','mousedown','click'])document.addEventListener(event,intercept,{capture:true,passive:false});
+}
 function render(){const p=state.panel;if(!p)return;p.replaceChildren();const h=E('div',p);h.className='tuim-header';E('strong',h,'Item Monitor');B(h,'−',()=>p.hidden=true);B(h,'×',()=>{p.hidden=true;state.context?.close?.()});B(p,category()==='Item Market'?'Use current Item Market item':'Select item on Torn',pick);E('p',p,'Current selection: '+(state.selected?state.selected.category+' / '+state.selected.name:'None'));const label=(t)=>E('label',p,t);label('Minimum available quantity (Foreign / Stores)');const q=E('input',p);q.type='number';q.min='1';q.placeholder='No quantity alert';label('Alert at or below unit price ($, Item Market / Stores)');const pr=E('input',p);pr.type='number';pr.min='0';pr.step='0.01';pr.placeholder='No price alert';if(state.selected){const prev=state.items.find(w=>w.category===state.selected.category&&w.key===state.selected.key);if(prev){q.value=prev.minQty??'';pr.value=prev.maxPrice??''}}B(p,'Add / update monitor',()=>{if(!state.selected)return alert('Select an item first.');const s=state.selected;const minQty=q.value.trim()===''?null:Number(q.value),maxPrice=pr.value.trim()===''?null:Number(pr.value);if(s.category==='Foreign'&&minQty===null)return alert('Enter a minimum quantity for foreign items.');if(s.category==='Item Market'&&maxPrice===null)return alert('Enter a target price for Item Market.');if(minQty===null&&maxPrice===null)return alert('Enter a quantity or target price.');if(minQty!==null&&(!Number.isFinite(minQty)||minQty<1)||maxPrice!==null&&(!Number.isFinite(maxPrice)||maxPrice<0))return alert('Invalid target.');state.items=state.items.filter(w=>!(w.category===s.category&&w.key===s.key));state.items.push({...s,minQty:s.category==='Item Market'?null:minQty,maxPrice:s.category==='Foreign'?null:maxPrice,fired:false,status:'Waiting'});save();scan();render()});const st=E('p',p,state.items.length+' monitored item(s)');st.id='tuim-status';for(const cat of ['Foreign','Stores','Item Market','Other']){const watches=state.items.filter(w=>w.category===cat);if(!watches.length)continue;E('h3',p,cat+' ('+watches.length+')');for(const w of watches){const line=E('div',p);line.className='tuim-entry';E('strong',line,w.name);E('div',line,'Qty ≥ '+(w.minQty??'off')+' | Price ≤ '+(w.maxPrice==null?'off':'$'+w.maxPrice.toLocaleString()));E('small',line,w.status||'Waiting');B(line,'Remove',()=>{w.row?.classList.remove('tuim-watch','tuim-trigger');state.items=state.items.filter(x=>x!==w);save();render()})}}B(p,'Clear all monitors',()=>{if(!confirm('Remove all monitored items?'))return;for(const w of state.items)w.row?.classList.remove('tuim-watch','tuim-trigger');state.items=[];save();render()});E('h3',p,'Alarm settings');label('Volume (%)');const vol=E('input',p);vol.type='range';vol.min=0;vol.max=100;vol.value=state.cfg.alarmVolume??60;vol.oninput=()=>{state.cfg.alarmVolume=vol.value;saveCfg()};label('Sound');const snd=E('select',p);for(const v of ['beep','siren','chime']){const o=E('option',snd,v);o.value=v}snd.value=state.cfg.alarmSound||'beep';snd.onchange=()=>{state.cfg.alarmSound=snd.value;saveCfg()};label('Duration (seconds)');const dur=E('input',p);dur.type='number';dur.min=.5;dur.max=30;dur.value=state.cfg.alarmDuration??3;dur.oninput=()=>{state.cfg.alarmDuration=dur.value;saveCfg()};B(p,'Test alarm',sound);E('p',p,'Monitors persist across navigation and refresh. Alerts only evaluate visible listings while Torn is running.')}
 function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=load(OLD,[]);for(const w of old){if(!w.name)continue;const key=w.key?.startsWith('id:')?w.key:'name:'+norm(w.name);if(!state.items.some(x=>x.key===key&&x.category==='Foreign'))state.items.push({category:'Foreign',name:w.name,key,minQty:Number(w.min)||null,maxPrice:null,status:'Migrated',fired:false})}save();localStorage.setItem('tuim-migrated','1')}
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
 function deactivate(){stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.1.1',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'1.1.2',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
