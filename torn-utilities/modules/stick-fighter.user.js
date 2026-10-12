@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Stick Fighter
 // @namespace    https://www.torn.com/
-// @version      0.2.0
+// @version      0.2.1
 // @description  Standalone TU Stick Fighter module, playable anytime
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -30,7 +30,7 @@
  * v0.5.0 - Added crosshair Game Manager, Games/Settings tabs, and removed displayed flight status.
  * v0.4.0 - Added availability modes, strict flight detection, and draggable launcher persistence.
  * v0.3.0 - Added analog controls, chat sharing, donation link, and auto-update metadata.
- * v0.2.0 - Improved flight detection, mobile controls/layout, and update support.
+ * v0.2.1 - Improved flight detection, mobile controls/layout, and update support.
  * v0.1.0 - Initial release.
  */
 
@@ -301,7 +301,7 @@
     function arcadeEndPrompt(id,died=false){
         const isStick=id==='stick-figure-fighter';
         const donation='Torn donations are appreciated. Send cash or items to RelaxSweety [4539436].';
-        const close=()=>{if(isStick)StickFighter.stop();else closeActiveGame();};
+        const close=()=>{if(isStick)StickFighter.stop();else closeActiveGame();window.TornUtilities?.closeActiveModule?.();};
         const replay=()=>{if(isStick){StickFighter.start();}else startGame();};
         const buttons=died?[
             {label:'REPLAY',action:replay},
@@ -815,7 +815,7 @@
       for(const id of ['tpfg-manager','tpfg-prompt','tpfg-game-settings','tpfg-root'])document.getElementById(id)?.remove();
       initialized=false;
     }
-    const definitions=[{id:'stick-fighter',version:'0.2.0',activate:activateStick,deactivate:deactivateFromTU}];
+    const definitions=[{id:'stick-fighter',version:'0.2.1',activate:activateStick,deactivate:deactivateFromTU}];
     function registerTU(){if(window.TornUtilities?.register)for(const definition of definitions)window.TornUtilities.register(definition);}
     window.addEventListener('torn-utilities-ready',registerTU);registerTU();
 })();
