@@ -315,7 +315,7 @@
     const h=document.createElement('h3');h.textContent=label;h.style.cssText='margin:0;font-size:18px;min-width:0;overflow-wrap:anywhere';bar.append(h);content.append(bar);
   };
   const showInstallationInstructions=()=>{
-    const instructions='Install a TU module in Torn PDA:\\n\\n1. Copy the module script URL from TU.\\n2. Open PDA Settings > Advanced Browser Settings > Manage Scripts > Add New Script.\\n3. Select Configure > Paste URL > Fetch > Load.\\n4. Select OK or Authorize when prompted.\\n5. Reload the Torn page inside PDA, then reopen TU.\\n\\nTU modules are installed separately; copying a URL does not install it.';
+    const instructions='Install a TU module in Torn PDA:\n\n1. Copy the module script URL from TU.\n2. Open PDA Settings > Advanced Browser Settings > Manage Scripts > Add New Script.\n3. Select Configure > Paste URL > Fetch > Load.\n4. Select OK or Authorize when prompted.\n5. Reload the Torn page inside PDA, then reopen TU.\n\nTU modules are installed separately; copying a URL does not install it.';
     alert(instructions);
   };
   function render(tab) {
