@@ -117,7 +117,7 @@
       "id": "item-monitor",
       "name": "Item Monitor",
       "category": "business",
-      "version": "1.0.3",
+      "version": "1.1.0",
       "description": "Persistent categorized foreign, store and item market monitoring with optional quantity and target price alerts",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/item-monitor.user.js"
     }
