@@ -45,7 +45,7 @@
       "id": "alerts-calculations",
       "name": "Alerts and Calculations",
       "category": "business",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "description": "Cash-target stock calculations, multi-item foreign stock alerts with adjustable sound, and percentage calculator",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/alerts-and-calculations.user.js"
     },
