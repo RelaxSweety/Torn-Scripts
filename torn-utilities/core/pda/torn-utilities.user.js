@@ -447,7 +447,7 @@
     if(launcher.hidden!==hide)launcher.hidden=hide;
   };
   const closePanel = () => { panel.hidden = true; syncLauncher(); };
-  const togglePanel = () => { if(active)stopModule(); panel.hidden=!panel.hidden; if(!panel.hidden)render('home'); syncLauncher(); };
+  const togglePanel = () => { if(active)stopModule(); panel.hidden=!panel.hidden; if(!panel.hidden){viewModule=null;render('modules');} syncLauncher(); };
   panel.querySelector('.tu-close').addEventListener('click', () => { closePanel(); });
   panel.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => render(b.dataset.tab)));
   const visibilityObserver=new MutationObserver(syncLauncher);
