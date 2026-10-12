@@ -160,7 +160,7 @@
     if(data?.error)throw Error('Torn API error '+(data.error.code??'')+': '+(data.error.error??'Unknown'));
     const id=data?.player_id??data?.id??data?.profile?.id;
     const name=validPlayerName(data?.name??data?.profile?.name);
-    if(!/^\\d+$/.test(String(id??''))||!name)throw Error('Player ID or name missing from API response');
+    if(!/^\d+$/.test(String(id??''))||!name)throw Error('Player ID or name missing from API response');
     return {id:String(id),name,profileUrl:'https://www.torn.com/profiles.php?XID='+id,updatedAt:Date.now()};
   };
   async function updatePlayer(){
