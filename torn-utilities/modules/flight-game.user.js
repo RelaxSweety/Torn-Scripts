@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Flight Game
 // @namespace    https://www.torn.com/
-// @version      0.12.0
+// @version      0.12.1
 // @description  Standalone TU Flight Game module, playable anytime
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -301,7 +301,7 @@
     function arcadeEndPrompt(id,died=false){
         const isStick=id==='stick-figure-fighter';
         const donation='Torn donations are appreciated. Send cash or items to RelaxSweety [4539436].';
-        const close=()=>{if(isStick)StickFighter.stop();else closeActiveGame();};
+        const close=()=>{if(isStick)StickFighter.stop();else closeActiveGame();window.TornUtilities?.closeActiveModule?.();};
         const replay=()=>{if(isStick){StickFighter.start();}else startGame();};
         const buttons=died?[
             {label:'REPLAY',action:replay},
@@ -815,7 +815,7 @@
       for(const id of ['tpfg-manager','tpfg-prompt','tpfg-game-settings','tpfg-root'])document.getElementById(id)?.remove();
       initialized=false;
     }
-    const definitions=[{id:'flight-game',version:'0.12.0',activate:activateFlight,deactivate:deactivateFromTU}];
+    const definitions=[{id:'flight-game',version:'0.12.1',activate:activateFlight,deactivate:deactivateFromTU}];
     function registerTU(){if(window.TornUtilities?.register)for(const definition of definitions)window.TornUtilities.register(definition);}
     window.addEventListener('torn-utilities-ready',registerTU);registerTU();
 })();
