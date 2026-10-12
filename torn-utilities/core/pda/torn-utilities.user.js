@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.14
+// @version      0.4.15
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -15,7 +15,7 @@
   if (window.__RELAX_TORN_UTILITIES_PDA__) return;
   window.__RELAX_TORN_UTILITIES_PDA__ = true;
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.4.14';
+  const TU_VERSION='0.4.15';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -146,63 +146,58 @@
     }
     return pending.length;
   }
-  // Shared player identity: only Torn-provided data, never manual username entry.
-  const PLAYER_KEY='tu:manager:player:v1';
-  const profilePattern=/\/profiles\.php(?:\?|$)/i;
-  const playerIdFrom=url=>{try{const u=new URL(url,location.origin);const id=u.searchParams.get('XID');return /^\d+$/.test(id||'')?id:null}catch{return null}};
-  const validPlayerName=name=>{name=String(name||'').trim();return /^[a-zA-Z0-9_-]{2,32}$/.test(name)&&!(/^(view|profile|player|viewprofile)$/i.test(name))?name:null};
-  let playerInfo=null;
-  try{const cached=JSON.parse(localStorage.getItem(PLAYER_KEY)||'null');if(cached?.id&&validPlayerName(cached.name))playerInfo=cached}catch{}
-  const playerFromPage=()=>{
-    const make=(id,name)=>({id,name,profileUrl:'https://www.torn.com/profiles.php?XID='+id,updatedAt:Date.now()});
-    // The Home > General Information > Name row contains "Username [ID]".
-    // Only read this row on the player's own Home page, not arbitrary profile links.
-    if(location.pathname==='/'||/\/index\.php$/i.test(location.pathname)){
-      for(const cell of document.querySelectorAll('td,th,div,span')){
-        if(cell.children.length>2||cell.textContent.trim()!=='Name')continue;
-        const row=cell.closest('tr')||cell.parentElement;
-        if(!row||!row.textContent.includes('Name'))continue;
-        const value=row.querySelector('a[href*="profiles.php?XID="]')||row.querySelector('a');
-        const match=value?.textContent?.trim().match(/^([a-zA-Z0-9_-]{2,32})\s*\[(\d+)\]$/);
-        if(match&&validPlayerName(match[1]))return make(match[2],match[1]);
-      }
-    }
-    // A directly visited profile can identify its owner only if the page itself
-    // exposes an unambiguous username and matching XID.
-    if(!profilePattern.test(location.pathname))return null;
-    const id=playerIdFrom(location.href);
-    if(!id)return null;
-    for(const el of document.querySelectorAll('h1,h2,[class*="profileName"],[class*="playerName"]')){
-      const raw=el.textContent.trim();
-      const match=raw.match(/^([a-zA-Z0-9_-]{2,32})\s*\[(\d+)\]$/);
-      if(match&&match[2]===id&&validPlayerName(match[1]))return make(id,match[1]);
-    }
-    return null;
-  };
-  const updatePlayer=()=>{
-    const next=playerFromPage();
-    if(!next)return false;
-    if(playerInfo?.id===next.id&&playerInfo?.name===next.name)return true;
-    playerInfo=next;localStorage.setItem(PLAYER_KEY,JSON.stringify(next));
-    window.dispatchEvent(new CustomEvent('tu-player-updated',{detail:{...next}}));
-    return true;
-  };
+  // Shared identity from the authenticated Torn PDA API key; no Torn screen scraping.
+  const PLAYER_KEY='tu:manager:player:v2';
+  const PDA_KEY='###PDA-APIKEY###';
+  const validPlayerName=name=>{name=String(name||'').trim();return /^[a-zA-Z0-9_-]{2,32}$/.test(name)?name:null};
+  let playerInfo=null,identityStatus='Waiting for PDA API',identityBusy=null;
   const getPlayer=()=>playerInfo?Object.freeze({...playerInfo}):null;
+  const parseApiResponse=response=>{
+    let data=response;
+    if(typeof data==='object'&&data!==null&&('responseText' in data||'data' in data||'body' in data||'response' in data))
+      data=data.responseText??data.data??data.body??data.response;
+    if(typeof data==='string')data=JSON.parse(data);
+    if(data?.error)throw Error('Torn API error '+(data.error.code??'')+': '+(data.error.error??'Unknown'));
+    const id=data?.player_id??data?.id??data?.profile?.id;
+    const name=validPlayerName(data?.name??data?.profile?.name);
+    if(!/^\\d+$/.test(String(id??''))||!name)throw Error('Player ID or name missing from API response');
+    return {id:String(id),name,profileUrl:'https://www.torn.com/profiles.php?XID='+id,updatedAt:Date.now()};
+  };
+  async function updatePlayer(){
+    if(identityBusy)return identityBusy;
+    identityBusy=(async()=>{
+      try{
+        if(!PDA_KEY||PDA_KEY.includes('PDA-APIKEY'))throw Error('PDA API key not available; check PDA API settings and reload the script');
+        const url='https://api.torn.com/user/?selections=basic&key='+encodeURIComponent(PDA_KEY);
+        let response;
+        if(typeof PDA_httpGet==='function')response=await PDA_httpGet(url);
+        else {const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);response=await r.text();}
+        const next=parseApiResponse(response);
+        playerInfo=next;
+        try{localStorage.setItem(PLAYER_KEY,JSON.stringify(next));}catch(_){}
+        identityStatus='Verified by Torn API';
+        window.dispatchEvent(new CustomEvent('tu-player-updated',{detail:{...next}}));
+        return true;
+      }catch(e){
+        identityStatus='API identity unavailable: '+e.message;
+        console.warn('[TU] identity request failed',e.message);
+        // Cache is intentionally not used as verified identity for a possibly different account.
+        return false;
+      }finally{identityBusy=null;}
+    })();
+    return identityBusy;
+  }
   const openProfileHelp=()=>{
     if(playerInfo)return;
-    if(document.getElementById('tu-profile-help'))return;
-    const notice=document.createElement('div');notice.id='tu-profile-help';
-    notice.style.cssText='position:fixed;bottom:70px;right:12px;z-index:2147483647;background:#20252e;color:white;border:1px solid #d6b96a;border-radius:10px;padding:12px;max-width:290px;font:13px system-ui;box-shadow:0 4px 20px #0009';
-    const title=document.createElement('div');title.textContent='TU could not identify your Torn player. Open Torn Home and let TU read the General Information > Name row. If needed, open your own profile afterward.';notice.append(title);
-    const link=document.createElement('a');link.textContent='Open Torn Home';link.href='https://www.torn.com/index.php';link.style.cssText='display:inline-block;color:#f1ce72;margin-top:10px;text-decoration:underline';notice.append(link);
-    const dismiss=document.createElement('button');dismiss.textContent='Later';dismiss.style.cssText='margin-left:12px;padding:5px';dismiss.onclick=()=>notice.remove();notice.append(dismiss);document.body.append(notice);
+    alert('TU could not identify your player through the PDA API. Confirm your PDA API key is configured, reload Torn in PDA, then reopen TU. '+identityStatus);
+    updatePlayer();
   };
   updatePlayer();
-  window.addEventListener('popstate',()=>setTimeout(updatePlayer,200));
-  let profileChecks=0;const profilePoll=setInterval(()=>{updatePlayer();if(++profileChecks>=20)clearInterval(profilePoll)},1500);
+  window.addEventListener('focus',()=>{if(!playerInfo)updatePlayer();});
   const api = Object.freeze({
     storage,
     getPlayer,
+    refreshPlayer:updatePlayer,
     requestPlayerProfile:openProfileHelp,
     closeActiveModule(){stopModule();syncLauncher();},
     register(def) {
@@ -280,7 +275,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.4.14 (PDA)</footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.4.15 (PDA)</footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
@@ -319,6 +314,10 @@
     const btn=makeButton('← '+back.label,back.action);btn.style.marginLeft='0';btn.style.flex='0 0 auto';bar.append(btn);
     const h=document.createElement('h3');h.textContent=label;h.style.cssText='margin:0;font-size:18px;min-width:0;overflow-wrap:anywhere';bar.append(h);content.append(bar);
   };
+  const showInstallationInstructions=()=>{
+    const instructions='Install a TU module in Torn PDA:\\n\\n1. Copy the module script URL from TU.\\n2. Open PDA Settings > Advanced Browser Settings > Manage Scripts > Add New Script.\\n3. Select Configure > Paste URL > Fetch > Load.\\n4. Select OK or Authorize when prompted.\\n5. Reload the Torn page inside PDA, then reopen TU.\\n\\nTU modules are installed separately; copying a URL does not install it.';
+    alert(instructions);
+  };
   function render(tab) {
     currentTab=tab;
     panel.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===tab)));
@@ -346,7 +345,7 @@
           if(navigator.clipboard?.writeText)navigator.clipboard.writeText(m.scriptUrl).then(()=>alert('Script URL copied')).catch(()=>prompt('Copy script URL',m.scriptUrl));
           else prompt('Copy script URL',m.scriptUrl);
         }));
-        addLink('View script on GitHub',m.scriptUrl.replace('raw.githubusercontent.com/','github.com/').replace('/main/','/blob/main/'));
+        content.append(makeButton('PDA installation instructions',showInstallationInstructions));
         const help=document.createElement('p');help.textContent='Copy the script URL, add or update it in Torn PDA Scripts, then reload Torn. TU cannot install scripts automatically.';content.append(help);
       }else if(viewCategory){
         const category=registry.categories.find(x=>x.id===viewCategory);
@@ -424,7 +423,7 @@
         line.append(name,makeButton('Clear data',()=>{if(confirm('Delete all TU data for '+id+'?')){storage.clear(id);render('settings');}}));content.append(line);
       }
     }else{
-      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.14 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.15 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
       const guideLink=document.createElement('a');guideLink.href='https://github.com/RelaxSweety/Torn-Scripts/blob/main/torn-utilities/INSTALLATION.md';guideLink.target='_blank';guideLink.rel='noopener noreferrer';guideLink.textContent='TU Installation & Module Setup Guide ↗';guideLink.style.cssText='display:block;margin:12px 0;padding:12px;border:1px solid #806a3e;border-radius:8px;color:#e4c779;text-decoration:underline;font-weight:600';content.append(guideLink);
       // Official-style vector marks; no remote image dependencies.
       addSocialIcon('RelaxSweety on Discord','https://discord.com/users/relaxsweety','M20.317 4.369a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.211.375-.445.865-.608 1.25a18.27 18.27 0 0 0-5.49 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037 19.736 19.736 0 0 0-4.885 1.515.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.1 18.057a.083.083 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.077.077 0 0 0 .084-.028c.462-.63.873-1.295 1.226-1.994a.075.075 0 0 0-.041-.104 13.1 13.1 0 0 1-1.872-.89.076.076 0 0 1-.008-.127c.126-.095.252-.193.372-.292a.074.074 0 0 1 .077-.01c3.929 1.793 8.185 1.793 12.068 0a.074.074 0 0 1 .078.01c.12.099.246.197.373.292a.076.076 0 0 1-.007.127c-.598.35-1.224.65-1.873.89a.076.076 0 0 0-.04.105c.36.698.77 1.363 1.225 1.993a.076.076 0 0 0 .084.028 19.83 19.83 0 0 0 6.003-3.03.077.077 0 0 0 .031-.056c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028ZM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.42 0-1.334.955-2.42 2.157-2.42 1.211 0 2.176 1.095 2.157 2.42 0 1.335-.955 2.42-2.157 2.42Zm7.96 0c-1.183 0-2.157-1.085-2.157-2.42 0-1.334.955-2.42 2.157-2.42 1.211 0 2.176 1.095 2.157 2.42 0 1.335-.946 2.42-2.157 2.42Z');
@@ -435,7 +434,7 @@
   }
   render('modules');
   refreshRegistry();
-  if(!getPlayer())setTimeout(openProfileHelp,1800);
+  // Do not interrupt first-run API requests with an immediate alert.
   window.addEventListener('torn-utilities-ready',()=>render(currentTab));
   // A module script can be installed separately, but remains inert until Open is pressed.
 
