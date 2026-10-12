@@ -53,7 +53,7 @@
       "id": "flight-game",
       "name": "Flight Game",
       "category": "single-player",
-      "version": "0.12.1",
+      "version": "0.12.2",
       "description": "Standalone Flight Game arcade module, playable anytime",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/flight-game.user.js"
     },
