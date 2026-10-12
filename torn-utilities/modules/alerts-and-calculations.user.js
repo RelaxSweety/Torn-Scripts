@@ -1,25 +1,16 @@
 // ==UserScript==
-// @name         TU Alerts and Calculations
+// @name         TU Stock and Calculations
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.3.2
+// @version      0.4.0
 // @description  Stock cash targets, foreign stock alerts and calculator
 // @match        https://www.torn.com/*
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
 (()=>{'use strict';if(window.__TU_ALERT_CALC__)return;window.__TU_ALERT_CALC__=true;
-const ID='alerts-calculations',state={panel:null,tab:'stocks',stock:null,item:null,watches:new Map(),observer:null,alarmTimers:[],minimized:false,context:null,pick:null,audio:null};
-const cfg=(()=>{try{return window.TornUtilities?.storage?.get(ID,'settings',{})||{}}catch{return {}}})();
-const save=()=>{try{localStorage.setItem('tuac-settings',JSON.stringify(cfg));window.TornUtilities?.storage?.set(ID,'settings',cfg)}catch{}};
-try{Object.assign(cfg,JSON.parse(localStorage.getItem('tuac-settings')||'{}'))}catch{}
-const saved=()=>{try{return JSON.parse(localStorage.getItem('tuac-watches')||'[]')}catch{return []}};
-const persist=()=>{try{localStorage.setItem('tuac-watches',JSON.stringify([...state.watches.values()].map(w=>({key:w.key,name:w.name,min:w.min}))))}catch{}};
-const ensureHighlightStyle=()=>{if(document.getElementById('tuac-highlight-style'))return;const st=document.createElement('style');st.id='tuac-highlight-style';st.textContent='.tuac-monitored{outline:3px solid #1ce15e!important;outline-offset:-2px!important}.tuac-alert{outline:4px solid #00ff69!important;outline-offset:-2px!important}';(document.head||document.documentElement).append(st)};
-const normalize=x=>String(x||'').toLowerCase().replace(/\s+/g,' ').trim();
-const itemName=row=>{const el=row?.querySelector?.('[data-item-name],[class*=itemName],[class*=ItemName],[class*=name],[class*=Name]');return (el?.getAttribute('data-item-name')||el?.textContent||row?.textContent||'').split('\n').map(x=>x.trim()).find(Boolean)?.slice(0,70)||''};
-const itemKey=row=>normalize(itemName(row));
-const itemMatches=(row,w)=>{const text=normalize(row?.textContent);return !!text&&(itemKey(row)===w.key||text.includes(w.key)||text.includes(w.key))};
-
+const ID='alerts-calculations',state={panel:null,tab:'stocks',stock:null,minimized:false,context:null,pick:null,audio:null};
+const cfg=(()=>{try{return JSON.parse(localStorage.getItem('tu-stock-calc-settings')||'{}')}catch{return {}}})();
+const save=()=>{try{localStorage.setItem('tu-stock-calc-settings',JSON.stringify(cfg))}catch{}};
 const num=x=>Number(String(x??'').replace(/[$,\s]/g,''));const cash=x=>'$'+x.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const E=(tag,parent,text)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;parent?.append(e);return e};
 const B=(parent,text,fn)=>{const b=E('button',parent,text);b.type='button';b.onclick=fn;return b};
@@ -30,108 +21,15 @@ const stockPrice=row=>{if(!row)return NaN;for(const el of row.querySelectorAll('
 const qtyField=row=>[...row.querySelectorAll('input:not([type=hidden])')].find(e=>e.type==='number'||/quantity|amount|shares/i.test([e.name,e.id,e.placeholder].join(' ')))||null;
 function stopPick(){if(state.pick){document.removeEventListener('pointerdown',state.pick,true);document.removeEventListener('touchstart',state.pick,true);document.removeEventListener('mousedown',state.pick,true);document.removeEventListener('click',state.pick,true)}state.pick=null;document.getElementById('tuac-tip')?.remove()}
 function pick(kind){stopPick();state.panel.hidden=true;const tip=E('div',document.body,'Tap a Torn '+kind+' row to select it. Tap here to cancel.');tip.id='tuac-tip';tip.style.cssText='position:fixed;z-index:2147483646;top:10px;left:5%;width:90%;padding:12px;background:#3a2c16;color:white;border:2px solid gold';tip.onclick=()=>{stopPick();state.panel.hidden=false};state.pick=e=>{if(e.target.closest('#tuac-tip,#tuac-panel,#tu-pda-panel'))return;const row=rowFor(e.target);if(!row)return;e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();if(kind==='stock')state.stock=row;else state.item=row;stopPick();state.minimized=false;state.panel.hidden=false;render()};for(const event of ['pointerdown','touchstart','mousedown','click'])document.addEventListener(event,state.pick,{capture:true,passive:false})}
-function stopSound(){for(const t of state.alarmTimers)clearTimeout(t);state.alarmTimers=[];}
-function alarm(){
-  stopSound();
-  const duration=Math.max(.5,Math.min(30,num(cfg.alarmDuration||3)));
-  const volume=Math.max(0,Math.min(100,num(cfg.alarmVolume??60)))/100;
-  const sound=cfg.alarmSound||'beep';
-  try{
-    const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
-    const a=state.audio||(state.audio=new C());a.resume?.();
-    const tone=(offset)=>{
-      if(!state.watches.size)return;
-      const o=a.createOscillator(),g=a.createGain(),now=a.currentTime;
-      o.type=sound==='siren'?'sawtooth':sound==='chime'?'sine':'square';
-      o.frequency.setValueAtTime(sound==='chime'?1046:sound==='siren'?520:850,now);
-      if(sound==='siren')o.frequency.linearRampToValueAtTime(1150,now+.2);
-      g.gain.setValueAtTime(.0001,now);g.gain.linearRampToValueAtTime(volume*.16,now+.02);
-      g.gain.exponentialRampToValueAtTime(.0001,now+.19);
-      o.connect(g);g.connect(a.destination);o.start(now);o.stop(now+.2);
-    };
-    for(let t=0;t<duration*1000;t+=260)state.alarmTimers.push(setTimeout(tone,t));
-  }catch(e){console.warn('[TU alerts] Audio unavailable',e)}
-}
-function notifyAlarm(name,qty){
-  state.minimized=false;state.panel.hidden=false;render();
-  state.tab='foreign';render();
-  const message=state.panel.querySelector('#tuac-status');
-  if(message)message.textContent='ALERT: '+name+' — '+qty+' available';
-  alarm();
-}
-function quantity(row){for(const e of row.querySelectorAll('[data-stock],[data-quantity],[class*=stock],[class*=Stock],[class*=quantity],[class*=available]')){const t=e.getAttribute('data-stock')||e.getAttribute('data-quantity')||e.textContent||'';const m=t.match(/(?:stock|quantity|available|in stock)?\s*:?\s*([\d,]+)/i);if(m)return num(m[1])}const m=(row.innerText||'').match(/(?:stock|quantity|available|remaining)\s*:?\s*([\d,]+)/i);return m?num(m[1]):NaN}
-function stopWatch(key){
-  if(key){const w=state.watches.get(key);if(w?.row)w.row.classList.remove('tuac-monitored','tuac-alert');state.watches.delete(key)}
-  else{for(const w of state.watches.values())w.row?.classList.remove('tuac-monitored','tuac-alert');state.watches.clear()}
-  persist();if(!state.watches.size)stopSound();
-}
-function scan(){
-  ensureHighlightStyle();
-  const rows=[...document.querySelectorAll('tr,[role=row],li,[class*=row],[class*=Row],[class*=card],[class*=Card]')];
-  for(const w of state.watches.values()){
-    if(!w.row?.isConnected||!itemMatches(w.row,w))w.row=null;
-    if(!w.row)w.row=rows.filter(row=>itemMatches(row,w)).sort((a,b)=>(a.innerText||'').length-(b.innerText||'').length)[0]||null;
-    if(!w.row){w.status='Waiting for item screen';w.fired=false;continue}
-    const q=quantity(w.row);w.status=Number.isFinite(q)?'Available: '+q:'Quantity unavailable';
-    w.row.classList.add('tuac-monitored');
-    if(!Number.isFinite(q))continue;
-    if(q>=w.min){w.row.classList.add('tuac-alert');if(!w.fired){w.fired=true;notifyAlarm(w.name,q)}}
-    else{w.row.classList.remove('tuac-alert');w.fired=false}
-  }
-  const output=state.panel?.querySelector('#tuac-status');
-  if(output&&!output.textContent.startsWith('ALERT:'))output.textContent=state.watches.size+' item(s) monitored';
-}
-function ensureObserver(){
-  if(state.observer)return;
-  let timer=null;state.observer=new MutationObserver(()=>{if(timer)return;timer=setTimeout(()=>{timer=null;scan()},350)});
-  state.observer.observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['data-stock','data-quantity','class','style']});
-}
-function restoreWatches(){
-  for(const w of saved())if(w.key&&Number.isFinite(Number(w.min))&&Number(w.min)>0&&!state.watches.has(w.key))
-    state.watches.set(w.key,{...w,min:Number(w.min),row:null,fired:false,status:'Waiting for item screen'});
-  ensureHighlightStyle();ensureObserver();scan();
-}
-function watch(min){
-  if(!state.item?.isConnected||!Number.isFinite(min)||min<1){alert('Select a visible foreign item and enter a valid minimum.');return}
-  const row=state.item,key=itemKey(row),name=itemName(row);
-  if(!name){alert('Could not identify this item.');return}
-  state.watches.set(key,{key,row,name,min,fired:false,status:'Waiting'});
-  persist();ensureObserver();scan();render();
-}
 function minimize(){state.minimized=true;state.panel.hidden=true;}
 // Closing ends monitoring; minimizing preserves it.
 function close(){stopPick();state.minimized=false;state.panel.hidden=true;state.context?.close?.()}
-function render(){const p=state.panel;p.replaceChildren();const header=E('div',p);header.style.cssText='display:flex;align-items:center;gap:10px';const title=E('strong',header,'Alerts and Calculations');title.style.flex='1';B(header,'−',minimize);B(header,'×',close);const nav=E('nav',p);for(const [id,label] of [['stocks','Stocks'],['foreign','Foreign Alerts'],['math','Calculator']])B(nav,label,()=>{state.tab=id;render()});const root=E('section',p);
+function render(){const p=state.panel;p.replaceChildren();const header=E('div',p);header.style.cssText='display:flex;align-items:center;gap:10px';const title=E('strong',header,'Stock and Calculations');title.style.flex='1';B(header,'−',minimize);B(header,'×',close);const nav=E('nav',p);for(const [id,label] of [['stocks','Stocks'],['math','Calculator']])B(nav,label,()=>{state.tab=id;render()});const root=E('section',p);
 if(state.tab==='stocks'){info(root,'Enter current cash and desired cash AFTER the trade. Select the stock row on Torn. This tool fills quantity only; you press Buy/Sell.');B(root,'Select Torn stock row',()=>pick('stock'));const priceDetected=state.stock?.isConnected?stockPrice(state.stock):NaN;info(root,'Selected: '+(state.stock?.isConnected?(state.stock.innerText||'').slice(0,80):'None'));E('label',root,'Trade type');const side=E('select',root);for(const type of ['Buy','Sell']){const o=E('option',side,type);o.value=type}side.value=cfg.side||'Buy';side.onchange=()=>{cfg.side=side.value;save()};const current=F(root,'Current cash ($)','cash','');const target=F(root,'Desired ending cash ($)','target','');const price=F(root,'Price per share ($)','price',Number.isFinite(priceDetected)?priceDetected:'');if(Number.isFinite(priceDetected))price.value=priceDetected;const fee=F(root,'Sell fee (%)','fee',0);const out=E('pre',root,'');B(root,'Calculate and fill quantity',()=>{const c=num(current.value),t=num(target.value),v=num(price.value),f=num(fee.value),buy=side.value==='Buy';if([c,t,v,f].some(x=>!Number.isFinite(x))||c<0||t<0||v<=0||f<0||f>=100){out.textContent='Invalid values';return}const delta=buy?c-t:t-c,unit=buy?v:v*(1-f/100);if(delta<=0){out.textContent='Target must be '+(buy?'lower':'higher')+' than current cash';return}const shares=Math.floor(delta/unit+1e-10);if(shares<1||!Number.isSafeInteger(shares)){out.textContent='No valid whole-share quantity';return}const end=buy?c-shares*unit:c+shares*unit;out.textContent='Shares: '+shares+'\nEstimated ending cash: '+cash(end)+'\nTarget difference: '+cash(Math.abs(end-t));const input=state.stock?.isConnected?qtyField(state.stock):null;if(!input){out.textContent+='\nNo Torn quantity input detected; nothing filled.';return}const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')?.set;setter?.call(input,String(shares));input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));out.textContent+='\nQuantity entered. Verify Torn quote before confirming.'});info(root,'Confirm the current share price, cash balance and applicable fees. The script never submits trades.');}
-else if(state.tab==='foreign'){
-  info(root,'Select multiple foreign items. Every monitored item has a green outline. Monitoring continues when this window is minimized.',root);
-  B(root,'Select another foreign item',()=>pick('item'));
-  info(root,'Current selection: '+(state.item?.isConnected?(state.item.innerText||'').slice(0,70):'None'));
-  const min=F(root,'Minimum quantity for selected item','minimum',10);
-  B(root,'Add / update selected item',()=>watch(num(min.value)));
-  const status=E('p',root,state.watches.size+' item(s) monitored');status.id='tuac-status';
-  for(const w of state.watches.values()){
-    const line=E('div',root);line.style.cssText='border:1px solid #3ba35b;border-radius:6px;padding:6px;margin:6px 0';
-    E('span',line,w.name+' · Minimum '+w.min+' · '+w.status+' ');
-    B(line,'Remove',()=>{stopWatch(w.key);render()});
-  }
-  B(root,'Stop all monitoring',()=>{stopWatch();render()});
-  B(root,'Test alarm',()=>{if(!state.watches.size){alarm()}else alarm()});
-  E('h3',root,'Alarm Settings');
-  E('label',root,'Volume: '+(cfg.alarmVolume??60)+'%');
-  const vol=E('input',root);vol.type='range';vol.min='0';vol.max='100';vol.value=cfg.alarmVolume??60;vol.oninput=()=>{cfg.alarmVolume=vol.value;vol.previousElementSibling.textContent='Volume: '+vol.value+'%';save()};
-  E('label',root,'Sound type');const sound=E('select',root);
-  for(const [v,label] of [['beep','Beep'],['siren','Siren'],['chime','Chime']]){const o=E('option',sound,label);o.value=v}
-  sound.value=cfg.alarmSound||'beep';sound.onchange=()=>{cfg.alarmSound=sound.value;save()};
-  const duration=F(root,'Alarm duration (seconds, 0.5–30)','alarmDuration',3);duration.min='.5';duration.max='30';
-  info(root,'Selections and alarm settings persist across refreshes and navigation. Monitoring resumes when matching foreign items appear; alerts cannot run while the page is closed or suspended. Audio may require a user gesture.');
-}
+
 else{const a=F(root,'First / original value','mathA','');const b=F(root,'Second / new value','mathB','');const op=E('select',root);for(const [v,label] of [['+','Add'],['-','Subtract'],['*','Multiply'],['/','Divide'],['pct','Percentage gain/loss'],['ratio','First as % of second']]){const o=E('option',op,label);o.value=v}op.value=cfg.op||'pct';op.onchange=()=>{cfg.op=op.value;save()};const out=E('p',root,'');B(root,'Calculate',()=>{const x=num(a.value),y=num(b.value);if(![x,y].every(Number.isFinite)){out.textContent='Invalid numbers';return}const v=op.value==='+'?x+y:op.value==='-'?x-y:op.value==='*'?x*y:op.value==='/'?x/y:op.value==='pct'?(y-x)/Math.abs(x)*100:x/y*100;out.textContent=Number.isFinite(v)?v.toLocaleString('en-US',{maximumFractionDigits:5})+(['pct','ratio'].includes(op.value)?'%':''):'Undefined (division by zero)'});}}
-function activate(ctx){state.context=ctx; if(!state.panel){const style=E('style',document.head);style.textContent='#tuac-panel{position:fixed;z-index:2147483642;top:10vh;left:4vw;width:min(92vw,440px);max-height:80vh;overflow:auto;background:#11191d;color:#eee;border:1px solid #cba953;border-radius:14px;padding:14px;font:14px system-ui;box-shadow:0 10px 30px #000c}#tuac-panel[hidden]{display:none!important}#tuac-panel button{margin:4px;padding:9px;background:#d6b65c;color:#111;border:0;border-radius:6px;font-weight:700}#tuac-panel nav{display:flex}#tuac-panel nav button{flex:1}#tuac-panel label{display:block;margin-top:10px}#tuac-panel input,#tuac-panel select{display:block;width:100%;box-sizing:border-box;background:#283239;color:#fff;border:1px solid #647077;border-radius:5px;padding:9px;font-size:16px}#tuac-panel pre{white-space:pre-wrap}.tuac-monitored{outline:3px solid #1ce15e!important;outline-offset:-2px!important}.tuac-alert{outline:4px solid #00ff69!important;outline-offset:-2px!important}';state.panel=E('section',document.body);state.panel.id='tuac-panel'}state.panel.hidden=false;ensureHighlightStyle();restoreWatches();render()}
+function activate(ctx){state.context=ctx; if(!state.panel){const style=E('style',document.head);style.textContent='#tuac-panel{position:fixed;z-index:2147483642;top:10vh;left:4vw;width:min(92vw,440px);max-height:80vh;overflow:auto;background:#11191d;color:#eee;border:1px solid #cba953;border-radius:14px;padding:14px;font:14px system-ui;box-shadow:0 10px 30px #000c}#tuac-panel[hidden]{display:none!important}#tuac-panel button{margin:4px;padding:9px;background:#d6b65c;color:#111;border:0;border-radius:6px;font-weight:700}#tuac-panel nav{display:flex}#tuac-panel nav button{flex:1}#tuac-panel label{display:block;margin-top:10px}#tuac-panel input,#tuac-panel select{display:block;width:100%;box-sizing:border-box;background:#283239;color:#fff;border:1px solid #647077;border-radius:5px;padding:9px;font-size:16px}#tuac-panel pre{white-space:pre-wrap}.tuac-monitored{outline:3px solid #1ce15e!important;outline-offset:-2px!important}.tuac-alert{outline:4px solid #00ff69!important;outline-offset:-2px!important}';state.panel=E('section',document.body);state.panel.id='tuac-panel'}state.panel.hidden=false;render()}
 function deactivate(){stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 ensureHighlightStyle();restoreWatches();
-window.addEventListener('pageshow',()=>{restoreWatches();scan()});
-window.addEventListener('popstate',()=>setTimeout(scan,250));
-setInterval(()=>{if(state.watches.size)scan()},2000);
-const definition={id:ID,version:'0.3.2',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'0.4.0',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
