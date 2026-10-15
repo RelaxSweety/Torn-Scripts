@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.2.2
+// @version      1.2.3
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -132,7 +132,7 @@ function pick(){
  for(const event of ['pointerdown','touchstart','mousedown','click'])document.addEventListener(event,intercept,{capture:true,passive:false});
 }
 
-const catalogCacheKey='tuim-catalog-v1';
+const catalogCacheKey='tuim-catalog-v2';
 async function getCatalog(){
  if(state.catalog)return state.catalog;
  const cached=load(catalogCacheKey,null);
@@ -157,8 +157,14 @@ async function getCatalog(){
  const raw=payload.items||payload;
  const entries=Array.isArray(raw)?raw:Object.entries(raw).filter(([,v])=>v&&typeof v==='object').map(([id,v])=>({...v,id:v.id??id}));
  state.catalog=entries.filter(v=>v&&v.name).map(v=>{
-   const shops=Array.isArray(v.shops)?v.shops:[];
-   const locations=shops.map(x=>typeof x==='string'?x:[x.country,x.location,x.name,x.shop].filter(Boolean).join(' / ')).filter(Boolean);
+   const value=v.value&&typeof v.value==='object'?v.value:{};
+   const shops=Array.isArray(value.shops)?value.shops:Array.isArray(v.shops)?v.shops:[];
+   const locations=shops.map(shop=>{
+     if(typeof shop==='string')return shop;
+     if(!shop||typeof shop!=='object')return '';
+     const location=shop.location||shop.country||shop.city||shop.name||shop.shop?.name||shop.shop||shop.vendor||'';
+     return typeof location==='string'?location:String(location?.name||location?.country||'');
+   }).filter(Boolean);
    return {id:String(v.id),name:String(v.name),type:String(v.type||'Other'),locations:[...new Set(locations)],country:String(v.country||v.origin||'')};
  }).sort((a,b)=>a.name.localeCompare(b.name));
  localStorage.setItem(catalogCacheKey,JSON.stringify({time:Date.now(),items:state.catalog}));
@@ -222,5 +228,5 @@ function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=loa
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
 function deactivate(){state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.2.2',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'1.2.3',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
