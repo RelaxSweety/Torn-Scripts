@@ -50,7 +50,7 @@
     }
     return {schemaVersion:1,categories,modules};
   }
-  let registry=FALLBACK,registryStatus='Built-in catalog';
+  let registry=FALLBACK,registryStatus='Built-in catalog',registryRefreshing=false,registryUpdatedAt=Number(localStorage.getItem('tu:catalog:updated-at')||0);
   try{const cached=localStorage.getItem(CACHE_KEY);if(cached){registry=validateRegistry(JSON.parse(cached));registryStatus='Cached catalog';}}catch(_){}
   const versionCompare=(a,b)=>{
     const aa=String(a||'0').split('.').map(v=>parseInt(v,10)||0),bb=String(b||'0').split('.').map(v=>parseInt(v,10)||0);
@@ -58,7 +58,8 @@
     return 0;
   };
   async function refreshRegistry(){
-    registryStatus='Refreshing catalog';render(currentTab);
+    if(registryRefreshing)return;
+    registryRefreshing=true;registryStatus='Refreshing catalog';render(currentTab);
     try{
       const url=REGISTRY_URL+'?t='+Date.now();
       const get=async()=>{
@@ -77,9 +78,9 @@
       const raw=await Promise.race([get(),new Promise((_,reject)=>setTimeout(()=>reject(new Error('Catalog timeout')),12000))]);
       const next=validateRegistry(typeof raw==='string'?JSON.parse(raw):raw);
       registry=next;localStorage.setItem(CACHE_KEY,JSON.stringify(next));
-      registryStatus='GitHub catalog updated';
+      registryStatus='GitHub catalog updated';registryUpdatedAt=Date.now();localStorage.setItem('tu:catalog:updated-at',String(registryUpdatedAt));
     }catch(e){registryStatus='Catalog unavailable · using cached list';console.warn('[TU] catalog refresh failed',e);}
-    render(currentTab);
+    registryRefreshing=false;render(currentTab);
   }
   // Lifecycle API: modules register inert factories; only this manager calls activate().
   const registered = new Map();
@@ -199,7 +200,7 @@
     getPlayer,
     refreshPlayer:updatePlayer,
     requestPlayerProfile:openProfileHelp,
-    closeActiveModule(){stopModule();syncLauncher();},
+    closeActiveModule(){stopModule();panel.hidden=false;viewModule=null;render('modules');syncLauncher();},
     register(def) {
       if (!def || typeof def.id !== 'string' || !/^[a-z0-9-]+$/.test(def.id) ||
           typeof def.activate !== 'function' || typeof def.deactivate !== 'function' ||
@@ -228,7 +229,7 @@
     moduleHost.hidden=false;
     try {
       active=id;
-      mod.activate(Object.freeze({mount:moduleHost, close:stopModule}));
+      mod.activate(Object.freeze({mount:moduleHost, close:()=>{stopModule();panel.hidden=false;viewModule=null;render('modules');syncLauncher();},minimize:()=>{panel.hidden=true;syncLauncher();}}));
       return true;
     } catch(e) {
       console.error('[TU] module activation failed', id, e);
@@ -242,6 +243,7 @@
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch {} };
   const style = document.createElement('style');
   style.textContent = `
+#tu-pda-panel .tu-refresh-icon{display:inline-block}#tu-pda-panel .tu-spinning{animation:tu-refresh-spin .8s linear infinite}@keyframes tu-refresh-spin{to{transform:rotate(360deg)}}
 #tu-pda-launcher{position:fixed;left:12px;top:38%;z-index:2147483645;touch-action:none;width:43px;height:43px;border-radius:50%;border:2px solid #e3bb57;background:radial-gradient(circle at 35% 25%,#293b45,#07090b 70%);color:#f5d87e;box-shadow:0 2px 9px #000b,inset 0 0 4px #f5d87e66;font:bold italic 23px 'Palatino Linotype','Book Antiqua',Georgia,serif;letter-spacing:-2px;padding:0 2px 0 0;display:flex;align-items:center;justify-content:center;line-height:1;cursor:grab;user-select:none;-webkit-user-select:none}
 #tu-pda-launcher:active{cursor:grabbing}
 #tu-pda-launcher[hidden]{display:none!important}
@@ -392,7 +394,7 @@
           body.append(title,count);card.append(icon,body,makeButton('Open →',()=>{viewCategory=group.id;render('modules');}));content.append(card);
         }
         const refreshRow=document.createElement('div');refreshRow.style.cssText='display:flex;justify-content:flex-end;margin:16px 0 4px';
-        const refresh=makeButton('↻ Refresh catalog',refreshRegistry);refresh.style.marginLeft='0';refreshRow.append(refresh);content.append(refreshRow);
+        const refresh=makeButton('',refreshRegistry);refresh.style.marginLeft='0';refresh.disabled=registryRefreshing;refresh.innerHTML='<span class="tu-refresh-icon'+(registryRefreshing?' tu-spinning':'')+'">↻</span> '+(registryRefreshing?'Refreshing…':'Refresh catalog');refreshRow.append(refresh);content.append(refreshRow);const updated=document.createElement('small');updated.style.cssText='display:block;text-align:right;color:#cba953;margin:4px 0 8px';updated.textContent='Catalog updated: '+(registryUpdatedAt?new Date(registryUpdatedAt).toLocaleString():'Not yet refreshed');content.append(updated);
       }
     }else if(tab==='settings'){
       const heading=document.createElement('strong');heading.textContent='Storage & Backups';content.append(heading);
@@ -443,12 +445,12 @@
     return !!el&&el.isConnected&&!el.hidden&&getComputedStyle(el).display!=='none'&&getComputedStyle(el).visibility!=='hidden';
   };
   const syncLauncher=()=>{
-    const moduleVisible=!!active&&(['tpfg-root','tpfg-manager','tpfg-prompt','sff-root','tca-panel','tca-playbar','tuac-panel'].some(isVisible)||[...moduleHost.children].some(el=>isVisible(el.id)||(!el.hidden&&el.getClientRects().length>0)));
+    const moduleVisible=!!active&&(['tuim-panel','tuim-catalog','tpfg-root','tpfg-manager','tpfg-prompt','sff-root','tca-panel','tca-playbar','tuac-panel'].some(isVisible)||[...moduleHost.children].some(el=>isVisible(el.id)||(!el.hidden&&el.getClientRects().length>0)));
     const hide=!panel.hidden||moduleVisible;
     if(launcher.hidden!==hide)launcher.hidden=hide;
   };
   const closePanel = () => { panel.hidden = true; syncLauncher(); };
-  const togglePanel = () => { if(active)stopModule(); panel.hidden=!panel.hidden; if(!panel.hidden){viewModule=null;render('modules');} syncLauncher(); };
+  const togglePanel = () => { if(active==='item-monitor'&&document.getElementById('tuim-panel')?.hidden){registered.get(active)?.activate(Object.freeze({mount:moduleHost,close:()=>{stopModule();panel.hidden=false;viewModule=null;render('modules');syncLauncher();},minimize:()=>{panel.hidden=true;syncLauncher();}}));panel.hidden=true;syncLauncher();return;} if(active)stopModule(); panel.hidden=!panel.hidden; if(!panel.hidden){viewModule=null;render('modules');} syncLauncher(); };
   panel.querySelector('.tu-close').addEventListener('click', () => { closePanel(); });
   panel.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => render(b.dataset.tab)));
   // Shared floating-window support for TU module panels.
