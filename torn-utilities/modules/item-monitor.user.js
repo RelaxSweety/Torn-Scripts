@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.2.5
+// @version      1.2.6
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -191,7 +191,7 @@ function openCatalog(){
  const populateLocations=()=>{
    const previous=locationFilter.value;locationFilter.replaceChildren();
    const all=E('option',locationFilter,'All locations');all.value='';
-   const locations=[...new Set(state.catalog.flatMap(catalogGroups))].sort((a,b)=>a.localeCompare(b));
+   const locations=[...new Set(state.catalog.flatMap(catalogGroups))].sort((a,b)=>a.localeCompare(b));for(const shared of ['Torn / Item Market / Bazaar'])if(!locations.includes(shared))locations.unshift(shared);
    for(const loc of locations){const o=E('option',locationFilter,loc);o.value=loc}
    locationFilter.value=locations.includes(previous)?previous:'';
  };
@@ -203,7 +203,7 @@ function openCatalog(){
  let matches=[],position=-1;
  const draw=items=>{
    list.replaceChildren();const grouped=new Map();
-   for(const item of items)for(const loc of catalogGroups(item)){if(!grouped.has(loc))grouped.set(loc,[]);grouped.get(loc).push(item)}
+   for(const item of items)for(const loc of (locationFilter.value?[locationFilter.value]:catalogGroups(item))){if(!grouped.has(loc))grouped.set(loc,[]);grouped.get(loc).push(item)}
    for(const [loc,group] of [...grouped].sort((a,b)=>a[0].localeCompare(b[0]))){
      const heading=E('h3',list,loc);heading.style.cssText='font-size:15px;margin:14px 0 6px;color:#d6b65c';
      for(const item of group){const line=E('div',list);line.dataset.itemId=item.id;line.style.cssText='padding:8px;border-bottom:1px solid #39434a;display:flex;align-items:center;gap:8px';
@@ -222,7 +222,7 @@ function openCatalog(){
  }
  function filter(){
    const term=norm(search.value);
-   const visible=locationFilter.value?state.catalog.filter(x=>catalogGroups(x).includes(locationFilter.value)):state.catalog;
+   const visible=locationFilter.value==='Torn / Item Market / Bazaar'?state.catalog:locationFilter.value?state.catalog.filter(x=>catalogGroups(x).includes(locationFilter.value)):state.catalog;
    matches=visible.filter(x=>norm(x.name).includes(term)||x.id.includes(term));
    position=-1;
    // Keep the full catalog visible; Next navigates through partial keyword matches.
@@ -241,5 +241,5 @@ function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=loa
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
 function deactivate(){state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.2.5',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'1.2.6',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
