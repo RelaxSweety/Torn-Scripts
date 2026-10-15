@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.18
+// @version      0.4.19
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -15,7 +15,7 @@
   if (window.__RELAX_TORN_UTILITIES_PDA__) return;
   window.__RELAX_TORN_UTILITIES_PDA__ = true;
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.4.18';
+  const TU_VERSION='0.4.19';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -63,23 +63,28 @@
     try{
       const url=REGISTRY_URL+'?t='+Date.now();
       const get=async()=>{
-        if(typeof PDA_httpGet==='function'){
-          try{
-            const response=await PDA_httpGet(url);
-            const raw=typeof response==='string'?response:(response?.responseText??response?.data??response?.body??response?.response);
-            if(typeof raw==='string'&&raw.trim())return raw;
-            if(raw&&typeof raw==='object')return raw;
-          }catch(e){console.warn('[TU] PDA catalog bridge failed; trying fetch',e);}
+        // Prefer a cache-busted browser request; PDA_httpGet may return a stale cached GitHub response.
+        try{
+          const response=await fetch(url,{cache:'no-store',headers:{'Cache-Control':'no-cache'}});
+          if(!response.ok)throw Error('HTTP '+response.status);
+          return await response.text();
+        }catch(browserError){
+          if(typeof PDA_httpGet!=='function')throw browserError;
+          const response=await PDA_httpGet(url+'&refresh='+Math.random().toString(36).slice(2));
+          const raw=typeof response==='string'?response:(response?.responseText??response?.data??response?.body??response?.response);
+          if(typeof raw==='string'&&raw.trim())return raw;
+          if(raw&&typeof raw==='object')return raw;
+          throw Error('PDA returned empty catalog: '+browserError.message);
         }
-        const response=await fetch(url,{cache:'no-store'});
-        if(!response.ok)throw Error('HTTP '+response.status);
-        return await response.text();
       };
       const raw=await Promise.race([get(),new Promise((_,reject)=>setTimeout(()=>reject(new Error('Catalog timeout')),12000))]);
       const next=validateRegistry(typeof raw==='string'?JSON.parse(raw):raw);
+      const prior=registry.modules.find(m=>m.id==='item-monitor')?.version;
+      const incoming=next.modules.find(m=>m.id==='item-monitor')?.version;
+      if(prior&&incoming&&versionCompare(incoming,prior)<0)throw Error('Stale catalog returned (Item Monitor '+incoming+' < '+prior+')');
       registry=next;localStorage.setItem(CACHE_KEY,JSON.stringify(next));
       registryStatus='GitHub catalog updated';registryUpdatedAt=Date.now();localStorage.setItem('tu:catalog:updated-at',String(registryUpdatedAt));
-    }catch(e){registryStatus='Catalog unavailable · using cached list';console.warn('[TU] catalog refresh failed',e);}
+    }catch(e){registryStatus='Refresh failed: '+e.message;console.warn('[TU] catalog refresh failed',e);}
     registryRefreshing=false;render(currentTab);
   }
   // Lifecycle API: modules register inert factories; only this manager calls activate().
@@ -277,7 +282,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.4.18 (PDA)</footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer>Torn Utilities v0.4.19 (PDA)</footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
@@ -394,7 +399,7 @@
           body.append(title,count);card.append(icon,body,makeButton('Open →',()=>{viewCategory=group.id;render('modules');}));content.append(card);
         }
         const refreshRow=document.createElement('div');refreshRow.style.cssText='display:flex;justify-content:flex-end;margin:16px 0 4px';
-        const refresh=makeButton('',refreshRegistry);refresh.style.marginLeft='0';refresh.disabled=registryRefreshing;refresh.innerHTML='<span class="tu-refresh-icon'+(registryRefreshing?' tu-spinning':'')+'">↻</span> '+(registryRefreshing?'Refreshing…':'Refresh catalog');refreshRow.append(refresh);content.append(refreshRow);const updated=document.createElement('small');updated.style.cssText='display:block;text-align:right;color:#cba953;margin:4px 0 8px';updated.textContent='Catalog updated: '+(registryUpdatedAt?new Date(registryUpdatedAt).toLocaleString():'Not yet refreshed');content.append(updated);
+        const refresh=makeButton('',refreshRegistry);refresh.style.marginLeft='0';refresh.disabled=registryRefreshing;refresh.innerHTML='<span class="tu-refresh-icon'+(registryRefreshing?' tu-spinning':'')+'">↻</span> '+(registryRefreshing?'Refreshing…':'Refresh catalog');refreshRow.append(refresh);content.append(refreshRow);const updated=document.createElement('small');updated.style.cssText='display:block;text-align:right;color:#cba953;margin:4px 0 8px';updated.textContent='Catalog updated: '+(registryUpdatedAt?new Date(registryUpdatedAt).toLocaleString():'Not yet refreshed')+' · Item Monitor '+(registry.modules.find(m=>m.id==='item-monitor')?.version||'not listed');content.append(updated);const refreshStatus=document.createElement('small');refreshStatus.style.cssText='display:block;text-align:right;color:#b9b9b9';refreshStatus.textContent=registryStatus;content.append(refreshStatus);
       }
     }else if(tab==='settings'){
       const heading=document.createElement('strong');heading.textContent='Storage & Backups';content.append(heading);
@@ -425,7 +430,7 @@
         line.append(name,makeButton('Clear data',()=>{if(confirm('Delete all TU data for '+id+'?')){storage.clear(id);render('settings');}}));content.append(line);
       }
     }else{
-      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.18 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.19 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
       const guideLink=document.createElement('a');guideLink.href='https://github.com/RelaxSweety/Torn-Scripts/blob/main/torn-utilities/INSTALLATION.md';guideLink.target='_blank';guideLink.rel='noopener noreferrer';guideLink.textContent='TU Installation & Module Setup Guide ↗';guideLink.style.cssText='display:block;margin:12px 0;padding:12px;border:1px solid #806a3e;border-radius:8px;color:#e4c779;text-decoration:underline;font-weight:600';content.append(guideLink);
       // Official-style vector marks; no remote image dependencies.
       addSocialIcon('RelaxSweety on Discord','https://discord.com/users/relaxsweety','M20.317 4.369a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.211.375-.445.865-.608 1.25a18.27 18.27 0 0 0-5.49 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037 19.736 19.736 0 0 0-4.885 1.515.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.1 18.057a.083.083 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.077.077 0 0 0 .084-.028c.462-.63.873-1.295 1.226-1.994a.075.075 0 0 0-.041-.104 13.1 13.1 0 0 1-1.872-.89.076.076 0 0 1-.008-.127c.126-.095.252-.193.372-.292a.074.074 0 0 1 .077-.01c3.929 1.793 8.185 1.793 12.068 0a.074.074 0 0 1 .078.01c.12.099.246.197.373.292a.076.076 0 0 1-.007.127c-.598.35-1.224.65-1.873.89a.076.076 0 0 0-.04.105c.36.698.77 1.363 1.225 1.993a.076.076 0 0 0 .084.028 19.83 19.83 0 0 0 6.003-3.03.077.077 0 0 0 .031-.056c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028ZM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.42 0-1.334.955-2.42 2.157-2.42 1.211 0 2.176 1.095 2.157 2.42 0 1.335-.955 2.42-2.157 2.42Zm7.96 0c-1.183 0-2.157-1.085-2.157-2.42 0-1.334.955-2.42 2.157-2.42 1.211 0 2.176 1.095 2.157 2.42 0 1.335-.946 2.42-2.157 2.42Z');
