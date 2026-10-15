@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.2.3
+// @version      1.2.4
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -171,8 +171,12 @@ async function getCatalog(){
  return state.catalog;
 }
 function catalogGroups(item){
- const countries=['Japan','Mexico','Canada','Hawaii','Cayman Islands','Switzerland','China','Argentina','United Kingdom','UAE','South Africa'];const locations=item.locations.length?item.locations.map(x=>{const c=countries.find(c=>norm(x).includes(norm(c)));return c?c+' Item Store / Bazaar':x}):item.country?[item.country+' Item Store / Bazaar']:['Other / '+item.type];
- return locations;
+ const countries=['Japan','Mexico','Canada','Hawaii','Cayman Islands','Switzerland','China','Argentina','United Kingdom','UAE','South Africa'];
+ const locations=item.locations.length?item.locations:item.country?[item.country]:[];
+ return locations.length?[...new Set(locations.map(x=>{
+   const country=countries.find(c=>norm(x).includes(norm(c)));
+   return country?country+' / Foreign / Item Market / Bazaar':x+' / Item Market / Bazaar';
+ }))]:['Unspecified Location / Item Market / Bazaar'];
 }
 function openCatalog(){
  style();
@@ -183,6 +187,7 @@ function openCatalog(){
  E('strong',head,'Select Item from Complete List').style.flex='1';
  const exit=B(head,'×',()=>{w.remove();state.catalogWindow=null});exit.style.cssText='background:#283239;color:#d6b65c;border:1px solid #d6b65c';
  draggable(w,head);
+ const sortRow=E('div',w);sortRow.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:8px';E('span',sortRow,'Sort locations:');const sort=E('select',sortRow);sort.style.cssText='flex:1;min-width:0;background:#283239;color:#d6b65c;border:1px solid #d6b65c;padding:8px';for(const [value,label] of [['asc','Location A–Z'],['desc','Location Z–A']]){const o=E('option',sort,label);o.value=value}sort.onchange=()=>{if(state.catalog)filter()};
  const search=E('input',w);search.placeholder='Keyword or item ID';search.style.cssText='width:100%;padding:10px;background:#283239;color:white;border:1px solid #667;margin-bottom:8px;box-sizing:border-box';
  const controls=E('div',w);controls.style.cssText='display:flex;align-items:center;gap:10px;margin-bottom:8px';
  const count=E('span',controls,'Loading catalog…');count.style.flex='1';
@@ -192,11 +197,11 @@ function openCatalog(){
  const draw=items=>{
    list.replaceChildren();const grouped=new Map();
    for(const item of items)for(const loc of catalogGroups(item)){if(!grouped.has(loc))grouped.set(loc,[]);grouped.get(loc).push(item)}
-   for(const [loc,group] of [...grouped].sort((a,b)=>a[0].localeCompare(b[0]))){
+   for(const [loc,group] of [...grouped].sort((a,b)=>sort.value==='desc'?b[0].localeCompare(a[0]):a[0].localeCompare(b[0]))){
      const heading=E('h3',list,loc);heading.style.cssText='font-size:15px;margin:14px 0 6px;color:#d6b65c';
      for(const item of group){const line=E('div',list);line.dataset.itemId=item.id;line.style.cssText='padding:8px;border-bottom:1px solid #39434a;display:flex;align-items:center;gap:8px';
        const label=E('span',line,item.name+' (#'+item.id+')');label.style.flex='1';
-       const select=B(line,'Select',()=>{state.selected={category:loc==='No documented shop location'?'Item Market':/foreign|mexico|canada|hawaii|cayman|switzerland|japan|china|argentina|uk|united kingdom|uae|south africa/i.test(loc)?'Foreign':'Stores',name:item.name,key:'id:'+item.id};w.remove();state.catalogWindow=null;state.panel.hidden=false;render()});select.style.cssText='background:#283239;color:#d6b65c;border:1px solid #d6b65c;padding:8px 12px;border-radius:5px';
+       const select=B(line,'Select',()=>{state.selected={category:loc.includes(' / Foreign / ')?'Foreign':'Item Market',name:item.name,key:'id:'+item.id};w.remove();state.catalogWindow=null;state.panel.hidden=false;render()});select.style.cssText='background:#283239;color:#d6b65c;border:1px solid #d6b65c;padding:8px 12px;border-radius:5px';
      }
    }
  };
@@ -228,5 +233,5 @@ function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=loa
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
 function deactivate(){state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.2.3',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'1.2.4',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
