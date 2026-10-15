@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.2.0
+// @version      1.2.1
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -137,13 +137,25 @@ async function getCatalog(){
  if(state.catalog)return state.catalog;
  const cached=load(catalogCacheKey,null);
  if(cached?.items?.length&&Date.now()-cached.time<86400000){state.catalog=cached.items;return state.catalog}
- const apiKey=window.TornUtilities?.apiKey||window.TornUtilities?.getApiKey?.()||'';
- const endpoints=['https://api.torn.com/v2/torn/items'+(apiKey?'?key='+encodeURIComponent(apiKey):'')];
+ const pdaKey='###PDA-APIKEY###';
+ const apiKey=!pdaKey.includes('PDA-APIKEY')?pdaKey:(window.TornUtilities?.apiKey||window.TornUtilities?.getApiKey?.()||'');
+ if(!apiKey)throw Error('PDA API key unavailable. Configure your key in Torn PDA, then reload the script.');
+ const url='https://api.torn.com/v2/torn/items?key='+encodeURIComponent(apiKey);
  let payload=null;
- for(const url of endpoints){try{const response=await fetch(url,{credentials:'same-origin'});if(!response.ok)throw Error('HTTP '+response.status);payload=await response.json();if(payload.error)throw Error(payload.error.error||'API error');break}catch(e){console.warn('[TU Item Monitor] Catalog fetch:',e)}}
+ const unpack=response=>{
+   let data=response;
+   if(data&&typeof data==='object'&&('responseText' in data||'data' in data||'body' in data||'response' in data))data=data.responseText??data.data??data.body??data.response;
+   if(typeof data==='string')data=JSON.parse(data);
+   if(data?.error)throw Error('Torn API: '+(data.error.error||'Unknown error'));
+   return data;
+ };
+ try{
+   if(typeof PDA_httpGet==='function')payload=unpack(await PDA_httpGet(url));
+   else {const response=await fetch(url);if(!response.ok)throw Error('HTTP '+response.status);payload=unpack(await response.json())}
+ }catch(e){console.warn('[TU Item Monitor] Catalog fetch:',e);if(cached?.items?.length){state.catalog=cached.items;return state.catalog}throw Error('Catalog request failed: '+e.message)}
  if(!payload){if(cached?.items?.length){state.catalog=cached.items;return state.catalog}throw Error('Could not retrieve item catalog. Configure Torn API access in PDA/TU and try again.')}
  const raw=payload.items||payload;
- const entries=Array.isArray(raw)?raw:Object.entries(raw).map(([id,v])=>({...v,id:v.id??id}));
+ const entries=Array.isArray(raw)?raw:Object.entries(raw).filter(([,v])=>v&&typeof v==='object').map(([id,v])=>({...v,id:v.id??id}));
  state.catalog=entries.filter(v=>v&&v.name).map(v=>{
    const shops=Array.isArray(v.shops)?v.shops:[];
    const locations=shops.map(x=>typeof x==='string'?x:[x.country,x.name,x.location,x.shop].filter(Boolean).join(' / ')).filter(Boolean);
@@ -153,7 +165,7 @@ async function getCatalog(){
  return state.catalog;
 }
 function catalogGroups(item){
- const locations=item.locations.length?item.locations:['No documented shop location'];
+ const locations=item.locations.length?item.locations:['Other / '+item.type];
  return locations;
 }
 function openCatalog(){
@@ -210,5 +222,5 @@ function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=loa
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
 function deactivate(){state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.2.0',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'1.2.1',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
