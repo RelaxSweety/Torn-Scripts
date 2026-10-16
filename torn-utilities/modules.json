@@ -117,8 +117,8 @@
       "id": "item-monitor",
       "name": "Item Monitor",
       "category": "business",
-      "version": "1.6.0",
-      "description": "Item Monitor with Travel Assistant: automatic flight times, foreign purchase and Torn resale prices, haul profit and departure forecasts",
+      "version": "1.7.0",
+      "description": "Item Monitor with separate movable and resizable Travel Assistant window, card-based flight schedule, stock forecasts and haul profit",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/item-monitor.user.js"
     }
   ]
