@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.6.0
+// @version      1.7.0
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -63,6 +63,7 @@ const price=row=>{for(const e of row.querySelectorAll('[data-price],[class*=pric
 const E=(tag,parent,t)=>{const e=document.createElement(tag);if(t!==undefined)e.textContent=t;parent?.append(e);return e};
 const B=(p,t,f)=>{const b=E('button',p,t);b.type='button';b.onclick=f;return b};
 function style(){if(document.getElementById('tuim-style'))return;const e=E('style',document.head||document.documentElement);e.id='tuim-style';e.textContent='#tuim-panel{position:fixed;z-index:2147483642;top:10vh;left:4vw;width:min(92vw,440px);min-width:220px;min-height:160px;max-width:calc(100vw - 12px);height:min(62dvh,540px);max-height:calc(100dvh - 160px)!important;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;resize:both;box-sizing:border-box;overflow-wrap:anywhere;background:#11191d;color:#eee;border:1px solid #cba953;border-radius:12px;padding:12px;font:14px/1.45 system-ui;display:block}#tuim-panel[hidden]{display:none!important}#tuim-panel *{box-sizing:border-box}#tuim-panel button{max-width:100%;white-space:normal;margin:0;padding:8px 12px;background:#d6b65c;color:#111;border:0;border-radius:5px;line-height:1.3;min-height:36px}#tuim-panel input[type=range]{touch-action:none!important;accent-color:#d6b65c;user-select:none}#tuim-panel input,#tuim-panel select{display:block;width:100%;box-sizing:border-box;padding:8px;margin:4px 0 12px;background:#283239;color:white;min-height:40px}#tuim-panel label{display:block;margin:12px 0 4px;line-height:1.4}#tuim-panel .tuim-header{display:flex;align-items:center;gap:8px;position:sticky;top:-12px;background:#11191d;z-index:2;padding:6px 0 12px;margin:0 0 12px;touch-action:none;cursor:move;min-height:52px}#tuim-panel .tuim-header strong{flex:1;min-width:0;font-size:18px;line-height:1.3}#tuim-panel .tuim-header button{flex:0 0 38px;padding:7px}#tuim-panel p{display:block;margin:12px 0!important;line-height:1.5!important;min-height:0!important}#tuim-panel h3{display:block;font-size:19px;line-height:1.35!important;margin:22px 0 12px!important;padding:0!important;clear:both}#tuim-panel .tuim-entry{display:block;border:1px solid #3ba35b;border-radius:6px;padding:12px;margin:10px 0 16px;line-height:1.5}#tuim-panel .tuim-entry strong,#tuim-panel .tuim-entry small{display:block;margin:4px 0;line-height:1.5}#tuim-panel .tuim-entry button{display:block;margin-top:10px}#tuim-panel div,#tuim-panel p,#tuim-panel small{overflow-wrap:anywhere}#tuim-panel>button{display:block;margin:12px 0}#tuim-panel #tuim-status{margin:16px 0 20px!important}.tuim-watch,.tuim-wait{outline:3px solid #d83030!important;outline-offset:-2px!important}.tuim-trigger{outline:4px solid #00ff69!important;outline-offset:-2px!important}'}
+function travelStyle(){if(document.getElementById('tuim-travel-style'))return;const x=E('style',document.head||document.documentElement);x.id='tuim-travel-style';x.textContent="#tuim-travel-window{position:fixed;z-index:2147483645;top:8vh;left:5vw;width:min(92vw,520px);height:min(82dvh,750px);min-width:280px;min-height:260px;max-width:100vw;max-height:96dvh;resize:both;overflow:auto;overscroll-behavior:contain;box-sizing:border-box;background:#11191d;color:#eee;border:1px solid #cba953;border-radius:12px;padding:12px;font:14px/1.45 system-ui}#tuim-travel-window *{box-sizing:border-box}#tuim-travel-window .tuim-travel-header{display:flex;align-items:center;justify-content:space-between;position:sticky;top:-12px;background:#11191d;padding:8px 0 12px;z-index:3;touch-action:none;cursor:move}#tuim-travel-window .tuim-travel-header strong{font-size:19px}#tuim-travel-window button{padding:9px 12px;background:#d6b65c;color:#111;border:0;border-radius:6px;min-height:36px}#tuim-travel-window .tuim-travel-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}#tuim-travel-window label{display:block;font-size:12px;color:#c7cbd0}#tuim-travel-window input:not([type=checkbox]),#tuim-travel-window select{display:block;width:100%;padding:9px;margin-top:5px;background:#283239;color:white;border:1px solid #57616a;border-radius:5px;min-height:40px}#tuim-travel-window input[type=checkbox]{margin:10px}#tuim-travel-window .tuim-travel-card{border:1px solid #39434a;border-radius:9px;background:#1b252b;padding:11px;min-width:0;overflow-wrap:anywhere}#tuim-travel-window .tuim-travel-muted,#tuim-travel-window small{display:block;color:#b3bbc0;font-size:12px}#tuim-travel-window .tuim-travel-card>strong{display:block;font-size:16px;margin-top:4px}#tuim-travel-window h3{font-size:16px;margin:16px 0 9px;color:#d6b65c}#tuim-travel-window .tuim-travel-line{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #344047}#tuim-travel-window .tuim-travel-line span{color:#c3c9cd;flex:1}#tuim-travel-window .tuim-travel-line strong{text-align:right;flex:1}#tuim-travel-window .tuim-travel-total{margin-top:10px;border-color:#7e9e67}#tuim-travel-window .tuim-travel-total>strong{font-size:24px;color:#8fd69c}#tuim-travel-window .tuim-travel-actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}#tuim-travel-window .tuim-travel-output>small{margin:10px 0}@media(max-width:380px){#tuim-travel-window .tuim-travel-grid{grid-template-columns:1fr}}"}
 function sound(){for(const t of state.alarmTimers)clearTimeout(t);state.alarmTimers=[];const duration=Math.max(.5,Math.min(30,Number(state.cfg.alarmDuration)||3)),vol=Math.max(0,Math.min(100,Number(state.cfg.alarmVolume??60)))/100;try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;const a=state.audio||(state.audio=new C());a.resume?.();for(let ms=0;ms<duration*1000;ms+=280)state.alarmTimers.push(setTimeout(()=>{const o=a.createOscillator(),g=a.createGain(),now=a.currentTime;o.type=state.cfg.alarmSound==='siren'?'sawtooth':state.cfg.alarmSound==='chime'?'sine':'square';o.frequency.value=state.cfg.alarmSound==='chime'?1046:850;g.gain.setValueAtTime(vol*.13,now);g.gain.exponentialRampToValueAtTime(.0001,now+.18);o.connect(g);g.connect(a.destination);o.start();o.stop(now+.2)},ms))}catch(e){console.warn('[Item Monitor] Audio unavailable',e)}}
 function alertItem(w,reason){if(!state.panel){sound();return}state.panel.hidden=false;render();const p=state.panel.querySelector('#tuim-status');if(p)p.textContent='ALERT: '+w.name+' — '+reason;sound()}
 function scan(){
@@ -267,75 +268,106 @@ function travelMarket(data){
   for(const [k,v] of Object.entries(x))if(['itemmarket','listings','items','item','market','bazaar','bazaars','offers'].includes(k))scan(v,depth+1);
  };scan(data,0);return found.length?Math.min(...found):null;
 }
-function travelUI(p){
- const d=E('details',p);d.open=!!state.travelOpen;d.ontoggle=()=>state.travelOpen=d.open;
- const h=E('summary',d,'Travel Assistant');h.style.cssText='cursor:pointer;color:#d6b65c;font-weight:bold;font-size:17px;padding:12px 0';
- E('p',d,'Automatically calculated flight times and API-based item prices. Predictions are experimental.');
- const field=(label,key)=>{E('label',d,label);const x=E('input',d);x.type='number';x.min='0';x.value=travel[key];x.onchange=()=>{travel[key]=x.value;travelSave();flightInfo()};return x};
- const select=(label,key,options)=>{E('label',d,label);const x=E('select',d);for(const [v,name] of Object.entries(options)){const o=E('option',x,name);o.value=v}x.value=travel[key];x.onchange=()=>{travel[key]=x.value;travelSave();flightInfo()};return x};
- field('Carrying capacity','capacity');
- const mode=select('Flight mode','mode',{standard:'Standard',airstrip:'Airstrip',private:'Private (WLT)',business:'Business Class'});
+
+let travelWindow=null,travelEpoch=0;
+function travelClose(){travelEpoch++;travelWindow?.remove();travelWindow=null}
+function travelUI(){
+ travelStyle();
+ if(travelWindow?.isConnected){travelWindow.hidden=false;return}
+ const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
+ const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
+ E('strong',head,'Travel Assistant');B(head,'×',travelClose);
+ const body=E('div',w);body.className='tuim-travel-body';
+ const intro=E('small',body,'Travel planner · Experimental restock predictions');
+ const controls=E('div',body);controls.className='tuim-travel-grid';
+ const field=(label,key)=>{const box=E('label',controls,label),x=E('input',box);x.type='number';x.min=0;x.value=travel[key];x.onchange=()=>{travel[key]=x.value;travelSave();refresh()};return x};
+ const select=(label,key,options)=>{const box=E('label',controls,label),x=E('select',box);for(const [v,n] of Object.entries(options)){const o=E('option',x,n);o.value=v}x.value=travel[key];return x};
  const country=select('Destination','country',travelCountries);
- const item=select('Destination item','item',{'':'Select item'});
- const info=E('small',d,'Loading item catalog...');
- const bookLabel=E('label',d,'Mailing Yourself Abroad book active');const book=E('input',bookLabel);book.type='checkbox';book.checked=!!travel.book;book.style.cssText='display:inline;width:auto;margin:0 8px';book.onchange=()=>{travel.book=book.checked;travelSave();flightInfo();if(travel.item)calculate()};
- field('Arrival buffer (minutes)','buffer');field('Item Market selling fee (%)','fee');
- const flight=E('p',d);const result=E('div',d,'Select an item to calculate prices and departure.');result.style.cssText='white-space:pre-line;border:1px solid #39434a;border-radius:7px;padding:10px;margin:10px 0';
- function flightInfo(){const m=travelMinutes();flight.textContent='One-way flight: '+m+' min | Return: '+m+' min | Arrival if leaving now: '+new Date(Date.now()+m*60000).toLocaleString()}
+ const mode=select('Flight mode','mode',{standard:'Standard',airstrip:'Airstrip',private:'Private Jet',business:'Business Class'});
+ const item=select('Item','item',{'':'Select an item'});
+ field('Carrying capacity','capacity');field('Arrival buffer (min)','buffer');field('Selling fee (%)','fee');
+ const bookLabel=E('label',controls,'Mailing Yourself Abroad');const book=E('input',bookLabel);book.type='checkbox';book.checked=!!travel.book;book.onchange=()=>{travel.book=book.checked;travelSave();refresh()};
+ const info=E('small',body,'Loading item catalog...');
+ const output=E('div',body);output.className='tuim-travel-output';
+ const actions=E('div',body);actions.className='tuim-travel-actions';
+ B(actions,'Refresh travel plan',refresh);
+ B(actions,'Arm departure reminder',()=>{if(!travel.departure||travel.departure*1000<=Date.now()+30000)return alert('No future recommended departure');travel.armed=true;travelAlerted=0;travelSave();alert('Reminder armed; keep PDA active')});
+ const box=(parent,title)=>{const d=E('div',parent);d.className='tuim-travel-card';if(title){const t=E('small',d,title);t.className='tuim-travel-muted'}return d};
+ const line=(parent,name,value)=>{const r=E('div',parent);r.className='tuim-travel-line';E('span',r,name);E('strong',r,String(value));return r};
+ const date=t=>t?travelDate(t):'Not available';
+ const money=n=>Number.isFinite(n)?travelMoney(n):'Unavailable';
+ function show(model){
+  if(!w.isConnected)return;
+  output.replaceChildren();
+  const overview=E('div',output);overview.className='tuim-travel-grid';
+  for(const [k,v] of [['Destination',travelCountries[travel.country]],['Flight mode',mode.selectedOptions[0]?.textContent||travel.mode],['Item',item.selectedOptions[0]?.textContent||'Not selected'],['Carrying capacity',travelNum(travel.capacity)+' items']]){const c=box(overview,k);E('strong',c,v)}
+  E('h3',output,'Recommended travel schedule');
+  const schedule=box(output);
+  line(schedule,'Recommended departure',date(model.depart));
+  line(schedule,'Flight duration',model.minutes+' minutes');
+  line(schedule,'Estimated arrival',date(model.arrive));
+  line(schedule,'Predicted restock window',model.pred?.status==='experimental'?date(model.pred.expected_start_at)+' – '+date(model.pred.expected_end_at):'Insufficient data');
+  line(schedule,'Forecast confidence score',model.pred?.status==='experimental'?Math.round(travelNum(model.pred.confidence)*100)+'% (not a probability)':'Unavailable');
+  if(model.depart&&model.depart<=Date.now()/1000)E('small',schedule,'Recommended departure has passed. A later opportunity cannot be guaranteed.');
+  E('h3',output,'Item pricing and profit');
+  const pricing=box(output);
+  line(pricing,'Foreign purchase price',money(model.buy));
+  line(pricing,'Torn resale listing',money(model.sell));
+  line(pricing,'Gross difference per item',money(model.gross));
+  line(pricing,'Selling fee per item',money(model.fee));
+  line(pricing,'Net profit per item',money(model.net));
+  const total=box(output,'Estimated total haul profit');
+  total.className+=' tuim-travel-total';
+  E('strong',total,money(model.haul));
+  line(total,'Cash needed for haul',money(model.cash));
+  line(total,'Estimated net sale proceeds',money(model.proceeds));
+  line(total,'Quantity used',model.qty+' of '+Math.floor(travelNum(travel.capacity))+' capacity');
+  if(model.stock!=null)line(total,'Last observed stock',model.stock+' items');
+  if(model.issues?.length)E('small',output,'API issues: '+model.issues.join('; '));
+  E('small',output,'Prices are listings, not guaranteed sales. Stock is a last-observed snapshot; predictions are experimental. Flight eligibility must be verified in Torn.');
+ }
+ let serial=0;
  async function populate(){
   const selected=travel.country;
-  try{const all=await getCatalog();if(!item.isConnected||selected!==travel.country)return;
-   item.replaceChildren();const first=E('option',item,'Select item');first.value='';
+  try{const all=await getCatalog();if(!w.isConnected||selected!==travel.country)return;
+   item.replaceChildren();const first=E('option',item,'Select an item');first.value='';
    const matched=all.filter(x=>[...(x.locations||[]),x.country||''].some(v=>travelAliases[selected].some(n=>norm(v).includes(norm(n)))));
-   for(const x of matched){const o=E('option',item,x.name+' (#'+x.id+')');o.value=x.id}
+   for(const x of matched){const o=E('option',item,x.name);o.value=x.id}
    item.value=travel.item;info.textContent=matched.length+' destination items found';
-  }catch(e){info.textContent='Item catalog unavailable: '+e.message}
+   refresh();
+  }catch(e){info.textContent='Catalog unavailable: '+e.message}
  }
- async function calculate(){
-  const id=Number(travel.item);if(!Number.isSafeInteger(id)||id<=0){result.textContent='Select an item';return}
-  result.textContent='Retrieving foreign stock, purchase price and resale listings...';
+ async function refresh(){
+  const seq=++serial,minutes=travelMinutes(),cap=Math.floor(travelNum(travel.capacity)),empty={minutes,depart:null,arrive:(Date.now()/1000)+minutes*60,pred:null,buy:NaN,sell:NaN,gross:NaN,fee:NaN,net:NaN,haul:NaN,cash:NaN,proceeds:NaN,qty:cap,stock:null,issues:[]};
+  const id=Number(travel.item);
+  if(!Number.isSafeInteger(id)||id<=0){show(empty);return}
+  info.textContent='Retrieving current stock and prices...';
   const base='https://tu-multiplayer-server.tuserver.workers.dev/api/foreign/',query='?country='+travel.country+'&item_id='+id;
-  const placeholder='###PDA-APIKEY###',key=!placeholder.includes('PDA-APIKEY')?placeholder:(window.TornUtilities?.apiKey||window.TornUtilities?.getApiKey?.()||'');
+  const key=window.TornUtilities?.apiKey||window.TornUtilities?.getApiKey?.()||'';
   const jobs=[travelGet(base+'history'+query+'&limit=1'),travelGet(base+'prediction'+query),key?travelGet('https://api.torn.com/v2/market/'+id+'/itemmarket?key='+encodeURIComponent(key)):Promise.reject(Error('Torn API key unavailable'))];
-  const settled=await Promise.allSettled(jobs),[history,pred,market]=settled.map(x=>x.status==='fulfilled'?x.value:null);
-  const issues=settled.map((x,i)=>x.status==='rejected'?['Foreign stock','Restock prediction','Market price'][i]+': '+x.reason.message:null).filter(Boolean);
-  const latest=history?.points?.[history.points.length-1],buy=Number(latest?.unit_price),sell=market?travelMarket(market):null;
-  const cap=Math.floor(travelNum(travel.capacity)),minutes=travelMinutes(),fee=travelNum(travel.fee)/100;
-  const lines=['Destination: '+travelCountries[travel.country],'Flight: '+minutes+' minutes each way','Arrival if leaving now: '+new Date(Date.now()+minutes*60000).toLocaleString()];
-  if(latest)lines.push('Last observed stock: '+latest.quantity+' at '+travelDate(latest.source_observed_at));
-  lines.push('Foreign purchase price: '+(buy>0?travelMoney(buy):'unavailable'));
-  lines.push('Lowest visible Torn resale listing: '+(sell?travelMoney(sell):'unavailable'));
-  if(buy>0&&sell){const gross=sell-buy,net=sell*(1-fee)-buy,haul=net*cap,travelCost=travel.mode==='standard'?2*travelCosts[travel.country]:0;
-   lines.push('Buy/sell difference per item: '+travelMoney(gross));
-   lines.push('Net profit per item after fee: '+travelMoney(net));
-   lines.push('Estimated profit for full haul ('+cap+' items): '+travelMoney(haul));
-   lines.push('Estimated profit after standard round-trip airfare: '+travelMoney(haul-travelCost));
-   lines.push('Cash needed to purchase haul: '+travelMoney(cap*buy));
-  }
-  travel.departure=0;travel.armed=false;
-  if(pred?.status==='experimental'){
-   const depart=pred.expected_start_at-(minutes+travelNum(travel.buffer))*60;
-   lines.push('Predicted stock availability: '+travelDate(pred.expected_start_at)+' – '+travelDate(pred.expected_end_at));
-   lines.push('Recommended departure: '+travelDate(depart));
-   lines.push('Estimated arrival: '+travelDate(depart+minutes*60));
-   lines.push('Model confidence score: '+Math.round(travelNum(pred.confidence)*100)+'% (not a probability)');
-   if(depart>Date.now()/1000+30)travel.departure=depart;else lines.push('Optimal departure has passed; next restock cannot yet be predicted reliably');
-  }else lines.push('Restock prediction unavailable: '+(pred?.reason||'insufficient observations'));
-  if(issues.length)lines.push('API issues: '+issues.join('; '));
-  lines.push('Prices are listings, not guaranteed sales. Verify flight eligibility and stock in Torn.');travelSave();result.textContent=lines.join('\n');
+  const settled=await Promise.allSettled(jobs);if(seq!==serial||!w.isConnected)return;
+  const [history,pred,market]=settled.map(x=>x.status==='fulfilled'?x.value:null);
+  const issues=settled.map((x,i)=>x.status==='rejected'?['Foreign stock','Prediction','Market price'][i]+': '+x.reason.message:null).filter(Boolean);
+  const latest=history?.points?.[history.points.length-1],buy=Number(latest?.unit_price)>0?Number(latest.unit_price):NaN,sell=market?travelMarket(market):null;
+  const stock=latest&&Number.isFinite(Number(latest.quantity))?Math.max(0,Math.floor(Number(latest.quantity))):null;
+  const qty=stock==null?cap:Math.min(cap,stock);
+  const gross=sell&&Number.isFinite(buy)?sell-buy:NaN,fee=sell?travelNum(travel.fee)/100*sell:NaN,net=gross-fee,haul=net*qty,cash=buy*qty,proceeds=(sell-fee)*qty;
+  const depart=pred?.status==='experimental'?pred.expected_start_at-(minutes+travelNum(travel.buffer))*60:null;
+  travel.departure=depart&&depart>Date.now()/1000+30?depart:0;travel.armed=false;travelSave();
+  show({minutes,depart,arrive:depart?depart+minutes*60:Date.now()/1000+minutes*60,pred,buy,sell,gross,fee,net,haul,cash,proceeds,qty,stock,issues});
+  info.textContent=issues.length?'Partial API data · See warnings':'Updated '+new Date().toLocaleTimeString();
  }
- country.onchange=()=>{travel.country=country.value;travel.item='';travel.departure=0;travel.armed=false;travelSave();flightInfo();populate();result.textContent='Select an item to calculate'};
- mode.onchange=()=>{travel.mode=mode.value;travelSave();flightInfo();if(travel.item)calculate()};
- item.onchange=()=>{travel.item=item.value;travelSave();calculate()};
- B(d,'Refresh prices and travel plan',calculate);
- B(d,'Arm 30-second in-app reminder',()=>{if(!travel.departure||travel.departure*1000<=Date.now()+30000)return alert('No future recommended departure');travel.armed=true;travelAlerted=0;travelSave();alert('Reminder armed. Keep PDA active; background alerts are not guaranteed.')});
- E('small',d,'Flight times use Torn Wiki estimates. No native Android alarm is created.');
- flightInfo();populate();
+ country.onchange=()=>{travel.country=country.value;travel.item='';travelSave();populate()};
+ mode.onchange=()=>{travel.mode=mode.value;travelSave();refresh()};
+ item.onchange=()=>{travel.item=item.value;travelSave();refresh()};
+ show({minutes:travelMinutes(),depart:null,arrive:Date.now()/1000+travelMinutes()*60,pred:null,buy:NaN,sell:NaN,gross:NaN,fee:NaN,net:NaN,haul:NaN,cash:NaN,proceeds:NaN,qty:Math.floor(travelNum(travel.capacity)),stock:null,issues:[]});
+ populate();
 }
-function render(){const p=state.panel;if(!p)return;p.replaceChildren();const h=E('div',p);h.className='tuim-header';draggable(p,h);E('strong',h,'Item Monitor');B(h,'−',()=>{p.hidden=true;state.catalogWindow?.remove();state.catalogWindow=null;state.context?.minimize?.()});B(h,'×',()=>{p.hidden=true;state.catalogWindow?.remove();state.catalogWindow=null;state.context?.close?.()});B(p,category()==='Item Market'?'Select Current Market Item':'Select item on Torn',pick);B(p,'Select Item from Complete List',openCatalog);E('p',p,'Current selection: '+(state.selected?state.selected.category+' / '+state.selected.name:'None'));const label=(t)=>E('label',p,t);label('Minimum available quantity (Foreign / Stores)');const q=E('input',p);q.type='number';q.min='1';q.placeholder='No quantity alert';label('Alert at or below unit price ($, Item Market / Stores)');const pr=E('input',p);pr.type='number';pr.min='0';pr.step='0.01';pr.placeholder='No price alert';if(state.selected){const prev=state.items.find(w=>w.category===state.selected.category&&(w.key===state.selected.key||norm(w.name)===norm(state.selected.name)));if(prev){q.value=prev.minQty??'';pr.value=prev.maxPrice??''}}B(p,'Add / update monitor',()=>{if(!state.selected)return alert('Select an item first.');const s=state.selected;const minQty=q.value.trim()===''?null:Number(q.value),maxPrice=pr.value.trim()===''?null:Number(pr.value);if(s.category==='Foreign'&&minQty===null)return alert('Enter a minimum quantity for foreign items.');if(s.category==='Item Market'&&maxPrice===null)return alert('Enter a target price for Item Market.');if(minQty===null&&maxPrice===null)return alert('Enter a quantity or target price.');if(minQty!==null&&(!Number.isFinite(minQty)||minQty<1)||maxPrice!==null&&(!Number.isFinite(maxPrice)||maxPrice<0))return alert('Invalid target.');state.items=state.items.filter(w=>!(w.category===s.category&&(w.key===s.key||norm(w.name)===norm(s.name))));clearHighlights();state.items.push({...s,minQty:s.category==='Item Market'?null:minQty,maxPrice:s.category==='Foreign'?null:maxPrice,fired:false,status:'Waiting'});save();scan();render()});const st=E('p',p,state.items.length+' monitored item(s)');st.id='tuim-status';for(const cat of ['Foreign','Stores','Item Market','Other']){const watches=state.items.filter(w=>w.category===cat);if(!watches.length)continue;E('h3',p,cat+' ('+watches.length+')');for(const w of watches){const line=E('div',p);line.className='tuim-entry';const heading=E('strong',line,w.name+' ✎');heading.style.cssText='cursor:pointer;color:#d6b65c;padding:5px 0';heading.setAttribute('role','button');heading.tabIndex=0;const edit=()=>{state.selected={category:w.category,name:w.name,key:w.key};render();state.panel.scrollTo({top:0,behavior:'smooth'});state.panel.querySelectorAll('input[type=number]')[w.category==='Item Market'?1:0]?.focus()};heading.onclick=edit;heading.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();edit()}};E('div',line,'Qty ≥ '+(w.minQty??'off')+' | Price ≤ '+(w.maxPrice==null?'off':'$'+w.maxPrice.toLocaleString()));E('small',line,w.status||'Waiting');B(line,'Edit',edit);B(line,'Remove',()=>{state.items=state.items.filter(x=>x!==w);clearHighlights();save();scan();render()})}}B(p,'Clear all monitors',()=>{if(!confirm('Remove all monitored items?'))return;state.items=[];clearHighlights();save();render()});travelUI(p);E('h3',p,'Alarm settings');label('Volume (%)');const vol=E('input',p);vol.type='range';vol.min=0;vol.max=100;vol.value=state.cfg.alarmVolume??60;vol.style.touchAction='none';const setVolume=x=>{const rect=vol.getBoundingClientRect();if(!rect.width)return;vol.value=String(Math.round(Math.max(0,Math.min(100,(x-rect.left)/rect.width*100))));state.cfg.alarmVolume=vol.value;saveCfg()};let volumePointer=null;vol.addEventListener('pointerdown',e=>{if(e.button!==0&&e.pointerType==='mouse')return;e.preventDefault();e.stopImmediatePropagation();volumePointer=e.pointerId;vol.setPointerCapture?.(e.pointerId);setVolume(e.clientX)},{capture:true,passive:false});vol.addEventListener('pointermove',e=>{if(volumePointer!==e.pointerId)return;e.preventDefault();e.stopImmediatePropagation();setVolume(e.clientX)},{capture:true,passive:false});for(const ev of ['pointerup','pointercancel','lostpointercapture'])vol.addEventListener(ev,e=>{if(volumePointer===e.pointerId)volumePointer=null;e.stopPropagation()},{capture:true});vol.addEventListener('touchmove',e=>{if(volumePointer!==null)e.preventDefault();e.stopPropagation()},{passive:false});vol.oninput=()=>{state.cfg.alarmVolume=vol.value;saveCfg()};label('Sound');const snd=E('select',p);for(const v of ['beep','siren','chime']){const o=E('option',snd,v);o.value=v}snd.value=state.cfg.alarmSound||'beep';snd.onchange=()=>{state.cfg.alarmSound=snd.value;saveCfg()};label('Duration (seconds)');const dur=E('input',p);dur.type='number';dur.min=.5;dur.max=30;dur.value=state.cfg.alarmDuration??3;dur.oninput=()=>{state.cfg.alarmDuration=dur.value;saveCfg()};B(p,'Test alarm',sound);E('p',p,'Monitors persist across navigation and refresh. Alerts only evaluate visible listings while Torn is running.')}
+
+function render(){const p=state.panel;if(!p)return;p.replaceChildren();const h=E('div',p);h.className='tuim-header';draggable(p,h);E('strong',h,'Item Monitor');B(h,'−',()=>{p.hidden=true;state.catalogWindow?.remove();state.catalogWindow=null;state.context?.minimize?.()});B(h,'×',()=>{p.hidden=true;state.catalogWindow?.remove();state.catalogWindow=null;state.context?.close?.()});B(p,category()==='Item Market'?'Select Current Market Item':'Select item on Torn',pick);B(p,'Select Item from Complete List',openCatalog);E('p',p,'Current selection: '+(state.selected?state.selected.category+' / '+state.selected.name:'None'));const label=(t)=>E('label',p,t);label('Minimum available quantity (Foreign / Stores)');const q=E('input',p);q.type='number';q.min='1';q.placeholder='No quantity alert';label('Alert at or below unit price ($, Item Market / Stores)');const pr=E('input',p);pr.type='number';pr.min='0';pr.step='0.01';pr.placeholder='No price alert';if(state.selected){const prev=state.items.find(w=>w.category===state.selected.category&&(w.key===state.selected.key||norm(w.name)===norm(state.selected.name)));if(prev){q.value=prev.minQty??'';pr.value=prev.maxPrice??''}}B(p,'Add / update monitor',()=>{if(!state.selected)return alert('Select an item first.');const s=state.selected;const minQty=q.value.trim()===''?null:Number(q.value),maxPrice=pr.value.trim()===''?null:Number(pr.value);if(s.category==='Foreign'&&minQty===null)return alert('Enter a minimum quantity for foreign items.');if(s.category==='Item Market'&&maxPrice===null)return alert('Enter a target price for Item Market.');if(minQty===null&&maxPrice===null)return alert('Enter a quantity or target price.');if(minQty!==null&&(!Number.isFinite(minQty)||minQty<1)||maxPrice!==null&&(!Number.isFinite(maxPrice)||maxPrice<0))return alert('Invalid target.');state.items=state.items.filter(w=>!(w.category===s.category&&(w.key===s.key||norm(w.name)===norm(s.name))));clearHighlights();state.items.push({...s,minQty:s.category==='Item Market'?null:minQty,maxPrice:s.category==='Foreign'?null:maxPrice,fired:false,status:'Waiting'});save();scan();render()});const st=E('p',p,state.items.length+' monitored item(s)');st.id='tuim-status';for(const cat of ['Foreign','Stores','Item Market','Other']){const watches=state.items.filter(w=>w.category===cat);if(!watches.length)continue;E('h3',p,cat+' ('+watches.length+')');for(const w of watches){const line=E('div',p);line.className='tuim-entry';const heading=E('strong',line,w.name+' ✎');heading.style.cssText='cursor:pointer;color:#d6b65c;padding:5px 0';heading.setAttribute('role','button');heading.tabIndex=0;const edit=()=>{state.selected={category:w.category,name:w.name,key:w.key};render();state.panel.scrollTo({top:0,behavior:'smooth'});state.panel.querySelectorAll('input[type=number]')[w.category==='Item Market'?1:0]?.focus()};heading.onclick=edit;heading.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();edit()}};E('div',line,'Qty ≥ '+(w.minQty??'off')+' | Price ≤ '+(w.maxPrice==null?'off':'$'+w.maxPrice.toLocaleString()));E('small',line,w.status||'Waiting');B(line,'Edit',edit);B(line,'Remove',()=>{state.items=state.items.filter(x=>x!==w);clearHighlights();save();scan();render()})}}B(p,'Clear all monitors',()=>{if(!confirm('Remove all monitored items?'))return;state.items=[];clearHighlights();save();render()});E('h3',p,'Travel planning');B(p,'Open Travel Assistant',travelUI);E('h3',p,'Alarm settings');label('Volume (%)');const vol=E('input',p);vol.type='range';vol.min=0;vol.max=100;vol.value=state.cfg.alarmVolume??60;vol.style.touchAction='none';const setVolume=x=>{const rect=vol.getBoundingClientRect();if(!rect.width)return;vol.value=String(Math.round(Math.max(0,Math.min(100,(x-rect.left)/rect.width*100))));state.cfg.alarmVolume=vol.value;saveCfg()};let volumePointer=null;vol.addEventListener('pointerdown',e=>{if(e.button!==0&&e.pointerType==='mouse')return;e.preventDefault();e.stopImmediatePropagation();volumePointer=e.pointerId;vol.setPointerCapture?.(e.pointerId);setVolume(e.clientX)},{capture:true,passive:false});vol.addEventListener('pointermove',e=>{if(volumePointer!==e.pointerId)return;e.preventDefault();e.stopImmediatePropagation();setVolume(e.clientX)},{capture:true,passive:false});for(const ev of ['pointerup','pointercancel','lostpointercapture'])vol.addEventListener(ev,e=>{if(volumePointer===e.pointerId)volumePointer=null;e.stopPropagation()},{capture:true});vol.addEventListener('touchmove',e=>{if(volumePointer!==null)e.preventDefault();e.stopPropagation()},{passive:false});vol.oninput=()=>{state.cfg.alarmVolume=vol.value;saveCfg()};label('Sound');const snd=E('select',p);for(const v of ['beep','siren','chime']){const o=E('option',snd,v);o.value=v}snd.value=state.cfg.alarmSound||'beep';snd.onchange=()=>{state.cfg.alarmSound=snd.value;saveCfg()};label('Duration (seconds)');const dur=E('input',p);dur.type='number';dur.min=.5;dur.max=30;dur.value=state.cfg.alarmDuration??3;dur.oninput=()=>{state.cfg.alarmDuration=dur.value;saveCfg()};B(p,'Test alarm',sound);E('p',p,'Monitors persist across navigation and refresh. Alerts only evaluate visible listings while Torn is running.')}
 function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=load(OLD,[]);for(const w of old){if(!w.name)continue;const key=w.key?.startsWith('id:')?w.key:'name:'+norm(w.name);if(!state.items.some(x=>x.key===key&&x.category==='Foreign'))state.items.push({category:'Foreign',name:w.name,key,minQty:Number(w.min)||null,maxPrice:null,status:'Migrated',fired:false})}save();localStorage.setItem('tuim-migrated','1')}
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
-function deactivate(){state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
+function deactivate(){travelClose();state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
 const definition={id:ID,version:'1.6.0',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
