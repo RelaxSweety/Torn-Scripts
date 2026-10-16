@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.7.1
+// @version      1.7.2
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -248,7 +248,7 @@ const travelCosts={mex:6500,cay:10000,can:9000,haw:11000,uni:18000,arg:21000,swi
 const travelAliases={mex:['mexico'],cay:['cayman'],can:['canada'],haw:['hawaii'],uni:['united kingdom','london'],arg:['argentina'],swi:['switzerland'],jap:['japan'],chi:['china'],uae:['united arab emirates','dubai','uae'],sou:['south africa']};
 const travelSave=()=>localStorage.setItem('tuim-travel-v8',JSON.stringify(travel));
 const travelNum=v=>Math.max(0,Number(v)||0);
-const travelDate=t=>new Date(t*1000).toLocaleString();
+const travelDate=t=>{const d=new Date(t*1000);return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false})+' Local / '+new Intl.DateTimeFormat('en-GB',{timeZone:'UTC',hour:'2-digit',minute:'2-digit',hour12:false}).format(d)+' TCT'};
 const travelMoney=v=>(v<0?'-$':'$')+Math.abs(Math.round(v)).toLocaleString();
 const travelMinutes=()=>Math.ceil(travelTimes[travel.country][{standard:0,airstrip:1,private:2,business:3}[travel.mode]]*(travel.book?.75/100:1));
 let travelAlerted=0;
@@ -286,7 +286,7 @@ function travelUI(){
  const mode=select('Flight mode','mode',{standard:'Standard',airstrip:'Airstrip',private:'Private Jet',business:'Business Class'});
  const item=select('Item','item',{'':'Select an item'});
  field('Carrying capacity','capacity');field('Arrival buffer (min)','buffer');field('Selling fee (%)','fee');
- const bookLabel=E('label',controls,'Mailing Yourself Abroad');const book=E('input',bookLabel);book.type='checkbox';book.checked=!!travel.book;book.onchange=()=>{travel.book=book.checked;travelSave();refresh()};
+ const book=select('Mailing Yourself Abroad','book',{'false':'No','true':'Yes'});book.value=String(!!travel.book);book.onchange=()=>{travel.book=book.value==='true';travelSave();refresh()};
  const info=E('small',body,'Loading item catalog...');
  const output=E('div',body);output.className='tuim-travel-output';
  const actions=E('div',body);actions.className='tuim-travel-actions';
@@ -317,7 +317,7 @@ function travelUI(){
   const total=box(output,'Estimated total haul profit');
   total.className+=' tuim-travel-total';
   E('strong',total,money(model.haul));
-  line(total,'Cash needed for haul',money(model.cash));
+  line(total,'Cash needed for full-capacity haul',money(model.cash));
   line(total,'Estimated net sale proceeds',money(model.proceeds));
   line(total,'Full-capacity profit estimate',money(model.fullHaul));
   line(total,'Currently purchasable quantity',model.qty+' of '+Math.floor(travelNum(travel.capacity))+' capacity');
@@ -351,7 +351,7 @@ function travelUI(){
   const latest=history?.points?.[history.points.length-1],buy=Number(latest?.unit_price)>0?Number(latest.unit_price):NaN,sell=market?travelMarket(market):null;
   const stock=latest&&Number.isFinite(Number(latest.quantity))?Math.max(0,Math.floor(Number(latest.quantity))):null;
   const qty=stock==null?cap:Math.min(cap,stock);
-  const gross=sell&&Number.isFinite(buy)?sell-buy:NaN,fee=sell?travelNum(travel.fee)/100*sell:NaN,net=gross-fee,haul=net*qty,fullHaul=net*cap,cash=buy*qty,proceeds=(sell-fee)*qty;
+  const gross=sell&&Number.isFinite(buy)?sell-buy:NaN,fee=sell?travelNum(travel.fee)/100*sell:NaN,net=gross-fee,haul=net*qty,fullHaul=net*cap,cash=buy*cap,proceeds=(sell-fee)*qty;
   const depart=pred?.status==='experimental'?pred.expected_start_at-(minutes+travelNum(travel.buffer))*60:null;
   travel.departure=depart&&depart>Date.now()/1000+30?depart:0;travel.armed=false;travelSave();
   show({minutes,depart,arrive:depart?depart+minutes*60:Date.now()/1000+minutes*60,pred,buy,sell,gross,fee,net,haul,fullHaul,cash,proceeds,qty,stock,issues});
@@ -369,5 +369,5 @@ function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=loa
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
 function deactivate(){travelClose();state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.7.1',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'1.7.2',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
