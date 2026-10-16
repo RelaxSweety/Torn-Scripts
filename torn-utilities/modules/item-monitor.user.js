@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.7.2
+// @version      1.7.3
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -319,9 +319,7 @@ function travelUI(){
   E('strong',total,money(model.haul));
   line(total,'Cash needed for full-capacity haul',money(model.cash));
   line(total,'Estimated net sale proceeds',money(model.proceeds));
-  line(total,'Full-capacity profit estimate',money(model.fullHaul));
-  line(total,'Currently purchasable quantity',model.qty+' of '+Math.floor(travelNum(travel.capacity))+' capacity');
-  if(model.stock!=null)line(total,'Last observed stock',model.stock+' items');
+  line(total,'Planned haul quantity',model.qty+' items');
   if(model.issues?.length)E('small',output,'API issues: '+model.issues.join('; '));
   E('small',output,'Prices are listings, not guaranteed sales. Stock is a last-observed snapshot; predictions are experimental. Flight eligibility must be verified in Torn.');
  }
@@ -349,12 +347,11 @@ function travelUI(){
   const [history,pred,market]=settled.map(x=>x.status==='fulfilled'?x.value:null);
   const issues=settled.map((x,i)=>x.status==='rejected'?['Foreign stock','Prediction','Market price'][i]+': '+x.reason.message:null).filter(Boolean);
   const latest=history?.points?.[history.points.length-1],buy=Number(latest?.unit_price)>0?Number(latest.unit_price):NaN,sell=market?travelMarket(market):null;
-  const stock=latest&&Number.isFinite(Number(latest.quantity))?Math.max(0,Math.floor(Number(latest.quantity))):null;
-  const qty=stock==null?cap:Math.min(cap,stock);
-  const gross=sell&&Number.isFinite(buy)?sell-buy:NaN,fee=sell?travelNum(travel.fee)/100*sell:NaN,net=gross-fee,haul=net*qty,fullHaul=net*cap,cash=buy*cap,proceeds=(sell-fee)*qty;
+  const qty=cap;
+  const gross=sell&&Number.isFinite(buy)?sell-buy:NaN,fee=sell?travelNum(travel.fee)/100*sell:NaN,net=gross-fee,haul=net*cap,fullHaul=haul,cash=buy*cap,proceeds=(sell-fee)*cap;
   const depart=pred?.status==='experimental'?pred.expected_start_at-(minutes+travelNum(travel.buffer))*60:null;
   travel.departure=depart&&depart>Date.now()/1000+30?depart:0;travel.armed=false;travelSave();
-  show({minutes,depart,arrive:depart?depart+minutes*60:Date.now()/1000+minutes*60,pred,buy,sell,gross,fee,net,haul,fullHaul,cash,proceeds,qty,stock,issues});
+  show({minutes,depart,arrive:depart?depart+minutes*60:Date.now()/1000+minutes*60,pred,buy,sell,gross,fee,net,haul,fullHaul,cash,proceeds,qty,stock:null,issues});
   info.textContent=issues.length?'Partial API data · See warnings':'Updated '+new Date().toLocaleTimeString();
  }
  country.onchange=()=>{travel.country=country.value;travel.item='';travelSave();populate()};
@@ -369,5 +366,5 @@ function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=loa
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
 function deactivate(){travelClose();state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.7.2',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'1.7.3',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
