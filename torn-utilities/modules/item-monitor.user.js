@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.5.0
+// @version      1.6.0
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -239,104 +239,103 @@ function openCatalog(){
 }
 
 
-const travel=load('tuim-travel-v7',{capacity:20,mode:'standard',country:'mex',item:0,price:0,resale:0,reserve:0,flight:0,buffer:5,departure:0,armed:false});
-const travelCountries={mex:'Mexico',cay:'Cayman Islands',can:'Canada',haw:'Hawaii',uni:'United Kingdom',arg:'Argentina',swi:'Switzerland',jap:'Japan',chi:'China',uae:'UAE',sou:'South Africa'};
-const saveTravel=()=>localStorage.setItem('tuim-travel-v7',JSON.stringify(travel));
+
+const travel=load('tuim-travel-v8',{capacity:20,mode:'standard',country:'mex',item:'',buffer:5,fee:5,book:false,departure:0,armed:false});
+const travelCountries={mex:'Mexico',cay:'Cayman Islands',can:'Canada',haw:'Hawaii',uni:'United Kingdom',arg:'Argentina',swi:'Switzerland',jap:'Japan',chi:'China',uae:'United Arab Emirates',sou:'South Africa'};
+const travelTimes={mex:[24,17,12,7],cay:[33,23,17,10],can:[39,27,19,12],haw:[127,89,63,38],uni:[151,106,75,45],arg:[158,111,79,47],swi:[166,116,83,50],jap:[213,149,107,64],chi:[229,160,114,69],uae:[257,180,128,77],sou:[282,197,141,85]};
+const travelCosts={mex:6500,cay:10000,can:9000,haw:11000,uni:18000,arg:21000,swi:27000,jap:32000,chi:35000,uae:32000,sou:40000};
+const travelAliases={mex:['mexico'],cay:['cayman'],can:['canada'],haw:['hawaii'],uni:['united kingdom','london'],arg:['argentina'],swi:['switzerland'],jap:['japan'],chi:['china'],uae:['united arab emirates','dubai','uae'],sou:['south africa']};
+const travelSave=()=>localStorage.setItem('tuim-travel-v8',JSON.stringify(travel));
 const travelNum=v=>Math.max(0,Number(v)||0);
 const travelDate=t=>new Date(t*1000).toLocaleString();
+const travelMoney=v=>(v<0?'-$':'$')+Math.abs(Math.round(v)).toLocaleString();
+const travelMinutes=()=>Math.ceil(travelTimes[travel.country][{standard:0,airstrip:1,private:2,business:3}[travel.mode]]*(travel.book?.75/100:1));
 let travelAlerted=0;
-setInterval(()=>{
- const t=travel.departure;if(!travel.armed||!t||travelAlerted===t)return;
- if(t-Date.now()/1000<=30&&t-Date.now()/1000>=-5){travelAlerted=t;travel.armed=false;saveTravel();sound();alert('Travel Assistant: departure in 30 seconds')}
-},1000);
+setInterval(()=>{const t=travel.departure;if(!travel.armed||!t||travelAlerted===t)return;if(t-Date.now()/1000<=30&&t-Date.now()/1000>=-5){travelAlerted=t;travel.armed=false;travelSave();sound();alert('Travel Assistant: departure in 30 seconds')}},1000);
 async function travelGet(url){
- try{const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);return await r.json()}
- catch(e){if(typeof PDA_httpGet!=='function')throw e;const r=await PDA_httpGet(url);const raw=typeof r==='string'?r:r.responseText||r.data||r.body||r.response||r;return typeof raw==='string'?JSON.parse(raw):raw}
+ const parse=r=>{const raw=typeof r==='string'?r:r?.responseText??r?.data??r?.body??r?.response??r;const data=typeof raw==='string'?JSON.parse(raw):raw;if(data?.error)throw Error(typeof data.error==='string'?data.error:data.error.error||'API error');return data};
+ try{const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);return parse(await r.text())}
+ catch(e){if(typeof PDA_httpGet!=='function')throw e;return parse(await PDA_httpGet(url))}
+}
+function travelMarket(data){
+ const found=[];const scan=(x,depth)=>{
+  if(!x||depth>5)return;
+  if(Array.isArray(x)){for(const y of x)scan(y,depth+1);return}
+  if(typeof x!=='object')return;
+  const price=Number(x.price??x.listing_price);
+  if(Number.isFinite(price)&&price>0&&('quantity' in x||'amount' in x||'seller' in x))found.push(price);
+  for(const [k,v] of Object.entries(x))if(['itemmarket','listings','items','item','market','bazaar','bazaars','offers'].includes(k))scan(v,depth+1);
+ };scan(data,0);return found.length?Math.min(...found):null;
 }
 function travelUI(p){
  const d=E('details',p);d.open=!!state.travelOpen;d.ontoggle=()=>state.travelOpen=d.open;
- const head=E('summary',d,'Travel Assistant');head.style.cssText='color:#d6b65c;font-size:17px;font-weight:bold;padding:12px 0';
- E('p',d,'Manual capacity and flight duration. Restock predictions are experimental.');
- const input=(label,key)=>{
-  E('label',d,label);const x=E('input',d);x.type='number';x.min='0';x.value=travel[key];
-  x.onchange=()=>{travel[key]=x.value;saveTravel()};return x;
- };
- const select=(label,key,opts)=>{
-  E('label',d,label);const x=E('select',d);
-  for(const [v,name] of Object.entries(opts)){const o=E('option',x,name);o.value=v}
-  x.value=travel[key];x.onchange=()=>{travel[key]=x.value;saveTravel()};return x;
- };
- input('User-defined carrying capacity','capacity');
- select('Flight mode','mode',{standard:'Standard',business:'Business',private:'Private jet'});
+ const h=E('summary',d,'Travel Assistant');h.style.cssText='cursor:pointer;color:#d6b65c;font-weight:bold;font-size:17px;padding:12px 0';
+ E('p',d,'Automatically calculated flight times and API-based item prices. Predictions are experimental.');
+ const field=(label,key)=>{E('label',d,label);const x=E('input',d);x.type='number';x.min='0';x.value=travel[key];x.onchange=()=>{travel[key]=x.value;travelSave();flightInfo()};return x};
+ const select=(label,key,options)=>{E('label',d,label);const x=E('select',d);for(const [v,name] of Object.entries(options)){const o=E('option',x,name);o.value=v}x.value=travel[key];x.onchange=()=>{travel[key]=x.value;travelSave();flightInfo()};return x};
+ field('Carrying capacity','capacity');
+ const mode=select('Flight mode','mode',{standard:'Standard',airstrip:'Airstrip',private:'Private (WLT)',business:'Business Class'});
  const country=select('Destination','country',travelCountries);
  const item=select('Destination item','item',{'':'Select item'});
- const manual=input('Item ID (manual fallback)','item');
  const info=E('small',d,'Loading item catalog...');
+ const bookLabel=E('label',d,'Mailing Yourself Abroad book active');const book=E('input',bookLabel);book.type='checkbox';book.checked=!!travel.book;book.style.cssText='display:inline;width:auto;margin:0 8px';book.onchange=()=>{travel.book=book.checked;travelSave();flightInfo();if(travel.item)calculate()};
+ field('Arrival buffer (minutes)','buffer');field('Item Market selling fee (%)','fee');
+ const flight=E('p',d);const result=E('div',d,'Select an item to calculate prices and departure.');result.style.cssText='white-space:pre-line;border:1px solid #39434a;border-radius:7px;padding:10px;margin:10px 0';
+ function flightInfo(){const m=travelMinutes();flight.textContent='One-way flight: '+m+' min | Return: '+m+' min | Arrival if leaving now: '+new Date(Date.now()+m*60000).toLocaleString()}
  async function populate(){
   const selected=travel.country;
-  try{
-   const all=await getCatalog();if(!item.isConnected||selected!==travel.country)return;
-   item.replaceChildren();const empty=E('option',item,'Select item');empty.value='';
-   const matched=all.filter(x=>[...(x.locations||[]),x.country||''].some(loc=>norm(loc).includes(norm(travelCountries[selected]))));
+  try{const all=await getCatalog();if(!item.isConnected||selected!==travel.country)return;
+   item.replaceChildren();const first=E('option',item,'Select item');first.value='';
+   const matched=all.filter(x=>[...(x.locations||[]),x.country||''].some(v=>travelAliases[selected].some(n=>norm(v).includes(norm(n)))));
    for(const x of matched){const o=E('option',item,x.name+' (#'+x.id+')');o.value=x.id}
    item.value=travel.item;info.textContent=matched.length+' destination items found';
-  }catch(e){info.textContent='Catalog unavailable; enter item ID manually'}
+  }catch(e){info.textContent='Item catalog unavailable: '+e.message}
  }
- item.onchange=()=>{travel.item=item.value;manual.value=item.value;saveTravel()};
- manual.onchange=()=>{travel.item=manual.value;item.value=manual.value;saveTravel()};
- country.onchange=()=>{travel.country=country.value;travel.item='';manual.value='';saveTravel();populate()};
- populate();
- input('Foreign unit price ($)','price');input('Expected resale price ($)','resale');input('Cash reserve ($)','reserve');
- input('Flight duration (minutes; verify in Torn)','flight');input('Arrival buffer (minutes)','buffer');
- const result=E('div',d,'Enter trip details and calculate.');result.style.cssText='white-space:pre-line;border:1px solid #39434a;border-radius:7px;padding:10px;margin:12px 0';
- B(d,'Calculate travel plan',async()=>{
-  const cap=Math.floor(travelNum(travel.capacity)),cost=travelNum(travel.price),sale=travelNum(travel.resale),reserve=travelNum(travel.reserve);
-  const lines=['Capacity: '+cap,'Purchase cash: $'+(cap*cost).toLocaleString(),'Required cash including reserve: $'+(cap*cost+reserve).toLocaleString()];
-  if(sale>0)lines.push('Gross resale margin before fees: $'+((sale-cost)*cap).toLocaleString());
-  travel.departure=0;travel.armed=false;saveTravel();
-  const id=Number(travel.item);
-  if(!Number.isSafeInteger(id)||id<=0){result.textContent=lines.concat('Select a valid item ID.').join('\n');return}
-  result.textContent=lines.concat('Checking inventory...').join('\n');
-  const base='https://tu-multiplayer-server.tuserver.workers.dev/api/foreign/';
-  const query='?country='+travel.country+'&item_id='+id;
-  try{
-   const [history,pred]=await Promise.all([travelGet(base+'history'+query+'&limit=1'),travelGet(base+'prediction'+query)]);
-   if(history.error||pred.error)throw Error('Stock service returned an error');
-   const last=history.points&&history.points[history.points.length-1];
-   if(last)lines.push('Last observed stock: '+last.quantity+' at '+travelDate(last.source_observed_at));
-   else lines.push('No observed stock available');
-   if(pred.status==='experimental'){
-    lines.push('Estimated restock: '+travelDate(pred.expected_start_at)+' to '+travelDate(pred.expected_end_at));
-    lines.push('Model confidence score: '+Math.round(travelNum(pred.confidence)*100)+'% (not a probability)');
-    if(travelNum(travel.flight)>0){
-     const depart=pred.expected_start_at-Math.round((travelNum(travel.flight)+travelNum(travel.buffer))*60);
-     lines.push('Suggested departure: '+travelDate(depart));
-     if(depart>Date.now()/1000+30){travel.departure=depart;saveTravel()}else lines.push('Departure has passed or is too close');
-    }else lines.push('Enter flight duration to calculate departure');
-   }else lines.push('Forecast unavailable: '+(pred.reason||'insufficient history'));
-  }catch(e){lines.push('Forecast unavailable: '+e.message)}
-  lines.push('Verify actual flight eligibility, duration and live stock in Torn.');
-  result.textContent=lines.join('\n');
- });
- B(d,'Arm in-app 30-second reminder',()=>{
-  if(!travel.departure||travel.departure*1000<=Date.now()+30000)return alert('Calculate a future departure first');
-  travel.armed=true;travelAlerted=0;saveTravel();alert('Reminder armed. Keep PDA running; background alerts are not guaranteed.');
- });
- B(d,'Export calendar reminder (.ics)',()=>{
-  if(!travel.departure||travel.departure*1000<=Date.now()+30000)return alert('Calculate a future departure first');
-  const stamp=t=>new Date(t*1000).toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
-  const t=travel.departure-30;
-  const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//TU//Travel Assistant//EN','BEGIN:VEVENT','UID:tu-'+travel.departure+'@torn','DTSTAMP:'+stamp(Date.now()/1000),'DTSTART:'+stamp(t),'DTEND:'+stamp(t+60),'SUMMARY:Torn departure in 30 seconds','BEGIN:VALARM','TRIGGER:PT0S','ACTION:DISPLAY','DESCRIPTION:Torn departure reminder','END:VALARM','END:VEVENT','END:VCALENDAR'];
-  const u=URL.createObjectURL(new Blob([lines.join('\r\n')],{type:'text/calendar'}));
-  const a=E('a',document.body);a.href=u;a.download='torn-travel.ics';a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),10000);
- });
- E('small',d,'Calendar import depends on your device. Downloading .ics does not automatically set an Android alarm.');
+ async function calculate(){
+  const id=Number(travel.item);if(!Number.isSafeInteger(id)||id<=0){result.textContent='Select an item';return}
+  result.textContent='Retrieving foreign stock, purchase price and resale listings...';
+  const base='https://tu-multiplayer-server.tuserver.workers.dev/api/foreign/',query='?country='+travel.country+'&item_id='+id;
+  const placeholder='###PDA-APIKEY###',key=!placeholder.includes('PDA-APIKEY')?placeholder:(window.TornUtilities?.apiKey||window.TornUtilities?.getApiKey?.()||'');
+  const jobs=[travelGet(base+'history'+query+'&limit=1'),travelGet(base+'prediction'+query),key?travelGet('https://api.torn.com/v2/market/'+id+'/itemmarket?key='+encodeURIComponent(key)):Promise.reject(Error('Torn API key unavailable'))];
+  const settled=await Promise.allSettled(jobs),[history,pred,market]=settled.map(x=>x.status==='fulfilled'?x.value:null);
+  const issues=settled.map((x,i)=>x.status==='rejected'?['Foreign stock','Restock prediction','Market price'][i]+': '+x.reason.message:null).filter(Boolean);
+  const latest=history?.points?.[history.points.length-1],buy=Number(latest?.unit_price),sell=market?travelMarket(market):null;
+  const cap=Math.floor(travelNum(travel.capacity)),minutes=travelMinutes(),fee=travelNum(travel.fee)/100;
+  const lines=['Destination: '+travelCountries[travel.country],'Flight: '+minutes+' minutes each way','Arrival if leaving now: '+new Date(Date.now()+minutes*60000).toLocaleString()];
+  if(latest)lines.push('Last observed stock: '+latest.quantity+' at '+travelDate(latest.source_observed_at));
+  lines.push('Foreign purchase price: '+(buy>0?travelMoney(buy):'unavailable'));
+  lines.push('Lowest visible Torn resale listing: '+(sell?travelMoney(sell):'unavailable'));
+  if(buy>0&&sell){const gross=sell-buy,net=sell*(1-fee)-buy,haul=net*cap,travelCost=travel.mode==='standard'?2*travelCosts[travel.country]:0;
+   lines.push('Buy/sell difference per item: '+travelMoney(gross));
+   lines.push('Net profit per item after fee: '+travelMoney(net));
+   lines.push('Estimated profit for full haul ('+cap+' items): '+travelMoney(haul));
+   lines.push('Estimated profit after standard round-trip airfare: '+travelMoney(haul-travelCost));
+   lines.push('Cash needed to purchase haul: '+travelMoney(cap*buy));
+  }
+  travel.departure=0;travel.armed=false;
+  if(pred?.status==='experimental'){
+   const depart=pred.expected_start_at-(minutes+travelNum(travel.buffer))*60;
+   lines.push('Predicted stock availability: '+travelDate(pred.expected_start_at)+' – '+travelDate(pred.expected_end_at));
+   lines.push('Recommended departure: '+travelDate(depart));
+   lines.push('Estimated arrival: '+travelDate(depart+minutes*60));
+   lines.push('Model confidence score: '+Math.round(travelNum(pred.confidence)*100)+'% (not a probability)');
+   if(depart>Date.now()/1000+30)travel.departure=depart;else lines.push('Optimal departure has passed; next restock cannot yet be predicted reliably');
+  }else lines.push('Restock prediction unavailable: '+(pred?.reason||'insufficient observations'));
+  if(issues.length)lines.push('API issues: '+issues.join('; '));
+  lines.push('Prices are listings, not guaranteed sales. Verify flight eligibility and stock in Torn.');travelSave();result.textContent=lines.join('\n');
+ }
+ country.onchange=()=>{travel.country=country.value;travel.item='';travel.departure=0;travel.armed=false;travelSave();flightInfo();populate();result.textContent='Select an item to calculate'};
+ mode.onchange=()=>{travel.mode=mode.value;travelSave();flightInfo();if(travel.item)calculate()};
+ item.onchange=()=>{travel.item=item.value;travelSave();calculate()};
+ B(d,'Refresh prices and travel plan',calculate);
+ B(d,'Arm 30-second in-app reminder',()=>{if(!travel.departure||travel.departure*1000<=Date.now()+30000)return alert('No future recommended departure');travel.armed=true;travelAlerted=0;travelSave();alert('Reminder armed. Keep PDA active; background alerts are not guaranteed.')});
+ E('small',d,'Flight times use Torn Wiki estimates. No native Android alarm is created.');
+ flightInfo();populate();
 }
-
 function render(){const p=state.panel;if(!p)return;p.replaceChildren();const h=E('div',p);h.className='tuim-header';draggable(p,h);E('strong',h,'Item Monitor');B(h,'−',()=>{p.hidden=true;state.catalogWindow?.remove();state.catalogWindow=null;state.context?.minimize?.()});B(h,'×',()=>{p.hidden=true;state.catalogWindow?.remove();state.catalogWindow=null;state.context?.close?.()});B(p,category()==='Item Market'?'Select Current Market Item':'Select item on Torn',pick);B(p,'Select Item from Complete List',openCatalog);E('p',p,'Current selection: '+(state.selected?state.selected.category+' / '+state.selected.name:'None'));const label=(t)=>E('label',p,t);label('Minimum available quantity (Foreign / Stores)');const q=E('input',p);q.type='number';q.min='1';q.placeholder='No quantity alert';label('Alert at or below unit price ($, Item Market / Stores)');const pr=E('input',p);pr.type='number';pr.min='0';pr.step='0.01';pr.placeholder='No price alert';if(state.selected){const prev=state.items.find(w=>w.category===state.selected.category&&(w.key===state.selected.key||norm(w.name)===norm(state.selected.name)));if(prev){q.value=prev.minQty??'';pr.value=prev.maxPrice??''}}B(p,'Add / update monitor',()=>{if(!state.selected)return alert('Select an item first.');const s=state.selected;const minQty=q.value.trim()===''?null:Number(q.value),maxPrice=pr.value.trim()===''?null:Number(pr.value);if(s.category==='Foreign'&&minQty===null)return alert('Enter a minimum quantity for foreign items.');if(s.category==='Item Market'&&maxPrice===null)return alert('Enter a target price for Item Market.');if(minQty===null&&maxPrice===null)return alert('Enter a quantity or target price.');if(minQty!==null&&(!Number.isFinite(minQty)||minQty<1)||maxPrice!==null&&(!Number.isFinite(maxPrice)||maxPrice<0))return alert('Invalid target.');state.items=state.items.filter(w=>!(w.category===s.category&&(w.key===s.key||norm(w.name)===norm(s.name))));clearHighlights();state.items.push({...s,minQty:s.category==='Item Market'?null:minQty,maxPrice:s.category==='Foreign'?null:maxPrice,fired:false,status:'Waiting'});save();scan();render()});const st=E('p',p,state.items.length+' monitored item(s)');st.id='tuim-status';for(const cat of ['Foreign','Stores','Item Market','Other']){const watches=state.items.filter(w=>w.category===cat);if(!watches.length)continue;E('h3',p,cat+' ('+watches.length+')');for(const w of watches){const line=E('div',p);line.className='tuim-entry';const heading=E('strong',line,w.name+' ✎');heading.style.cssText='cursor:pointer;color:#d6b65c;padding:5px 0';heading.setAttribute('role','button');heading.tabIndex=0;const edit=()=>{state.selected={category:w.category,name:w.name,key:w.key};render();state.panel.scrollTo({top:0,behavior:'smooth'});state.panel.querySelectorAll('input[type=number]')[w.category==='Item Market'?1:0]?.focus()};heading.onclick=edit;heading.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();edit()}};E('div',line,'Qty ≥ '+(w.minQty??'off')+' | Price ≤ '+(w.maxPrice==null?'off':'$'+w.maxPrice.toLocaleString()));E('small',line,w.status||'Waiting');B(line,'Edit',edit);B(line,'Remove',()=>{state.items=state.items.filter(x=>x!==w);clearHighlights();save();scan();render()})}}B(p,'Clear all monitors',()=>{if(!confirm('Remove all monitored items?'))return;state.items=[];clearHighlights();save();render()});travelUI(p);E('h3',p,'Alarm settings');label('Volume (%)');const vol=E('input',p);vol.type='range';vol.min=0;vol.max=100;vol.value=state.cfg.alarmVolume??60;vol.style.touchAction='none';const setVolume=x=>{const rect=vol.getBoundingClientRect();if(!rect.width)return;vol.value=String(Math.round(Math.max(0,Math.min(100,(x-rect.left)/rect.width*100))));state.cfg.alarmVolume=vol.value;saveCfg()};let volumePointer=null;vol.addEventListener('pointerdown',e=>{if(e.button!==0&&e.pointerType==='mouse')return;e.preventDefault();e.stopImmediatePropagation();volumePointer=e.pointerId;vol.setPointerCapture?.(e.pointerId);setVolume(e.clientX)},{capture:true,passive:false});vol.addEventListener('pointermove',e=>{if(volumePointer!==e.pointerId)return;e.preventDefault();e.stopImmediatePropagation();setVolume(e.clientX)},{capture:true,passive:false});for(const ev of ['pointerup','pointercancel','lostpointercapture'])vol.addEventListener(ev,e=>{if(volumePointer===e.pointerId)volumePointer=null;e.stopPropagation()},{capture:true});vol.addEventListener('touchmove',e=>{if(volumePointer!==null)e.preventDefault();e.stopPropagation()},{passive:false});vol.oninput=()=>{state.cfg.alarmVolume=vol.value;saveCfg()};label('Sound');const snd=E('select',p);for(const v of ['beep','siren','chime']){const o=E('option',snd,v);o.value=v}snd.value=state.cfg.alarmSound||'beep';snd.onchange=()=>{state.cfg.alarmSound=snd.value;saveCfg()};label('Duration (seconds)');const dur=E('input',p);dur.type='number';dur.min=.5;dur.max=30;dur.value=state.cfg.alarmDuration??3;dur.oninput=()=>{state.cfg.alarmDuration=dur.value;saveCfg()};B(p,'Test alarm',sound);E('p',p,'Monitors persist across navigation and refresh. Alerts only evaluate visible listings while Torn is running.')}
 function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=load(OLD,[]);for(const w of old){if(!w.name)continue;const key=w.key?.startsWith('id:')?w.key:'name:'+norm(w.name);if(!state.items.some(x=>x.key===key&&x.category==='Foreign'))state.items.push({category:'Foreign',name:w.name,key,minQty:Number(w.min)||null,maxPrice:null,status:'Migrated',fired:false})}save();localStorage.setItem('tuim-migrated','1')}
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
 function deactivate(){state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.5.0',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'1.6.0',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
