@@ -267,7 +267,7 @@ function travelAssistant(p){
  try{
   Promise.resolve(getCatalog()).then(items=>{
    if(!itemSel.isConnected)return;
-   const list=items.filter(x=>Array.isArray(x.locations)&&x.locations.some(loc=>norm(loc).includes(norm(destinations[travelCfg.country]))));
+   const list=items.filter(x=>((Array.isArray(x.locations)?x.locations:[]).concat(x.country||[])).some(loc=>norm(loc).includes(norm(destinations[travelCfg.country]))));
    itemSel.replaceChildren();
    const empty=E('option',itemSel,'Select destination item');empty.value='';
    for(const x of list.sort((a,b)=>a.name.localeCompare(b.name))){const o=E('option',itemSel,x.name+' (#'+x.id+')');o.value=String(x.id)}
