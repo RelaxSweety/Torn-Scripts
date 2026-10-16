@@ -117,8 +117,8 @@
       "id": "item-monitor",
       "name": "Item Monitor",
       "category": "business",
-      "version": "1.4.0",
-      "description": "Persistent item monitoring plus Travel Assistant with manual carry capacity, inventory forecasts, cash planning and departure reminders",
+      "version": "1.4.1",
+      "description": "Persistent item monitoring (stability hotfix; Travel Assistant temporarily disabled)",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/item-monitor.user.js"
     }
   ]
