@@ -1,13 +1,15 @@
 // ==UserScript==
 // @name         TU Tic-Tac-Toe Module
 // @namespace    https://www.torn.com/
-// @version      0.6.1
+// @version      0.6.2
 // @description  Torn PDA mobile multiplayer Tic-Tac-Toe
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
 // @connect      tu-multiplayer-server.tuserver.workers.dev
 // @run-at       document-idle
+// @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/tic-tac-toe.user.js
+// @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/tic-tac-toe.user.js
 // ==/UserScript==
 (()=>{
 "use strict";
@@ -86,6 +88,6 @@ function startPolling(){if(timer)clearInterval(timer);if(session)timer=setInterv
 render(null);if(session){startPolling();refresh();}
 }
 function deactivate(){dragCleanup?.();dragCleanup=null;clearInterval(timer);timer=null;panel?.remove();panel=null;host=null;latestGame=null;}
-function register(){if((typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register){(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities.register({id:ID,version:"0.6.1",activate,deactivate});return true;}return false;}
+function register(){if((typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register){(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities.register({id:ID,version:"0.6.2",activate,deactivate});return true;}return false;}
 if(!register())window.addEventListener("torn-utilities-ready",register,{once:true});
 })();
