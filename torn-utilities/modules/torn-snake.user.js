@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Slithering Streets
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.2.10
+// @version      0.2.11
 // @description  Torn Utilities mobile-friendly Snake arcade
 // @match        https://www.torn.com/*
 // @grant        none
@@ -28,5 +28,25 @@ const copy=E("button",panel,"Copy Game Summary");copy.style.cssText="background:
 panel.insertBefore(statbox,arena);panel.insertBefore(play,arena);panel.insertBefore(copy,arena);panel.append(show,history);
 const key=e=>{const d={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],w:[0,-1],s:[0,1],a:[-1,0],d:[1,0]}[e.key];if(d){e.preventDefault();turn(...d)}};window.addEventListener("keydown",key);panel._cleanup=()=>window.removeEventListener("keydown",key);snake=[210,209,208];spawn();draw()}
 function deactivate(){clearInterval(timer);timer=null;running=false;panel?._cleanup?.();panel?.remove();panel=null;canvas=null;ctx=null}
-const register=()=>(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register({id:ID,version:"0.2.10",activate,deactivate});if(!register())window.addEventListener("torn-utilities-ready",register,{once:true});
+const register=()=>(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register({id:ID,version:"0.2.11",activate,deactivate});if(!register())window.addEventListener("torn-utilities-ready",register,{once:true});
+  // TU cross-world registration: retry after manager startup and SPA initialization.
+  // Stop once this exact module is visible in the shared manager registry.
+  {
+    const tuId="torn-snake";
+    let tries=0;
+    const attempt=()=>{
+      const host=typeof unsafeWindow!=='undefined'?unsafeWindow:window;
+      if(host.TornUtilities?.isRegistered?.(tuId))return true;
+      try{
+        if(typeof registerTU==='function')registerTU();
+        else if(typeof register==='function')register();
+      }catch(err){console.warn('[TU] Registration retry failed for '+tuId,err);}
+      return !!host.TornUtilities?.isRegistered?.(tuId);
+    };
+    if(!attempt()){
+      const interval=setInterval(()=>{if(attempt()||++tries>=30)clearInterval(interval)},1000);
+      (typeof unsafeWindow!=='undefined'?unsafeWindow:window).addEventListener('torn-utilities-ready',attempt);
+    }
+  }
+
 })();
