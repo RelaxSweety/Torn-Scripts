@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         TU Tic-Tac-Toe Module
 // @namespace    https://www.torn.com/
-// @version      0.6.0
+// @version      0.6.1
 // @description  Torn PDA mobile multiplayer Tic-Tac-Toe
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
+// @grant        unsafeWindow
 // @connect      tu-multiplayer-server.tuserver.workers.dev
 // @run-at       document-idle
 // ==/UserScript==
@@ -59,7 +60,7 @@ const opponentText=el("div",{},panel);
 const summaryBtn=btn("Copy game summary",()=>copySummary(),panel);
 const rematchBtn=btn("Rematch",()=>{if(session)action("/api/rooms/"+session.room+"/rematch","POST",{});},panel);
 const victoryPopup=el("div",{},panel);victoryPopup.hidden=true;victoryPopup.style.cssText="position:sticky;top:8px;z-index:5;background:#143b27;color:#8bffab;border:2px solid #39d879;border-radius:10px;padding:14px;text-align:center;font-size:20px;font-weight:800;box-shadow:0 4px 18px #0009";const victoryText=el("div",{},victoryPopup);btn("Close",()=>{victoryPopup.hidden=true},victoryPopup);
-function playerIdentity(){const p=window.TornUtilities?.getPlayer?.();if(!p?.name||!p?.id){window.TornUtilities?.requestPlayerProfile?.();notice("Open Torn Home to identify your player in TU Manager");return null}return {name:p.name,playerId:String(p.id)}}
+function playerIdentity(){const p=(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.getPlayer?.();if(!p?.name||!p?.id){(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.requestPlayerProfile?.();notice("Open Torn Home to identify your player in TU Manager");return null}return {name:p.name,playerId:String(p.id)}}
 function copySummary(){if(!latestGame||!session)return notice("No game to summarize");const g=latestGame,n=g.names||{},x=n.X||"Player X",o=n.O||"Player O",result=g.winner==="draw"?"Draw":g.winner?(n[g.winner]||"Player "+g.winner)+" won":"In progress";const message="Tic-Tac-Toe | "+x+" vs "+o+" | "+result;if(navigator.clipboard?.writeText)navigator.clipboard.writeText(message).then(()=>notice("Summary copied")).catch(()=>fallbackCopy(message));else fallbackCopy(message)}
 
 function fallbackCopy(message){const t=el("textarea",{value:message},panel);t.select();try{document.execCommand("copy");notice("Summary copied - paste into Torn chat");}catch{notice("Select and copy the summary below");}setTimeout(()=>t.remove(),12000);}
@@ -85,6 +86,6 @@ function startPolling(){if(timer)clearInterval(timer);if(session)timer=setInterv
 render(null);if(session){startPolling();refresh();}
 }
 function deactivate(){dragCleanup?.();dragCleanup=null;clearInterval(timer);timer=null;panel?.remove();panel=null;host=null;latestGame=null;}
-function register(){if(window.TornUtilities?.register){window.TornUtilities.register({id:ID,version:"0.6.0",activate,deactivate});return true;}return false;}
+function register(){if((typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register){(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities.register({id:ID,version:"0.6.1",activate,deactivate});return true;}return false;}
 if(!register())window.addEventListener("torn-utilities-ready",register,{once:true});
 })();
