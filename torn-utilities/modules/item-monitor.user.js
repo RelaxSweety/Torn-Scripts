@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.8.2
+// @version      1.8.3
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -248,7 +248,7 @@ const travelCosts={mex:6500,cay:10000,can:9000,haw:11000,uni:18000,arg:21000,swi
 const travelAliases={mex:['mexico'],cay:['cayman'],can:['canada'],haw:['hawaii'],uni:['united kingdom','london'],arg:['argentina'],swi:['switzerland'],jap:['japan'],chi:['china'],uae:['united arab emirates','dubai','uae'],sou:['south africa']};
 const travelSave=()=>localStorage.setItem('tuim-travel-v8',JSON.stringify(travel));
 const travelNum=v=>Math.max(0,Number(v)||0);
-const travelDate=t=>{const d=new Date(t*1000);const local=d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false});const utc=new Intl.DateTimeFormat('en-GB',{timeZone:'UTC',hour:'2-digit',minute:'2-digit',hour12:false}).format(d);const localDay=[d.getFullYear(),d.getMonth(),d.getDate()].join('-');const utcDay=[d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()].join('-');const day=utcDay!==localDay?' (UTC '+(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate())>Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())?'next day':'previous day')+')':'';return local+' Local / '+utc+' TCT'+day};
+const travelDate=t=>{const d=new Date(t*1000);const local=d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false});const utc=new Intl.DateTimeFormat('en-GB',{timeZone:'UTC',hour:'2-digit',minute:'2-digit',hour12:false}).format(d);return local+' Local / '+utc+' TCT'};
 const travelMoney=v=>(v<0?'-$':'$')+Math.abs(Math.round(v)).toLocaleString();
 const travelMinutes=()=>Math.ceil(travelTimes[travel.country][{standard:0,airstrip:1,private:2,business:3}[travel.mode]]*(travel.book?.75/100:1));
 let travelAlerted=0;
@@ -318,7 +318,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.8.2');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.8.3');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
@@ -510,5 +510,5 @@ function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=loa
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
 function deactivate(){travelClose();state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.8.2',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'1.8.3',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
