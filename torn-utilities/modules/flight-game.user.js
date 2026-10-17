@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         TU Flight Game
 // @namespace    https://www.torn.com/
-// @version      0.12.4
+// @version      0.12.5
 // @description  Standalone TU Flight Game module, playable anytime
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
 // @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/flight-game.user.js
 // @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/flight-game.user.js
-// @grant        none
+// @grant        unsafeWindow
 // ==/UserScript==
 
 /*
@@ -819,7 +819,7 @@
       for(const id of ['tpfg-manager','tpfg-prompt','tpfg-game-settings','tpfg-root'])document.getElementById(id)?.remove();
       initialized=false;
     }
-    const definitions=[{id:'flight-game',version:'0.12.4',activate:activateFlight,deactivate:deactivateFromTU}];
+    const definitions=[{id:'flight-game',version:'0.12.5',activate:activateFlight,deactivate:deactivateFromTU}];
     function registerTU(){if((typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register)for(const definition of definitions)(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities.register(definition);}
     window.addEventListener('torn-utilities-ready',registerTU);registerTU();
   // TU cross-world registration: retry after manager startup and SPA initialization.
