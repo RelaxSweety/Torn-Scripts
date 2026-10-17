@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.8.0
+// @version      1.8.1
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -253,6 +253,13 @@ const travelMoney=v=>(v<0?'-$':'$')+Math.abs(Math.round(v)).toLocaleString();
 const travelMinutes=()=>Math.ceil(travelTimes[travel.country][{standard:0,airstrip:1,private:2,business:3}[travel.mode]]*(travel.book?.75/100:1));
 let travelAlerted=0;
 setInterval(()=>{const t=travel.departure;if(!travel.armed||!t||travelAlerted===t)return;if(t-Date.now()/1000<=30&&t-Date.now()/1000>=-5){travelAlerted=t;travel.armed=false;travelSave();sound();alert('Travel Assistant: departure in 30 seconds')}},1000);
+function travelArrivalFallback(description){
+ const now=Math.floor(Date.now()/1000);
+ const text=String(description||'');
+ const h=text.match(/(\d+)\s*(?:hours?|hrs?|h)\b/i),m=text.match(/(\d+)\s*(?:minutes?|mins?|m)\b/i),sec=text.match(/(\d+)\s*(?:seconds?|secs?|s)\b/i);
+ if((h||m||sec)&&/travel|flight|arriv|land|remain|left/i.test(text))return now+(Number(h?.[1]||0)*3600+Number(m?.[1]||0)*60+Number(sec?.[1]||0));
+ return null;
+}
 async function travelCurrentFlight(key){
  if(!key)return null;
  try{
@@ -264,8 +271,9 @@ async function travelCurrentFlight(key){
   const description=String(status.description||'');
   const text=[description,String(user.travel?.destination||''),String(user.travel?.country||'')].join(' ').toLowerCase();
   const destination=Object.keys(travelAliases).find(code=>travelAliases[code].some(alias=>text.includes(alias)));
-  const until=Number(status.until||user.travel?.arrival||0);
-  return {destination,description,arrival:until>Date.now()/1000?until:null,traveling:state.includes('travel'),state};
+  const until=Number(status.until||user.travel?.arrival||user.travel?.arrival_time||0);
+  const arrival=until>Date.now()/1000?until:travelArrivalFallback(description);
+  return {destination,description,arrival,traveling:state.includes('travel'),state};
  }catch(e){return {error:e.message}}
 }
 async function travelGet(url){
@@ -302,7 +310,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.8.0');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.8.1');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
@@ -313,6 +321,10 @@ function travelUI(){
  const item=select('Item','item',{'':'Select an item'});
  field('Carrying capacity','capacity');field('Arrival buffer (min)','buffer');field('Selling fee (%)','fee');
  const book=select('Mailing Yourself Abroad','book',{'false':'No','true':'Yes'});book.value=String(!!travel.book);book.onchange=()=>{travel.book=book.value==='true';travelSave();refresh()};
+ const remainingLabel=E('label',body,'In-flight fallback: remaining flight minutes (optional)');
+ const remainingInput=E('input',remainingLabel);remainingInput.type='number';remainingInput.min='0';remainingInput.placeholder='Use if Torn API has no arrival time';
+ remainingInput.value=travel.manualArrival&&travel.manualArrival>Date.now()/1000?Math.ceil((travel.manualArrival-Date.now()/1000)/60):'';
+ remainingInput.onchange=()=>{const minutes=Number(remainingInput.value);travel.manualArrival=remainingInput.value!==''&&Number.isFinite(minutes)&&minutes>=0?Math.floor(Date.now()/1000+minutes*60):0;travelSave();refresh()};
  const info=E('small',body,'Loading item catalog...');
  const output=E('div',body);output.className='tuim-travel-output';
  const feedbackPanel=E('div',body);feedbackPanel.className='tuim-travel-output';
@@ -397,7 +409,7 @@ function travelUI(){
   if(model.flight?.traveling){
    const flight=model.flight;
    line(schedule,'Current travel status','In flight'+(flight.destination?' to '+travelCountries[flight.destination]:''));
-   line(schedule,'Actual estimated arrival',flight.arrival?date(flight.arrival):'Not available from profile');
+   line(schedule,'Estimated in-flight arrival',flight.arrival?date(flight.arrival):'Enter remaining flight minutes above');
    if(flight.arrival)line(schedule,'Time remaining',Math.max(0,Math.ceil((flight.arrival-now)/60))+' minutes');
    if(flight.destination&&flight.destination!==travel.country){
     line(schedule,'Item forecast','Select your flight destination to evaluate stock');
@@ -406,6 +418,8 @@ function travelUI(){
     const observed=Number(model.stock?.observed_at);
     const fresh=Number.isFinite(observed)&&observed>0&&now-observed<=900;
     let assessment='Insufficient data';
+    if(fresh&&q>0)assessment='Stock recently observed; availability at arrival not guaranteed';
+    else if(fresh&&q===0)assessment='Recently observed out of stock';
     if(flight.arrival){
      if(fresh&&q>0&&flight.arrival-now<=900)assessment='Stock recently observed; availability at arrival not guaranteed';
      else if(forecast&&flight.arrival>=start&&flight.arrival<=end)assessment='Arrival within projected restock window';
@@ -466,6 +480,7 @@ function travelUI(){
   const settled=await Promise.allSettled(jobs);if(seq!==serial||!w.isConnected)return;
   const [history,pred,market]=settled.map(x=>x.status==='fulfilled'?x.value:null);
   const flight=await flightPromise;if(seq!==serial||!w.isConnected)return;
+  if(flight?.traveling&&!flight.arrival&&travel.manualArrival>Date.now()/1000)flight.arrival=travel.manualArrival;
   const issues=settled.map((x,i)=>x.status==='rejected'?['Foreign stock','Prediction','Market price'][i]+': '+x.reason.message:null).filter(Boolean);
   const latest=history?.points?.[history.points.length-1],buy=Number(latest?.unit_price)>0?Number(latest.unit_price):NaN,sell=market?travelMarket(market):null;
   const qty=cap;
@@ -487,5 +502,5 @@ function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=loa
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
 function deactivate(){travelClose();state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.8.0',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'1.8.1',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
