@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.8.4
+// @version      1.9.0
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -303,17 +303,65 @@ function travelMarket(data){
  };scan(data,0);return found.length?Math.min(...found):null;
 }
 
-const feedbackKey='tuim-feedback-v1';
-const feedbackLoad=()=>{try{return JSON.parse(localStorage.getItem(feedbackKey)||'null')}catch{return null}};
-const feedbackSave=x=>{if(x)localStorage.setItem(feedbackKey,JSON.stringify(x));else localStorage.removeItem(feedbackKey)};
-const feedbackTimestamp=t=>{const d=new Date(t*1000);return d.toISOString().slice(0,16)};
-const feedbackParseUTC=t=>{const ms=Date.parse(t+'Z');return Number.isFinite(ms)?Math.floor(ms/1000):null};
-async function feedbackSend(report){
- const url='https://tu-multiplayer-server.tuserver.workers.dev/api/foreign/feedback';
- const response=await fetch(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(report)});
- const body=await response.json();if(!response.ok||!body.ok)throw Error(body.error||'Submission failed');return body;
+// Anonymous foreign-shop observations. No API key, account ID or player name is sent.
+const stockReportingKey='tuim-stock-reporting-v1';
+const stockReportingEnabled=()=>localStorage.getItem(stockReportingKey)==='yes';
+let stockReportingBusy=false;
+const stockChecks=new Map();
+function foreignShopCountry(){
+ const path=location.pathname.toLowerCase();
+ if(!/abroad|travel|index\\.php/.test(path))return null;
+ const heading=[...document.querySelectorAll('h1,h2,h3,[class*="country"],[class*="Country"],[class*="location"],[class*="Location"]')]
+  .filter(e=>e.getClientRects().length&&!e.closest('#tuim-panel,#tuim-travel-window'))
+  .map(e=>norm(text(e))).join(' ');
+ return Object.keys(travelAliases).find(code=>travelAliases[code].some(alias=>heading.includes(alias)))||null;
 }
-
+function foreignShopSnapshot(){
+ const country=foreignShopCountry();
+ if(!country)return null;
+ const rows=[],seen=new Set();
+ const candidates=[...document.querySelectorAll('[data-item-id],[data-itemid],[class*="shopItem"],[class*="ShopItem"],[class*="itemRow"],[class*="ItemRow"]')];
+ for(const row of candidates){
+  if(!row.getClientRects().length||row.closest('#tuim-panel,#tuim-travel-window'))continue;
+  const node=row.closest('[data-item-id],[data-itemid]')||row;
+  const idText=node.getAttribute('data-item-id')||node.getAttribute('data-itemid')||node.querySelector('[data-item-id],[data-itemid]')?.getAttribute('data-item-id')||node.querySelector('a[href*="itemID="],a[href*="itemId="]')?.href.match(/[?&]itemI[Dd]=(\\d+)/)?.[1];
+  const id=Number(idText);
+  if(!Number.isSafeInteger(id)||id<=0||seen.has(id))continue;
+  const qtyNode=node.querySelector('[data-quantity],[data-stock],[class*="quantity"],[class*="Quantity"],[class*="stock"],[class*="Stock"]');
+  const qtyText=qtyNode?.getAttribute('data-quantity')||qtyNode?.getAttribute('data-stock')||text(qtyNode);
+  const qtyMatch=String(qtyText||'').match(/(?:^|(?:stock|available|qty|quantity)\\s*:?\\s*)([\\d,]+)\\b/i);
+  if(!qtyMatch)continue;
+  const quantity=Number(qtyMatch[1].replaceAll(',',''));
+  if(!Number.isSafeInteger(quantity)||quantity<0||quantity>1000000000)continue;
+  const priceNode=node.querySelector('[data-price],[class*="price"],[class*="Price"]');
+  const priceText=priceNode?.getAttribute('data-price')||text(priceNode);
+  const priceMatch=String(priceText||'').match(/\\$?([\\d,]+)/);
+  const unit_price=priceMatch?Number(priceMatch[1].replaceAll(',','')):null;
+  seen.add(id);rows.push({item_id:id,quantity,unit_price:Number.isSafeInteger(unit_price)?unit_price:null,node});
+ }
+ return {country,rows};
+}
+async function reportForeignShop(){
+ if(!stockReportingEnabled()||stockReportingBusy||document.hidden)return;
+ const snap=foreignShopSnapshot();if(!snap?.rows.length)return;
+ stockReportingBusy=true;
+ const observed_at=Math.floor(Date.now()/1000);
+ const items=snap.rows.slice(0,50).map(({item_id,quantity,unit_price})=>({item_id,quantity,unit_price}));
+ try{
+  const response=await fetch('https://tu-multiplayer-server.tuserver.workers.dev/api/foreign/observations',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({country:snap.country,observed_at,items})});
+  if(!response.ok)throw Error('HTTP '+response.status);
+  const result=await response.json();if(!result.ok)throw Error('Not accepted');
+  const accepted=new Set(result.accepted||[]);
+  for(const row of snap.rows){
+   if(!accepted.has(row.item_id))continue;
+   let mark=row.node.querySelector('[data-tu-stock-reported]');
+   if(!mark){mark=document.createElement('span');mark.setAttribute('data-tu-stock-reported','');mark.style.cssText='color:#34c759;font-weight:bold;margin-left:6px';mark.title='Inventory reported to TU';row.node.append(mark)}
+   mark.textContent='✓';stockChecks.set(row.item_id,observed_at);
+  }
+ }catch(e){console.warn('[TU Stock Reporter] Submission not confirmed:',e.message)}
+ finally{stockReportingBusy=false}
+}
+setInterval(reportForeignShop,10000);
 let travelWindow=null,travelEpoch=0;
 function travelClose(){travelEpoch++;travelWindow?.remove();travelWindow=null}
 function travelUI(){
@@ -321,7 +369,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.8.4');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.9.0');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
@@ -338,8 +386,7 @@ function travelUI(){
  remainingInput.onchange=()=>{const minutes=Number(remainingInput.value);travel.manualArrival=remainingInput.value!==''&&Number.isFinite(minutes)&&minutes>=0?Math.floor(Date.now()/1000+minutes*60):0;travelSave();refresh()};
  const info=E('small',body,'Loading item catalog...');
  const output=E('div',body);output.className='tuim-travel-output';
- const feedbackPanel=E('div',body);feedbackPanel.className='tuim-travel-output';
- let currentProjection=null;
+ const reportingPanel=E('div',body);reportingPanel.className='tuim-travel-output';
  const actions=E('div',body);actions.className='tuim-travel-actions';
  B(actions,'Refresh travel plan',refresh);
  B(actions,'Arm departure reminder',()=>{if(!travel.departure||travel.departure*1000<=Date.now()+30000)return alert('No future recommended departure');travel.armed=true;travelAlerted=0;travelSave();alert('Reminder armed; keep PDA active')});
@@ -347,49 +394,18 @@ function travelUI(){
  const line=(parent,name,value)=>{const r=E('div',parent);r.className='tuim-travel-line';E('span',r,name);E('strong',r,String(value));return r};
  const date=t=>t?travelDate(t):'Not available';
  const money=n=>Number.isFinite(n)?travelMoney(n):'Unavailable';
- function renderFeedback(){
-  feedbackPanel.replaceChildren();
-  const pending=feedbackLoad();
-  const panel=box(feedbackPanel,'Travel Outcome Feedback');
-  if(!pending){
-   E('small',panel,'Will you provide feedback on this travel projection?');
-   const controls=E('div',panel);controls.className='tuim-travel-actions';
-   B(controls,'Yes, I will provide feedback',()=>{
-    if(!currentProjection||!currentProjection.item_id)return alert('Select an item and refresh the projection first');
-    const report={report_id:crypto.randomUUID(),projection:{...currentProjection,captured_at:Math.floor(Date.now()/1000)},outcome:null};
-    feedbackSave(report);renderFeedback();
-   });
-   B(controls,'No',()=>{E('small',panel,'Feedback is optional.');});
-   return;
-  }
-  E('strong',panel,'Saved projection — '+travelCountries[pending.projection.country]+' · Item #'+pending.projection.item_id);
-  line(panel,'Saved at',date(pending.projection.captured_at));
-  line(panel,'Projected arrival',date(pending.projection.predicted_arrival));
-  line(panel,'Projected restock',date(pending.projection.forecast_start)+' – '+date(pending.projection.forecast_end));
-  line(panel,'Forecast confidence',Math.round((pending.projection.confidence||0)*100)+'%');
-  const controls=E('div',panel);controls.className='tuim-travel-actions';
-  B(controls,'Cancel feedback',()=>{if(confirm('Discard the saved travel projection?')){feedbackSave(null);renderFeedback()}});
-  E('h3',panel,'Arrival survey');
-  const pick=(label,values)=>{const wrap=E('label',panel,label),sel=E('select',wrap);for(const [value,name] of Object.entries(values)){const o=E('option',sel,name);o.value=value}return sel};
-  const available=pick('Was the item available when you checked?',{yes:'Yes',no:'No',not_checked:'Did not check'});
-  const qtyLabel=E('label',panel,'Quantity available (optional)');const qty=E('input',qtyLabel);qty.type='number';qty.min='0';qty.placeholder='Quantity';
-  const restocked=pick('Did the item restock while you were there?',{no:'No',yes:'Yes',unsure:'Not sure'});
-  const timeLabel=E('label',panel,'Restock date and time (TCT / UTC)');const time=E('input',timeLabel);time.type='datetime-local';time.value=feedbackTimestamp(Date.now()/1000);
-  const accuracy=pick('How certain is the restock time?',{exact:'Exact — witnessed increase',approximate:'Approximate — noticed stock returned'});
-  const toggle=()=>{timeLabel.hidden=accuracy.parentElement.hidden=restocked.value!=='yes';qtyLabel.hidden=available.value!=='yes'};
-  restocked.onchange=toggle;available.onchange=toggle;toggle();
-  const status=E('small',panel,'Your saved projection will be submitted with the survey.');
-  B(panel,'Submit feedback',async()=>{
-   const stamp=feedbackParseUTC(time.value);
-   if(restocked.value==='yes'&&(!stamp||stamp>Math.floor(Date.now()/1000)+300))return alert('Enter a valid past restock time in TCT (UTC)');
-   const quantity=qty.value.trim()?Number(qty.value):null;
-   if(quantity!==null&&(!Number.isSafeInteger(quantity)||quantity<0))return alert('Invalid quantity');
-   const report={...pending,outcome:{available:available.value,quantity,restocked:restocked.value,restock_time:restocked.value==='yes'?stamp:null,time_accuracy:restocked.value==='yes'?accuracy.value:null,checked_at:Math.floor(Date.now()/1000)}};
-   status.textContent='Submitting feedback...';
-   try{await feedbackSend(report);feedbackSave(null);renderFeedback();alert('Travel feedback submitted. Thank you.')}
-   catch(e){status.textContent='Submission failed: '+e.message+'. Your saved projection remains available.'}
-  });
+ function renderReporting(){
+  reportingPanel.replaceChildren();
+  const panel=box(reportingPanel,'Automatic Foreign Stock Reporting');
+  const row=E('div',panel);row.className='tuim-travel-actions';
+  const toggle=B(row,stockReportingEnabled()?'Reporting: ON':'Reporting: OFF',()=>{localStorage.setItem(stockReportingKey,stockReportingEnabled()?'no':'yes');renderReporting();if(stockReportingEnabled())reportForeignShop()});
+  toggle.setAttribute('aria-pressed',String(stockReportingEnabled()));
+  const details=E('div',panel);details.hidden=true;
+  B(row,'ⓘ Info',()=>{details.hidden=!details.hidden});
+  E('small',details,'Optional and off by default. When enabled and a supported foreign item shop is open, TU reads visible item IDs, inventory quantities, prices, country and observation timestamps every 10 seconds. These are sent to the TU server to improve stock, depletion and restock forecasts. Player names, player IDs, API keys, chat messages and device identifiers are not included in the report. A green check appears beside each item only after the server confirms receipt. Reporting stops when the shop is not visible or you disable it. Data may still be associated with network metadata handled by the hosting provider.');
+  E('small',panel,stockReportingEnabled()?'Enabled · Captures only when a supported foreign shop is visible':'Disabled · No inventory reports sent');
  }
+ renderReporting();
  function show(model){
   if(!w.isConnected)return;
   output.replaceChildren();
@@ -449,8 +465,6 @@ function travelUI(){
   if(missed&&end>now&&arrivalNow<=end)E('small',schedule,'Original departure has passed. Departing now may still reach the predicted window; stock is not guaranteed.');
   if(missed&&end>now&&arrivalNow>end)E('small',schedule,'Original departure has passed. The remaining predicted window is shorter than the flight. Next forecast unavailable.');
   if(missed&&end<=now)E('small',schedule,'Predicted window has ended. Next forecast unavailable.');
-  currentProjection={country:travel.country,item_id:Number(travel.item)||0,item_name:item.selectedOptions[0]?.textContent||'',flight_mode:travel.mode,flight_minutes:model.minutes,arrival_buffer_minutes:travelNum(travel.buffer),predicted_departure:model.depart||0,predicted_arrival:model.flight?.arrival||model.arrive||0,forecast_start:model.pred?.expected_start_at||0,forecast_end:model.pred?.expected_end_at||0,confidence:model.pred?.confidence||0,historical_events:model.pred?.observed_events||0,forecast_model:model.pred?.model_version||'',observed_quantity:model.stock?.quantity??null,observed_at:model.stock?.observed_at||0};
-  renderFeedback();
   E('h3',output,'Item pricing and profit');
   const pricing=box(output);
   line(pricing,'Foreign purchase price',money(model.buy));
@@ -515,5 +529,5 @@ function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=loa
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
 function deactivate(){travelClose();state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.8.4',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'1.9.0',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
