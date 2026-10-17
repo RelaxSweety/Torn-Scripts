@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.8.3
+// @version      1.8.4
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -276,7 +276,10 @@ async function travelCurrentFlight(key){
   if(!state.includes('travel')&&!state.includes('abroad')&&!(Number(trip.time_left)>0))return null;
   const description=String(status.description||'');
   const text=[description,String(trip.destination||''),String(user.travel?.destination||''),String(user.travel?.country||'')].join(' ').toLowerCase();
-  const destination=Object.keys(travelAliases).find(code=>travelAliases[code].some(alias=>text.includes(alias)));
+  // Profile direction overrides the legacy travel field, which can name the overseas country on a return flight.
+  const returnFlight=/\\b(?:travel(?:l)?ing|flying|heading|going)\\s+(?:back\\s+)?to\\s+torn\\b|\\b(?:returning|flying\\s+back|heading\\s+back)\\s+(?:to\\s+torn|home)\\b/i.test(description)
+    ||/^(?:torn|torn city)$/i.test(String(trip.destination||'').trim());
+  const destination=returnFlight?'torn':Object.keys(travelAliases).find(code=>travelAliases[code].some(alias=>text.includes(alias)));
   const until=Number(status.until||user.travel?.arrival||user.travel?.arrival_time||0);
   const seconds=Number(trip.time_left);
   const tripTimestamp=Number(trip.timestamp);
@@ -318,7 +321,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.8.3');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.8.4');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
@@ -416,10 +419,12 @@ function travelUI(){
   }
   if(model.flight?.traveling){
    const flight=model.flight;
-   line(schedule,'Current travel status','In flight'+(flight.destination?' to '+travelCountries[flight.destination]:''));
+   line(schedule,'Current travel status',flight.destination==='torn'?'Returning to Torn':'In flight'+(flight.destination?' to '+travelCountries[flight.destination]:''));
    line(schedule,'Estimated in-flight arrival',flight.arrival?date(flight.arrival):'Enter remaining flight minutes above');
    if(flight.arrival)line(schedule,'Time remaining',Math.max(0,Math.ceil((flight.arrival-now)/60))+' minutes');
-   if(flight.destination&&flight.destination!==travel.country){
+   if(flight.destination==='torn'){
+    line(schedule,'Stock on arrival','Returning to Torn — foreign stock forecast not applicable');
+   }else if(flight.destination&&flight.destination!==travel.country){
     line(schedule,'Item forecast','Select your flight destination to evaluate stock');
    }else{
     const q=Number(model.stock?.quantity);
@@ -510,5 +515,5 @@ function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=loa
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
 function deactivate(){travelClose();state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.8.3',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'1.8.4',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
