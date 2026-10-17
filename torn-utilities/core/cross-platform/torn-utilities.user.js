@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.8
+// @version      0.5.9
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -18,7 +18,7 @@
   if (window.__RELAX_TORN_UTILITIES_PDA__) return;
   window.__RELAX_TORN_UTILITIES_PDA__ = true;
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.5.8';
+  const TU_VERSION='0.5.9';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -60,53 +60,78 @@
     for(let i=0;i<3;i++)if(aa[i]!==bb[i])return (aa[i]||0)-(bb[i]||0);
     return 0;
   };
+  // Fetch the entire catalog; never special-case a module or trust stale CDN results.
   async function refreshRegistry(){
     if(registryRefreshing)return;
     registryRefreshing=true;registryStatus='Refreshing catalog';render(currentTab);
-    try{
-      const url=REGISTRY_URL+'?t='+Date.now();
-      const get=async()=>{
-        // Prefer a cache-busted browser request; PDA_httpGet may return a stale cached GitHub response.
-        try{
-          const response=await fetch(url,{cache:'no-store'});
-          if(!response.ok)throw Error('HTTP '+response.status);
-          return await response.text();
-        }catch(browserError){
-          if(typeof PDA_httpGet!=='function')throw browserError;
-          const response=await PDA_httpGet(url+'&refresh='+Math.random().toString(36).slice(2));
-          const raw=typeof response==='string'?response:(response?.responseText??response?.data??response?.body??response?.response);
-          if(typeof raw==='string'&&raw.trim())return raw;
-          if(raw&&typeof raw==='object')return raw;
-          throw Error('PDA returned empty catalog: '+browserError.message);
-        }
-      };
-      const raw=await Promise.race([get(),new Promise((_,reject)=>setTimeout(()=>reject(new Error('Catalog timeout')),12000))]);
-      let next=validateRegistry(typeof raw==='string'?JSON.parse(raw):raw);
-      // When PDA returns a stale raw.githubusercontent.com response, use the GitHub
-      // contents endpoint as an independent, cache-busted source of truth.
-      const githubApi='https://api.github.com/repos/RelaxSweety/Torn-Scripts/contents/torn-utilities/modules.json?ref=main&t='+Date.now();
-      const currentVersion=next.modules.find(m=>m.id==='item-monitor')?.version;
-      const cachedVersion=registry.modules.find(m=>m.id==='item-monitor')?.version;
-      if(!currentVersion||currentVersion==='1.4.0'||(cachedVersion&&versionCompare(currentVersion,cachedVersion)<0)){
-        try{
-          const apiResponse=await fetch(githubApi,{cache:'no-store',headers:{Accept:'application/vnd.github.raw+json'}});
-          if(apiResponse.ok){
-            const data=await apiResponse.json();
-            let parsed=data;
-            if(data.content&&data.encoding==='base64')parsed=JSON.parse(atob(data.content.replace(/\\s/g,'')));
-            const apiCatalog=validateRegistry(parsed);
-            const apiVersion=apiCatalog.modules.find(m=>m.id==='item-monitor')?.version;
-            if(apiVersion&&(!currentVersion||versionCompare(apiVersion,currentVersion)>0))next=apiCatalog;
-          }
-        }catch(err){console.warn('[TU] alternate catalog lookup failed',err)}
+    const nonce=Date.now()+'-'+Math.random().toString(36).slice(2);
+    const readResponse=async response=>{
+      if(typeof response==='string')return JSON.parse(response);
+      if(response&&typeof response==='object'&&response.schemaVersion===1)return response;
+      const body=response?.responseText??response?.data??response?.body??response?.response;
+      if(typeof body==='string')return JSON.parse(body);
+      if(body&&typeof body==='object')return body;
+      throw Error('Empty catalog response');
+    };
+    const fromRaw=async()=>{
+      const url=REGISTRY_URL+'?tu_refresh='+nonce;
+      try{
+        const response=await fetch(url,{cache:'no-store'});
+        if(!response.ok)throw Error('Raw catalog HTTP '+response.status);
+        return readResponse(await response.text());
+      }catch(err){
+        if(typeof PDA_httpGet!=='function')throw err;
+        return readResponse(await PDA_httpGet(url));
       }
-      const prior=registry.modules.find(m=>m.id==='item-monitor')?.version;
-      const incoming=next.modules.find(m=>m.id==='item-monitor')?.version;
-      if(prior&&incoming&&versionCompare(incoming,prior)<0)throw Error('Stale catalog returned (Item Monitor '+incoming+' < '+prior+')');
-      registry=next;localStorage.setItem(CACHE_KEY,JSON.stringify(next));
-      registryStatus='GitHub catalog updated';registryUpdatedAt=Date.now();localStorage.setItem('tu:catalog:updated-at',String(registryUpdatedAt));
+    };
+    const fromGithub=async()=>{
+      const url='https://api.github.com/repos/RelaxSweety/Torn-Scripts/contents/torn-utilities/modules.json?ref=main&tu_refresh='+nonce;
+      const response=await fetch(url,{cache:'no-store',headers:{Accept:'application/vnd.github+json'}});
+      if(!response.ok)throw Error('GitHub catalog HTTP '+response.status);
+      const body=await response.json();
+      if(body.encoding==='base64'&&typeof body.content==='string'){
+        const decoded=atob(body.content.replace(/\\s/g,''));
+        return JSON.parse(new TextDecoder().decode(Uint8Array.from(decoded,c=>c.charCodeAt(0))));
+      }
+      return readResponse(body);
+    };
+    const validateComplete=data=>{
+      const result=validateRegistry(data);
+      if(result.modules.length!==data.modules.length||result.categories.length<data.categories.length)throw Error('Catalog contains invalid entries');
+      if(new Set(result.modules.map(m=>m.id)).size!==result.modules.length)throw Error('Duplicate module IDs');
+      return result;
+    };
+    const isNotOlder=(candidate,baseline)=>{
+      const old=new Map(baseline.modules.map(m=>[m.id,m]));
+      return baseline.modules.every(m=>{
+        const incoming=candidate.modules.find(x=>x.id===m.id);
+        return !incoming||versionCompare(incoming.version,m.version)>=0;
+      });
+    };
+    try{
+      const timeout=new Promise((_,reject)=>setTimeout(()=>reject(Error('Catalog refresh timeout')),15000));
+      const results=await Promise.race([Promise.allSettled([fromRaw(),fromGithub()]),timeout]);
+      const valid=[];
+      for(const result of results){
+        if(result.status==='fulfilled'){
+          try{valid.push(validateComplete(result.value));}
+          catch(e){console.warn('[TU] invalid catalog source',e);}
+        }else console.warn('[TU] catalog source unavailable',result.reason);
+      }
+      if(!valid.length)throw Error('Both catalog sources failed or returned invalid data');
+      // Prefer the source with the newest combined versions, not an Item Monitor sentinel.
+      valid.sort((x,y)=>{
+        const scores=c=>c.modules.reduce((total,m)=>total+((parseInt(m.version.split('.')[0],10)||0)*1000000+(parseInt(m.version.split('.')[1],10)||0)*1000+(parseInt(m.version.split('.')[2],10)||0)),0);
+        return scores(y)-scores(x);
+      });
+      const next=valid.find(c=>isNotOlder(c,registry));
+      if(!next)throw Error('Catalog appears older than cached module versions');
+      registry=next;
+      try{localStorage.setItem(CACHE_KEY,JSON.stringify(next));registryUpdatedAt=Date.now();localStorage.setItem('tu:catalog:updated-at',String(registryUpdatedAt));}
+      catch(err){console.warn('[TU] catalog cache unavailable',err);}
+      registryStatus='GitHub catalog updated';
     }catch(e){registryStatus='Refresh failed: '+e.message;console.warn('[TU] catalog refresh failed',e);}
-    registryRefreshing=false;render(currentTab);
+    finally{registryRefreshing=false;render(currentTab);}
   }
   // Lifecycle API: modules register inert factories; only this manager calls activate().
   const registered = new Map();
@@ -289,7 +314,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.8 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.9 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
@@ -457,7 +482,7 @@
         line.append(name,makeButton('Clear data',()=>{if(confirm('Delete all TU data for '+id+'?')){storage.clear(id);render('settings');}}));content.append(line);
       }
     }else{
-      const p=document.createElement('p');p.textContent='Torn Utilities v0.5.8 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      const p=document.createElement('p');p.textContent='Torn Utilities v0.5.9 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
       const guideLink=document.createElement('a');guideLink.href='https://github.com/RelaxSweety/Torn-Scripts/blob/main/torn-utilities/INSTALLATION.md';guideLink.target='_blank';guideLink.rel='noopener noreferrer';guideLink.textContent='TU Installation & Module Setup Guide ↗';guideLink.style.cssText='display:block;margin:12px 0;padding:12px;border:1px solid #806a3e;border-radius:8px;color:#e4c779;text-decoration:underline;font-weight:600';content.append(guideLink);
       // Official-style vector marks; no remote image dependencies.
       addSocialIcon('RelaxSweety on Discord','https://discord.com/users/relaxsweety','M20.317 4.369a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.211.375-.445.865-.608 1.25a18.27 18.27 0 0 0-5.49 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037 19.736 19.736 0 0 0-4.885 1.515.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.1 18.057a.083.083 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.077.077 0 0 0 .084-.028c.462-.63.873-1.295 1.226-1.994a.075.075 0 0 0-.041-.104 13.1 13.1 0 0 1-1.872-.89.076.076 0 0 1-.008-.127c.126-.095.252-.193.372-.292a.074.074 0 0 1 .077-.01c3.929 1.793 8.185 1.793 12.068 0a.074.074 0 0 1 .078.01c.12.099.246.197.373.292a.076.076 0 0 1-.007.127c-.598.35-1.224.65-1.873.89a.076.076 0 0 0-.04.105c.36.698.77 1.363 1.225 1.993a.076.076 0 0 0 .084.028 19.83 19.83 0 0 0 6.003-3.03.077.077 0 0 0 .031-.056c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028ZM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.42 0-1.334.955-2.42 2.157-2.42 1.211 0 2.176 1.095 2.157 2.42 0 1.335-.955 2.42-2.157 2.42Zm7.96 0c-1.183 0-2.157-1.085-2.157-2.42 0-1.334.955-2.42 2.157-2.42 1.211 0 2.176 1.095 2.157 2.42 0 1.335-.946 2.42-2.157 2.42Z');
