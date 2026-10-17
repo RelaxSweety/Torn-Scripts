@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         TU Torn Fleet
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.2.0
+// @version      0.2.1
 // @description  Torn Utilities Torn Fleet multiplayer module
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
+// @grant        unsafeWindow
 // @connect      tu-multiplayer-server.tuserver.workers.dev
 // @run-at       document-idle
 // ==/UserScript==
@@ -53,6 +54,6 @@ const roomInfo=E("div",panel);roomInfo.className="room";const playerInfo=E("div"
 render();if(session)action("/"+session.room+"/state");timer=setInterval(()=>{if(session&&panel)action("/"+session.room+"/state")},2500);
 }
 function deactivate(){clearInterval(timer);timer=null;panel?.remove();panel=null;mount=null;context=null}
-const register=()=>window.TornUtilities?.register({id:ID,version:"0.2.0",activate,deactivate});
+const register=()=>(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register({id:ID,version:"0.2.1",activate,deactivate});
 if(!register())window.addEventListener("torn-utilities-ready",register,{once:true});
 })();
