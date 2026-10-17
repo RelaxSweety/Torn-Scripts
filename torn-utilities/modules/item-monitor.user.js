@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.9.3
+// @version      1.9.4
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -312,11 +312,13 @@ let stockReportingBusy=false;
 const stockChecks=new Map();
 function foreignShopCountry(){
  const path=location.pathname.toLowerCase();
- if(!/abroad|travel/.test(path))return null;
- const title=[document.title,...document.querySelectorAll('h1,h2,h3,[class*="country"],[class*="Country"],[class*="location"],[class*="Location"]')].map(e=>typeof e==='string'?e:(e.getClientRects().length?text(e):'')).join(' ').toLowerCase();
+ if(!/abroad|travel/.test(path)&&!/cayman|mexico|switzerland|japan|canada|hawaii|china|argentina|africa|united|dubai/i.test(document.body?.innerText?.slice(0,3000)||''))return null;
+ const title=[document.title,document.querySelector('header')?.innerText||'',...document.querySelectorAll('h1,h2,h3,[class*="country"],[class*="Country"],[class*="location"],[class*="Location"]')].map(e=>typeof e==='string'?e:(e.getClientRects().length?text(e):'')).join(' ').toLowerCase();
  return Object.keys(travelAliases).find(code=>travelAliases[code].some(alias=>title.includes(alias)))||null;
 }
 let stockCatalogMap=null,stockCatalogPending=null;
+let stockReportStatus='Waiting for foreign shop';
+const setStockReportStatus=message=>{stockReportStatus=message;const el=document.querySelector('#tuim-stock-report-status');if(el)el.textContent=message};
 async function ensureStockCatalog(){
  if(stockCatalogMap)return stockCatalogMap;
  if(stockCatalogPending)return stockCatalogPending;
@@ -356,13 +358,15 @@ function foreignShopSnapshot(){
 }
 async function reportForeignShop(){
  if(!stockReportingEnabled()||stockReportingBusy||document.hidden)return;
- const country=foreignShopCountry();if(!country)return;
+ const country=foreignShopCountry();if(!country){setStockReportStatus('Waiting for supported foreign country screen');return;}
  stockReportingBusy=true;
  try{
+  setStockReportStatus('Reading shop inventory...');
   await ensureStockCatalog();
-  const snap=foreignShopSnapshot();if(!snap?.rows.length)return;
+  const snap=foreignShopSnapshot();if(!snap?.rows.length){setStockReportStatus('No shop rows recognized — reporting not sent');return;}
   const observed_at=Math.floor(Date.now()/1000);
   const items=snap.rows.slice(0,50).map(({item_id,quantity,unit_price})=>({item_id,quantity,unit_price}));
+  setStockReportStatus('Submitting '+items.length+' inventory records...');
   const response=await fetch('https://tu-multiplayer-server.tuserver.workers.dev/api/foreign/observations',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({country:snap.country,observed_at,items})});
   if(!response.ok)throw Error('HTTP '+response.status);
   const result=await response.json();if(!result.ok)throw Error('Not accepted');
@@ -373,7 +377,8 @@ async function reportForeignShop(){
    if(!mark){mark=document.createElement('span');mark.setAttribute('data-tu-stock-reported','');mark.style.cssText='color:#34c759;font-weight:bold;margin-left:6px';mark.title='Inventory reported to TU';row.node.append(mark)}
    mark.textContent='✓';stockChecks.set(row.item_id,observed_at);
   }
- }catch(e){console.warn('[TU Stock Reporter] Submission not confirmed:',e.message)}
+  setStockReportStatus('Reported '+accepted.size+' items at '+new Date(observed_at*1000).toLocaleTimeString());
+ }catch(e){setStockReportStatus('Reporting error: '+e.message);console.warn('[TU Stock Reporter] Submission not confirmed:',e.message)}
  finally{stockReportingBusy=false}
 }
 setInterval(reportForeignShop,10000);
@@ -384,7 +389,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.9.3');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.9.4');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
@@ -419,6 +424,7 @@ function travelUI(){
   B(row,'ⓘ Info',()=>{details.hidden=!details.hidden});
   E('small',details,'Optional and off by default. When enabled and a supported foreign item shop is open, TU reads visible item IDs, inventory quantities, prices, country and observation timestamps every 10 seconds. These are sent to the TU server to improve stock, depletion and restock forecasts. Player information is not transmitted. A green check appears beside each item only after the server confirms receipt. Reporting stops when the shop is not visible or you disable it. Data may still be associated with network metadata handled by the hosting provider.');
   E('small',panel,stockReportingEnabled()?'Enabled · Captures only when a supported foreign shop is visible':'Disabled · No inventory reports sent');
+  const status=E('small',panel,stockReportingEnabled()?stockReportStatus:'Reporting disabled');status.id='tuim-stock-report-status';
  }
  renderReporting();
  function show(model){
@@ -544,5 +550,5 @@ function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=loa
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
 function deactivate(){travelClose();state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.9.3',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'1.9.4',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
