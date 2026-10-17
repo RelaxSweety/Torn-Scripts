@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.7.8
+// @version      1.7.9
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -253,6 +253,21 @@ const travelMoney=v=>(v<0?'-$':'$')+Math.abs(Math.round(v)).toLocaleString();
 const travelMinutes=()=>Math.ceil(travelTimes[travel.country][{standard:0,airstrip:1,private:2,business:3}[travel.mode]]*(travel.book?.75/100:1));
 let travelAlerted=0;
 setInterval(()=>{const t=travel.departure;if(!travel.armed||!t||travelAlerted===t)return;if(t-Date.now()/1000<=30&&t-Date.now()/1000>=-5){travelAlerted=t;travel.armed=false;travelSave();sound();alert('Travel Assistant: departure in 30 seconds')}},1000);
+async function travelCurrentFlight(key){
+ if(!key)return null;
+ try{
+  const data=await travelGet('https://api.torn.com/v2/user/profile?key='+encodeURIComponent(key));
+  const user=data.profile||data;
+  const status=user.status||{};
+  const state=String(status.state||'').toLowerCase();
+  if(!state.includes('travel')&&!state.includes('abroad'))return null;
+  const description=String(status.description||'');
+  const text=[description,String(user.travel?.destination||''),String(user.travel?.country||'')].join(' ').toLowerCase();
+  const destination=Object.keys(travelAliases).find(code=>travelAliases[code].some(alias=>text.includes(alias)));
+  const until=Number(status.until||user.travel?.arrival||0);
+  return {destination,description,arrival:until>Date.now()/1000?until:null,traveling:state.includes('travel'),state};
+ }catch(e){return {error:e.message}}
+}
 async function travelGet(url){
  const parse=r=>{const raw=typeof r==='string'?r:r?.responseText??r?.data??r?.body??r?.response??r;const data=typeof raw==='string'?JSON.parse(raw):raw;if(data?.error)throw Error(typeof data.error==='string'?data.error:data.error.error||'API error');return data};
  try{const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);return parse(await r.text())}
@@ -276,7 +291,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.7.8');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.7.9');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
@@ -323,6 +338,28 @@ function travelUI(){
    line(schedule,'Flight duration',model.minutes+' minutes');
    line(schedule,'Estimated arrival',date(model.arrive));
   }
+  if(model.flight?.traveling){
+   const flight=model.flight;
+   line(schedule,'Current travel status','In flight'+(flight.destination?' to '+travelCountries[flight.destination]:''));
+   line(schedule,'Actual estimated arrival',flight.arrival?date(flight.arrival):'Not available from profile');
+   if(flight.arrival)line(schedule,'Time remaining',Math.max(0,Math.ceil((flight.arrival-now)/60))+' minutes');
+   if(flight.destination&&flight.destination!==travel.country){
+    line(schedule,'Item forecast','Select your flight destination to evaluate stock');
+   }else{
+    const q=Number(model.stock?.quantity);
+    const observed=Number(model.stock?.observed_at);
+    const fresh=Number.isFinite(observed)&&observed>0&&now-observed<=900;
+    let assessment='Insufficient data';
+    if(flight.arrival){
+     if(fresh&&q>0&&flight.arrival-now<=900)assessment='Stock recently observed; availability at arrival not guaranteed';
+     else if(forecast&&flight.arrival>=start&&flight.arrival<=end)assessment='Arrival within projected restock window';
+     else if(forecast&&flight.arrival>end)assessment='Arrival after projected window; availability unknown';
+     else if(forecast&&flight.arrival<start)assessment='Arrival before projected window';
+    }
+    line(schedule,'Stock on arrival',assessment);
+    if(Number.isFinite(q)&&observed>0)line(schedule,'Last observed stock',q+' items at '+date(observed));
+   }
+  }else if(model.flight?.error)E('small',schedule,'Live flight status unavailable: '+model.flight.error);
   line(schedule,'Predicted restock window',forecast?date(start)+' – '+date(end):'Insufficient data');
   line(schedule,'Forecast confidence score',forecast?Math.round(travelNum(model.pred.confidence)*100)+'% (not a probability)':'Unavailable');
   line(schedule,'Historical stock increases used',model.pred?.observed_events!=null?String(model.pred.observed_events)+' observed events':'Unavailable');
@@ -366,16 +403,18 @@ function travelUI(){
   const base='https://tu-multiplayer-server.tuserver.workers.dev/api/foreign/',query='?country='+travel.country+'&item_id='+id;
   const pdaKey='###PDA-APIKEY###';
   const key=!pdaKey.includes('PDA-APIKEY')?pdaKey:(window.TornUtilities?.apiKey||window.TornUtilities?.getApiKey?.()||'');
+  const flightPromise=travelCurrentFlight(key);
   const jobs=[travelGet(base+'history'+query+'&limit=1'),travelGet(base+'prediction'+query+'&lead_seconds='+Math.ceil((minutes+travelNum(travel.buffer))*60+60)),key?travelGet('https://api.torn.com/v2/market/'+id+'/itemmarket?key='+encodeURIComponent(key)):Promise.reject(Error('Torn API key unavailable'))];
   const settled=await Promise.allSettled(jobs);if(seq!==serial||!w.isConnected)return;
   const [history,pred,market]=settled.map(x=>x.status==='fulfilled'?x.value:null);
+  const flight=await flightPromise;if(seq!==serial||!w.isConnected)return;
   const issues=settled.map((x,i)=>x.status==='rejected'?['Foreign stock','Prediction','Market price'][i]+': '+x.reason.message:null).filter(Boolean);
   const latest=history?.points?.[history.points.length-1],buy=Number(latest?.unit_price)>0?Number(latest.unit_price):NaN,sell=market?travelMarket(market):null;
   const qty=cap;
   const gross=sell&&Number.isFinite(buy)?sell-buy:NaN,fee=sell?travelNum(travel.fee)/100*sell:NaN,net=gross-fee,grossHaul=net*cap,travelCost=travel.mode==='standard'?2*travelCosts[travel.country]:0,haul=grossHaul-travelCost,fullHaul=haul,cash=buy*cap,proceeds=(sell-fee)*cap;
   const depart=pred?.status==='experimental'?pred.expected_start_at-(minutes+travelNum(travel.buffer))*60:null;
   travel.departure=depart&&depart>Date.now()/1000+30?depart:0;travel.armed=false;travelSave();
-  show({minutes,depart,arrive:depart?depart+minutes*60:Date.now()/1000+minutes*60,pred,buy,sell,gross,fee,net,haul,grossHaul,travelCost,fullHaul,cash,proceeds,qty,stock:null,issues});
+  show({minutes,depart,arrive:depart?depart+minutes*60:Date.now()/1000+minutes*60,flight,stock:{quantity:latest?.quantity,observed_at:latest?.source_observed_at},pred,buy,sell,gross,fee,net,haul,grossHaul,travelCost,fullHaul,cash,proceeds,qty,issues});
   info.textContent=issues.length?'Partial API data · See warnings':'Updated '+new Date().toLocaleTimeString();
  }
  country.onchange=()=>{travel.country=country.value;travel.item='';travelSave();populate()};
@@ -390,5 +429,5 @@ function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=loa
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
 function deactivate(){travelClose();state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.7.8',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'1.7.9',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
