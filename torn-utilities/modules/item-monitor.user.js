@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.9.5
+// @version      1.9.6
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -311,10 +311,22 @@ const stockReportingEnabled=()=>localStorage.getItem(stockReportingKey)==='yes';
 let stockReportingBusy=false;
 const stockChecks=new Map();
 function foreignShopCountry(){
+ // PDA's Cayman Islands title is browser chrome, not necessarily an HTML heading.
+ // Verify a foreign shop is actually present before using the selected destination.
+ const visibleShop=[...document.querySelectorAll('table,[role="table"]')].some(t=>{
+  if(!t.getClientRects().length)return false;
+  const headers=[...t.querySelectorAll('th,[role="columnheader"]')].map(e=>norm(text(e)));
+  return headers.includes('name')&&headers.includes('stock')&&headers.includes('cost')&&headers.includes('buy');
+ });
+ if(!visibleShop)return null;
  const path=location.pathname.toLowerCase();
- if(!/abroad|travel/.test(path)&&!/cayman|mexico|switzerland|japan|canada|hawaii|china|argentina|africa|united|dubai/i.test(document.body?.innerText?.slice(0,3000)||''))return null;
- const title=[document.title,document.querySelector('header')?.innerText||'',...document.querySelectorAll('h1,h2,h3,[class*="country"],[class*="Country"],[class*="location"],[class*="Location"]')].map(e=>typeof e==='string'?e:(e.getClientRects().length?text(e):'')).join(' ').toLowerCase();
- return Object.keys(travelAliases).find(code=>travelAliases[code].some(alias=>title.includes(alias)))||null;
+ const pageText=[document.title,document.querySelector('main')?.innerText?.slice(0,1200)||'',...document.querySelectorAll('h1,h2,h3,[class*="country"],[class*="Country"],[class*="location"],[class*="Location"]')].map(e=>typeof e==='string'?e:(e.getClientRects().length?text(e):'')).join(' ').toLowerCase();
+ const detected=Object.keys(travelAliases).find(code=>travelAliases[code].some(alias=>pageText.includes(alias)));
+ if(detected)return detected;
+ // Torn's foreign shop may not expose the country name inside the web page.
+ // Only use the planner's country on an actual abroad/travel route with shop columns.
+ if(/abroad|travel/.test(path)&&travelAliases[travel.country])return travel.country;
+ return null;
 }
 let stockCatalogMap=null,stockCatalogPending=null;
 let stockReportStatus='Waiting for foreign shop';
@@ -425,7 +437,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.9.5');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.9.6');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
@@ -586,5 +598,5 @@ function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=loa
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
 function deactivate(){travelClose();state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.9.5',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'1.9.6',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
