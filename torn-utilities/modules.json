@@ -117,9 +117,9 @@
       "id": "item-monitor",
       "name": "Item Monitor",
       "category": "business",
-      "version": "1.9.8",
+      "version": "1.9.9",
       "description": "Item Monitor with separate movable and resizable Travel Assistant window, card-based flight schedule, stock forecasts and haul profit",
-      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/item-monitor-v198.user.js"
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/item-monitor-v199.user.js"
     }
   ]
 }
