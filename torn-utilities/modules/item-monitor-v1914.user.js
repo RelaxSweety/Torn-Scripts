@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.9.18
+// @version      1.9.19
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -538,6 +538,53 @@ async function reportForeignShop(){
  finally{stockReportingBusy=false}
 }
 setInterval(reportForeignShop,10000);
+let itemMonitorDiagWindow=null;
+let travelLastDiagnostics={status:'Not tested'};
+async function itemMonitorDiagnostics(probe=false){
+ const data={
+  version:'1.9.19',platform:{tampermonkey:typeof GM_xmlhttpRequest==='function',pda:typeof PDA_httpGet==='function',managerRegistered:(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.isRegistered?.(ID)??false},
+  module:{active:!!state.context,monitorCount:state.items.length,monitors:state.items.map(x=>({category:x.category,name:x.name,status:x.status,minQty:x.minQty,maxPrice:x.maxPrice})),selection:state.selected?{category:state.selected.category,name:state.selected.name}:null,alarmMuted:state.muted,picking:state.picking},
+  catalog:{loaded:state.catalog?.length||0,cacheItems:load(catalogCacheKey,null)?.items?.length||0,reportingCatalogSize:stockCatalogMap?.size||0},
+  travel:{windowOpen:!!travelWindow?.isConnected,country:travel.country,itemId:Number(travel.item)||null,mode:travel.mode,capacity:travel.capacity,arrivalBufferMinutes:travel.buffer,sellingFeePercent:travel.fee,departureReminderArmed:travel.armed,lastRequest:travelLastDiagnostics},
+  reporting:{enabled:stockReportingEnabled(),...stockPageDiagnostics(),bodyExcerpt:undefined},
+  authentication:{publicOnlyKeyPresent:!!travelApiKey()},
+  generatedAt:new Date().toISOString()
+ };
+ delete data.reporting.bodyExcerpt;
+ if(probe&&data.travel.itemId){
+  const query='?country='+encodeURIComponent(travel.country)+'&item_id='+data.travel.itemId;
+  for(const [name,path] of [['history','history'+query+'&limit=1'],['prediction','prediction'+query+'&lead_seconds='+Math.ceil((travelMinutes()+travelNum(travel.buffer))*60+60)]]){
+   const started=Date.now();
+   try{
+    const result=await travelGet('https://tu-multiplayer-server.tuserver.workers.dev/api/foreign/'+path);
+    data.travel[name]={ok:true,elapsedMs:Date.now()-started,status:result.status||null,count:result.count??null,points:result.points?.length??null,observedEvents:result.observed_events??null,confidence:result.confidence??null,reason:result.reason||null};
+   }catch(e){data.travel[name]={ok:false,elapsedMs:Date.now()-started,error:String(e.message)}}
+  }
+ }
+ return data;
+}
+function openItemMonitorDiagnostics(){
+ if(itemMonitorDiagWindow?.isConnected){itemMonitorDiagWindow.hidden=false;return}
+ const w=E('section',document.body);itemMonitorDiagWindow=w;w.id='tuim-diagnostics';
+ w.style.cssText='position:fixed;z-index:2147483646;left:8vw;top:9vh;width:min(86vw,650px);height:min(78vh,720px);min-width:290px;min-height:250px;resize:both;overflow:hidden;display:flex;flex-direction:column;box-sizing:border-box;background:#11191d;color:#eee;border:1px solid #cba953;border-radius:12px;padding:12px;font:13px system-ui;box-shadow:0 10px 30px #000b';
+ const head=E('div',w);head.style.cssText='display:flex;align-items:center;gap:10px;cursor:move;touch-action:none;padding-bottom:10px';
+ E('strong',head,'Item Monitor Diagnostics v1.9.19').style.flex='1';
+ B(head,'×',()=>{w.remove();itemMonitorDiagWindow=null});
+ draggable(w,head);
+ const actions=E('div',w);actions.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px';
+ const status=E('small',w,'Gathering module diagnostics...');
+ const pre=E('pre',w);pre.style.cssText='flex:1;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:#071014;color:#d5e5e9;padding:10px;border-radius:6px;user-select:text';
+ let snapshot=null;
+ const refresh=async(probe=false)=>{
+  status.textContent=probe?'Testing Worker history and prediction endpoints...':'Collecting module state...';
+  try{snapshot=await itemMonitorDiagnostics(probe);pre.textContent=JSON.stringify(snapshot,null,2);status.textContent=probe?'Worker tests completed':'Diagnostics updated'}
+  catch(e){status.textContent='Diagnostic error: '+e.message}
+ };
+ B(actions,'Refresh',()=>refresh(false));
+ B(actions,'Test D1 / Worker',()=>refresh(true));
+ B(actions,'Copy Diagnostics',async()=>{if(!snapshot)await refresh(false);const value=JSON.stringify(snapshot,null,2);try{await navigator.clipboard.writeText(value);status.textContent='Diagnostics copied'}catch(e){status.textContent='Select the text below and copy manually'}});
+ refresh(false);
+}
 let travelWindow=null,travelEpoch=0;
 function travelClose(){travelEpoch++;travelWindow?.remove();travelWindow=null}
 function travelUI(){
@@ -545,7 +592,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.9.18');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.9.19');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
@@ -581,14 +628,7 @@ function travelUI(){
   E('small',details,'Optional and off by default. When enabled and a supported foreign item shop is open, TU reads visible item IDs, inventory quantities, prices, country and observation timestamps every 10 seconds. These are sent to the TU server to improve stock, depletion and restock forecasts. Player information is not transmitted. A green check appears when the item observation is saved locally, even if server upload is pending. Reporting stops when the shop is not visible or you disable it. Data may still be associated with network metadata handled by the hosting provider.');
   E('small',panel,stockReportingEnabled()?'Enabled · Captures only when a supported foreign shop is visible':'Disabled · No inventory reports sent');
   const status=E('small',panel,stockReportingEnabled()?stockReportStatus:'Reporting disabled');status.id='tuim-stock-report-status';
-  B(row,'Copy Diagnostics',()=>{
-   const data=stockPageDiagnostics();
-   const output=JSON.stringify(data,null,2);
-   if(navigator.clipboard?.writeText)navigator.clipboard.writeText(output).then(()=>setStockReportStatus('Diagnostics copied')).catch(()=>{setStockReportStatus('Clipboard unavailable; use diagnostic text below')});
-   let pre=panel.querySelector('[data-tu-stock-debug]');
-   if(!pre){pre=E('pre',panel);pre.setAttribute('data-tu-stock-debug','');pre.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto;font-size:11px'}
-   pre.textContent=output;
-  });
+  B(row,'Diagnostics',openItemMonitorDiagnostics);
 
  }
  renderReporting();
@@ -712,9 +752,9 @@ function travelUI(){
 function render(){const p=state.panel;if(!p)return;p.replaceChildren();const h=E('div',p);h.className='tuim-header';draggable(p,h);E('strong',h,'Item Monitor');B(h,'−',()=>{p.hidden=true;state.catalogWindow?.remove();state.catalogWindow=null;state.context?.minimize?.()});B(h,'×',()=>{p.hidden=true;state.catalogWindow?.remove();state.catalogWindow=null;state.context?.close?.()});B(p,category()==='Item Market'?'Select Current Market Item':'Select item on Torn',pick);B(p,'Select Item from Complete List',openCatalog);E('p',p,'Current selection: '+(state.selected?state.selected.category+' / '+state.selected.name:'None'));const label=(t)=>E('label',p,t);label('Minimum available quantity (Foreign / Stores)');const q=E('input',p);q.type='number';q.min='1';q.placeholder='No quantity alert';label('Alert at or below unit price ($, Item Market / Stores)');const pr=E('input',p);pr.type='number';pr.min='0';pr.step='0.01';pr.placeholder='No price alert';if(state.selected){const prev=state.items.find(w=>w.category===state.selected.category&&(w.key===state.selected.key||norm(w.name)===norm(state.selected.name)));if(prev){q.value=prev.minQty??'';pr.value=prev.maxPrice??''}}B(p,'Add / update monitor',()=>{if(!state.selected)return alert('Select an item first.');const s=state.selected;const minQty=q.value.trim()===''?null:Number(q.value),maxPrice=pr.value.trim()===''?null:Number(pr.value);if(s.category==='Foreign'&&minQty===null)return alert('Enter a minimum quantity for foreign items.');if(s.category==='Item Market'&&maxPrice===null)return alert('Enter a target price for Item Market.');if(minQty===null&&maxPrice===null)return alert('Enter a quantity or target price.');if(minQty!==null&&(!Number.isFinite(minQty)||minQty<1)||maxPrice!==null&&(!Number.isFinite(maxPrice)||maxPrice<0))return alert('Invalid target.');state.items=state.items.filter(w=>!(w.category===s.category&&(w.key===s.key||norm(w.name)===norm(s.name))));clearHighlights();state.items.push({...s,minQty:s.category==='Item Market'?null:minQty,maxPrice:s.category==='Foreign'?null:maxPrice,fired:false,status:'Waiting'});save();scan();render()});const st=E('p',p,state.items.length+' monitored item(s)');st.id='tuim-status';for(const cat of ['Foreign','Stores','Item Market','Other']){const watches=state.items.filter(w=>w.category===cat);if(!watches.length)continue;E('h3',p,cat+' ('+watches.length+')');for(const w of watches){const line=E('div',p);line.className='tuim-entry';const heading=E('strong',line,w.name+' ✎');heading.style.cssText='cursor:pointer;color:#d6b65c;padding:5px 0';heading.setAttribute('role','button');heading.tabIndex=0;const edit=()=>{state.selected={category:w.category,name:w.name,key:w.key};render();state.panel.scrollTo({top:0,behavior:'smooth'});state.panel.querySelectorAll('input[type=number]')[w.category==='Item Market'?1:0]?.focus()};heading.onclick=edit;heading.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();edit()}};E('div',line,'Qty ≥ '+(w.minQty??'off')+' | Price ≤ '+(w.maxPrice==null?'off':'$'+w.maxPrice.toLocaleString()));E('small',line,w.status||'Waiting');B(line,'Edit',edit);B(line,'Remove',()=>{state.items=state.items.filter(x=>x!==w);clearHighlights();save();scan();render()})}}B(p,'Clear all monitors',()=>{if(!confirm('Remove all monitored items?'))return;state.items=[];clearHighlights();save();render()});E('h3',p,'Travel planning');B(p,'Open Travel Assistant',travelUI);E('h3',p,'Alarm settings');label('Volume (%)');const vol=E('input',p);vol.type='range';vol.min=0;vol.max=100;vol.value=state.cfg.alarmVolume??60;vol.style.touchAction='none';const setVolume=x=>{const rect=vol.getBoundingClientRect();if(!rect.width)return;vol.value=String(Math.round(Math.max(0,Math.min(100,(x-rect.left)/rect.width*100))));state.cfg.alarmVolume=vol.value;saveCfg()};let volumePointer=null;vol.addEventListener('pointerdown',e=>{if(e.button!==0&&e.pointerType==='mouse')return;e.preventDefault();e.stopImmediatePropagation();volumePointer=e.pointerId;vol.setPointerCapture?.(e.pointerId);setVolume(e.clientX)},{capture:true,passive:false});vol.addEventListener('pointermove',e=>{if(volumePointer!==e.pointerId)return;e.preventDefault();e.stopImmediatePropagation();setVolume(e.clientX)},{capture:true,passive:false});for(const ev of ['pointerup','pointercancel','lostpointercapture'])vol.addEventListener(ev,e=>{if(volumePointer===e.pointerId)volumePointer=null;e.stopPropagation()},{capture:true});vol.addEventListener('touchmove',e=>{if(volumePointer!==null)e.preventDefault();e.stopPropagation()},{passive:false});vol.oninput=()=>{state.cfg.alarmVolume=vol.value;saveCfg()};label('Sound');const snd=E('select',p);for(const v of ['beep','siren','chime']){const o=E('option',snd,v);o.value=v}snd.value=state.cfg.alarmSound||'beep';snd.onchange=()=>{state.cfg.alarmSound=snd.value;saveCfg()};label('Duration (seconds)');const dur=E('input',p);dur.type='number';dur.min=.5;dur.max=30;dur.value=state.cfg.alarmDuration??3;dur.oninput=()=>{state.cfg.alarmDuration=dur.value;saveCfg()};B(p,'Test alarm',sound);E('p',p,'Monitors persist across navigation and refresh. Alerts only evaluate visible listings while Torn is running.')}
 function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=load(OLD,[]);for(const w of old){if(!w.name)continue;const key=w.key?.startsWith('id:')?w.key:'name:'+norm(w.name);if(!state.items.some(x=>x.key===key&&x.category==='Foreign'))state.items.push({category:'Foreign',name:w.name,key,minQty:Number(w.min)||null,maxPrice:null,status:'Migrated',fired:false})}save();localStorage.setItem('tuim-migrated','1')}
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
-function deactivate(){travelClose();state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
+function deactivate(){itemMonitorDiagWindow?.remove();itemMonitorDiagWindow=null;travelClose();state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.9.18',activate,deactivate};
+const definition={id:ID,version:'1.9.19',activate,deactivate};
 const pageWindow=typeof unsafeWindow!=='undefined'?unsafeWindow:window;
 let registered=false;
 function register(){
