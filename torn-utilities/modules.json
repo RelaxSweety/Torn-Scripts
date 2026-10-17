@@ -45,7 +45,7 @@
       "id": "alerts-calculations",
       "name": "Stock and Calculations",
       "category": "business",
-      "version": "0.4.3",
+      "version": "0.4.4",
       "description": "Stock cash-target transaction calculator and basic percentage calculator",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/alerts-and-calculations.user.js"
     },
@@ -53,7 +53,7 @@
       "id": "flight-game",
       "name": "Flight Game",
       "category": "single-player",
-      "version": "0.12.4",
+      "version": "0.12.5",
       "description": "Standalone Flight Game arcade module, playable anytime",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/flight-game.user.js"
     },
@@ -61,7 +61,7 @@
       "id": "stick-fighter",
       "name": "Stick Fighter",
       "category": "single-player",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "description": "Standalone Stick Fighter arcade module, playable anytime",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/stick-fighter.user.js"
     },
@@ -101,7 +101,7 @@
       "id": "torn-snake",
       "name": "Slithering Streets",
       "category": "single-player",
-      "version": "0.2.11",
+      "version": "0.2.12",
       "description": "Single-player Snake with touch controls and local high scores",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/torn-snake.user.js"
     },
