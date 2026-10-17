@@ -404,7 +404,7 @@ function travelUI(){
   toggle.setAttribute('aria-pressed',String(stockReportingEnabled()));
   const details=E('div',panel);details.hidden=true;
   B(row,'ⓘ Info',()=>{details.hidden=!details.hidden});
-  E('small',details,'Optional and off by default. When enabled and a supported foreign item shop is open, TU reads visible item IDs, inventory quantities, prices, country and observation timestamps every 10 seconds. These are sent to the TU server to improve stock, depletion and restock forecasts. Player names, player IDs, API keys, chat messages and device identifiers are not included in the report. A green check appears beside each item only after the server confirms receipt. Reporting stops when the shop is not visible or you disable it. Data may still be associated with network metadata handled by the hosting provider.');
+  E('small',details,'Optional and off by default. When enabled and a supported foreign item shop is open, TU reads visible item IDs, inventory quantities, prices, country and observation timestamps every 10 seconds. These are sent to the TU server to improve stock, depletion and restock forecasts. Player information is not transmitted. A green check appears beside each item only after the server confirms receipt. Reporting stops when the shop is not visible or you disable it. Data may still be associated with network metadata handled by the hosting provider.');
   E('small',panel,stockReportingEnabled()?'Enabled · Captures only when a supported foreign shop is visible':'Disabled · No inventory reports sent');
  }
  renderReporting();
