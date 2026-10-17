@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.9.0
+// @version      1.9.1
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -310,7 +310,7 @@ let stockReportingBusy=false;
 const stockChecks=new Map();
 function foreignShopCountry(){
  const path=location.pathname.toLowerCase();
- if(!/abroad|travel|index\\.php/.test(path))return null;
+ if(!/abroad|travel|index\.php/.test(path))return null;
  const heading=[...document.querySelectorAll('h1,h2,h3,[class*="country"],[class*="Country"],[class*="location"],[class*="Location"]')]
   .filter(e=>e.getClientRects().length&&!e.closest('#tuim-panel,#tuim-travel-window'))
   .map(e=>norm(text(e))).join(' ');
@@ -324,18 +324,18 @@ function foreignShopSnapshot(){
  for(const row of candidates){
   if(!row.getClientRects().length||row.closest('#tuim-panel,#tuim-travel-window'))continue;
   const node=row.closest('[data-item-id],[data-itemid]')||row;
-  const idText=node.getAttribute('data-item-id')||node.getAttribute('data-itemid')||node.querySelector('[data-item-id],[data-itemid]')?.getAttribute('data-item-id')||node.querySelector('a[href*="itemID="],a[href*="itemId="]')?.href.match(/[?&]itemI[Dd]=(\\d+)/)?.[1];
+  const idText=node.getAttribute('data-item-id')||node.getAttribute('data-itemid')||node.querySelector('[data-item-id],[data-itemid]')?.getAttribute('data-item-id')||node.querySelector('a[href*="itemID="],a[href*="itemId="]')?.href.match(/[?&]itemI[Dd]=(\d+)/)?.[1];
   const id=Number(idText);
   if(!Number.isSafeInteger(id)||id<=0||seen.has(id))continue;
   const qtyNode=node.querySelector('[data-quantity],[data-stock],[class*="quantity"],[class*="Quantity"],[class*="stock"],[class*="Stock"]');
   const qtyText=qtyNode?.getAttribute('data-quantity')||qtyNode?.getAttribute('data-stock')||text(qtyNode);
-  const qtyMatch=String(qtyText||'').match(/(?:^|(?:stock|available|qty|quantity)\\s*:?\\s*)([\\d,]+)\\b/i);
+  const qtyMatch=String(qtyText||'').match(/(?:^|(?:stock|available|qty|quantity)\s*:?\s*)([\d,]+)\b/i);
   if(!qtyMatch)continue;
   const quantity=Number(qtyMatch[1].replaceAll(',',''));
   if(!Number.isSafeInteger(quantity)||quantity<0||quantity>1000000000)continue;
   const priceNode=node.querySelector('[data-price],[class*="price"],[class*="Price"]');
   const priceText=priceNode?.getAttribute('data-price')||text(priceNode);
-  const priceMatch=String(priceText||'').match(/\\$?([\\d,]+)/);
+  const priceMatch=String(priceText||'').match(/\$?([\d,]+)/);
   const unit_price=priceMatch?Number(priceMatch[1].replaceAll(',','')):null;
   seen.add(id);rows.push({item_id:id,quantity,unit_price:Number.isSafeInteger(unit_price)?unit_price:null,node});
  }
@@ -369,7 +369,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.9.0');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.9.1');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
@@ -529,5 +529,5 @@ function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=loa
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
 function deactivate(){travelClose();state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.9.0',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'1.9.1',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
