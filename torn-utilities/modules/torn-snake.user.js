@@ -1,11 +1,13 @@
 // ==UserScript==
 // @name         TU Slithering Streets
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.2.9
+// @version      0.2.10
 // @description  Torn Utilities mobile-friendly Snake arcade
 // @match        https://www.torn.com/*
 // @grant        none
 // @run-at       document-idle
+// @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/torn-snake.user.js
+// @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/torn-snake.user.js
 // ==/UserScript==
 (()=>{'use strict';const ID="torn-snake";let panel=null,canvas=null,ctx=null,timer=null,head=null,score=0,food=null,dir=[1,0],next=[1,0],snake=[],running=false;
 const E=(tag,parent,text)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;parent.append(e);return e};
@@ -26,5 +28,5 @@ const copy=E("button",panel,"Copy Game Summary");copy.style.cssText="background:
 panel.insertBefore(statbox,arena);panel.insertBefore(play,arena);panel.insertBefore(copy,arena);panel.append(show,history);
 const key=e=>{const d={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],w:[0,-1],s:[0,1],a:[-1,0],d:[1,0]}[e.key];if(d){e.preventDefault();turn(...d)}};window.addEventListener("keydown",key);panel._cleanup=()=>window.removeEventListener("keydown",key);snake=[210,209,208];spawn();draw()}
 function deactivate(){clearInterval(timer);timer=null;running=false;panel?._cleanup?.();panel?.remove();panel=null;canvas=null;ctx=null}
-const register=()=>(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register({id:ID,version:"0.2.9",activate,deactivate});if(!register())window.addEventListener("torn-utilities-ready",register,{once:true});
+const register=()=>(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register({id:ID,version:"0.2.10",activate,deactivate});if(!register())window.addEventListener("torn-utilities-ready",register,{once:true});
 })();
