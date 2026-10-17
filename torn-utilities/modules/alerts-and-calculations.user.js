@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Stock and Calculations
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.4
+// @version      0.4.5
 // @description  Stock cash targets, foreign stock alerts and calculator
 // @match        https://www.torn.com/*
 // @grant        unsafeWindow
@@ -32,8 +32,8 @@ if(state.tab==='stocks'){info(root,'Enter current cash and desired cash AFTER th
 else{const a=F(root,'First / original value','mathA','');const b=F(root,'Second / new value','mathB','');const op=E('select',root);for(const [v,label] of [['+','Add'],['-','Subtract'],['*','Multiply'],['/','Divide'],['pct','Percentage gain/loss'],['ratio','First as % of second']]){const o=E('option',op,label);o.value=v}op.value=cfg.op||'pct';op.onchange=()=>{cfg.op=op.value;save()};const out=E('p',root,'');B(root,'Calculate',()=>{const x=num(a.value),y=num(b.value);if(![x,y].every(Number.isFinite)){out.textContent='Invalid numbers';return}const v=op.value==='+'?x+y:op.value==='-'?x-y:op.value==='*'?x*y:op.value==='/'?x/y:op.value==='pct'?(y-x)/Math.abs(x)*100:x/y*100;out.textContent=Number.isFinite(v)?v.toLocaleString('en-US',{maximumFractionDigits:5})+(['pct','ratio'].includes(op.value)?'%':''):'Undefined (division by zero)'});}}
 function activate(ctx){state.context=ctx; if(!state.panel){const style=E('style',document.head);style.textContent='#tuac-panel{position:fixed;z-index:2147483642;top:10vh;left:4vw;width:min(92vw,440px);max-height:80vh;overflow:auto;background:#11191d;color:#eee;border:1px solid #cba953;border-radius:14px;padding:14px;font:14px system-ui;box-shadow:0 10px 30px #000c}#tuac-panel[hidden]{display:none!important}#tuac-panel button{margin:4px;padding:9px;background:#d6b65c;color:#111;border:0;border-radius:6px;font-weight:700}#tuac-panel nav{display:flex}#tuac-panel nav button{flex:1}#tuac-panel label{display:block;margin-top:10px}#tuac-panel input,#tuac-panel select{display:block;width:100%;box-sizing:border-box;background:#283239;color:#fff;border:1px solid #647077;border-radius:5px;padding:9px;font-size:16px}#tuac-panel pre{white-space:pre-wrap}.tuac-monitored{outline:3px solid #1ce15e!important;outline-offset:-2px!important}.tuac-alert{outline:4px solid #00ff69!important;outline-offset:-2px!important}';state.panel=E('section',document.body);state.panel.id='tuac-panel'}state.panel.hidden=false;render()}
 function deactivate(){stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
-ensureHighlightStyle();restoreWatches();
-const definition={id:ID,version:'0.4.4',activate,deactivate};const register=()=>(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+// Legacy startup hooks were removed; calling them prevented TU registration.
+const definition={id:ID,version:'0.4.5',activate,deactivate};const register=()=>(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
   // TU cross-world registration: retry after manager startup and SPA initialization.
   // Stop once this exact module is visible in the shared manager registry.
   {
