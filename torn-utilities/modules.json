@@ -45,7 +45,7 @@
       "id": "alerts-calculations",
       "name": "Stock and Calculations",
       "category": "business",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "description": "Stock cash-target transaction calculator and basic percentage calculator",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/alerts-and-calculations.user.js"
     },
@@ -53,7 +53,7 @@
       "id": "flight-game",
       "name": "Flight Game",
       "category": "single-player",
-      "version": "0.12.2",
+      "version": "0.12.3",
       "description": "Standalone Flight Game arcade module, playable anytime",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/flight-game.user.js"
     },
@@ -61,7 +61,7 @@
       "id": "stick-fighter",
       "name": "Stick Fighter",
       "category": "single-player",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "description": "Standalone Stick Fighter arcade module, playable anytime",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/stick-fighter.user.js"
     },
@@ -77,7 +77,7 @@
       "id": "tic-tac-toe",
       "name": "Tic-Tac-Toe",
       "category": "multiplayer",
-      "version": "0.6.0",
+      "version": "0.6.1",
       "description": "Two-player Tic-Tac-Toe with named winners, green winning line, rematches and head-to-head history",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/tic-tac-toe.user.js"
     },
@@ -85,7 +85,7 @@
       "id": "torn-four",
       "name": "Torn Four",
       "category": "multiplayer",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "description": "Connect Four: two-player multiplayer with private room codes",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/torn-four.user.js"
     },
@@ -93,7 +93,7 @@
       "id": "torn-fleet",
       "name": "Torn Fleet",
       "category": "multiplayer",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "description": "Battleship: fleet placement and turn-based naval combat",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/torn-fleet.user.js"
     },
@@ -101,7 +101,7 @@
       "id": "torn-snake",
       "name": "Slithering Streets",
       "category": "single-player",
-      "version": "0.2.8",
+      "version": "0.2.9",
       "description": "Single-player Snake with touch controls and local high scores",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/torn-snake.user.js"
     },
@@ -109,7 +109,7 @@
       "id": "chaos-marbles",
       "name": "Chaos Marbles",
       "category": "multiplayer",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "description": "Online 2–4 player marble race with private player sessions, Waiting for Chaos staging, and game history",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/chaos-marbles.user.js"
     },
