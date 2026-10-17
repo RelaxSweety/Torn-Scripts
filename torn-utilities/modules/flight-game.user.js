@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Flight Game
 // @namespace    https://www.torn.com/
-// @version      0.12.2
+// @version      0.12.3
 // @description  Standalone TU Flight Game module, playable anytime
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -40,7 +40,7 @@
     // on first access; modules continue to work if TU loads later or is absent.
     const TU_NAMESPACE = 'flight-game';
     const legacyStore = window.localStorage;
-    const tuStorage = () => window.TornUtilities?.storage;
+    const tuStorage = () => (typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.storage;
     const moduleStore = {
         getItem(key) {
             const name = String(key);
@@ -301,7 +301,7 @@
     function arcadeEndPrompt(id,died=false){
         const isStick=id==='stick-figure-fighter';
         const donation='Torn donations are appreciated. Send cash or items to RelaxSweety [4539436].';
-        const close=()=>{if(isStick)StickFighter.stop();else closeActiveGame();window.TornUtilities?.closeActiveModule?.();};
+        const close=()=>{if(isStick)StickFighter.stop();else closeActiveGame();(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.closeActiveModule?.();};
         const replay=()=>{if(isStick){StickFighter.start();}else startGame();};
         const buttons=died?[
             {label:'REPLAY',action:replay},
@@ -316,7 +316,7 @@
         const score=isStick?StickFighter.getScore():Math.floor(state.score);
         const time=isStick?formatTime(StickFighter.getTime()*1000):formatTime(state.activeMs);
         const status=died?'Game Over':'Session Ended';
-        const player=window.TornUtilities?.getPlayer?.();
+        const player=(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.getPlayer?.();
         const playerName=player?.name||'Unknown Player';
         const summary=playerName+' Played Flight Game with a score of '+Number(score).toLocaleString()+' | Kills '+Number(kills).toLocaleString()+' | Flight Time '+time;
         promptBox(died?'GAME OVER':'END GAME',donation,buttons,true,summary);
@@ -553,7 +553,7 @@
         raf=requestAnimationFrame(loop);
     }
 
-    function minimize(){if(state.running&&!state.over){requestLeave();return;}updateEngineSound(false);window.TornUtilities?.closeActiveModule?.();if(!window.TornUtilities?.closeActiveModule)document.getElementById('tpfg-root').style.display='none';}
+    function minimize(){if(state.running&&!state.over){requestLeave();return;}updateEngineSound(false);(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.closeActiveModule?.();if(!(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.closeActiveModule)document.getElementById('tpfg-root').style.display='none';}
 
     function togglePause() {
         if (!state.running || state.over) return;
@@ -811,7 +811,7 @@
     let initialized=false;
     async function ensureInitialized(){if(!initialized){await init();initialized=true;}}
     let activationEpoch=0;
-    async function activateFlight(){const epoch=++activationEpoch;await ensureInitialized();if(epoch!==activationEpoch||!window.TornUtilities?.isActive?.('flight-game'))return;launchGame(Arcade.games.get('flight-arcade'));}
+    async function activateFlight(){const epoch=++activationEpoch;await ensureInitialized();if(epoch!==activationEpoch||!(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.isActive?.('flight-game'))return;launchGame(Arcade.games.get('flight-arcade'));}
     async function activateStick(){await ensureInitialized();launchGame(Arcade.games.get('stick-figure-fighter'));}
     function deactivateFromTU(){
       ++activationEpoch;
@@ -819,7 +819,7 @@
       for(const id of ['tpfg-manager','tpfg-prompt','tpfg-game-settings','tpfg-root'])document.getElementById(id)?.remove();
       initialized=false;
     }
-    const definitions=[{id:'flight-game',version:'0.12.2',activate:activateFlight,deactivate:deactivateFromTU}];
-    function registerTU(){if(window.TornUtilities?.register)for(const definition of definitions)window.TornUtilities.register(definition);}
+    const definitions=[{id:'flight-game',version:'0.12.3',activate:activateFlight,deactivate:deactivateFromTU}];
+    function registerTU(){if((typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register)for(const definition of definitions)(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities.register(definition);}
     window.addEventListener('torn-utilities-ready',registerTU);registerTU();
 })();
