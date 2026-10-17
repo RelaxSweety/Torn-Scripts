@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Tic-Tac-Toe Module
 // @namespace    https://www.torn.com/
-// @version      0.6.2
+// @version      0.6.3
 // @description  Torn PDA mobile multiplayer Tic-Tac-Toe
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -88,6 +88,26 @@ function startPolling(){if(timer)clearInterval(timer);if(session)timer=setInterv
 render(null);if(session){startPolling();refresh();}
 }
 function deactivate(){dragCleanup?.();dragCleanup=null;clearInterval(timer);timer=null;panel?.remove();panel=null;host=null;latestGame=null;}
-function register(){if((typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register){(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities.register({id:ID,version:"0.6.2",activate,deactivate});return true;}return false;}
+function register(){if((typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register){(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities.register({id:ID,version:"0.6.3",activate,deactivate});return true;}return false;}
 if(!register())window.addEventListener("torn-utilities-ready",register,{once:true});
+  // TU cross-world registration: retry after manager startup and SPA initialization.
+  // Stop once this exact module is visible in the shared manager registry.
+  {
+    const tuId="tic-tac-toe";
+    let tries=0;
+    const attempt=()=>{
+      const host=typeof unsafeWindow!=='undefined'?unsafeWindow:window;
+      if(host.TornUtilities?.isRegistered?.(tuId))return true;
+      try{
+        if(typeof registerTU==='function')registerTU();
+        else if(typeof register==='function')register();
+      }catch(err){console.warn('[TU] Registration retry failed for '+tuId,err);}
+      return !!host.TornUtilities?.isRegistered?.(tuId);
+    };
+    if(!attempt()){
+      const interval=setInterval(()=>{if(attempt()||++tries>=30)clearInterval(interval)},1000);
+      (typeof unsafeWindow!=='undefined'?unsafeWindow:window).addEventListener('torn-utilities-ready',attempt);
+    }
+  }
+
 })();
