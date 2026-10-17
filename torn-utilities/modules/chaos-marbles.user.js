@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         TU Chaos Marbles
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.2.2
+// @version      0.2.3
 // @description  Online multiplayer marble race for 2-4 players
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
+// @grant        unsafeWindow
 // @connect      tu-multiplayer-server.tuserver.workers.dev
 // @run-at       document-idle
 // @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/chaos-marbles.user.js
@@ -60,6 +61,6 @@ let drag=null;bar.addEventListener("pointerdown",e=>{if(e.target.closest("button
 const grip=E("div",panel,"◢");grip.style.cssText="position:absolute;right:3px;bottom:2px;width:30px;height:30px;display:flex;align-items:end;justify-content:end;padding:3px;box-sizing:border-box;cursor:nwse-resize;touch-action:none;color:#d6b96a;font-size:21px";let resize=null;grip.onpointerdown=e=>{e.preventDefault();const r=panel.getBoundingClientRect();resize={x:e.clientX,y:e.clientY,w:r.width,h:r.height,l:r.left,t:r.top};panel.style.transform="none";panel.style.left=r.left+"px";panel.style.top=r.top+"px";grip.setPointerCapture(e.pointerId)};grip.onpointermove=e=>{if(!resize)return;panel.style.width=Math.max(260,Math.min(innerWidth-resize.l-8,resize.w+e.clientX-resize.x))+"px";panel.style.height=Math.max(320,Math.min(innerHeight-resize.t-8,resize.h+e.clientY-resize.y))+"px"};grip.onpointerup=()=>resize=null;grip.onpointercancel=()=>resize=null;
 E("style",panel,"@keyframes chaosSpin{from{transform:rotate(-14deg) scale(.9)}to{transform:rotate(14deg) scale(1.1)}}");E("div",panel).className="body";session=read(SESSION,null);render();if(session)action("/"+session.room+"/state");timer=setInterval(()=>{if(session&&!busy&&panel)action("/"+session.room+"/state")},2500)}
 function deactivate(){clearInterval(timer);clearInterval(rollTimer);timer=null;rollTimer=null;panel?.remove();panel=null}
-function register(){return window.TornUtilities?.register({id:ID,version:"0.2.2",activate,deactivate})}
+function register(){return (typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register({id:ID,version:"0.2.3",activate,deactivate})}
 if(!register())window.addEventListener("torn-utilities-ready",register,{once:true});
 })();
