@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.9.4
+// @version      1.9.5
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -356,29 +356,65 @@ function foreignShopSnapshot(){
  }
  return {country,rows};
 }
+const stockArchiveKey='tuim-stock-archive-v1';
+const stockQueueKey='tuim-stock-upload-queue-v1';
+function markStockArchived(rows,stamp){
+ for(const row of rows){
+  let mark=row.node.querySelector('[data-tu-stock-reported]');
+  if(!mark){mark=document.createElement('span');mark.setAttribute('data-tu-stock-reported','');mark.style.cssText='color:#34c759;font-weight:bold;margin-left:6px';mark.title='Inventory saved locally; server upload may be pending';row.node.append(mark)}
+  mark.textContent='✓';stockChecks.set(row.item_id,stamp);
+ }
+}
+function storeStockSnapshot(snapshot){
+ const archive=load(stockArchiveKey,[]);
+ const queue=load(stockQueueKey,[]);
+ // Keep a bounded local history and unsent batches, with no silent loss of unsent data.
+ if(queue.length>=500)throw Error('Upload queue full (500 batches); retry when connected');
+ archive.push(snapshot);
+ queue.push(snapshot);
+ try{
+  localStorage.setItem(stockArchiveKey,JSON.stringify(archive.slice(-500)));
+  localStorage.setItem(stockQueueKey,JSON.stringify(queue));
+ }catch(e){throw Error('Local storage full or unavailable: '+e.message)}
+}
+async function flushStockQueue(){
+ const queue=load(stockQueueKey,[]);
+ if(!queue.length)return 0;
+ let sent=0;
+ for(const batch of queue.slice(0,6)){
+  const response=await fetch('https://tu-multiplayer-server.tuserver.workers.dev/api/foreign/observations',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(batch)});
+  if(!response.ok)throw Error('Upload HTTP '+response.status);
+  const result=await response.json();
+  if(!result.ok||!Array.isArray(result.accepted)||result.accepted.length!==batch.items.length)throw Error('Upload not fully accepted');
+  // Remove only after acknowledgment, preserving batches queued later.
+  const current=load(stockQueueKey,[]);
+  if(current[0]?.observed_at!==batch.observed_at||current[0]?.country!==batch.country)break;
+  localStorage.setItem(stockQueueKey,JSON.stringify(current.slice(1)));
+  sent++;
+ }
+ return sent;
+}
 async function reportForeignShop(){
  if(!stockReportingEnabled()||stockReportingBusy||document.hidden)return;
- const country=foreignShopCountry();if(!country){setStockReportStatus('Waiting for supported foreign country screen');return;}
  stockReportingBusy=true;
  try{
+  const country=foreignShopCountry();
+  if(!country){setStockReportStatus('Waiting for supported foreign country screen');return}
   setStockReportStatus('Reading shop inventory...');
   await ensureStockCatalog();
-  const snap=foreignShopSnapshot();if(!snap?.rows.length){setStockReportStatus('No shop rows recognized — reporting not sent');return;}
+  const snap=foreignShopSnapshot();
+  if(!snap?.rows.length){setStockReportStatus('No shop rows recognized — nothing archived');return}
   const observed_at=Math.floor(Date.now()/1000);
-  const items=snap.rows.slice(0,50).map(({item_id,quantity,unit_price})=>({item_id,quantity,unit_price}));
-  setStockReportStatus('Submitting '+items.length+' inventory records...');
-  const response=await fetch('https://tu-multiplayer-server.tuserver.workers.dev/api/foreign/observations',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({country:snap.country,observed_at,items})});
-  if(!response.ok)throw Error('HTTP '+response.status);
-  const result=await response.json();if(!result.ok)throw Error('Not accepted');
-  const accepted=new Set(result.accepted||[]);
-  for(const row of snap.rows){
-   if(!accepted.has(row.item_id))continue;
-   let mark=row.node.querySelector('[data-tu-stock-reported]');
-   if(!mark){mark=document.createElement('span');mark.setAttribute('data-tu-stock-reported','');mark.style.cssText='color:#34c759;font-weight:bold;margin-left:6px';mark.title='Inventory reported to TU';row.node.append(mark)}
-   mark.textContent='✓';stockChecks.set(row.item_id,observed_at);
-  }
-  setStockReportStatus('Reported '+accepted.size+' items at '+new Date(observed_at*1000).toLocaleTimeString());
- }catch(e){setStockReportStatus('Reporting error: '+e.message);console.warn('[TU Stock Reporter] Submission not confirmed:',e.message)}
+  const rows=snap.rows.slice(0,50);
+  const batch={country:snap.country,observed_at,items:rows.map(({item_id,quantity,unit_price})=>({item_id,quantity,unit_price}))};
+  storeStockSnapshot(batch);
+  markStockArchived(rows,observed_at);
+  setStockReportStatus('Archived '+rows.length+' items locally · '+load(stockQueueKey,[]).length+' upload batches pending');
+  try{
+   const sent=await flushStockQueue();
+   setStockReportStatus('Archived '+rows.length+' items locally · '+sent+' batches uploaded · '+load(stockQueueKey,[]).length+' pending');
+  }catch(e){setStockReportStatus('Archived '+rows.length+' items locally · Upload pending: '+e.message)}
+ }catch(e){setStockReportStatus('Archive error: '+e.message);console.warn('[TU Stock Reporter]',e)}
  finally{stockReportingBusy=false}
 }
 setInterval(reportForeignShop,10000);
@@ -389,7 +425,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.9.4');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.9.5');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
@@ -422,7 +458,7 @@ function travelUI(){
   toggle.setAttribute('aria-pressed',String(stockReportingEnabled()));
   const details=E('div',panel);details.hidden=true;
   B(row,'ⓘ Info',()=>{details.hidden=!details.hidden});
-  E('small',details,'Optional and off by default. When enabled and a supported foreign item shop is open, TU reads visible item IDs, inventory quantities, prices, country and observation timestamps every 10 seconds. These are sent to the TU server to improve stock, depletion and restock forecasts. Player information is not transmitted. A green check appears beside each item only after the server confirms receipt. Reporting stops when the shop is not visible or you disable it. Data may still be associated with network metadata handled by the hosting provider.');
+  E('small',details,'Optional and off by default. When enabled and a supported foreign item shop is open, TU reads visible item IDs, inventory quantities, prices, country and observation timestamps every 10 seconds. These are sent to the TU server to improve stock, depletion and restock forecasts. Player information is not transmitted. A green check appears when the item observation is saved locally, even if server upload is pending. Reporting stops when the shop is not visible or you disable it. Data may still be associated with network metadata handled by the hosting provider.');
   E('small',panel,stockReportingEnabled()?'Enabled · Captures only when a supported foreign shop is visible':'Disabled · No inventory reports sent');
   const status=E('small',panel,stockReportingEnabled()?stockReportStatus:'Reporting disabled');status.id='tuim-stock-report-status';
  }
@@ -550,5 +586,5 @@ function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=loa
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
 function deactivate(){travelClose();state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.9.4',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'1.9.5',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
