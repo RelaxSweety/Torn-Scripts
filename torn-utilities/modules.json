@@ -120,6 +120,14 @@
       "version": "1.9.20",
       "description": "Item Monitor with separate movable and resizable Travel Assistant window, card-based flight schedule, stock forecasts and haul profit",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/item-monitor-v1914.user.js"
+    },
+    {
+      "id": "war-status-diagnostic",
+      "name": "War Status Diagnostic",
+      "category": "other",
+      "version": "0.1.0",
+      "description": "Benchmark opposing faction status API freshness, latency, and status changes at selectable intervals; export CSV",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/war-status-diagnostic.user.js"
     }
   ]
 }
