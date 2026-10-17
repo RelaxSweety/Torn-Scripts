@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Flight Game
 // @namespace    https://www.torn.com/
-// @version      0.12.3
+// @version      0.12.4
 // @description  Standalone TU Flight Game module, playable anytime
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -819,7 +819,27 @@
       for(const id of ['tpfg-manager','tpfg-prompt','tpfg-game-settings','tpfg-root'])document.getElementById(id)?.remove();
       initialized=false;
     }
-    const definitions=[{id:'flight-game',version:'0.12.3',activate:activateFlight,deactivate:deactivateFromTU}];
+    const definitions=[{id:'flight-game',version:'0.12.4',activate:activateFlight,deactivate:deactivateFromTU}];
     function registerTU(){if((typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register)for(const definition of definitions)(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities.register(definition);}
     window.addEventListener('torn-utilities-ready',registerTU);registerTU();
+  // TU cross-world registration: retry after manager startup and SPA initialization.
+  // Stop once this exact module is visible in the shared manager registry.
+  {
+    const tuId="flight-game";
+    let tries=0;
+    const attempt=()=>{
+      const host=typeof unsafeWindow!=='undefined'?unsafeWindow:window;
+      if(host.TornUtilities?.isRegistered?.(tuId))return true;
+      try{
+        if(typeof registerTU==='function')registerTU();
+        else if(typeof register==='function')register();
+      }catch(err){console.warn('[TU] Registration retry failed for '+tuId,err);}
+      return !!host.TornUtilities?.isRegistered?.(tuId);
+    };
+    if(!attempt()){
+      const interval=setInterval(()=>{if(attempt()||++tries>=30)clearInterval(interval)},1000);
+      (typeof unsafeWindow!=='undefined'?unsafeWindow:window).addEventListener('torn-utilities-ready',attempt);
+    }
+  }
+
 })();
