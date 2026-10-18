@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU War Status Diagnostic
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.7.2
+// @version      0.7.3
 // @description  Benchmark Torn faction member status freshness and API response times
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -12,7 +12,7 @@
 // @run-at       document-idle
 // ==/UserScript==
 (()=>{'use strict';
-const ID='war-status-diagnostic',VERSION='0.7.2',STORE='tu-war-diagnostic-v1';
+const ID='war-status-diagnostic',VERSION='0.7.3',STORE='tu-war-diagnostic-v1';
 if(window.__TU_WAR_DIAG__?.version===VERSION)return;window.__TU_WAR_DIAG__={version:VERSION};
 const host=typeof unsafeWindow!=='undefined'?unsafeWindow:window;
 const read=()=>{try{return JSON.parse(localStorage.getItem(STORE)||'{}')}catch{return {}}};
@@ -40,7 +40,7 @@ function closePicker(){picker?.remove();picker=null;pickerList=null;pickerSearch
 async function openPicker(){if(picker){pickerSearch?.focus();return}picker=el('section',document.body);picker.style.cssText='position:fixed;z-index:2147483647;inset:5vh 4vw;background:#11191d;color:#eee;border:2px solid #cba953;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;box-sizing:border-box;font:13px system-ui';const head=el('div',picker);head.style.cssText='display:flex;align-items:center;gap:8px';el('strong',head,'Select Warring Faction').style.flex='1';btn(head,'Close',closePicker);pickerSearch=el('input',picker);pickerSearch.placeholder='Filter by faction name, keywords, or ID';pickerSearch.style.cssText='padding:10px;background:#253038;color:#fff;border:1px solid #cba953;font-size:16px';pickerSearch.oninput=renderPicker;pickerStatus=el('small',picker,'Loading full faction directory...');pickerList=el('div',picker);pickerList.style.cssText='flex:1;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y';btn(picker,'Refresh Directory',async()=>{pickerStatus.textContent='Refreshing directory...';try{await loadDirectory(true);renderPicker()}catch(e){pickerStatus.textContent='Directory error: '+e.message}});try{await loadDirectory();if(picker)renderPicker()}catch(e){if(pickerStatus)pickerStatus.textContent='Directory error: '+e.message}}
 
 function warParticipants(w){const raw=w.factions||w.participants||w.teams||w.faction_participants||[];const entries=Array.isArray(raw)?raw:Object.entries(raw).map(([id,v])=>({...v,id:v.id||v.faction_id||id}));return entries.map(v=>({id:String(v.id||v.faction_id||v.faction?.id||''),name:String(v.name||v.faction_name||v.faction?.name||'Faction')})).filter(v=>/^\\d+$/.test(v.id)).slice(0,2)}
-function parseWars(data){const raw=data.rankedwars??data.ranked_wars??data.warfare?.ranked??data.wars??data.data?.rankedwars??data.data?.ranked_wars??data.data??[];const entries=Array.isArray(raw)?raw:Object.entries(raw||{}).filter(([k,v])=>v&&typeof v==='object').map(([k,v])=>({...v,id:v.id||v.war_id||k}));const now=Date.now()/1000;return entries.map(w=>{const war=w.war||w;const factions=warParticipants(w);const start=Number(w.start??war.start??w.started??war.started??0);const endRaw=w.end??war.end??w.ended??war.ended;const end=endRaw==null?null:Number(endRaw);const explicit=w.active===true||w.is_active===true||String(w.status||war.status||'').toLowerCase()==='active';const finished=end!==null&&end>0&&end<=now||['ended','finished','complete','completed'].includes(String(w.status||war.status||'').toLowerCase());return {id:String(w.id||w.war_id||war.id||war.war_id||''),factions,start,end,active:!finished&&(explicit||start>0&&start<=now&&(end===null||end===0||end>now)),status:w.status||war.status||'',rawKeys:Object.keys(w)}}).filter(w=>w.active&&w.factions.length===2&&/^\d+$/.test(w.id))}
+function parseWars(data){const raw=data.rankedwars??data.ranked_wars??data.warfare?.ranked??data.wars??data.data?.rankedwars??data.data?.ranked_wars??data.data??[];const entries=Array.isArray(raw)?raw:Object.entries(raw||{}).filter(([k,v])=>v&&typeof v==='object').map(([k,v])=>({...v,id:v.id||v.war_id||k}));const now=Date.now()/1000;return entries.map(w=>{const war=w.war||w;const factions=warParticipants(w);const start=Number(w.start??war.start??w.started??war.started??0);const endRaw=w.end??war.end??w.ended??war.ended;const end=endRaw==null?null:Number(endRaw);const explicit=w.active===true||w.is_active===true||String(w.status||war.status||'').toLowerCase()==='active';const finished=(end!==null&&end>0&&end<=now)||w.winner!=null||war.winner!=null||['ended','finished','complete','completed'].includes(String(w.status||war.status||'').toLowerCase());return {id:String(w.id||w.war_id||war.id||war.war_id||''),factions,start,end,active:!finished&&(explicit||start>0&&start<=now&&(end===null||end===0||end>now)),status:w.status||war.status||'',rawKeys:Object.keys(w)}}).filter(w=>w.active&&w.factions.length===2&&/^\d+$/.test(w.id))}
 function rememberWar(w){selectedWar=w;sessionStorage.setItem('tu:who:selected-war',JSON.stringify(w))}
 function warUrl(w){return 'https://www.torn.com/war.php?step=ranked&rankID='+encodeURIComponent(w.id)}
 function closeWarPicker(){warPicker?.remove();warPicker=null;warPickerList=null;warPickerStatus=null}
