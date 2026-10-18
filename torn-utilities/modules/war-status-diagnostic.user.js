@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU War Status Diagnostic
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.3
+// @version      0.5.4
 // @description  Benchmark Torn faction member status freshness and API response times
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -12,7 +12,7 @@
 // @run-at       document-idle
 // ==/UserScript==
 (()=>{'use strict';
-const ID='war-status-diagnostic',VERSION='0.5.3',STORE='tu-war-diagnostic-v1';
+const ID='war-status-diagnostic',VERSION='0.5.4',STORE='tu-war-diagnostic-v1';
 if(window.__TU_WAR_DIAG__?.version===VERSION)return;window.__TU_WAR_DIAG__={version:VERSION};
 const host=typeof unsafeWindow!=='undefined'?unsafeWindow:window;
 const read=()=>{try{return JSON.parse(localStorage.getItem(STORE)||'{}')}catch{return {}}};
@@ -37,7 +37,6 @@ async function loadDirectory(force=false){if(!force){try{const c=JSON.parse(loca
 function renderPicker(){if(!pickerList||!pickerStatus)return;const q=(pickerSearch?.value||'').trim().toLocaleLowerCase();const matches=directory.filter(x=>String(x.id).includes(q)||x.name.toLocaleLowerCase().includes(q));pickerStatus.textContent=directory.length+' factions loaded · '+matches.length+' matches';pickerList.replaceChildren();const frag=document.createDocumentFragment();for(const item of matches.slice(0,250)){const b=btn(frag,item.name+' ['+item.id+']',()=>{faction=String(item.id);const field=document.getElementById('tu-war-opponent-id');if(field)field.value=faction;save();closePicker();render()});b.style.cssText+=';display:block;width:100%;text-align:left;margin:2px 0'}pickerList.append(frag);if(matches.length>250)el('small',pickerList,'Showing first 250 matches. Type to narrow results.');}
 function closePicker(){picker?.remove();picker=null;pickerList=null;pickerSearch=null;pickerStatus=null}
 async function openPicker(){if(picker){pickerSearch?.focus();return}picker=el('section',document.body);picker.style.cssText='position:fixed;z-index:2147483647;inset:5vh 4vw;background:#11191d;color:#eee;border:2px solid #cba953;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;box-sizing:border-box;font:13px system-ui';const head=el('div',picker);head.style.cssText='display:flex;align-items:center;gap:8px';el('strong',head,'Select Warring Faction').style.flex='1';btn(head,'Close',closePicker);pickerSearch=el('input',picker);pickerSearch.placeholder='Filter by faction name, keywords, or ID';pickerSearch.style.cssText='padding:10px;background:#253038;color:#fff;border:1px solid #cba953;font-size:16px';pickerSearch.oninput=renderPicker;pickerStatus=el('small',picker,'Loading full faction directory...');pickerList=el('div',picker);pickerList.style.cssText='flex:1;overflow-y:auto;overscroll-behavior:contain';btn(picker,'Refresh Directory',async()=>{pickerStatus.textContent='Refreshing directory...';try{await loadDirectory(true);renderPicker()}catch(e){pickerStatus.textContent='Directory error: '+e.message}});try{await loadDirectory();if(picker)renderPicker()}catch(e){if(pickerStatus)pickerStatus.textContent='Directory error: '+e.message}}
-}
 function membersOf(data){const raw=data.members??data.faction?.members??data;const list=Array.isArray(raw)?raw:Object.entries(raw||{}).filter(([id,v])=>/^\d+$/.test(id)&&v&&typeof v==='object').map(([id,v])=>({...v,id:v.id||Number(id)}));return list.filter(x=>x&&typeof x==='object')}
 function signature(m){const st=m.status||{},last=m.last_action||{};return JSON.stringify({state:st.state||st.description||'',until:st.until??null,details:st.details||'',online:last.status||'',relative:last.relative||''})}
 function activity(m){const a=String(m.last_action?.status||'').toLowerCase();return a==='online'?'Online':a==='idle'?'Idle':a==='offline'?'Offline':a||'Unknown'}
