@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU War Status Diagnostic
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.7.0
+// @version      0.7.1
 // @description  Benchmark Torn faction member status freshness and API response times
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -12,7 +12,7 @@
 // @run-at       document-idle
 // ==/UserScript==
 (()=>{'use strict';
-const ID='war-status-diagnostic',VERSION='0.7.0',STORE='tu-war-diagnostic-v1';
+const ID='war-status-diagnostic',VERSION='0.7.1',STORE='tu-war-diagnostic-v1';
 if(window.__TU_WAR_DIAG__?.version===VERSION)return;window.__TU_WAR_DIAG__={version:VERSION};
 const host=typeof unsafeWindow!=='undefined'?unsafeWindow:window;
 const read=()=>{try{return JSON.parse(localStorage.getItem(STORE)||'{}')}catch{return {}}};
@@ -24,7 +24,7 @@ function drag(node,handle){let origin=null;handle.style.touchAction='none';handl
 const save=()=>localStorage.setItem(STORE,JSON.stringify({faction,interval,ownFaction}));
 const manager=()=>host.TornUtilities||window.TornUtilities;
 function key(){const injected='###PDA-APIKEY###';if(!injected.includes('PDA-APIKEY'))return injected;return localStorage.getItem('tu:identity:public-only-key:v1')||sessionStorage.getItem('tu:war:api-key')||''}
-async function request(url){if(manager()?.requestTorn&&url.startsWith('https://api.torn.com/v2/faction/'))return manager().requestTorn(url.slice('https://api.torn.com'.length));const errors=[];if(typeof GM_xmlhttpRequest==='function')try{return await new Promise((resolve,reject)=>GM_xmlhttpRequest({method:'GET',url,timeout:15000,onload:r=>{try{if(r.status<200||r.status>=300)throw Error('HTTP '+r.status);resolve(JSON.parse(r.responseText))}catch(e){reject(e)}},onerror:()=>reject(Error('Network error')),ontimeout:()=>reject(Error('Timeout'))}))}catch(e){errors.push(e.message)}
+async function request(url){if(manager()?.requestTorn&&url.startsWith('https://api.torn.com/v2/faction/')){const parsed=new URL(url);parsed.searchParams.delete('key');return manager().requestTorn(parsed.pathname+parsed.search)}if(url.startsWith('https://api.torn.com/')&&!new URL(url).searchParams.has('key')){const apiKey=key();if(!apiKey)throw Error('Public Only API key unavailable. Open TU Manager Settings and verify your key.');const parsed=new URL(url);parsed.searchParams.set('key',apiKey);url=parsed.toString()}const errors=[];if(typeof GM_xmlhttpRequest==='function')try{return await new Promise((resolve,reject)=>GM_xmlhttpRequest({method:'GET',url,timeout:15000,onload:r=>{try{if(r.status<200||r.status>=300)throw Error('HTTP '+r.status);resolve(JSON.parse(r.responseText))}catch(e){reject(e)}},onerror:()=>reject(Error('Network error')),ontimeout:()=>reject(Error('Timeout'))}))}catch(e){errors.push(e.message)}
 try{const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);return await r.json()}catch(e){errors.push(e.message)}
 if(typeof PDA_httpGet==='function')try{const r=await PDA_httpGet(url);return typeof r==='string'?JSON.parse(r):r?.data||r}catch(e){errors.push(e.message)}
 throw Error(errors.join(' | '))}
