@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU War Status Diagnostic
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.2
+// @version      0.5.3
 // @description  Benchmark Torn faction member status freshness and API response times
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -12,8 +12,8 @@
 // @run-at       document-idle
 // ==/UserScript==
 (()=>{'use strict';
-const ID='war-status-diagnostic',VERSION='0.5.0',STORE='tu-war-diagnostic-v1';
-if(window.__TU_WAR_DIAG__)return;window.__TU_WAR_DIAG__=true;
+const ID='war-status-diagnostic',VERSION='0.5.3',STORE='tu-war-diagnostic-v1';
+if(window.__TU_WAR_DIAG__?.version===VERSION)return;window.__TU_WAR_DIAG__={version:VERSION};
 const host=typeof unsafeWindow!=='undefined'?unsafeWindow:window;
 const read=()=>{try{return JSON.parse(localStorage.getItem(STORE)||'{}')}catch{return {}}};
 const saved=read();let faction=String(saved.faction||''),interval=Number(saved.interval)||15,remaining=0,running=false,timer=null,results=[],previous=new Map(),panel=null,output=null,status=null,ctx=null,epoch=0,roster=new Map(),rosterTable=null,counts=null,sortField='activity',sortAsc=true,ownFaction=String(saved.ownFaction||''),ownOnline=null,ownTotal=null,lastOwnPoll=0,searchResults=null,searchMessage=null;
