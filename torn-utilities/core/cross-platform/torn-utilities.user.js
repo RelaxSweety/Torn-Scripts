@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform (Auth Dev)
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.23
+// @version      0.5.24
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -26,7 +26,7 @@
   if (pageWindow.__RELAX_TORN_UTILITIES_PDA__) return;
   pageWindow.__RELAX_TORN_UTILITIES_PDA__ = true;
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.5.23';
+  const TU_VERSION='0.5.24';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -375,7 +375,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.23 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.24 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
@@ -566,7 +566,42 @@
         }catch(err){devStatus.textContent='Server logout failed: '+err.message}
         finally{localStorage.removeItem(sessionKey);logout.disabled=false;}
       });
+      const adminArea=document.createElement('div');
+      const adminList=document.createElement('div');
+      const loadPending=makeButton('Admin: View Pending Users');
+      loadPending.addEventListener('click',async()=>{
+        const token=session();
+        if(!token){devStatus.textContent='Register first';return;}
+        loadPending.disabled=true;
+        try{
+          const result=await requestDev('/api/auth/admin/pending','GET',null,token);
+          if(result.status!==200){devStatus.textContent='Pending users HTTP '+result.status+': '+String(result.body?.error||'Unknown');return;}
+          adminList.replaceChildren();
+          const users=result.body?.users||[];
+          if(!users.length)adminList.textContent='No pending users';
+          for(const user of users){
+            const row=document.createElement('div');
+            row.style.cssText='display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:5px 0';
+            const label=document.createElement('span');label.textContent=user.username+' ['+user.torn_id+']';
+            const approve=makeButton('Approve');
+            approve.addEventListener('click',async()=>{
+              if(!confirm('Approve '+user.username+' ['+user.torn_id+'] for development server access?'))return;
+              approve.disabled=true;
+              try{
+                const response=await requestDev('/api/auth/admin/approve','POST',{torn_id:user.torn_id},session());
+                devStatus.textContent=response.status===200?'Approved '+user.username:'Approval HTTP '+response.status+': '+String(response.body?.error||'Unknown');
+                if(response.status===200)row.remove();
+              }catch(err){devStatus.textContent='Approval failed: '+err.message}
+              finally{approve.disabled=false}
+            });
+            row.append(label,approve);adminList.append(row);
+          }
+        }catch(err){devStatus.textContent='Pending users failed: '+err.message}
+        finally{loadPending.disabled=false}
+      });
+      adminArea.append(loadPending,adminList);
       devWrap.append(devTitle,devNote,register,check,logout,devStatus);
+      devWrap.append(adminArea);
       content.append(devWrap);
       void checkSession();
       const notice=document.createElement('p');notice.textContent='Key sent to Torn over HTTPS. Optional saved Public Only key is stored locally without encryption or a passphrase, excluded from TU backups, and never shared by TU. Other scripts running on Torn pages may be able to read browser storage. This verification does not grant WHO server access.';content.append(notice);
@@ -672,7 +707,7 @@
         line.append(name,makeButton('Clear data',()=>{if(confirm('Delete all TU data for '+id+'?')){storage.clear(id);render('settings');}}));content.append(line);
       }
     }else{
-      const p=document.createElement('p');p.textContent='Torn Utilities v0.5.23 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      const p=document.createElement('p');p.textContent='Torn Utilities v0.5.24 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
       const guideLink=document.createElement('a');guideLink.href='https://github.com/RelaxSweety/Torn-Scripts/blob/main/torn-utilities/INSTALLATION.md';guideLink.target='_blank';guideLink.rel='noopener noreferrer';guideLink.textContent='TU Installation & Module Setup Guide ↗';guideLink.style.cssText='display:block;margin:12px 0;padding:12px;border:1px solid #806a3e;border-radius:8px;color:#e4c779;text-decoration:underline;font-weight:600';content.append(guideLink);
       // Official-style vector marks; no remote image dependencies.
       addSocialIcon('RelaxSweety on Discord','https://discord.com/users/relaxsweety','M20.317 4.369a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.211.375-.445.865-.608 1.25a18.27 18.27 0 0 0-5.49 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037 19.736 19.736 0 0 0-4.885 1.515.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.1 18.057a.083.083 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.077.077 0 0 0 .084-.028c.462-.63.873-1.295 1.226-1.994a.075.075 0 0 0-.041-.104 13.1 13.1 0 0 1-1.872-.89.076.076 0 0 1-.008-.127c.126-.095.252-.193.372-.292a.074.074 0 0 1 .077-.01c3.929 1.793 8.185 1.793 12.068 0a.074.074 0 0 1 .078.01c.12.099.246.197.373.292a.076.076 0 0 1-.007.127c-.598.35-1.224.65-1.873.89a.076.076 0 0 0-.04.105c.36.698.77 1.363 1.225 1.993a.076.076 0 0 0 .084.028 19.83 19.83 0 0 0 6.003-3.03.077.077 0 0 0 .031-.056c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028ZM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.42 0-1.334.955-2.42 2.157-2.42 1.211 0 2.176 1.095 2.157 2.42 0 1.335-.955 2.42-2.157 2.42Zm7.96 0c-1.183 0-2.157-1.085-2.157-2.42 0-1.334.955-2.42 2.157-2.42 1.211 0 2.176 1.095 2.157 2.42 0 1.335-.946 2.42-2.157 2.42Z');
