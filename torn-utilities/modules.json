@@ -125,8 +125,8 @@
       "id": "war-status-diagnostic",
       "name": "War Status Diagnostic",
       "category": "other",
-      "version": "0.3.0",
-      "description": "War status diagnostic with automatic own-faction detection, opponent faction-name search, sortable activity and online counts",
+      "version": "0.3.1",
+      "description": "War status diagnostic with auto-detected own faction and case-insensitive partial opponent name search",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/war-status-diagnostic.user.js"
     }
   ]
