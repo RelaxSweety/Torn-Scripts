@@ -15,8 +15,8 @@
 // @connect      raw.githubusercontent.com
 // @connect      api.github.com
 // @run-at       document-idle
-// @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/core/cross-platform/torn-utilities.user.js
-// @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/core/cross-platform/torn-utilities.user.js
+// @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/core/cross-platform/torn-utilities.user.js
+// @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/core/cross-platform/torn-utilities.user.js
 // ==/UserScript==
 (() => {
   'use strict';
