@@ -125,8 +125,8 @@
       "id": "war-status-diagnostic",
       "name": "War Status Diagnostic",
       "category": "other",
-      "version": "0.2.0",
-      "description": "War status benchmark with sortable opponent activity (Online/Idle/Offline), hospital timestamps, and both factions' online counts",
+      "version": "0.3.0",
+      "description": "War status diagnostic with automatic own-faction detection, opponent faction-name search, sortable activity and online counts",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/war-status-diagnostic.user.js"
     }
   ]
