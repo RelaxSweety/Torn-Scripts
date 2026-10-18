@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU War Status Diagnostic
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.0
+// @version      0.5.1
 // @description  Benchmark Torn faction member status freshness and API response times
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -53,7 +53,7 @@ function activate(context){ctx=context;if(panel?.isConnected){panel.hidden=false
 const fields=el('div',panel);fields.style.cssText='display:flex;flex-wrap:wrap;gap:8px;align-items:center';el('span',fields,'Opposing faction ID');const id=el('input',fields);id.type='text';id.id='tu-war-opponent-id';id.inputMode='numeric';id.value=faction;id.style.cssText='width:110px;padding:7px;background:#253038;color:white;border:1px solid #cba953';id.oninput=()=>{faction=id.value.trim();save()};
 el('span',fields,'Interval');const select=el('select',fields);select.style.cssText='padding:7px;background:#253038;color:#d6b65c;border:1px solid #cba953';for(const sec of [5,10,15,30,60]){const option=el('option',select,sec+' sec');option.value=sec}select.value=String(interval);select.onchange=()=>{interval=Number(select.value);save();if(running){stop();start()}};
 const ownLabel=el('strong',panel,'Detecting your faction...');ownLabel.id='tu-war-own-faction';
-const searchRow=el('div',panel);btn(searchRow,'Select Warring Faction',openPicker);searchRow.style.cssText='display:flex;flex-wrap:wrap;gap:7px';const query=el('input',searchRow);query.placeholder='Partial faction name (any case)';query.style.cssText='flex:1;min-width:140px;background:#253038;color:white;border:1px solid #cba953;padding:7px';btn(searchRow,'Search Factions',()=>searchFactions(query.value));const msg=el('small',panel,'Search by faction name, or enter an ID directly');searchMessage=msg;searchResults=el('div',panel);searchResults.style.cssText='display:flex;gap:5px;flex-wrap:wrap;max-height:95px;overflow:auto';
+const searchRow=el('div',panel);searchRow.style.cssText='display:flex;gap:7px';btn(searchRow,'Select Warring Faction',openPicker);
 counts=el('strong',panel,'Faction online totals loading...');const rosterWrap=el('div',panel);rosterWrap.style.cssText='max-height:38%;min-height:110px;overflow:auto;border:1px solid #344047';rosterTable=el('table',rosterWrap);rosterTable.style.cssText='width:100%;border-collapse:collapse;font-size:12px';
 const controls=el('div',panel);controls.style.cssText='display:flex;gap:7px;flex-wrap:wrap';btn(controls,'Start Benchmark',start);btn(controls,'Stop',stop);btn(controls,'Clear Results',()=>{results=[];previous.clear();render()});btn(controls,'Export CSV',download);btn(controls,'Copy JSON',()=>navigator.clipboard?.writeText(JSON.stringify({factionId:faction,intervalSeconds:interval,results},null,2)));
 status=el('small',panel);output=el('pre',panel);output.style.cssText='flex:1;overflow:auto;background:#071014;color:#d6e6e8;padding:10px;border-radius:6px;white-space:pre-wrap;overflow-wrap:anywhere';el('small',panel,'Benchmark only. The first sample establishes a baseline. Polling faster than Torn refreshes its data may return unchanged results. Runs only while this panel is open.');render()}
