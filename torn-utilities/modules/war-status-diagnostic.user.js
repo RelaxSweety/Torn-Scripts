@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU War Status Diagnostic
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.3.1
+// @version      0.3.2
 // @description  Benchmark Torn faction member status freshness and API response times
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -12,7 +12,7 @@
 // @run-at       document-idle
 // ==/UserScript==
 (()=>{'use strict';
-const ID='war-status-diagnostic',VERSION='0.3.1',STORE='tu-war-diagnostic-v1';
+const ID='war-status-diagnostic',VERSION='0.3.2',STORE='tu-war-diagnostic-v1';
 if(window.__TU_WAR_DIAG__)return;window.__TU_WAR_DIAG__=true;
 const host=typeof unsafeWindow!=='undefined'?unsafeWindow:window;
 const read=()=>{try{return JSON.parse(localStorage.getItem(STORE)||'{}')}catch{return {}}};
@@ -28,7 +28,7 @@ try{const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.s
 if(typeof PDA_httpGet==='function')try{const r=await PDA_httpGet(url);return typeof r==='string'?JSON.parse(r):r?.data||r}catch(e){errors.push(e.message)}
 throw Error(errors.join(' | '))}
 async function detectOwnFaction(){if(!key())return;try{const data=await request('https://api.torn.com/user/?selections=profile&key='+encodeURIComponent(key()));if(data.error)throw Error(data.error.error||'API error');const id=data.faction?.faction_id||data.faction?.id;if(!id)throw Error('No faction in user profile');ownFaction=String(id);ownOnline=null;ownTotal=null;lastOwnPoll=0;save();const own=document.getElementById('tu-war-own-faction');if(own)own.textContent='Your faction: '+(data.faction?.faction_name||ownFaction)+' ['+ownFaction+']';render()}catch(e){const own=document.getElementById('tu-war-own-faction');if(own)own.textContent='Your faction detection failed: '+e.message}}
-async function searchFactions(q){if(!searchResults||!searchMessage)return;searchResults.replaceChildren();if(q.trim().length<2){searchMessage.textContent='Enter at least 2 characters';return}searchMessage.textContent='Searching factions...';try{const url='https://api.torn.com/v2/faction/search?name='+encodeURIComponent(q.trim().toLowerCase())+'&key='+encodeURIComponent(key());const data=await request(url);if(data.error)throw Error(data.error.error||'API error');const raw=data.factions||data.results||data.items||data;const matches=Array.isArray(raw)?raw:Object.entries(raw||{}).filter(([k,v])=>/^\d+$/.test(k)&&v&&typeof v==='object').map(([k,v])=>({...v,id:v.id||Number(k)}));const filtered=matches.filter(x=>String(x.name||x.faction_name||'').toLocaleLowerCase().includes(q.trim().toLocaleLowerCase())).slice(0,30);searchMessage.textContent=filtered.length+' matching factions';for(const m of filtered){const id=m.id||m.faction_id;if(!id)continue;btn(searchResults,(m.name||m.faction_name||'Faction')+' ['+id+']',()=>{faction=String(id);const field=document.getElementById('tu-war-opponent-id');if(field)field.value=faction;searchResults.replaceChildren();searchMessage.textContent='Selected '+(m.name||m.faction_name)+' ['+id+']';save()})}}catch(e){searchMessage.textContent='Faction search failed: '+e.message}}
+async function searchFactions(q){if(!searchResults||!searchMessage)return;searchResults.replaceChildren();if(q.trim().length<2){searchMessage.textContent='Enter at least 2 characters';return}searchMessage.textContent='Searching factions...';try{const url='https://api.torn.com/v2/faction/search?name='+encodeURIComponent(q.trim())+'&key='+encodeURIComponent(key());const data=await request(url);if(data.error)throw Error(data.error.error||'API error');const raw=data.factions||data.results||data.items||data;const matches=Array.isArray(raw)?raw:Object.entries(raw||{}).filter(([k,v])=>/^\d+$/.test(k)&&v&&typeof v==='object').map(([k,v])=>({...v,id:v.id||Number(k)}));const filtered=matches.filter(x=>String(x.name||x.faction_name||'').toLocaleLowerCase().includes(q.trim().toLocaleLowerCase())).slice(0,30);searchMessage.textContent=filtered.length+' matching factions'+(!matches.length?' (API returned no faction records)':'');for(const m of filtered){const id=m.id||m.faction_id;if(!id)continue;btn(searchResults,(m.name||m.faction_name||'Faction')+' ['+id+']',()=>{faction=String(id);const field=document.getElementById('tu-war-opponent-id');if(field)field.value=faction;searchResults.replaceChildren();searchMessage.textContent='Selected '+(m.name||m.faction_name)+' ['+id+']';save()})}}catch(e){searchMessage.textContent='Faction search failed: '+e.message}}
 function membersOf(data){const raw=data.members??data.faction?.members??data;const list=Array.isArray(raw)?raw:Object.entries(raw||{}).filter(([id,v])=>/^\d+$/.test(id)&&v&&typeof v==='object').map(([id,v])=>({...v,id:v.id||Number(id)}));return list.filter(x=>x&&typeof x==='object')}
 function signature(m){const st=m.status||{},last=m.last_action||{};return JSON.stringify({state:st.state||st.description||'',until:st.until??null,details:st.details||'',online:last.status||'',relative:last.relative||''})}
 function activity(m){const a=String(m.last_action?.status||'').toLowerCase();return a==='online'?'Online':a==='idle'?'Idle':a==='offline'?'Offline':a||'Unknown'}
