@@ -120,6 +120,14 @@
       "version": "0.7.9",
       "description": "Active ranked war discovery, war-page navigation, synchronized dual-faction API and DOM monitoring, and comparison exports",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/modules/war-status-diagnostic.user.js"
+    },
+    {
+      "id": "torn-fleet",
+      "name": "Torn Fleet",
+      "category": "multiplayer",
+      "version": "0.2.3",
+      "description": "Battleship: fleet placement and turn-based naval combat",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/dev-modules/torn-fleet.user.js"
     }
   ]
 }
