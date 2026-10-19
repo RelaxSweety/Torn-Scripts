@@ -396,25 +396,25 @@
 #tu-pda-launcher{position:fixed;left:12px;top:38%;z-index:2147483645;touch-action:none;width:43px;height:43px;border-radius:50%;border:2px solid #e3bb57;background:radial-gradient(circle at 35% 25%,#293b45,#07090b 70%);color:#f5d87e;box-shadow:0 2px 9px #000b,inset 0 0 4px #f5d87e66;font:bold italic 23px 'Palatino Linotype','Book Antiqua',Georgia,serif;letter-spacing:-2px;padding:0 2px 0 0;display:flex;align-items:center;justify-content:center;line-height:1;cursor:grab;user-select:none;-webkit-user-select:none}
 #tu-pda-launcher:active{cursor:grabbing}
 #tu-pda-launcher[hidden]{display:none!important}
-#tu-pda-panel{position:fixed;z-index:2147483644;inset:8% 3% auto 3%;max-width:440px;margin:auto;max-height:82vh;overflow:auto;background:#101417;color:#eee;border:1px solid #c49a46;border-radius:18px;box-shadow:0 10px 35px #000d;font:14px system-ui,Arial,sans-serif}
+#tu-pda-panel{display:flex;flex-direction:column;position:fixed;z-index:2147483644;inset:8% 3% auto 3%;max-width:440px;margin:auto;max-height:82vh;overflow:hidden;background:#101417;color:#eee;border:1px solid #c49a46;border-radius:18px;box-shadow:0 10px 35px #000d;font:14px system-ui,Arial,sans-serif}
 #tu-pda-panel[hidden]{display:none}
 #tu-pda-panel *{box-sizing:border-box}
-#tu-pda-panel header{display:flex;align-items:center;gap:12px;padding:17px;border-bottom:1px solid #4a3c21}
+#tu-pda-panel header{display:flex;align-items:center;gap:12px;padding:12px 15px;border-bottom:1px solid #4a3c21;position:relative;z-index:3;flex-shrink:0;background:#101417}
 #tu-pda-panel .tu-logo{font:bold italic 29px Georgia,serif;color:#f1ce72}
 #tu-pda-panel h2{font-size:22px;margin:0;color:#f1ce72}
 #tu-pda-panel p{margin:4px 0;color:#aeb4bd}
 #tu-pda-panel button{cursor:pointer}
-#tu-pda-panel .tu-close{margin-left:auto;background:none;border:0;color:#ddd;font-size:28px}
-#tu-pda-panel nav{display:flex;gap:6px;padding:10px}
+#tu-pda-panel .tu-minimize{margin-left:auto;background:none;border:0;color:#ddd;font-size:27px;padding:2px 8px}#tu-pda-panel .tu-close{margin-left:0;background:none;border:0;color:#ddd;font-size:28px;padding:2px 8px}
+#tu-pda-panel nav{display:flex;gap:6px;padding:8px;flex-shrink:0;overflow-x:auto}
 #tu-pda-panel nav button{flex:1;background:#252a2e;border:0;color:#ddd;padding:11px 4px;border-radius:20px}
 #tu-pda-panel nav button[aria-selected=true]{background:#dfb952;color:#141414;font-weight:700}
-#tu-pda-panel .tu-content{padding:4px 12px 16px}
+#tu-pda-panel .tu-content{padding:4px 12px 16px;flex:1;min-height:0;overflow:auto;overscroll-behavior:contain}
 #tu-pda-panel .tu-card{padding:13px;display:flex;align-items:center;gap:12px;background:#1c2226;border:1px solid #32383b;border-radius:12px;margin:9px 0}
 #tu-pda-panel .tu-symbol{font-size:25px;color:#e1b95a;min-width:30px}
 #tu-pda-panel .tu-card strong{display:block;font-size:16px}
 #tu-pda-panel .tu-card small{color:#b6bac0}
 #tu-pda-panel .tu-status{margin-left:auto;white-space:nowrap;color:#a9abb0;font-size:11px}
-#tu-pda-panel footer{border-top:1px solid #59451d;padding:13px;color:#aeb4bd;font-size:12px}
+#tu-pda-panel footer{flex-shrink:0;border-top:1px solid #59451d;padding:13px;color:#aeb4bd;font-size:12px}
 `;
   document.head.appendChild(style);
   const launcher = document.createElement('button');
@@ -426,7 +426,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="subscription">Subscription</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.32 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-minimize" aria-label="Minimize" title="Minimize">−</button><button class="tu-close" aria-label="Close" title="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="subscription">Subscription</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.32 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
@@ -851,6 +851,7 @@
   const closePanel = () => { panel.hidden = true; syncLauncher(); };
   const togglePanel = () => { if(active==='item-monitor'&&document.getElementById('tuim-panel')?.hidden){registered.get(active)?.activate(Object.freeze({mount:moduleHost,close:()=>{stopModule();panel.hidden=false;viewModule=null;render('modules');syncLauncher();},minimize:()=>{panel.hidden=true;syncLauncher();}}));panel.hidden=true;syncLauncher();return;} if(active)stopModule(); panel.hidden=!panel.hidden; if(!panel.hidden){viewModule=null;render('modules');} syncLauncher(); };
   panel.querySelector('.tu-close').addEventListener('click', () => { closePanel(); });
+  panel.querySelector('.tu-minimize').addEventListener('click',()=>{panel.hidden=true;syncLauncher();});
   panel.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => render(b.dataset.tab)));
   // Shared floating-window support for TU module panels.
   // Persist each TU window's user-selected size and position independently.
@@ -865,11 +866,50 @@
     el.style.boxSizing='border-box';
     el.style.maxWidth='calc(100vw - 12px)';
     el.style.maxHeight='calc(100dvh - 12px)';
-    el.style.overflow='auto';
-    el.style.resize='both';
+    el.style.overflow=el.id==='tu-pda-panel'?'hidden':'auto';
+    el.style.resize='none';
     el.style.minWidth='220px';
     el.style.minHeight='120px';
     el.style.overflowWrap='anywhere';
+    // Eight independent pointer resize grips: four edges and four corners.
+    const directions=['n','s','e','w','ne','nw','se','sw'];
+    for(const direction of directions){
+      const grip=document.createElement('div');
+      grip.className='tu-resize-grip';
+      grip.dataset.edge=direction;
+      grip.setAttribute('aria-label','Resize '+direction);
+      const vertical=direction.includes('n')?'top:-6px;':direction.includes('s')?'bottom:-6px;':'top:12px;bottom:12px;';
+      const horizontal=direction.includes('w')?'left:-6px;':direction.includes('e')?'right:-6px;':'left:12px;right:12px;';
+      const corner=direction.length===2;
+      grip.style.cssText='position:absolute;z-index:2147483646;touch-action:none;'+vertical+horizontal+
+        (corner?'width:16px;height:16px;':'')+
+        (direction==='n'||direction==='s'?'height:12px;':'')+
+        (direction==='e'||direction==='w'?'width:12px;':'')+
+        'cursor:'+({n:'ns-resize',s:'ns-resize',e:'ew-resize',w:'ew-resize',ne:'nesw-resize',sw:'nesw-resize',nw:'nwse-resize',se:'nwse-resize'}[direction])+';';
+      let start=null;
+      grip.addEventListener('pointerdown',e=>{
+        if(e.button!==0&&e.pointerType==='mouse')return;
+        e.preventDefault();e.stopPropagation();
+        const rect=el.getBoundingClientRect();
+        el.style.left=rect.left+'px';el.style.top=rect.top+'px';el.style.right='auto';el.style.bottom='auto';
+        el.style.width=rect.width+'px';el.style.height=rect.height+'px';
+        start={id:e.pointerId,x:e.clientX,y:e.clientY,left:rect.left,top:rect.top,width:rect.width,height:rect.height};
+        grip.setPointerCapture(e.pointerId);
+      });
+      grip.addEventListener('pointermove',e=>{
+        if(!start||e.pointerId!==start.id)return;
+        const dx=e.clientX-start.x,dy=e.clientY-start.y;
+        let left=start.left,top=start.top,width=start.width,height=start.height;
+        if(direction.includes('e'))width=Math.max(220,Math.min(innerWidth-left-6,start.width+dx));
+        if(direction.includes('s'))height=Math.max(120,Math.min(innerHeight-top-6,start.height+dy));
+        if(direction.includes('w')){left=Math.max(6,Math.min(start.left+start.width-220,start.left+dx));width=start.width+start.left-left;}
+        if(direction.includes('n')){top=Math.max(6,Math.min(start.top+start.height-120,start.top+dy));height=start.height+start.top-top;}
+        el.style.left=left+'px';el.style.top=top+'px';el.style.width=width+'px';el.style.height=height+'px';
+      });
+      const end=e=>{if(start?.id===e.pointerId){start=null;remember();}};
+      grip.addEventListener('pointerup',end);grip.addEventListener('pointercancel',end);
+      el.appendChild(grip);
+    }
     const layout=getLayout(el.id);
     if(layout){
       if(Number.isFinite(layout.width)&&layout.width>=220)el.style.width=Math.min(layout.width,Math.max(220,innerWidth-12))+'px';
