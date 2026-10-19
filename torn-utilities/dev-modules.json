@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "categories": [
+    {
+      "id": "business",
+      "name": "Business Tools",
+      "icon": "▥",
+      "order": 10
+    },
+    {
+      "id": "games",
+      "name": "Games",
+      "icon": "♜",
+      "order": 20
+    },
+    {
+      "id": "single-player",
+      "name": "Single Player",
+      "icon": "▣",
+      "order": 21,
+      "parent": "games"
+    },
+    {
+      "id": "multiplayer",
+      "name": "Multiplayer",
+      "icon": "♟",
+      "order": 22,
+      "parent": "games"
+    },
+    {
+      "id": "chat",
+      "name": "Chat Tools",
+      "icon": "◉",
+      "order": 30
+    },
+    {
+      "id": "other",
+      "name": "Other Tools",
+      "icon": "⚙",
+      "order": 40
+    }
+  ],
+  "modules": [
+    {
+      "id": "alerts-calculations",
+      "name": "Stock and Calculations",
+      "category": "business",
+      "version": "0.4.5",
+      "description": "Stock cash-target transaction calculator and basic percentage calculator",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/modules/alerts-and-calculations.user.js"
+    },
+    {
+      "id": "flight-game",
+      "name": "Flight Game",
+      "category": "single-player",
+      "version": "0.12.5",
+      "description": "Standalone Flight Game arcade module, playable anytime",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/modules/flight-game.user.js"
+    },
+    {
+      "id": "stick-fighter",
+      "name": "Stick Fighter",
+      "category": "single-player",
+      "version": "0.2.4",
+      "description": "Standalone Stick Fighter arcade module, playable anytime",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/modules/stick-fighter.user.js"
+    },
+    {
+      "id": "chat-archiver",
+      "name": "Chat Archiver",
+      "category": "chat",
+      "version": "0.1.7",
+      "description": "Archive Torn chat conversations",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/chat-archiver/pda/src/torn-multi-chat-archiver-pda.user.js"
+    },
+    {
+      "id": "tic-tac-toe",
+      "name": "Tic-Tac-Toe",
+      "category": "multiplayer",
+      "version": "0.6.3",
+      "description": "Two-player Tic-Tac-Toe with named winners, green winning line, rematches and head-to-head history",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/dev-modules/tic-tac-toe.user.js"
+    },
+    {
+      "id": "torn-four",
+      "name": "Torn Four",
+      "category": "multiplayer",
+      "version": "0.2.3",
+      "description": "Connect Four: two-player multiplayer with private room codes",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/dev-modules/torn-four.user.js"
+    },
+    {
+      "id": "torn-fleet",
+      "name": "Torn Fleet",
+      "category": "multiplayer",
+      "version": "0.2.3",
+      "description": "Battleship: fleet placement and turn-based naval combat",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/modules/torn-fleet.user.js"
+    },
+    {
+      "id": "torn-snake",
+      "name": "Slithering Streets",
+      "category": "single-player",
+      "version": "0.2.12",
+      "description": "Single-player Snake with touch controls and local high scores",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/modules/torn-snake.user.js"
+    },
+    {
+      "id": "chaos-marbles",
+      "name": "Chaos Marbles",
+      "category": "multiplayer",
+      "version": "0.2.4",
+      "description": "Online 2–4 player marble race with private player sessions, Waiting for Chaos staging, and game history",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/dev-modules/chaos-marbles.user.js"
+    },
+    {
+      "id": "item-monitor",
+      "name": "Item Monitor",
+      "category": "business",
+      "version": "1.9.20",
+      "description": "Item Monitor with separate movable and resizable Travel Assistant window, card-based flight schedule, stock forecasts and haul profit",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/modules/item-monitor-v1914.user.js"
+    },
+    {
+      "id": "war-status-diagnostic",
+      "name": "War Status Diagnostic",
+      "category": "other",
+      "version": "0.7.9",
+      "description": "Active ranked war discovery, war-page navigation, synchronized dual-faction API and DOM monitoring, and comparison exports",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/modules/war-status-diagnostic.user.js"
+    }
+  ]
+}
