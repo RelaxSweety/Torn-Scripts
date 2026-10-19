@@ -28,22 +28,10 @@
   const KEY = 'relaxsweety_tu_pda_v1';
   const TU_VERSION='0.5.32';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/dev-modules.json';
-  const CACHE_KEY='tu:registry:auth-dev:v1';
-  const FALLBACK={schemaVersion:1,categories:[
-    {id:'business',name:'Business Tools',icon:'▥',order:10},
-    {id:'games',name:'Games',icon:'♜',order:20},
-    {id:'single-player',name:'Single Player',icon:'▣',order:21,parent:'games'},
-    {id:'multiplayer',name:'Multiplayer',icon:'♟',order:22,parent:'games'},
-    {id:'chat',name:'Chat Tools',icon:'◉',order:30},
-    {id:'other',name:'Other Tools',icon:'⚙',order:40}
-  ],modules:[
-    {id:'alerts-calculations',name:'Alerts and Calculations',category:'business',version:'0.2.0',description:'Stock cash targets, foreign item alerts and calculator',scriptUrl:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/alerts-and-calculations.user.js'},
-    {id:'flight-game',name:'Flight Game',category:'single-player',version:'0.11.13',description:'Flight arcade and Stick Fighter',scriptUrl:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/pda-flight-game/Torn-PDA-Flight-Game.user.js'},
-    {id:'stick-fighter',name:'Stick Fighter',category:'single-player',version:'0.1.6',description:'Stick Fighter arcade game',scriptUrl:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/pda-flight-game/Torn-PDA-Flight-Game.user.js'},
-    {id:'chat-archiver',name:'Chat Archiver',category:'chat',version:'0.1.7',description:'Archive Torn chat conversations',scriptUrl:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/chat-archiver/pda/src/torn-multi-chat-archiver-pda.user.js'}
-  ]};
+  const CACHE_KEY='tu:registry:auth-dev:v2';
+  const FALLBACK={"schemaVersion":1,"categories":[{"id":"business","name":"Business Tools","icon":"▥","order":10},{"id":"games","name":"Games","icon":"♜","order":20},{"id":"single-player","name":"Single Player","icon":"▣","order":21,"parent":"games"},{"id":"multiplayer","name":"Multiplayer","icon":"♟","order":22,"parent":"games"},{"id":"chat","name":"Chat Tools","icon":"◉","order":30},{"id":"other","name":"Other Tools","icon":"⚙","order":40}],"modules":[{"id":"alerts-calculations","name":"Stock and Calculations","category":"business","version":"0.4.5","description":"Stock cash-target transaction calculator and basic percentage calculator","scriptUrl":"https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/modules/alerts-and-calculations.user.js"},{"id":"flight-game","name":"Flight Game","category":"single-player","version":"0.12.5","description":"Standalone Flight Game arcade module, playable anytime","scriptUrl":"https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/modules/flight-game.user.js"},{"id":"stick-fighter","name":"Stick Fighter","category":"single-player","version":"0.2.4","description":"Standalone Stick Fighter arcade module, playable anytime","scriptUrl":"https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/modules/stick-fighter.user.js"},{"id":"chat-archiver","name":"Chat Archiver","category":"chat","version":"0.1.7","description":"Archive Torn chat conversations","scriptUrl":"https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/chat-archiver/pda/src/torn-multi-chat-archiver-pda.user.js"},{"id":"tic-tac-toe","name":"Tic-Tac-Toe","category":"multiplayer","version":"0.6.3","description":"Two-player Tic-Tac-Toe with named winners, green winning line, rematches and head-to-head history","scriptUrl":"https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/dev-modules/tic-tac-toe.user.js","subscriptionRequired":true},{"id":"torn-four","name":"Torn Four","category":"multiplayer","version":"0.2.3","description":"Connect Four: two-player multiplayer with private room codes","scriptUrl":"https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/dev-modules/torn-four.user.js","subscriptionRequired":true},{"id":"torn-snake","name":"Slithering Streets","category":"single-player","version":"0.2.12","description":"Single-player Snake with touch controls and local high scores","scriptUrl":"https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/modules/torn-snake.user.js"},{"id":"chaos-marbles","name":"Chaos Marbles","category":"multiplayer","version":"0.2.4","description":"Online 2–4 player marble race with private player sessions, Waiting for Chaos staging, and game history","scriptUrl":"https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/dev-modules/chaos-marbles.user.js","subscriptionRequired":true},{"id":"item-monitor","name":"Item Monitor","category":"business","version":"1.9.20","description":"Item Monitor with separate movable and resizable Travel Assistant window, card-based flight schedule, stock forecasts and haul profit","scriptUrl":"https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/modules/item-monitor-v1914.user.js"},{"id":"war-status-diagnostic","name":"War Status Diagnostic","category":"other","version":"0.7.9","description":"Active ranked war discovery, war-page navigation, synchronized dual-faction API and DOM monitoring, and comparison exports","scriptUrl":"https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/modules/war-status-diagnostic.user.js"},{"id":"torn-fleet","name":"Torn Fleet","category":"multiplayer","version":"0.2.3","description":"Battleship: fleet placement and turn-based naval combat","scriptUrl":"https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/dev-modules/torn-fleet.user.js","subscriptionRequired":true}]};
   const validId=/^[a-z0-9-]{1,64}$/;
-  const safeScriptUrl=url=>typeof url==='string'&&/^https:\/\/raw\.githubusercontent\.com\/RelaxSweety\/Torn-Scripts\/main\/[a-zA-Z0-9/_-]+\.user\.js$/.test(url);
+  const safeScriptUrl=url=>typeof url==='string'&&/^https:\/\/raw\.githubusercontent\.com\/RelaxSweety\/Torn-Scripts\/dev\/tu-auth-registration-test\/[a-zA-Z0-9/_-]+\.user\.js$/.test(url);
   function validateRegistry(data){
     if(data?.schemaVersion!==1||!Array.isArray(data.categories)||!Array.isArray(data.modules)||data.modules.length>250||data.categories.length>50)throw Error('Invalid module catalog');
     const categories=data.categories.filter(c=>validId.test(c.id)&&typeof c.name==='string'&&c.name.length<=70).map(c=>({id:c.id,name:c.name,icon:String(c.icon||'•').slice(0,3),order:Number(c.order)||100,parent:typeof c.parent==='string'?c.parent:null}));
@@ -61,7 +49,7 @@
     }
     return {schemaVersion:1,categories,modules};
   }
-  let registry=FALLBACK,registryStatus='Built-in catalog',registryRefreshing=false,registryUpdatedAt=Number(localStorage.getItem('tu:catalog:updated-at')||0);
+  let registry=FALLBACK,registryStatus='Built-in catalog',registryRefreshing=false,registryUpdatedAt=Number(localStorage.getItem('tu:catalog:auth-dev:updated-at')||0);
   try{const cached=localStorage.getItem(CACHE_KEY);if(cached){registry=validateRegistry(JSON.parse(cached));registryStatus='Cached catalog';}}catch(_){}
   const versionCompare=(a,b)=>{
     const aa=String(a||'0').split('.').map(v=>parseInt(v,10)||0),bb=String(b||'0').split('.').map(v=>parseInt(v,10)||0);
@@ -144,7 +132,7 @@
       try{
         localStorage.setItem(CACHE_KEY,JSON.stringify(next));
         registryUpdatedAt=Date.now();
-        localStorage.setItem('tu:catalog:updated-at',String(registryUpdatedAt));
+        localStorage.setItem('tu:catalog:auth-dev:updated-at',String(registryUpdatedAt));
       }catch(err){console.warn('[TU] catalog cache write failed',err);}
       registryStatus='GitHub catalog updated';
     }catch(err){
@@ -483,7 +471,7 @@
   };
   function render(tab) {
     currentTab=tab;
-    const catalogFooter=panel.querySelector('#tu-catalog-updated');if(catalogFooter)catalogFooter.textContent='Catalog: '+(registryUpdatedAt?new Date(registryUpdatedAt).toLocaleString():'Not refreshed')+(registryStatus.startsWith('Refresh failed')?' · '+registryStatus:'');
+    const catalogFooter=panel.querySelector('#tu-catalog-updated');if(catalogFooter)catalogFooter.textContent='Catalog: '+(registryUpdatedAt?new Date(registryUpdatedAt).toLocaleString():'Not refreshed');
     panel.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===tab)));
     content.replaceChildren();
     if(tab==='subscription'){
