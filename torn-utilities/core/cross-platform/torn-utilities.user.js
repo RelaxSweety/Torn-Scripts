@@ -48,7 +48,7 @@
     if(data?.schemaVersion!==1||!Array.isArray(data.categories)||!Array.isArray(data.modules)||data.modules.length>250||data.categories.length>50)throw Error('Invalid module catalog');
     const categories=data.categories.filter(c=>validId.test(c.id)&&typeof c.name==='string'&&c.name.length<=70).map(c=>({id:c.id,name:c.name,icon:String(c.icon||'•').slice(0,3),order:Number(c.order)||100,parent:typeof c.parent==='string'?c.parent:null}));
     const ids=new Set(categories.map(c=>c.id));
-    const modules=data.modules.filter(m=>validId.test(m.id)&&ids.has(m.category)&&typeof m.name==='string'&&m.name.length<=90&&safeScriptUrl(m.scriptUrl)&&/^\d+\.\d+\.\d+(?:[-+][a-zA-Z0-9.-]+)?$/.test(m.version)).map(m=>({id:m.id,name:m.name,category:m.category,version:m.version,description:String(m.description||'').slice(0,250),scriptUrl:m.scriptUrl}));
+    const modules=data.modules.filter(m=>validId.test(m.id)&&ids.has(m.category)&&typeof m.name==='string'&&m.name.length<=90&&safeScriptUrl(m.scriptUrl)&&/^\d+\.\d+\.\d+(?:[-+][a-zA-Z0-9.-]+)?$/.test(m.version)).map(m=>({id:m.id,name:m.name,category:m.category,version:m.version,description:String(m.description||'').slice(0,250),scriptUrl:m.scriptUrl,subscriptionRequired:m.subscriptionRequired===true}));
     // Migrate older cached catalogs even when GitHub is temporarily unreachable.
     const gameCategory=categories.find(c=>c.id==='games');
     if(gameCategory){
@@ -438,7 +438,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.32 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="subscription">Subscription</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.32 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
@@ -486,6 +486,14 @@
     const catalogFooter=panel.querySelector('#tu-catalog-updated');if(catalogFooter)catalogFooter.textContent='Catalog: '+(registryUpdatedAt?new Date(registryUpdatedAt).toLocaleString():'Not refreshed')+(registryStatus.startsWith('Refresh failed')?' · '+registryStatus:'');
     panel.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===tab)));
     content.replaceChildren();
+    if(tab==='subscription'){
+      const title=document.createElement('h3');title.textContent='TU Subscription';content.append(title);
+      const intro=document.createElement('p');intro.textContent='Subscription billing is under development. No subscription payments or access activation are available through this page yet.';content.append(intro);
+      const terms=document.createElement('p');terms.textContent='Planned rate: 1 Xanax donation = 1 calendar month of access; 12 Xanax = 12 calendar months. Paid credit can extend an existing expiration. Gifts and discounts are planned, not enabled.';content.append(terms);
+      const info=document.createElement('p');info.textContent='Modules marked Subscription planned will require an active subscription when billing enforcement launches. Existing module permissions and account approval remain separate requirements.';content.append(info);
+      content.append(makeButton('Back to modules',goModules));
+      return;
+    }
     if(tab==='modules'){
       if(viewModule){
         const m=registry.modules.find(x=>x.id===viewModule);
@@ -497,6 +505,7 @@
         const status=document.createElement('p');
         status.textContent='Status: '+(!loaded?'Not loaded':disabled?'Loaded · disabled':'Ready')+' | Installed: '+(loaded?installed:'Not installed')+' | Latest: '+m.version;
         content.append(status);
+        if(m.subscriptionRequired){const note=document.createElement('p');note.textContent='Subscription planned — not yet enforced.';content.append(note);content.append(makeButton('Subscription details →',()=>render('subscription')));}
         if(loaded&&reg.version&&versionCompare(reg.version,m.version)<0){const u=document.createElement('p');u.textContent='Update available';content.append(u);}
         if(loaded){
           content.append(makeButton(disabled?'Enable module':'Disable module',()=>{
@@ -541,6 +550,7 @@
           const loaded=registered.get(m.id);
           const state=document.createElement('small');
           state.textContent=(loaded?(saved.disabled?.[m.id]?'Loaded · disabled':'Ready'):'Not loaded')+' · Latest v'+m.version+(loaded?.version?' · Installed v'+loaded.version:'');
+          if(m.subscriptionRequired){const tier=document.createElement('small');tier.textContent='Subscription planned · Not yet enforced';tier.style.cssText='display:block;color:#f1ce72;font-weight:700;margin-top:4px';body.append(tier);const link=document.createElement('button');link.type='button';link.textContent='Subscription details →';link.style.cssText='background:none;border:0;padding:4px 0;color:#f1ce72;text-decoration:underline;cursor:pointer;text-align:left';link.addEventListener('click',()=>render('subscription'));body.append(link);}
           body.append(name,state);
           const ready=!!loaded&&!saved.disabled?.[m.id];
           const go=()=>{if(ready){void openAuthorizedModule(m.id);}else{viewModule=m.id;render('modules');}};
