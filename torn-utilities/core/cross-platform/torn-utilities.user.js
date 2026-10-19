@@ -489,7 +489,7 @@
     if(tab==='subscription'){
       const title=document.createElement('h3');title.textContent='TU Subscription';content.append(title);
       const intro=document.createElement('p');intro.textContent='Subscription billing is under development. No subscription payments or access activation are available through this page yet.';content.append(intro);
-      const terms=document.createElement('p');terms.textContent='Planned rate: 1 Xanax donation = 1 calendar month of access; 12 Xanax = 12 calendar months. Paid credit can extend an existing expiration. Gifts and discounts are planned, not enabled.';content.append(terms);
+      const terms=document.createElement('p');terms.textContent='Planned rate: 1 Xanax = 30 days; each complete 12-Xanax package = 365 days (5 bonus days). Renewals add to existing unexpired access. Gifts transfer time in 30-day increments. Payment verification, gifting, and discounts are not yet enabled.';content.append(terms);
       const info=document.createElement('p');info.textContent='Modules marked Subscription planned will require an active subscription when billing enforcement launches. Existing module permissions and account approval remain separate requirements.';content.append(info);
       content.append(makeButton('Back to modules',goModules));
       return;
