@@ -27,8 +27,8 @@
   pageWindow.__RELAX_TORN_UTILITIES_PDA__ = true;
   const KEY = 'relaxsweety_tu_pda_v1';
   const TU_VERSION='0.5.32';
-  const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
-  const CACHE_KEY='tu:registry:v1';
+  const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/dev-modules.json';
+  const CACHE_KEY='tu:registry:auth-dev:v1';
   const FALLBACK={schemaVersion:1,categories:[
     {id:'business',name:'Business Tools',icon:'▥',order:10},
     {id:'games',name:'Games',icon:'♜',order:20},
@@ -115,7 +115,7 @@
       }catch(err){failures.push('Browser: '+err.message);}
       throw Error(failures.join('; ')||'No available request transport');
     };
-    const githubUrl='https://api.github.com/repos/RelaxSweety/Torn-Scripts/contents/torn-utilities/modules.json?ref=main&refresh='+nonce;
+    const githubUrl='https://api.github.com/repos/RelaxSweety/Torn-Scripts/contents/torn-utilities/dev-modules.json?ref=dev%2Ftu-auth-registration-test&refresh='+nonce;
     const sources=[
       async()=>{
         const raw=await get(githubUrl);
