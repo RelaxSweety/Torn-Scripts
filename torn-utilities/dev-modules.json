@@ -79,7 +79,8 @@
       "category": "multiplayer",
       "version": "0.6.3",
       "description": "Two-player Tic-Tac-Toe with named winners, green winning line, rematches and head-to-head history",
-      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/dev-modules/tic-tac-toe.user.js"
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/dev-modules/tic-tac-toe.user.js",
+      "subscriptionRequired": true
     },
     {
       "id": "torn-four",
@@ -87,7 +88,8 @@
       "category": "multiplayer",
       "version": "0.2.3",
       "description": "Connect Four: two-player multiplayer with private room codes",
-      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/dev-modules/torn-four.user.js"
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/dev-modules/torn-four.user.js",
+      "subscriptionRequired": true
     },
     {
       "id": "torn-snake",
@@ -103,7 +105,8 @@
       "category": "multiplayer",
       "version": "0.2.4",
       "description": "Online 2–4 player marble race with private player sessions, Waiting for Chaos staging, and game history",
-      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/dev-modules/chaos-marbles.user.js"
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/dev-modules/chaos-marbles.user.js",
+      "subscriptionRequired": true
     },
     {
       "id": "item-monitor",
@@ -127,7 +130,8 @@
       "category": "multiplayer",
       "version": "0.2.3",
       "description": "Battleship: fleet placement and turn-based naval combat",
-      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/dev-modules/torn-fleet.user.js"
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/dev-modules/torn-fleet.user.js",
+      "subscriptionRequired": true
     }
   ]
 }
