@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform (Auth Dev)
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.33
+// @version      0.5.34
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -399,8 +399,8 @@
 #tu-pda-panel{display:flex;flex-direction:column;position:fixed;z-index:2147483644;inset:8% 3% auto 3%;max-width:440px;margin:auto;max-height:82vh;overflow:hidden;background:#101417;color:#eee;border:1px solid #c49a46;border-radius:18px;box-shadow:0 10px 35px #000d;font:14px system-ui,Arial,sans-serif}
 #tu-pda-panel[hidden]{display:none}
 #tu-pda-panel *{box-sizing:border-box}
-#tu-pda-panel header{display:flex;align-items:center;gap:12px;padding:12px 15px;border-bottom:1px solid #4a3c21;position:relative;z-index:3;flex-shrink:0;background:#101417}
-#tu-pda-panel .tu-logo{font:bold italic 29px Georgia,serif;color:#f1ce72}
+#tu-pda-panel header{display:flex;align-items:center;gap:9px;padding:10px 12px;border-bottom:1px solid #4a3c21;position:relative;z-index:3;flex-shrink:0;background:#101417}
+#tu-pda-panel .tu-logo{display:inline-flex;align-items:center;justify-content:center;flex:0 0 44px;width:44px;height:44px;border:1px solid #c49a46;border-radius:11px;background:#1a2023;font:bold italic 23px Georgia,serif;letter-spacing:-2px;white-space:nowrap;line-height:1;color:#f1ce72}#tu-pda-panel .tu-heading{min-width:0;flex:1}#tu-pda-panel .tu-heading h2{font-size:19px;line-height:1.2}#tu-pda-panel .tu-heading p{font-size:12px;line-height:1.25}#tu-pda-panel .tu-player-identity{font-size:11px!important;line-height:1.25;word-break:break-word}
 #tu-pda-panel h2{font-size:22px;margin:0;color:#f1ce72}
 #tu-pda-panel p{margin:4px 0;color:#aeb4bd}
 #tu-pda-panel button{cursor:pointer}
@@ -426,11 +426,11 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-minimize" aria-label="Minimize" title="Minimize">−</button><button class="tu-close" aria-label="Close" title="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="subscription">Subscription</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.33 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header class="tu-window-header"><span class="tu-logo" aria-hidden="true">TU</span><div class="tu-heading"><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-minimize" aria-label="Minimize" title="Minimize">−</button><button class="tu-close" aria-label="Close" title="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="subscription">Subscription</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.34 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
-  identityLine.style.cssText='margin:3px 0 0;font-size:12px;color:#e4c779;overflow-wrap:anywhere';
+  identityLine.style.cssText='margin:3px 0 0;font-size:11px;color:#e4c779;overflow-wrap:anywhere';
   panel.querySelector('header h2').parentElement.appendChild(identityLine);
   const refreshIdentity=()=>{
     const player=getPlayer();
@@ -934,7 +934,23 @@
       });
       resizeObserver.observe(el);
     }
-    const bar=el.querySelector('header,.tu-header,.tuim-header,.tuac-header')||el.firstElementChild;
+    // Add a persistent control strip to modules that do not supply their own window header.
+    if(el.id!=='tu-pda-panel'){
+      const existing=el.querySelector(':scope > header,:scope > .tu-header,:scope > .tuim-header,:scope > .tuac-header');
+      if(!existing){
+        const bar=document.createElement('div');bar.className='tu-shared-header';
+        bar.style.cssText='position:sticky;top:0;z-index:2147483645;display:flex;align-items:center;gap:8px;background:#101417;color:#f1ce72;border-bottom:1px solid #c49a46;padding:7px 10px;min-height:42px';
+        const label=document.createElement('strong');label.textContent=el.getAttribute('data-title')||el.getAttribute('aria-label')||el.id.replace(/^tu-/, '').replace(/[-_]/g,' ');label.style.cssText='flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+        const minimize=document.createElement('button');minimize.type='button';minimize.textContent='−';minimize.title='Minimize';minimize.setAttribute('aria-label','Minimize module');minimize.style.cssText='background:none;color:#eee;border:0;font-size:25px;padding:0 9px';
+        minimize.addEventListener('click',()=>{el.style.display='none';el.dataset.tuMinimized='1';syncLauncher();});
+        const close=document.createElement('button');close.type='button';close.textContent='×';close.title='Close';close.setAttribute('aria-label','Close module');close.style.cssText='background:none;color:#eee;border:0;font-size:25px;padding:0 9px';
+        close.addEventListener('click',()=>{const own=el.querySelector('[aria-label="Close"],[title="Close"],.close-btn');if(own&&own!==close)own.click();else{el.hidden=true;el.style.display='none';}syncLauncher();});
+        bar.append(label,minimize,close);el.prepend(bar);
+      }else{
+        existing.style.position='sticky';existing.style.top='0';existing.style.zIndex='2147483645';
+      }
+    }
+    const bar=el.querySelector('header,.tu-shared-header,.tu-header,.tuim-header,.tuac-header')||el.firstElementChild;
     if(!bar)return;
     bar.style.touchAction='none';
     bar.style.cursor='move';
