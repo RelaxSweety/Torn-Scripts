@@ -550,8 +550,8 @@
           const loaded=registered.get(m.id);
           const state=document.createElement('small');
           state.textContent=(loaded?(saved.disabled?.[m.id]?'Loaded · disabled':'Ready'):'Not loaded')+' · Latest v'+m.version+(loaded?.version?' · Installed v'+loaded.version:'');
-          if(m.subscriptionRequired){const tier=document.createElement('small');tier.textContent='Subscription planned · Not yet enforced';tier.style.cssText='display:block;color:#f1ce72;font-weight:700;margin-top:4px';body.append(tier);const link=document.createElement('button');link.type='button';link.textContent='Subscription details →';link.style.cssText='background:none;border:0;padding:4px 0;color:#f1ce72;text-decoration:underline;cursor:pointer;text-align:left';link.addEventListener('click',()=>render('subscription'));body.append(link);}
           body.append(name,state);
+          if(m.subscriptionRequired){const tier=document.createElement('small');tier.textContent='Subscription planned · Not yet enforced';tier.style.cssText='display:block;color:#f1ce72;font-weight:700;margin-top:4px';body.append(tier);const link=document.createElement('button');link.type='button';link.textContent='Subscription details →';link.style.cssText='background:none;border:0;padding:4px 0;color:#f1ce72;text-decoration:underline;cursor:pointer;text-align:left';link.addEventListener('click',()=>render('subscription'));body.append(link);}
           const ready=!!loaded&&!saved.disabled?.[m.id];
           const go=()=>{if(ready){void openAuthorizedModule(m.id);}else{viewModule=m.id;render('modules');}};
           card.style.cursor='pointer';card.setAttribute('role','button');card.tabIndex=0;
