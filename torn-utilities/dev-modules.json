@@ -90,14 +90,6 @@
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/dev-modules/torn-four.user.js"
     },
     {
-      "id": "torn-fleet",
-      "name": "Torn Fleet",
-      "category": "multiplayer",
-      "version": "0.2.3",
-      "description": "Battleship: fleet placement and turn-based naval combat",
-      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-auth-registration-test/torn-utilities/modules/torn-fleet.user.js"
-    },
-    {
       "id": "torn-snake",
       "name": "Slithering Streets",
       "category": "single-player",
