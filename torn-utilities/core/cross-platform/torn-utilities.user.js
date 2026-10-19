@@ -350,6 +350,39 @@
     try { registered.get(id)?.deactivate(); } catch(e) { console.error('[TU] module cleanup failed', id, e); }
     moduleHost.replaceChildren(); moduleHost.hidden=true;
   }
+  // CORE-003: server-authorized launch for multiplayer modules. UI checks are not a security boundary.
+  const TU_DEV_AUTH_BASE='https://tu-multiplayer-server-dev.tuserver.workers.dev';
+  const TU_DEV_SESSION_KEY='tu:auth:dev:session:v1';
+  const TU_PROTECTED_MODULES=new Set(['tic-tac-toe','torn-four','torn-fleet','chaos-marbles']);
+  async function checkLaunchPermission(id){
+    if(!TU_PROTECTED_MODULES.has(id))return true;
+    const token=localStorage.getItem(TU_DEV_SESSION_KEY);
+    if(!token)throw Error('Register or renew your TU account in Settings before launching this multiplayer game.');
+    const url=TU_DEV_AUTH_BASE+'/api/auth/module-access?module_id='+encodeURIComponent(id);
+    const parse=(status,raw)=>{
+      let body={};try{body=JSON.parse(raw)}catch{}
+      if(status!==200||body.allowed!==true)throw Error(body.reason||body.error||'Module access denied (HTTP '+status+')');
+      return true;
+    };
+    if(typeof GM_xmlhttpRequest==='function'){
+      return new Promise((resolve,reject)=>GM_xmlhttpRequest({
+        method:'GET',url,timeout:12000,headers:{Authorization:'Bearer '+token,Accept:'application/json'},
+        onload:r=>{try{resolve(parse(r.status,r.responseText))}catch(e){reject(e)}},
+        onerror:()=>reject(Error('Cannot reach TU development authorization server')),
+        ontimeout:()=>reject(Error('TU authorization request timed out'))
+      }));
+    }
+    const response=await fetch(url,{headers:{Authorization:'Bearer '+token,Accept:'application/json'},cache:'no-store'});
+    return parse(response.status,await response.text());
+  }
+  async function openAuthorizedModule(id){
+    if(!registered.has(id)||saved.disabled?.[id])return false;
+    try{
+      await checkLaunchPermission(id);
+      if(openModule(id)){panel.hidden=true;syncLauncher();return true}
+    }catch(err){console.warn('[TU] module authorization denied',id,err);alert('Torn Utilities: '+err.message);}
+    return false;
+  }
   function openModule(id) {
     const mod=registered.get(id);
     if (!mod || saved.disabled?.[id]) return false;
@@ -510,7 +543,7 @@
           state.textContent=(loaded?(saved.disabled?.[m.id]?'Loaded · disabled':'Ready'):'Not loaded')+' · Latest v'+m.version+(loaded?.version?' · Installed v'+loaded.version:'');
           body.append(name,state);
           const ready=!!loaded&&!saved.disabled?.[m.id];
-          const go=()=>{if(ready){if(openModule(m.id)){panel.hidden=true;syncLauncher();}}else{viewModule=m.id;render('modules');}};
+          const go=()=>{if(ready){void openAuthorizedModule(m.id);}else{viewModule=m.id;render('modules');}};
           card.style.cursor='pointer';card.setAttribute('role','button');card.tabIndex=0;
           card.addEventListener('click',e=>{if(e.target.closest('button'))return;go();});
           card.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go();}});
