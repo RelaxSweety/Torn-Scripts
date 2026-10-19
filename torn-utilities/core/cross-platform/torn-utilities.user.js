@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform (Auth Dev)
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.30
+// @version      0.5.31
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -26,7 +26,7 @@
   if (pageWindow.__RELAX_TORN_UTILITIES_PDA__) return;
   pageWindow.__RELAX_TORN_UTILITIES_PDA__ = true;
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.5.30';
+  const TU_VERSION='0.5.31';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -405,7 +405,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.30 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.31 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
@@ -649,11 +649,15 @@
                 try{const res=await requestDev('/api/auth/admin/status','POST',{torn_id:user.torn_id,status:action},session());devStatus.textContent=res.status===200?'Account '+action+': '+user.username:'Account HTTP '+res.status+': '+String(res.body?.error||'Unknown');if(res.status===200)await renderAccount();}catch(err){devStatus.textContent='Account change failed: '+err.message}finally{btn.disabled=false}
               });actions.append(btn);
             }
-            const moduleField=document.createElement('input');moduleField.placeholder='Module ID';moduleField.style.cssText='max-width:160px;padding:5px';
+            const moduleField=document.createElement('select');moduleField.style.cssText='max-width:100%;min-width:170px;padding:7px';
+            const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='Select module';moduleField.append(placeholder);
+            const catalogModules=[...registry.modules].filter(m=>m&&typeof m.id==='string').sort((a,b)=>String(a.name||a.id).localeCompare(String(b.name||b.id)));
+            for(const module of catalogModules){const option=document.createElement('option');option.value=module.id;option.textContent=module.name||module.id;moduleField.append(option);}
+            if(!catalogModules.length){moduleField.disabled=true;devStatus.textContent='No modules in current catalog. Refresh Catalog first.';}
             actions.append(moduleField);
             for(const allowed of [true,false]){
               const btn=makeButton(allowed?'Allow Module':'Deny Module');btn.addEventListener('click',async()=>{
-                const module_id=moduleField.value.trim();if(!module_id){devStatus.textContent='Enter a module ID';return;}
+                const module_id=moduleField.value;if(!module_id){devStatus.textContent='Select a module';return;}
                 if(!confirm((allowed?'Allow ':'Deny ')+module_id+' for '+user.username+'?'))return;
                 btn.disabled=true;try{const res=await requestDev('/api/auth/admin/permission','POST',{torn_id:user.torn_id,module_id,allowed},session());devStatus.textContent=res.status===200?'Module '+module_id+' '+(allowed?'allowed':'denied')+' for '+user.username:'Permission HTTP '+res.status+': '+String(res.body?.error||'Unknown');}catch(err){devStatus.textContent='Permission failed: '+err.message}finally{btn.disabled=false}
               });actions.append(btn);
@@ -774,7 +778,7 @@
         line.append(name,makeButton('Clear data',()=>{if(confirm('Delete all TU data for '+id+'?')){storage.clear(id);render('settings');}}));content.append(line);
       }
     }else{
-      const p=document.createElement('p');p.textContent='Torn Utilities v0.5.30 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      const p=document.createElement('p');p.textContent='Torn Utilities v0.5.31 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
       const guideLink=document.createElement('a');guideLink.href='https://github.com/RelaxSweety/Torn-Scripts/blob/main/torn-utilities/INSTALLATION.md';guideLink.target='_blank';guideLink.rel='noopener noreferrer';guideLink.textContent='TU Installation & Module Setup Guide ↗';guideLink.style.cssText='display:block;margin:12px 0;padding:12px;border:1px solid #806a3e;border-radius:8px;color:#e4c779;text-decoration:underline;font-weight:600';content.append(guideLink);
       // Official-style vector marks; no remote image dependencies.
       addSocialIcon('RelaxSweety on Discord','https://discord.com/users/relaxsweety','M20.317 4.369a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.211.375-.445.865-.608 1.25a18.27 18.27 0 0 0-5.49 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037 19.736 19.736 0 0 0-4.885 1.515.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.1 18.057a.083.083 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.077.077 0 0 0 .084-.028c.462-.63.873-1.295 1.226-1.994a.075.075 0 0 0-.041-.104 13.1 13.1 0 0 1-1.872-.89.076.076 0 0 1-.008-.127c.126-.095.252-.193.372-.292a.074.074 0 0 1 .077-.01c3.929 1.793 8.185 1.793 12.068 0a.074.074 0 0 1 .078.01c.12.099.246.197.373.292a.076.076 0 0 1-.007.127c-.598.35-1.224.65-1.873.89a.076.076 0 0 0-.04.105c.36.698.77 1.363 1.225 1.993a.076.076 0 0 0 .084.028 19.83 19.83 0 0 0 6.003-3.03.077.077 0 0 0 .031-.056c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028ZM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.42 0-1.334.955-2.42 2.157-2.42 1.211 0 2.176 1.095 2.157 2.42 0 1.335-.955 2.42-2.157 2.42Zm7.96 0c-1.183 0-2.157-1.085-2.157-2.42 0-1.334.955-2.42 2.157-2.42 1.211 0 2.176 1.095 2.157 2.42 0 1.335-.946 2.42-2.157 2.42Z');
