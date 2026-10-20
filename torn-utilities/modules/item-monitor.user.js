@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.9.6
+// @version      1.9.7
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -250,7 +250,7 @@ const travelCosts={mex:6500,cay:10000,can:9000,haw:11000,uni:18000,arg:21000,swi
 const travelAliases={mex:['mexico'],cay:['cayman'],can:['canada'],haw:['hawaii'],uni:['united kingdom','london'],arg:['argentina'],swi:['switzerland'],jap:['japan'],chi:['china'],uae:['united arab emirates','dubai','uae'],sou:['south africa']};
 const travelSave=()=>localStorage.setItem('tuim-travel-v8',JSON.stringify(travel));
 const travelNum=v=>Math.max(0,Number(v)||0);
-const travelDate=t=>{const d=new Date(t*1000);const local=d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false});const utc=new Intl.DateTimeFormat('en-GB',{timeZone:'UTC',hour:'2-digit',minute:'2-digit',hour12:false}).format(d);return local+' Local / '+utc+' TCT'};
+const travelDate=t=>{const d=new Date(t*1000),mode=localStorage.getItem('tu-time-display')||'local';return mode==='tct'?new Intl.DateTimeFormat('en-GB',{timeZone:'UTC',hour:'2-digit',minute:'2-digit',hour12:false}).format(d)+' TCT':d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false})+' Local'};
 const travelMoney=v=>(v<0?'-$':'$')+Math.abs(Math.round(v)).toLocaleString();
 const travelMinutes=()=>Math.ceil(travelTimes[travel.country][{standard:0,airstrip:1,private:2,business:3}[travel.mode]]*(travel.book?.75/100:1));
 let travelAlerted=0;
@@ -373,8 +373,8 @@ const stockQueueKey='tuim-stock-upload-queue-v1';
 function markStockArchived(rows,stamp){
  for(const row of rows){
   let mark=row.node.querySelector('[data-tu-stock-reported]');
-  if(!mark){mark=document.createElement('span');mark.setAttribute('data-tu-stock-reported','');mark.style.cssText='color:#34c759;font-weight:bold;margin-left:6px';mark.title='Inventory saved locally; server upload may be pending';row.node.append(mark)}
-  mark.textContent='✓';stockChecks.set(row.item_id,stamp);
+  if(!mark){mark=document.createElement('span');mark.setAttribute('data-tu-stock-reported','');mark.style.cssText='color:#e69a22;font-weight:bold;margin-left:6px';mark.title='DOM observation awaiting server acknowledgment';row.node.append(mark)}
+  mark.textContent='✓';mark.style.color='#e69a22';mark.title='DOM observation pending D1 acknowledgment';mark.dataset.tuItemId=String(row.item_id);mark.dataset.tuObservedAt=String(stamp);stockChecks.set(row.item_id,stamp);
  }
 }
 function storeStockSnapshot(snapshot){
@@ -406,6 +406,7 @@ async function flushStockQueue(){
   const current=load(stockQueueKey,[]);
   if(current[0]?.observed_at!==batch.observed_at||current[0]?.country!==batch.country)break;
   localStorage.setItem(stockQueueKey,JSON.stringify(current.slice(1)));
+  for(const item of batch.items){for(const mark of document.querySelectorAll('[data-tu-stock-reported]')){if(mark.dataset.tuItemId===String(item.item_id)&&mark.dataset.tuObservedAt===String(batch.observed_at)){mark.style.color='#34c759';mark.title='DOM observation accepted by D1 server'}}}
   sent++;
  }
  return sent;
@@ -461,7 +462,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.9.6');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.9.7');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
@@ -495,7 +496,7 @@ function travelUI(){
   const details=E('div',panel);details.hidden=true;
   B(row,'ⓘ Info',()=>{details.hidden=!details.hidden});
   E('small',details,'Optional and off by default. When enabled and a supported foreign item shop is open, TU reads visible item IDs, inventory quantities, prices, country and observation timestamps every 10 seconds. These are sent to the TU server to improve stock, depletion and restock forecasts. Player information is not transmitted. A green check appears when the item observation is saved locally, even if server upload is pending. Reporting stops when the shop is not visible or you disable it. Data may still be associated with network metadata handled by the hosting provider.');
-  E('small',panel,stockReportingEnabled()?'Enabled · Captures only when a supported foreign shop is visible':'Disabled · No inventory reports sent');
+  E('small',panel,stockReportingEnabled()?'DOM observations: orange = queued, green = D1 accepted. API/YATA observations are separate server-sourced data.':'DOM reporting disabled; server API/YATA data is separate');
   const status=E('small',panel,stockReportingEnabled()?stockReportStatus:'Reporting disabled');status.id='tuim-stock-report-status';
  }
  renderReporting();
@@ -526,6 +527,7 @@ function travelUI(){
    line(schedule,'Flight duration',model.minutes+' minutes');
    line(schedule,'Estimated arrival',date(model.arrive));
   }
+  if(model.stock?.observed_at>0)line(schedule,'Last observed stock (server history)',String(model.stock.quantity??'Unknown')+' at '+date(model.stock.observed_at));
   if(model.flight?.traveling){
    const flight=model.flight;
    line(schedule,'Current travel status',flight.destination==='torn'?'Returning to Torn':'In flight'+(flight.destination?' to '+travelCountries[flight.destination]:''));
@@ -554,7 +556,7 @@ function travelUI(){
   }else if(model.flight?.error)E('small',schedule,'Live flight status unavailable: '+model.flight.error);
   line(schedule,'Predicted restock window',forecast?date(start)+' – '+date(end):'Insufficient data');
   line(schedule,'Forecast confidence score',forecast?Math.round(travelNum(model.pred.confidence)*100)+'% (not a probability)':'Unavailable');
-  line(schedule,'Historical stock increases used',model.pred?.observed_events!=null?String(model.pred.observed_events)+' observed events':'Unavailable');
+  line(schedule,'Historical stock increases (server API + DOM)',model.pred?.observed_events!=null?String(model.pred.observed_events)+' detected increases':'Unavailable');
   if(missed&&end>now&&arrivalNow<=end)E('small',schedule,'Original departure has passed. Departing now may still reach the predicted window; stock is not guaranteed.');
   if(missed&&end>now&&arrivalNow>end)E('small',schedule,'Original departure has passed. The remaining predicted window is shorter than the flight. Next forecast unavailable.');
   if(missed&&end<=now)E('small',schedule,'Predicted window has ended. Next forecast unavailable.');
