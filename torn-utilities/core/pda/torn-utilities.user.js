@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.25
+// @version      0.4.26
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -26,7 +26,7 @@ const TU_TERMS_VERSION='2026-10-20';
   ];
   const hasAgreement=()=>localStorage.getItem(TU_TERMS_KEY)===TU_TERMS_VERSION;
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.4.25';
+  const TU_VERSION='0.4.26';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -315,7 +315,7 @@ const TU_TERMS_VERSION='2026-10-20';
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.25 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.26 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
@@ -335,7 +335,7 @@ const TU_TERMS_VERSION='2026-10-20';
     if(handler)btn.addEventListener('click',handler);
     return btn;
   }
-  let viewCategory=null,viewModule=null,settingsPage=null;
+  let viewCategory=null,viewModule=null,settingsPage=null,diagnosticModule=null;
   const goModules=()=>{viewCategory=null;viewModule=null;render('modules');};
   const addLink=(label,url)=>{
     const a=document.createElement('a');a.href=url;a.textContent=label;a.target='_blank';a.rel='noopener noreferrer';
@@ -409,6 +409,7 @@ const TU_TERMS_VERSION='2026-10-20';
           if(navigator.clipboard?.writeText)navigator.clipboard.writeText(m.scriptUrl).then(()=>alert('Script URL copied')).catch(()=>prompt('Copy script URL',m.scriptUrl));
           else prompt('Copy script URL',m.scriptUrl);
         }));
+        content.append(makeButton('Module diagnostics',()=>{diagnosticModule=m.id;settingsPage='diagnostics';render('settings')}));
         content.append(makeButton('PDA installation instructions',showInstallationInstructions));
         const help=document.createElement('p');help.textContent='Copy the script URL, add or update it in Torn PDA Scripts, then reload Torn. TU cannot install scripts automatically.';content.append(help);
       }else if(viewCategory){
@@ -459,7 +460,7 @@ const TU_TERMS_VERSION='2026-10-20';
         const refresh=makeButton('',refreshRegistry);refresh.style.marginLeft='0';refresh.disabled=registryRefreshing;refresh.innerHTML='<span class="tu-refresh-icon'+(registryRefreshing?' tu-spinning':'')+'">↻</span> '+(registryRefreshing?'Refreshing…':'Refresh catalog');refreshRow.append(refresh);content.append(refreshRow);
       }
     }else if(tab==='settings'){
-      if(!settingsPage){
+      if(!settingsPage){diagnosticModule=null;
         const heading=document.createElement('h3');heading.textContent='Settings';content.append(heading);
         for(const [id,title,description] of [
           ['time','Time Display','Local time or Torn City Time (TCT)'],
@@ -474,11 +475,13 @@ const TU_TERMS_VERSION='2026-10-20';
         }
         return;
       }
-      const back=makeButton('← Settings',()=>{settingsPage=null;render('settings')});back.style.margin='0 0 12px';content.append(back);
+      const back=makeButton('← Settings',()=>{settingsPage=null;diagnosticModule=null;render('settings')});back.style.margin='0 0 12px';content.append(back);
       const section=document.createElement('h3');section.textContent=({time:'Time Display',storage:'Storage & Backups',diagnostics:'Diagnostics'})[settingsPage];content.append(section);
       if(settingsPage==='diagnostics'){
+        if(diagnosticModule){const h=document.createElement('h4');h.textContent='Module: '+(registry.modules.find(m=>m.id===diagnosticModule)?.name||diagnosticModule);content.append(h);}
         const report=()=>{
           const result={managerVersion:TU_VERSION,agreementVersion:hasAgreement()?TU_TERMS_VERSION:'not accepted',catalogStatus:registryStatus,catalogUpdatedAt:registryUpdatedAt,registeredModules:[...registered].map(([id,mod])=>({id,version:mod.version})),activeModule:active,playerIdentityStatus:identityStatus,storageNamespaces:storage.namespaces().map(id=>({namespace:id,keys:storage.keys(id).length})),timeDisplay:localStorage.getItem('tu-time-display')==='tct'?'tct':'local',timestamp:new Date().toISOString()};
+          if(diagnosticModule){const m=registry.modules.find(x=>x.id===diagnosticModule),loaded=registered.get(diagnosticModule);return JSON.stringify({timestamp:result.timestamp,moduleId:diagnosticModule,catalogVersion:m?.version||null,installedVersion:loaded?.version||null,registered:!!loaded,enabled:!saved.disabled?.[diagnosticModule],active:active===diagnosticModule,managerVersion:TU_VERSION},null,2)}
           return JSON.stringify(result,null,2);
         };
         const output=document.createElement('textarea');output.readOnly=true;output.value=report();output.style.cssText='width:100%;height:300px;box-sizing:border-box;background:#10171b;color:#eee;border:1px solid #806a3e;border-radius:8px;padding:10px';content.append(output);
@@ -525,7 +528,7 @@ const TU_TERMS_VERSION='2026-10-20';
       }
       }
     }else{
-      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.25 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.26 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
       if(hasAgreement())content.append(makeButton('Update Public API Key',()=>{const entered=prompt('Enter a public/scoped Torn API key (never a full-access key):','');if(entered===null)return;const key=entered.trim();if(!/^[a-zA-Z0-9]{12,32}$/.test(key))return alert('Invalid API key format');localStorage.setItem(USER_PUBLIC_KEY_STORAGE,key);playerInfo=null;updatePlayer();alert('Public API key saved locally.');}));
       const termsHeading=document.createElement('h3');termsHeading.textContent='Terms of Use and Information Use Agreement';content.append(termsHeading);appendTerms(content);if(!hasAgreement())content.append(makeButton('Review and Accept Terms',showAgreement));
       const guideLink=document.createElement('a');guideLink.href='https://github.com/RelaxSweety/Torn-Scripts/blob/main/torn-utilities/INSTALLATION.md';guideLink.target='_blank';guideLink.rel='noopener noreferrer';guideLink.textContent='TU Installation & Module Setup Guide ↗';guideLink.style.cssText='display:block;margin:12px 0;padding:12px;border:1px solid #806a3e;border-radius:8px;color:#e4c779;text-decoration:underline;font-weight:600';content.append(guideLink);
