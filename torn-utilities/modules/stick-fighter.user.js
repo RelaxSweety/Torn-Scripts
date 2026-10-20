@@ -30,7 +30,7 @@
  * v0.5.0 - Added crosshair Game Manager, Games/Settings tabs, and removed displayed flight status.
  * v0.4.0 - Added availability modes, strict flight detection, and draggable launcher persistence.
  * v0.3.0 - Added analog controls, chat sharing, donation link, and auto-update metadata.
- * v0.2.4 - Improved flight detection, mobile controls/layout, and update support.
+ * v0.2.5 - Improved flight detection, mobile controls/layout, and update support.
  * v0.1.0 - Initial release.
  */
 
@@ -815,7 +815,7 @@
       for(const id of ['tpfg-manager','tpfg-prompt','tpfg-game-settings','tpfg-root'])document.getElementById(id)?.remove();
       initialized=false;
     }
-    const definitions=[{id:'stick-fighter',version:'0.2.4',activate:activateStick,deactivate:deactivateFromTU}];
+    const definitions=[{id:'stick-fighter',version:'0.2.5',activate:activateStick,deactivate:deactivateFromTU}];
     function registerTU(){if((typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register)for(const definition of definitions)(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities.register(definition);}
     window.addEventListener('torn-utilities-ready',registerTU);registerTU();
   // TU cross-world registration: retry after manager startup and SPA initialization.
