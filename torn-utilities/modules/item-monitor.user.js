@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.10.6
+// @version      1.10.7
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -329,18 +329,26 @@ let stockReportingBusy=false;
 const stockChecks=new Map();
 function foreignShopTables(){
  const found=[];
- const containers=[...document.querySelectorAll('table,[role="table"],section,div,ul')];
- for(const root of containers){
-  if(!root.getClientRects().length||root.closest('#tuim-panel,#tuim-travel-window'))continue;
-  const rows=[...root.children].filter(e=>e.getClientRects().length&&/^(TR|DIV|LI)$/i.test(e.tagName));
-  const head=rows.find(row=>{const labels=[...row.children].map(e=>norm(text(e)));return ['name','stock','cost','buy'].every(h=>labels.includes(h))});
-  if(!head)continue;
-  const headers=[...head.children].map(e=>norm(text(e)));
-  const data=rows.filter(row=>row!==head&&row.children.length>=headers.length&&row.querySelector('img,button,a,[class*=buy],[class*=Buy]'));
-  if(data.length)found.push({headers,rows:data});
+ // Torn abroad inventory: wrapper > header + LI > nested row > seven cells.
+ for(const wrapper of document.querySelectorAll('[class*="stockTableWrapper"]')){
+  if(!wrapper.getClientRects().length||wrapper.closest('#tuim-panel,#tuim-travel-window'))continue;
+  const header=wrapper.querySelector('[class*="itemsHeader"]');
+  if(!header)continue;
+  const columns=[...header.children].map(x=>norm(text(x)));
+  if(!['name','stock','cost'].every(x=>columns.includes(x)))continue;
+  const rows=[...wrapper.querySelectorAll('li [class*="row"],li[class*="row"]')].filter(x=>x.getClientRects().length&&x.querySelector('[class*="tabletColB"]')&&x.querySelector('[class*="tabletColC"]'));
+  if(rows.length)found.push({headers:columns,rows,kind:'torn-abroad'});
  }
- // Keep only the most specific matching container for each row.
- const used=new Set();return found.map(t=>({...t,rows:t.rows.filter(r=>{if(used.has(r))return false;used.add(r);return true})})).filter(t=>t.rows.length);
+ // Retain standard HTML table support for alternate layouts.
+ for(const table of document.querySelectorAll('table,[role="table"]')){
+  if(!table.getClientRects().length||table.closest('#tuim-panel,#tuim-travel-window'))continue;
+  const header=table.querySelector('tr,[role="row"]');if(!header)continue;
+  const columns=[...header.children].map(x=>norm(text(x)));
+  if(!['name','stock','cost'].every(x=>columns.includes(x)))continue;
+  const rows=[...table.querySelectorAll('tr,[role="row"]')].filter(x=>x!==header&&x.getClientRects().length);
+  if(rows.length)found.push({headers:columns,rows,kind:'table'});
+ }
+ return found;
 }
 function foreignShopDiagnostic(){
  // Capture structural clues only. Never include entire page text, API keys, or player data.
@@ -396,16 +404,22 @@ function foreignShopSnapshot(){
  const country=foreignShopCountry();if(!country||!stockCatalogMap)return null;
  const rows=[],seen=new Set();
  for(const shop of foreignShopTables()){
-  const {headers}=shop,nameIndex=headers.indexOf('name'),stockIndex=headers.indexOf('stock'),costIndex=headers.indexOf('cost');
-  if(nameIndex<0||stockIndex<0||costIndex<0)continue;
+  const nameIndex=shop.headers.indexOf('name'),stockIndex=shop.headers.indexOf('stock'),costIndex=shop.headers.indexOf('cost');
   for(const row of shop.rows){
-   const cells=[...row.children];if(cells.length<=Math.max(nameIndex,stockIndex,costIndex))continue;
-   const id=foreignItemId(cells[nameIndex]);if(!id||seen.has(id))continue;
-   const qtyText=text(cells[stockIndex]).trim().replaceAll(',','');if(!/^\\d+$/.test(qtyText))continue;
-   const quantity=Number(qtyText),priceMatch=text(cells[costIndex]).match(/\\$\\s*([\\d,]+)/);
-   const unit_price=priceMatch?Number(priceMatch[1].replaceAll(',','')):null;
+   const cells=[...row.children];
+   const nameCell=shop.kind==='torn-abroad'?row.querySelector('[class*="tabletColB"]'):cells[nameIndex];
+   const stockCell=shop.kind==='torn-abroad'?row.querySelector('[class*="tabletColC"]'):cells[stockIndex];
+   const costCell=shop.kind==='torn-abroad'?row.querySelector('[class*="tabletColD"]'):cells[costIndex];
+   if(!nameCell||!stockCell||!costCell)continue;
+   const id=foreignItemId(nameCell);if(!id||seen.has(id))continue;
+   const quantityLabel=text(stockCell).replace(/stock/ig,'').replace(/,/g,'').trim();
+   const quantityMatch=quantityLabel.match(/\\b(\\d+)\\b/);
+   if(!quantityMatch)continue;
+   const quantity=Number(quantityMatch[1]);
+   const priceMatch=text(costCell).match(/\\$\\s*([\\d,]+)/);
+   const unit_price=priceMatch?Number(priceMatch[1].replace(/,/g,'')):null;
    if(!Number.isSafeInteger(quantity)||quantity<0)continue;
-   seen.add(id);rows.push({item_id:id,quantity,unit_price,node:cells[nameIndex]});
+   seen.add(id);rows.push({item_id:id,quantity,unit_price,node:nameCell});
   }
  }
  return {country,rows};
@@ -524,7 +538,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.10.6');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.10.7');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
@@ -699,5 +713,5 @@ function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=loa
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
 function deactivate(){travelClose();state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.10.6',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'1.10.7',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
