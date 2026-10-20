@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Tic-Tac-Toe Module
 // @namespace    https://www.torn.com/
-// @version      0.6.3
+// @version      0.6.4
 // @description  Torn PDA mobile multiplayer Tic-Tac-Toe
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
