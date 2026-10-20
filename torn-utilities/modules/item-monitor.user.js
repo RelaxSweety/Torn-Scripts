@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.10.12
+// @version      1.10.13
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
-// @grant        none
+// @grant        GM_xmlhttpRequest
+// @connect      tu-multiplayer-server.tuserver.workers.dev
 // @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/item-monitor.user.js
 // @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/item-monitor.user.js
 // @run-at       document-idle
@@ -351,7 +352,7 @@ function foreignShopTables(){
  return found;
 }
 function foreignShopDiagnostic(){
- const report={version:'1.10.12',timestamp:new Date().toISOString(),countrySelection:travel.country,path:location.pathname,reportingEnabled:stockReportingEnabled(),reportingBusy:stockReportingBusy,reportingStatus:stockReportStatus,endpointConfigured:!!stockEndpoint,catalogLoaded:!!stockCatalogMap,catalogSize:stockCatalogMap?.size||0,queueBatches:load(stockQueueKey,[]).length,checks:document.querySelectorAll('[data-tu-stock-reported]').length,shops:[],errors:[]};
+ const report={version:'1.10.13',timestamp:new Date().toISOString(),countrySelection:travel.country,path:location.pathname,reportingEnabled:stockReportingEnabled(),reportingBusy:stockReportingBusy,reportingStatus:stockReportStatus,endpointConfigured:!!stockEndpoint,catalogLoaded:!!stockCatalogMap,catalogSize:stockCatalogMap?.size||0,queueBatches:load(stockQueueKey,[]).length,checks:document.querySelectorAll('[data-tu-stock-reported]').length,shops:[],errors:[]};
  const safe=(fn,fallback=null)=>{try{return fn()}catch(e){report.errors.push(String(e?.message||e));return fallback}};
  const sample=e=>e?{tag:e.tagName,cls:String(e.className||'').slice(0,90),text:String(text(e)).slice(0,100),title:e.getAttribute?.('title')?.slice(0,100)||null,aria:e.getAttribute?.('aria-label')?.slice(0,100)||null,html:String(e.outerHTML||'').slice(0,320)}:null;
  const shops=safe(()=>foreignShopTables(),[])||[];
@@ -461,14 +462,34 @@ function storeStockSnapshot(snapshot){
 }
 const stockEndpoint='https://tu-multiplayer-server.tuserver.workers.dev/api/foreign/observations';
 async function deliverStockBatch(batch){
+ const body=JSON.stringify(batch);
+ const parse=(raw,transport)=>{
+  let data=raw;
+  if(data&&typeof data==='object'&&('responseText' in data||'data' in data||'body' in data||'response' in data))data=data.responseText??data.data??data.body??data.response;
+  if(typeof data==='string'){try{data=JSON.parse(data)}catch{throw Error(transport+': invalid JSON response')}}
+  if(!data?.ok||!Array.isArray(data.accepted)||data.accepted.length!==batch.items.length)throw Error(transport+': upload not fully accepted'+(data?.error?' ('+data.error+')':''));
+  return data;
+ };
+ const failures=[];
+ if(typeof PDA_httpPost==='function'){
+  try{return parse(await PDA_httpPost(stockEndpoint,body,{'Content-Type':'application/json'}),'PDA_httpPost')}
+  catch(e){failures.push('PDA_httpPost: '+e.message)}
+ }
+ const gm=typeof GM_xmlhttpRequest==='function'?GM_xmlhttpRequest:typeof GM!=='undefined'&&typeof GM.xmlHttpRequest==='function'?GM.xmlHttpRequest:null;
+ if(gm){
+  try{
+   const response=await new Promise((resolve,reject)=>gm({method:'POST',url:stockEndpoint,headers:{'Content-Type':'application/json'},data:body,timeout:12000,onload:resolve,onerror:()=>reject(Error('network error')),ontimeout:()=>reject(Error('timeout'))}));
+   if(response.status<200||response.status>=300)throw Error('HTTP '+response.status+' '+String(response.responseText||'').slice(0,150));
+   return parse(response,'GM_xmlhttpRequest');
+  }catch(e){failures.push('GM_xmlhttpRequest: '+e.message)}
+ }
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
  try{
-  const response=await fetch(stockEndpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(batch),signal:controller.signal});
-  if(!response.ok)throw Error('Upload HTTP '+response.status);
-  const result=await response.json();
-  if(!result.ok||!Array.isArray(result.accepted)||result.accepted.length!==batch.items.length)throw Error('Upload not fully accepted');
-  return result;
- }finally{clearTimeout(timer)}
+  const response=await fetch(stockEndpoint,{method:'POST',headers:{'content-type':'application/json'},body,signal:controller.signal});
+  if(!response.ok)throw Error('HTTP '+response.status+' '+(await response.text()).slice(0,150));
+  return parse(await response.json(),'fetch');
+ }catch(e){failures.push('fetch: '+e.message);throw Error(failures.join(' | '))}
+ finally{clearTimeout(timer)}
 }
 function confirmStockMarks(batch){
  for(const item of batch.items)for(const mark of document.querySelectorAll('[data-tu-stock-reported]')){
@@ -552,7 +573,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.10.12');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.10.13');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
