@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.30
+// @version      0.4.31
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -24,12 +24,12 @@ const TU_TERMS_VERSION='2026-10-20';
     ['User choice','You can decline and still read this Info page, but the Manager will not open modules. You can stop using TU and remove local data through browser or PDA storage controls. Contact the project maintainer through the links on this Info page for questions about information handling.'],
     ['Agreement','By selecting I Agree, you confirm that you have reviewed these terms and consent to the described processing for TU features. Acceptance is recorded by the TU backend against your verified Torn player ID and cached on this device; renewed acceptance may be required when terms change.']
   ];
-  const hasAgreement=()=>localStorage.getItem(TU_TERMS_KEY)===TU_TERMS_VERSION;
+  const hasAgreement=()=>localStorage.getItem(TU_TERMS_KEY)===TU_TERMS_VERSION&&!!localStorage.getItem('tu:agreement:verified-key:v1')&&localStorage.getItem('tu:agreement:verified-key:v1')===localStorage.getItem('tu:public-api-key:v1');
   const ACCESS_URL='https://tu-multiplayer-server.tuserver.workers.dev/api/access/agreements';
   async function serverAgreement(key,accept){const response=await fetch(ACCESS_URL+(accept?'':'?check=1'),{method:accept?'POST':'GET',headers:{'content-type':'application/json','x-torn-public-key':key},...(accept?{body:JSON.stringify({accepted:true,version:TU_TERMS_VERSION})}:{})});let data={};try{data=await response.json()}catch{}if(!response.ok||!data.accessConfirmed)throw Error(data.error||'Backend confirmation failed ('+response.status+')');return data;}
 
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.4.30';
+  const TU_VERSION='0.4.31';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -318,7 +318,7 @@ const TU_TERMS_VERSION='2026-10-20';
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.30 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.31 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
@@ -376,7 +376,7 @@ const TU_TERMS_VERSION='2026-10-20';
     const keyNote=document.createElement('small');keyNote.textContent='An entered key is stored on this device to enable TU identity requests. Prefer configuring your public key in PDA settings. Never enter a full-access key.';dialog.append(keyNote);
     const confirmLabel=document.createElement('label');confirmLabel.style.cssText='display:flex;gap:10px;align-items:flex-start;margin:15px 0';const check=document.createElement('input');check.type='checkbox';confirmLabel.append(check,document.createTextNode('I have reviewed and agree to the Terms of Use and Information Use Agreement.'));dialog.append(confirmLabel);
     const actions=document.createElement('div');actions.style.cssText='display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap';
-    const decline=makeButton('Decline / Info only',()=>{overlay.remove();render('about');});const accept=makeButton('I Agree — Continue',async()=>{if(!check.checked)return;const entered=keyInput.value.trim();const key=entered||getPublicApiKey();if(!/^[a-zA-Z0-9]{16}$/.test(key))return alert('A valid 16-character Public Only Torn API key is required.');accept.disabled=true;accept.textContent='Confirming with TU server…';try{await serverAgreement(key,true);if(entered)localStorage.setItem(USER_PUBLIC_KEY_STORAGE,entered);localStorage.setItem(TU_TERMS_KEY,TU_TERMS_VERSION);overlay.remove();updatePlayer();render('modules');}catch(error){alert('Agreement not recorded: '+error.message+'\nCheck your API key and network connection, then retry.');}finally{accept.textContent='I Agree — Continue';accept.disabled=!check.checked;}});accept.disabled=true;check.addEventListener('change',()=>{accept.disabled=!check.checked});actions.append(decline,accept);dialog.append(actions);overlay.append(dialog);document.body.append(overlay);
+    const decline=makeButton('Decline / Info only',()=>{overlay.remove();render('about');});const accept=makeButton('I Agree — Continue',async()=>{if(!check.checked)return;const entered=keyInput.value.trim();const key=entered||getPublicApiKey();if(!/^[a-zA-Z0-9]{16}$/.test(key))return alert('A valid 16-character Public Only Torn API key is required.');accept.disabled=true;accept.textContent='Confirming with TU server…';try{await serverAgreement(key,true);if(entered)localStorage.setItem(USER_PUBLIC_KEY_STORAGE,entered);localStorage.setItem(TU_TERMS_KEY,TU_TERMS_VERSION);localStorage.setItem('tu:agreement:verified-key:v1',localStorage.getItem(USER_PUBLIC_KEY_STORAGE)||key);overlay.remove();updatePlayer();render('modules');}catch(error){alert('Agreement not recorded: '+error.message+'\nCheck your API key and network connection, then retry.');}finally{accept.textContent='I Agree — Continue';accept.disabled=!check.checked;}});accept.disabled=true;check.addEventListener('change',()=>{accept.disabled=!check.checked});actions.append(decline,accept);dialog.append(actions);overlay.append(dialog);document.body.append(overlay);
     // Minimize the consent dialog without accepting; the user may visit Torn to retrieve an API key.
     const minimizeAgreement=()=>{overlay.hidden=true;overlay.style.display='none';panel.hidden=true;launcher.hidden=false;};
     const agreementBar=document.createElement('div');agreementBar.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;background:#172026;z-index:2;padding:6px 0';
@@ -538,7 +538,7 @@ const TU_TERMS_VERSION='2026-10-20';
       }
       }
     }else{
-      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.30 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.31 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
       {
         const apiSection=document.createElement('section');apiSection.style.cssText='border:1px solid #806a3e;border-radius:8px;padding:12px;margin:12px 0';
         const title=document.createElement('h3');title.textContent='Public Only Torn API Key';apiSection.append(title);
@@ -546,8 +546,8 @@ const TU_TERMS_VERSION='2026-10-20';
         const field=document.createElement('input');field.type='password';field.autocomplete='off';field.spellcheck=false;field.value=localStorage.getItem(USER_PUBLIC_KEY_STORAGE)||'';field.placeholder=getPublicApiKey()?'PDA-provided key (not stored by TU)':'No TU API key saved';field.style.cssText='width:100%;box-sizing:border-box;padding:10px';apiSection.append(field);
         const buttons=document.createElement('div');buttons.style.cssText='display:flex;flex-wrap:wrap;gap:8px;margin-top:10px';
         const view=makeButton('Show API Key',()=>{field.type=field.type==='password'?'text':'password';view.textContent=field.type==='password'?'Show API Key':'Hide API Key';});
-        const save=makeButton('Save / Update',()=>{const key=field.value.trim();if(!/^[A-Za-z0-9]{16}$/.test(key))return alert('Enter a valid 16-character Public Only API key.');localStorage.setItem(USER_PUBLIC_KEY_STORAGE,key);field.value=key;field.type='password';view.textContent='Show API Key';playerInfo=null;updatePlayer();alert('TU API key saved on this device.');});
-        const del=makeButton('Delete Saved API Key',()=>{if(!localStorage.getItem(USER_PUBLIC_KEY_STORAGE))return alert('No TU-saved key to delete.');if(!confirm('Delete the API key saved by TU on this device? This will not delete a key configured separately in Torn PDA.'))return;localStorage.removeItem(USER_PUBLIC_KEY_STORAGE);field.value='';field.type='password';view.textContent='Show API Key';playerInfo=null;render('about');});
+        const save=makeButton('Save / Update',()=>{const key=field.value.trim();if(!/^[A-Za-z0-9]{16}$/.test(key))return alert('Enter a valid 16-character Public Only API key.');localStorage.setItem(USER_PUBLIC_KEY_STORAGE,key);localStorage.removeItem('tu:agreement:verified-key:v1');localStorage.removeItem(TU_TERMS_KEY);field.value=key;field.type='password';view.textContent='Show API Key';playerInfo=null;updatePlayer();alert('API key saved. Verify your key and accept the agreement again.');showAgreement();});
+        const del=makeButton('Delete Saved API Key',()=>{if(!localStorage.getItem(USER_PUBLIC_KEY_STORAGE))return alert('No TU-saved key to delete.');if(!confirm('Delete the API key saved by TU on this device? This will not delete a key configured separately in Torn PDA.'))return;localStorage.removeItem(USER_PUBLIC_KEY_STORAGE);localStorage.removeItem('tu:agreement:verified-key:v1');localStorage.removeItem(TU_TERMS_KEY);field.value='';field.type='password';view.textContent='Show API Key';playerInfo=null;render('about');showAgreement();});
         buttons.append(view,save,del);apiSection.append(buttons);content.append(apiSection);
       }
       const termsHeading=document.createElement('h3');termsHeading.textContent='Terms of Use and Information Use Agreement';content.append(termsHeading);appendTerms(content);if(!hasAgreement())content.append(makeButton('Review and Accept Terms',showAgreement));
