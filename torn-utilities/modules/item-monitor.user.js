@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.10.16
+// @version      1.10.17
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -352,7 +352,7 @@ function foreignShopTables(){
  return found;
 }
 function foreignShopDiagnostic(){
- const report={version:'1.10.16',timestamp:new Date().toISOString(),countrySelection:travel.country,path:location.pathname,reportingEnabled:stockReportingEnabled(),reportingBusy:stockReportingBusy,reportingStatus:stockReportStatus,endpointConfigured:!!stockEndpoint,catalogLoaded:!!stockCatalogMap,catalogSize:stockCatalogMap?.size||0,queueBatches:load(stockQueueKey,[]).length,checks:document.querySelectorAll('[data-tu-stock-reported]').length,shops:[],errors:[]};
+ const report={version:'1.10.17',timestamp:new Date().toISOString(),countrySelection:travel.country,path:location.pathname,reportingEnabled:stockReportingEnabled(),reportingBusy:stockReportingBusy,reportingStatus:stockReportStatus,endpointConfigured:!!stockEndpoint,catalogLoaded:!!stockCatalogMap,catalogSize:stockCatalogMap?.size||0,queueBatches:load(stockQueueKey,[]).length,checks:document.querySelectorAll('[data-tu-stock-reported]').length,shops:[],errors:[]};
  const safe=(fn,fallback=null)=>{try{return fn()}catch(e){report.errors.push(String(e?.message||e));return fallback}};
  const sample=e=>e?{tag:e.tagName,cls:String(e.className||'').slice(0,90),text:String(text(e)).slice(0,100),title:e.getAttribute?.('title')?.slice(0,100)||null,aria:e.getAttribute?.('aria-label')?.slice(0,100)||null,html:String(e.outerHTML||'').slice(0,320)}:null;
  const shops=safe(()=>foreignShopTables(),[])||[];
@@ -584,7 +584,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.10.16');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.10.17');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
@@ -618,17 +618,19 @@ function travelUI(){
   toggle.setAttribute('aria-pressed',String(stockReportingEnabled()));
   const details=E('div',panel);details.hidden=true;
   B(row,'ⓘ Info',()=>{details.hidden=!details.hidden});
-  B(row,'Show / Copy diagnostics',()=>{
-   const old=panel.querySelector('#tuim-diagnostics-output');old?.remove();
-   const output=E('textarea',panel);output.id='tuim-diagnostics-output';output.readOnly=true;
-   output.style.cssText='display:block;width:100%;min-height:180px;max-height:40vh;overflow:auto;white-space:pre;font:12px monospace;background:#233039;color:#fff;border:1px solid #d6b65c;user-select:text;-webkit-user-select:text';
-   try{output.value=foreignShopDiagnostic();setStockReportStatus('Diagnostics displayed below; select and copy or use Copy text')}
-   catch(e){output.value='Diagnostic failed: '+(e?.message||String(e));setStockReportStatus('Diagnostic error displayed below')}
-   const actions=E('div',panel);actions.className='tuim-travel-actions';output.after(actions);
-   B(actions,'Copy text',async()=>{try{await navigator.clipboard.writeText(output.value);setStockReportStatus('Diagnostics copied')}catch(e){output.focus();output.select();setStockReportStatus('Clipboard blocked; select and copy text manually')}});
-   output.focus();output.select();
+  B(row,'Diagnostics',()=>{
+   const overlay=E('div',document.body);overlay.style.cssText='position:fixed;inset:0;background:#000c;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:12px';
+   const page=E('section',overlay);page.style.cssText='width:min(96vw,620px);max-height:90dvh;overflow:auto;background:#11191d;color:#eee;border:1px solid #cba953;border-radius:12px;padding:14px;box-sizing:border-box';
+   const header=E('div',page);header.style.cssText='display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#11191d;padding:6px 0';
+   E('strong',header,'Travel Assistant and Item Monitor — Diagnostics');B(header,'×',()=>overlay.remove());
+   const output=E('textarea',page);output.readOnly=true;output.style.cssText='width:100%;height:55dvh;box-sizing:border-box;white-space:pre;font:12px monospace;background:#233039;color:#fff;border:1px solid #d6b65c';
+   const refresh=()=>{try{output.value=foreignShopDiagnostic()}catch(e){output.value='Diagnostic failed: '+(e?.message||String(e))}};
+   refresh();
+   const actions=E('div',page);actions.className='tuim-travel-actions';
+   B(actions,'Refresh',refresh);
+   B(actions,'Copy diagnostics',async()=>{try{await navigator.clipboard.writeText(output.value)}catch(e){output.focus();output.select()}});
   });
-  E('small',details,'Optional and off by default. When enabled and a supported foreign item shop is open, TU reads visible item IDs, inventory quantities, prices, country and observation timestamps every 10 seconds. These are sent to the TU server to improve stock, depletion and restock forecasts. Player information is not transmitted. An orange check indicates pending server delivery; green indicates a server acknowledgment. Failed uploads are retained locally for retry. Reporting stops when the shop is not visible or you disable it. Data may still be associated with network metadata handled by the hosting provider.');
+  E('small',details,'Optional and off by default. When enabled and a supported foreign item shop is open, TU reads visible item IDs, inventory quantities, prices, country and observation timestamps when visible inventory changes, no more than once every five seconds. These are sent to the TU server to improve stock, depletion and restock forecasts. Player information is not transmitted. An orange check indicates pending server delivery; green indicates a server acknowledgment. Failed uploads are retained locally for retry. Reporting stops when the shop is not visible or you disable it. Data may still be associated with network metadata handled by the hosting provider.');
   E('small',panel,stockReportingEnabled()?'DOM observations: orange = queued, green = D1 accepted. API/YATA observations are separate server-sourced data.':'DOM reporting disabled; server API/YATA data is separate');
   const status=E('small',panel,stockReportingEnabled()?stockReportStatus:'Reporting disabled');status.id='tuim-stock-report-status';
  }
