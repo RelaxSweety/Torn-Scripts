@@ -69,7 +69,7 @@
       "id": "chat-archiver",
       "name": "Chat Archiver",
       "category": "chat",
-      "version": "0.1.7",
+      "version": "0.1.8",
       "description": "Archive Torn chat conversations",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/chat-archiver/pda/src/torn-multi-chat-archiver-pda.user.js"
     },
