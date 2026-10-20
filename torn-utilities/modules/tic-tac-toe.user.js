@@ -88,7 +88,7 @@ function startPolling(){if(timer)clearInterval(timer);if(session)timer=setInterv
 render(null);if(session){startPolling();refresh();}
 }
 function deactivate(){dragCleanup?.();dragCleanup=null;clearInterval(timer);timer=null;panel?.remove();panel=null;host=null;latestGame=null;}
-function register(){if((typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register){(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities.register({id:ID,version:"0.6.3",activate,deactivate});return true;}return false;}
+function register(){if((typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register){(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities.register({id:ID,version:"0.6.4",activate,deactivate});return true;}return false;}
 if(!register())window.addEventListener("torn-utilities-ready",register,{once:true});
   // TU cross-world registration: retry after manager startup and SPA initialization.
   // Stop once this exact module is visible in the shared manager registry.
