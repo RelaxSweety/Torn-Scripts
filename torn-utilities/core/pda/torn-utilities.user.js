@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.22
+// @version      0.4.23
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -14,8 +14,19 @@
   'use strict';
   if (window.__RELAX_TORN_UTILITIES_PDA__) return;
   window.__RELAX_TORN_UTILITIES_PDA__ = true;
+const TU_TERMS_VERSION='2026-10-20';
+  const TU_TERMS_KEY='tu:agreement:accepted';
+  const TU_TERMS=[
+    ['Terms of Use','Torn Utilities (TU) is an independent, optional collection of Torn City userscripts. It is not affiliated with or endorsed by Torn City. Use is at your own risk and subject to Torn rules and applicable law. Features, availability, and data may change or be inaccurate. Do not rely on predictions or game information as guaranteed outcomes.'],
+    ['Information Use Agreement','TU may read your Torn player ID and name, publicly accessible game information, inventory and market information visible to the script, and information you enter in module settings. Certain features transmit observations, gameplay session information, or multiplayer actions to TU services for processing and shared functionality. Foreign shop stock observations may be sent to the TU Cloudflare server and stored for restock analysis.'],
+    ['API keys and local storage','The Manager uses the public or otherwise appropriately scoped Torn API key configured in Torn PDA to retrieve identity information. Do not provide a full-access or sensitive API key. TU stores preferences, agreement status, and module data in browser storage. Backups may include module data and should be handled privately. API keys should not be included in diagnostics or shared exports.'],
+    ['Third-party services and retention','TU features may use Torn API, GitHub, and TU-hosted services, including Cloudflare. Shared observations and gameplay records may be retained for service functionality and analysis. A comprehensive retention schedule, deletion procedure, and third-party data-sharing inventory have not yet been published; do not assume data is anonymous or immediately deleted.'],
+    ['User choice','You can decline and still read this Info page, but the Manager will not open modules. You can stop using TU and remove local data through browser or PDA storage controls. Contact the project maintainer through the links on this Info page for questions about information handling.'],
+    ['Agreement','By selecting I Agree, you confirm that you have reviewed these terms and consent to the described processing for TU features. Acceptance is stored on this device and may need to be renewed when the agreement changes.']
+  ];
+  const hasAgreement=()=>localStorage.getItem(TU_TERMS_KEY)===TU_TERMS_VERSION;
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.4.22';
+  const TU_VERSION='0.4.23';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -247,6 +258,7 @@
     moduleHost.replaceChildren(); moduleHost.hidden=true;
   }
   function openModule(id) {
+    if(!hasAgreement()){showAgreement();return false;}
     const mod=registered.get(id);
     if (!mod || saved.disabled?.[id]) return false;
     stopModule();
@@ -301,7 +313,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.21 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.23 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
@@ -344,7 +356,27 @@
     const instructions='Install a TU module in Torn PDA:\n\n1. Copy the module script URL from TU.\n2. Open PDA Settings > Advanced Browser Settings > Manage Scripts > Add New Script.\n3. Select Configure > Paste URL > Fetch > Load.\n4. Select OK or Authorize when prompted.\n5. Reload the Torn page inside PDA, then reopen TU.\n\nTU modules are installed separately; copying a URL does not install it.';
     alert(instructions);
   };
+  function showAgreement(){
+    panel.hidden=false;
+    render('about');
+    const existing=document.getElementById('tu-agreement-overlay');if(existing)return;
+    const overlay=document.createElement('div');overlay.id='tu-agreement-overlay';
+    overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#000d;display:flex;align-items:center;justify-content:center;padding:14px';
+    const dialog=document.createElement('section');dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');dialog.setAttribute('aria-label','TU Terms and Information Use Agreement');
+    dialog.style.cssText='width:min(96vw,590px);max-height:90dvh;overflow:auto;background:#172026;color:#eee;border:2px solid #cba953;border-radius:12px;padding:18px;font:14px/1.5 system-ui';
+    const heading=document.createElement('h2');heading.textContent='TU Terms and Information Use Agreement';dialog.append(heading);
+    const note=document.createElement('p');note.textContent='First use: review the agreement below. Configure a public/scoped Torn API key in PDA settings; TU will use the PDA key, not ask you to paste it into this dialog.';dialog.append(note);
+    appendTerms(dialog);
+    const confirmLabel=document.createElement('label');confirmLabel.style.cssText='display:flex;gap:10px;align-items:flex-start;margin:15px 0';const check=document.createElement('input');check.type='checkbox';confirmLabel.append(check,document.createTextNode('I have reviewed and agree to the Terms of Use and Information Use Agreement.'));dialog.append(confirmLabel);
+    const actions=document.createElement('div');actions.style.cssText='display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap';
+    const decline=makeButton('Decline / Info only',()=>{overlay.remove();render('about');});const accept=makeButton('I Agree — Continue',()=>{if(!check.checked)return;localStorage.setItem(TU_TERMS_KEY,TU_TERMS_VERSION);overlay.remove();render('modules');});accept.disabled=true;check.addEventListener('change',()=>{accept.disabled=!check.checked});actions.append(decline,accept);dialog.append(actions);overlay.append(dialog);document.body.append(overlay);
+  }
+  function appendTerms(target){
+    const version=document.createElement('small');version.textContent='Agreement version '+TU_TERMS_VERSION;target.append(version);
+    for(const [title,body] of TU_TERMS){const h=document.createElement('h3');h.textContent=title;h.style.margin='14px 0 4px';const p=document.createElement('p');p.textContent=body;p.style.margin='0 0 8px';target.append(h,p);}
+  }
   function render(tab) {
+    if(!hasAgreement()&&tab!=='about')tab='about';
     currentTab=tab;
     const catalogFooter=panel.querySelector('#tu-catalog-updated');if(catalogFooter)catalogFooter.textContent='Catalog: '+(registryUpdatedAt?new Date(registryUpdatedAt).toLocaleString():'Not refreshed')+(registryStatus.startsWith('Refresh failed')?' · Failed':'');
     panel.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===tab)));
@@ -456,7 +488,8 @@
         line.append(name,makeButton('Clear data',()=>{if(confirm('Delete all TU data for '+id+'?')){storage.clear(id);render('settings');}}));content.append(line);
       }
     }else{
-      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.21 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.23 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      const termsHeading=document.createElement('h3');termsHeading.textContent='Terms of Use and Information Use Agreement';content.append(termsHeading);appendTerms(content);if(!hasAgreement())content.append(makeButton('Review and Accept Terms',showAgreement));
       const guideLink=document.createElement('a');guideLink.href='https://github.com/RelaxSweety/Torn-Scripts/blob/main/torn-utilities/INSTALLATION.md';guideLink.target='_blank';guideLink.rel='noopener noreferrer';guideLink.textContent='TU Installation & Module Setup Guide ↗';guideLink.style.cssText='display:block;margin:12px 0;padding:12px;border:1px solid #806a3e;border-radius:8px;color:#e4c779;text-decoration:underline;font-weight:600';content.append(guideLink);
       // Official-style vector marks; no remote image dependencies.
       addSocialIcon('RelaxSweety on Discord','https://discord.com/users/relaxsweety','M20.317 4.369a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.211.375-.445.865-.608 1.25a18.27 18.27 0 0 0-5.49 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037 19.736 19.736 0 0 0-4.885 1.515.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.1 18.057a.083.083 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.077.077 0 0 0 .084-.028c.462-.63.873-1.295 1.226-1.994a.075.075 0 0 0-.041-.104 13.1 13.1 0 0 1-1.872-.89.076.076 0 0 1-.008-.127c.126-.095.252-.193.372-.292a.074.074 0 0 1 .077-.01c3.929 1.793 8.185 1.793 12.068 0a.074.074 0 0 1 .078.01c.12.099.246.197.373.292a.076.076 0 0 1-.007.127c-.598.35-1.224.65-1.873.89a.076.076 0 0 0-.04.105c.36.698.77 1.363 1.225 1.993a.076.076 0 0 0 .084.028 19.83 19.83 0 0 0 6.003-3.03.077.077 0 0 0 .031-.056c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028ZM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.42 0-1.334.955-2.42 2.157-2.42 1.211 0 2.176 1.095 2.157 2.42 0 1.335-.955 2.42-2.157 2.42Zm7.96 0c-1.183 0-2.157-1.085-2.157-2.42 0-1.334.955-2.42 2.157-2.42 1.211 0 2.176 1.095 2.157 2.42 0 1.335-.946 2.42-2.157 2.42Z');
@@ -465,7 +498,8 @@
       const tornLogo=document.createElement('img');tornLogo.src='https://www.torn.com/favicon.ico';tornLogo.alt='Torn';tornLogo.width=30;tornLogo.height=30;tornLink.append(tornLogo);content.append(tornLink);
     }
   }
-  render('modules');
+  render(hasAgreement()?'modules':'about');
+  if(!hasAgreement())setTimeout(showAgreement,0);
   refreshRegistry();
   // Do not interrupt first-run API requests with an immediate alert.
   window.addEventListener('torn-utilities-ready',()=>render(currentTab));
@@ -481,9 +515,9 @@
     if(launcher.hidden!==hide)launcher.hidden=hide;
   };
   const closePanel = () => { panel.hidden = true; syncLauncher(); };
-  const togglePanel = () => { if(active==='item-monitor'&&document.getElementById('tuim-panel')?.hidden){registered.get(active)?.activate(Object.freeze({mount:moduleHost,close:()=>{stopModule();panel.hidden=false;viewModule=null;render('modules');syncLauncher();},minimize:()=>{panel.hidden=true;syncLauncher();}}));panel.hidden=true;syncLauncher();return;} if(active)stopModule(); panel.hidden=!panel.hidden; if(!panel.hidden){viewModule=null;render('modules');} syncLauncher(); };
+  const togglePanel = () => { if(active==='item-monitor'&&document.getElementById('tuim-panel')?.hidden){registered.get(active)?.activate(Object.freeze({mount:moduleHost,close:()=>{stopModule();panel.hidden=false;viewModule=null;render('modules');syncLauncher();},minimize:()=>{panel.hidden=true;syncLauncher();}}));panel.hidden=true;syncLauncher();return;} if(active)stopModule(); panel.hidden=!panel.hidden; if(!panel.hidden){viewModule=null;render(hasAgreement()?'modules':'about');if(!hasAgreement())showAgreement();} syncLauncher(); };
   panel.querySelector('.tu-close').addEventListener('click', () => { closePanel(); });
-  panel.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => render(b.dataset.tab)));
+  panel.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => {if(!hasAgreement()&&b.dataset.tab!=='about'){showAgreement();return;}render(b.dataset.tab);}));
   // Shared floating-window support for TU module panels.
   const floatIds=['tuim-panel','tuac-panel','tca-panel','tu-pda-panel','sff-root','tpfg-manager'];
   const floatingSetup=new WeakSet();
