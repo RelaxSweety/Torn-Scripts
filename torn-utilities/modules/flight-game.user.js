@@ -819,7 +819,7 @@
       for(const id of ['tpfg-manager','tpfg-prompt','tpfg-game-settings','tpfg-root'])document.getElementById(id)?.remove();
       initialized=false;
     }
-    const definitions=[{id:'flight-game',version:'0.12.5',activate:activateFlight,deactivate:deactivateFromTU}];
+    const definitions=[{id:'flight-game',version:'0.12.6',activate:activateFlight,deactivate:deactivateFromTU}];
     function registerTU(){if((typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register)for(const definition of definitions)(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities.register(definition);}
     window.addEventListener('torn-utilities-ready',registerTU);registerTU();
   // TU cross-world registration: retry after manager startup and SPA initialization.
