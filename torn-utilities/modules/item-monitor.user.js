@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.10.3
+// @version      1.10.4
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -327,25 +327,26 @@ const stockReportingKey='tuim-stock-reporting-v1';
 const stockReportingEnabled=()=>localStorage.getItem(stockReportingKey)==='yes';
 let stockReportingBusy=false;
 const stockChecks=new Map();
+function foreignShopTables(){
+ const found=[];
+ const containers=[...document.querySelectorAll('table,[role="table"],section,div,ul')];
+ for(const root of containers){
+  if(!root.getClientRects().length||root.closest('#tuim-panel,#tuim-travel-window'))continue;
+  const rows=[...root.children].filter(e=>e.getClientRects().length&&/^(TR|DIV|LI)$/i.test(e.tagName));
+  const head=rows.find(row=>{const labels=[...row.children].map(e=>norm(text(e)));return ['name','stock','cost','buy'].every(h=>labels.includes(h))});
+  if(!head)continue;
+  const headers=[...head.children].map(e=>norm(text(e)));
+  const data=rows.filter(row=>row!==head&&row.children.length>=headers.length&&row.querySelector('img,button,a,[class*=buy],[class*=Buy]'));
+  if(data.length)found.push({headers,rows:data});
+ }
+ // Keep only the most specific matching container for each row.
+ const used=new Set();return found.map(t=>({...t,rows:t.rows.filter(r=>{if(used.has(r))return false;used.add(r);return true})})).filter(t=>t.rows.length);
+}
 function foreignShopCountry(){
- // PDA's Cayman Islands title is browser chrome, not necessarily an HTML heading.
- // Verify a foreign shop is actually present before using the selected destination.
- const visibleShop=[...document.querySelectorAll('table,[role="table"]')].some(t=>{
-  if(!t.getClientRects().length)return false;
-  const headers=[...t.querySelectorAll('th,[role="columnheader"]')].map(e=>norm(text(e)));
-  return headers.includes('name')&&headers.includes('stock')&&headers.includes('cost')&&headers.includes('buy');
- });
- if(!visibleShop)return null;
- const path=location.pathname.toLowerCase();
- const pageText=[document.title,document.querySelector('main')?.innerText?.slice(0,1200)||'',...document.querySelectorAll('h1,h2,h3,[class*="country"],[class*="Country"],[class*="location"],[class*="Location"]')].map(e=>typeof e==='string'?e:(e.getClientRects().length?text(e):'')).join(' ').toLowerCase();
+ const shops=foreignShopTables();if(!shops.length)return null;
+ const pageText=[document.title,document.querySelector('main')?.innerText?.slice(0,1200)||'',...document.querySelectorAll('h1,h2,h3,[class*="country"],[class*="location"]')].map(e=>typeof e==='string'?e:(e.getClientRects().length?text(e):'')).join(' ').toLowerCase();
  const detected=Object.keys(travelAliases).find(code=>travelAliases[code].some(alias=>pageText.includes(alias)));
- if(detected)return detected;
- // Torn's foreign shop may not expose the country name inside the web page.
- // Only use the planner's country on an actual abroad/travel route with shop columns.
- // PDA's destination label lives in browser chrome and the foreign page can use /index.php.
- // Use the selected destination only when actual foreign shop tables are present.
- if(travelAliases[travel.country]&&visibleShop)return travel.country;
- return null;
+ return detected||(travelAliases[travel.country]?travel.country:null);
 }
 let stockCatalogMap=null,stockCatalogPending=null,stockCatalogIds=null;
 let stockReportStatus='Waiting for foreign shop';
@@ -380,26 +381,16 @@ function foreignItemId(cell){
  return null;
 }
 function foreignShopSnapshot(){
- const country=foreignShopCountry();
- if(!country||!stockCatalogMap)return null;
+ const country=foreignShopCountry();if(!country||!stockCatalogMap)return null;
  const rows=[],seen=new Set();
- // Torn's abroad General Store / Arms Dealer use ordinary table rows:
- // Item | Name | Stock | Cost | Buy. Item IDs aren't exposed as row attributes.
- for(const table of document.querySelectorAll('table,[role="table"]')){
-  if(!table.getClientRects().length||table.closest('#tuim-panel,#tuim-travel-window'))continue;
-  const heads=[...table.querySelectorAll('th,[role="columnheader"]')].map(x=>norm(text(x)));
-  const nameIndex=heads.findIndex(x=>x==='name'),stockIndex=heads.findIndex(x=>x==='stock'),costIndex=heads.findIndex(x=>x==='cost');
+ for(const shop of foreignShopTables()){
+  const {headers}=shop,nameIndex=headers.indexOf('name'),stockIndex=headers.indexOf('stock'),costIndex=headers.indexOf('cost');
   if(nameIndex<0||stockIndex<0||costIndex<0)continue;
-  for(const tr of table.querySelectorAll('tr,[role="row"]')){
-   if(!tr.getClientRects().length)continue;
-   const cells=[...tr.children].filter(x=>x.matches('td,th,[role="cell"]'));
-   if(cells.length<=Math.max(nameIndex,stockIndex,costIndex))continue;
-   const id=foreignItemId(cells[nameIndex]);
-   if(!id||seen.has(id))continue;
-   const qtyText=text(cells[stockIndex]).trim().replaceAll(',','');
-   if(!/^\d+$/.test(qtyText))continue;
-   const quantity=Number(qtyText);
-   const priceMatch=text(cells[costIndex]).match(/\$\s*([\d,]+)/);
+  for(const row of shop.rows){
+   const cells=[...row.children];if(cells.length<=Math.max(nameIndex,stockIndex,costIndex))continue;
+   const id=foreignItemId(cells[nameIndex]);if(!id||seen.has(id))continue;
+   const qtyText=text(cells[stockIndex]).trim().replaceAll(',','');if(!/^\\d+$/.test(qtyText))continue;
+   const quantity=Number(qtyText),priceMatch=text(cells[costIndex]).match(/\\$\\s*([\\d,]+)/);
    const unit_price=priceMatch?Number(priceMatch[1].replaceAll(',','')):null;
    if(!Number.isSafeInteger(quantity)||quantity<0)continue;
    seen.add(id);rows.push({item_id:id,quantity,unit_price,node:cells[nameIndex]});
@@ -521,7 +512,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.10.3');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.10.4');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
@@ -695,5 +686,5 @@ function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=loa
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
 function deactivate(){travelClose();state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.10.3',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'1.10.4',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
