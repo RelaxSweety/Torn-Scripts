@@ -389,7 +389,11 @@ function storeStockSnapshot(snapshot){
   localStorage.setItem(stockQueueKey,JSON.stringify(queue));
  }catch(e){throw Error('Local storage full or unavailable: '+e.message)}
 }
+let stockFlushBusy=false;
 async function flushStockQueue(){
+ if(stockFlushBusy)return 0;
+ stockFlushBusy=true;
+ try{
  const queue=load(stockQueueKey,[]);
  if(!queue.length)return 0;
  let sent=0;
@@ -405,7 +409,27 @@ async function flushStockQueue(){
   sent++;
  }
  return sent;
+ }finally{stockFlushBusy=false}
 }
+// Retry persisted observations independently of foreign-shop visibility.
+// This also drains the queue after returning to Torn or reopening PDA.
+let stockRetryDelay=15000;
+async function retryStockQueue(){
+ if(!stockReportingEnabled())return;
+ if(!load(stockQueueKey,[]).length){stockRetryDelay=15000;return}
+ try{
+  const sent=await flushStockQueue();
+  if(sent)stockRetryDelay=15000;
+  const pending=load(stockQueueKey,[]).length;
+  setStockReportStatus(sent+' queued batches delivered · '+pending+' pending');
+ }catch(e){
+  stockRetryDelay=Math.min(stockRetryDelay*2,300000);
+  setStockReportStatus('D1 delivery pending: '+e.message+' · '+load(stockQueueKey,[]).length+' batches queued');
+ }
+}
+setInterval(()=>{if(load(stockQueueKey,[]).length)retryStockQueue()},15000);
+window.addEventListener('online',retryStockQueue);
+window.addEventListener('pageshow',retryStockQueue);
 async function reportForeignShop(){
  if(!stockReportingEnabled()||stockReportingBusy||document.hidden)return;
  stockReportingBusy=true;
