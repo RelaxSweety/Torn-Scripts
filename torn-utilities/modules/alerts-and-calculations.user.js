@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Stock and Calculations
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.5
+// @version      0.4.6
 // @description  Stock cash targets, foreign stock alerts and calculator
 // @match        https://www.torn.com/*
 // @grant        unsafeWindow
