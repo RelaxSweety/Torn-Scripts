@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Torn Fleet
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.2.3
+// @version      0.2.4
 // @description  Torn Utilities Torn Fleet multiplayer module
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
