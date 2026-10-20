@@ -480,6 +480,7 @@ function travelUI(){
  const info=E('small',body,'Loading item catalog...');
  const output=E('div',body);output.className='tuim-travel-output';
  const reportingPanel=E('div',body);reportingPanel.className='tuim-travel-output';
+ const timeLabel=E('label',body,'Time display (shared TU preference)');const timeSelect=E('select',timeLabel);for(const [v,n] of [['local','Local time'],['tct','Torn City Time (TCT / UTC)']]){const o=E('option',timeSelect,n);o.value=v}timeSelect.value=localStorage.getItem('tu-time-display')||'local';timeSelect.onchange=()=>{localStorage.setItem('tu-time-display',timeSelect.value);refresh()};
  const actions=E('div',body);actions.className='tuim-travel-actions';
  B(actions,'Refresh travel plan',refresh);
  B(actions,'Arm departure reminder',()=>{if(!travel.departure||travel.departure*1000<=Date.now()+30000)return alert('No future recommended departure');travel.armed=true;travelAlerted=0;travelSave();alert('Reminder armed; keep PDA active')});
