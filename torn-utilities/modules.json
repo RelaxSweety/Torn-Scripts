@@ -117,7 +117,7 @@
       "id": "item-monitor",
       "name": "Travel Assistant and Item Monitor",
       "category": "business",
-      "version": "1.10.15",
+      "version": "1.10.16",
       "description": "Item Monitor and Travel Assistant with D1 stock reporting, source diagnostics and stock estimation",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/item-monitor.user.js"
     },
