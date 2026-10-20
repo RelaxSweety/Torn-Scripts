@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.10.11
+// @version      1.10.12
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -351,7 +351,7 @@ function foreignShopTables(){
  return found;
 }
 function foreignShopDiagnostic(){
- const report={version:'1.10.11',timestamp:new Date().toISOString(),countrySelection:travel.country,path:location.pathname,reportingEnabled:stockReportingEnabled(),reportingBusy:stockReportingBusy,reportingStatus:stockReportStatus,catalogLoaded:!!stockCatalogMap,catalogSize:stockCatalogMap?.size||0,queueBatches:load(stockQueueKey,[]).length,checks:document.querySelectorAll('[data-tu-stock-reported]').length,shops:[],errors:[]};
+ const report={version:'1.10.12',timestamp:new Date().toISOString(),countrySelection:travel.country,path:location.pathname,reportingEnabled:stockReportingEnabled(),reportingBusy:stockReportingBusy,reportingStatus:stockReportStatus,endpointConfigured:!!stockEndpoint,catalogLoaded:!!stockCatalogMap,catalogSize:stockCatalogMap?.size||0,queueBatches:load(stockQueueKey,[]).length,checks:document.querySelectorAll('[data-tu-stock-reported]').length,shops:[],errors:[]};
  const safe=(fn,fallback=null)=>{try{return fn()}catch(e){report.errors.push(String(e?.message||e));return fallback}};
  const sample=e=>e?{tag:e.tagName,cls:String(e.className||'').slice(0,90),text:String(text(e)).slice(0,100),title:e.getAttribute?.('title')?.slice(0,100)||null,aria:e.getAttribute?.('aria-label')?.slice(0,100)||null,html:String(e.outerHTML||'').slice(0,320)}:null;
  const shops=safe(()=>foreignShopTables(),[])||[];
@@ -362,14 +362,14 @@ function foreignShopDiagnostic(){
   for(const row of shop.rows.slice(0,5)){
    safe(()=>{
     const cells=[...row.children],name=shop.kind==='torn-abroad'?row.querySelector('[class*="tabletColB"]'):cells[shop.headers.indexOf('name')],stock=shop.kind==='torn-abroad'?row.querySelector('[class*="tabletColC"]'):cells[shop.headers.indexOf('stock')],cost=shop.kind==='torn-abroad'?row.querySelector('[class*="tabletColD"]'):cells[shop.headers.indexOf('cost')];
-    const entry={name:sample(name),stock:sample(stock),cost:sample(cost),itemId:stockCatalogMap&&name?safe(()=>foreignItemId(name)):null,quantityText:stock?text(stock).replace(/stock/ig,'').trim():null,quantityMatch:stock?text(stock).replace(/stock/ig,'').replace(/,/g,'').match(/\b(\d+)\b/)?.[1]??null:null,mark:!!name?.querySelector('[data-tu-stock-reported]')};
+    const entry={name:sample(name),stock:sample(stock),cost:sample(cost),itemId:name?safe(()=>foreignItemId(name)):null,quantityText:stock?text(stock).replace(/stock/ig,'').trim():null,quantityMatch:stock?text(stock).replace(/stock/ig,'').replace(/,/g,'').match(/\b(\d+)\b/)?.[1]??null:null,mark:!!name?.querySelector('[data-tu-stock-reported]')};
     data.rows.push(entry);
    });
   }
   report.shops.push(data);
  }
  report.totalRows=shops.reduce((n,x)=>n+x.rows.length,0);
- report.matchedRows=stockCatalogMap?safe(()=>foreignShopSnapshot()?.rows.length):null;
+ report.matchedRows=safe(()=>foreignShopSnapshot()?.rows.length);
  return JSON.stringify(report,null,2);
 }
 function foreignShopCountry(){
@@ -392,6 +392,10 @@ async function ensureStockCatalog(){
  return stockCatalogPending;
 }
 function foreignItemId(cell){
+ const control=cell?.querySelector?.('[aria-controls^="item-"]');
+ const controlId=control?.getAttribute('aria-controls')?.match(/^item-(\d+)-itemInfoWrapper$/);
+ if(controlId){const id=Number(controlId[1]);if(Number.isSafeInteger(id)&&id>0)return id}
+
  const direct=[cell,...cell.querySelectorAll('[data-item-id],[data-itemid],[data-id],a[href],img[src]')];
  for(const node of direct){
   for(const attr of ['data-item-id','data-itemid']){
@@ -404,14 +408,14 @@ function foreignItemId(cell){
   }
  }
  const labels=[cell.getAttribute('title'),cell.getAttribute('aria-label'),...cell.querySelectorAll('[title],[aria-label],img[alt]')].map(x=>typeof x==='string'?x:(x?.getAttribute?.('title')||x?.getAttribute?.('aria-label')||x?.getAttribute?.('alt'))).filter(Boolean);
- labels.push(text(cell));
+ labels.push(text(cell.querySelector('button')||cell).replace(/✓/g,'').trim());
  for(const label of labels){const key=norm(label).replace(/\s*[.…]+$/,'').trim();if(stockCatalogMap.has(key))return stockCatalogMap.get(key)}
  // Truncated names are only matched if exactly one catalog entry shares the prefix.
  for(const label of labels){const raw=norm(label);if(!/[.…]$/.test(raw))continue;const prefix=raw.replace(/[.…]+$/,'').trim();if(prefix.length<8)continue;const matches=[...stockCatalogMap].filter(([name])=>name.startsWith(prefix));if(matches.length===1)return matches[0][1]}
  return null;
 }
 function foreignShopSnapshot(){
- const country=foreignShopCountry();if(!country||!stockCatalogMap)return null;
+ const country=foreignShopCountry();if(!country)return null;
  const rows=[],seen=new Set();
  for(const shop of foreignShopTables()){
   const nameIndex=shop.headers.indexOf('name'),stockIndex=shop.headers.indexOf('stock'),costIndex=shop.headers.indexOf('cost');
@@ -519,7 +523,7 @@ async function reportForeignShop(){
   const country=foreignShopCountry();
   if(!country){setStockReportStatus('Foreign shop not detected; verify destination in Travel Assistant');return}
   setStockReportStatus('Reading shop inventory...');
-  await ensureStockCatalog();
+  try{await ensureStockCatalog()}catch(e){setStockReportStatus('Catalog unavailable; using DOM item IDs: '+e.message)}
   const snap=foreignShopSnapshot();
   if(!snap?.rows.length){setStockReportStatus('No shop rows recognized — nothing archived');return}
   const observed_at=Math.floor(Date.now()/1000);
@@ -548,7 +552,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.10.11');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.10.12');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
