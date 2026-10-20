@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.9.7
+// @version      1.9.8
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -389,6 +389,24 @@ function storeStockSnapshot(snapshot){
   localStorage.setItem(stockQueueKey,JSON.stringify(queue));
  }catch(e){throw Error('Local storage full or unavailable: '+e.message)}
 }
+const stockEndpoint='https://tu-multiplayer-server.tuserver.workers.dev/api/foreign/observations';
+async function deliverStockBatch(batch){
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
+ try{
+  const response=await fetch(stockEndpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(batch),signal:controller.signal});
+  if(!response.ok)throw Error('Upload HTTP '+response.status);
+  const result=await response.json();
+  if(!result.ok||!Array.isArray(result.accepted)||result.accepted.length!==batch.items.length)throw Error('Upload not fully accepted');
+  return result;
+ }finally{clearTimeout(timer)}
+}
+function confirmStockMarks(batch){
+ for(const item of batch.items)for(const mark of document.querySelectorAll('[data-tu-stock-reported]')){
+  if(mark.dataset.tuItemId===String(item.item_id)&&mark.dataset.tuObservedAt===String(batch.observed_at)){
+   mark.style.color='#34c759';mark.title='DOM observation acknowledged by server';
+  }
+ }
+}
 let stockFlushBusy=false;
 async function flushStockQueue(){
  if(stockFlushBusy)return 0;
@@ -398,15 +416,12 @@ async function flushStockQueue(){
  if(!queue.length)return 0;
  let sent=0;
  for(const batch of queue.slice(0,6)){
-  const response=await fetch('https://tu-multiplayer-server.tuserver.workers.dev/api/foreign/observations',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(batch)});
-  if(!response.ok)throw Error('Upload HTTP '+response.status);
-  const result=await response.json();
-  if(!result.ok||!Array.isArray(result.accepted)||result.accepted.length!==batch.items.length)throw Error('Upload not fully accepted');
+  await deliverStockBatch(batch);
   // Remove only after acknowledgment, preserving batches queued later.
   const current=load(stockQueueKey,[]);
   if(current[0]?.observed_at!==batch.observed_at||current[0]?.country!==batch.country)break;
   localStorage.setItem(stockQueueKey,JSON.stringify(current.slice(1)));
-  for(const item of batch.items){for(const mark of document.querySelectorAll('[data-tu-stock-reported]')){if(mark.dataset.tuItemId===String(item.item_id)&&mark.dataset.tuObservedAt===String(batch.observed_at)){mark.style.color='#34c759';mark.title='DOM observation accepted by D1 server'}}}
+  confirmStockMarks(batch);
   sent++;
  }
  return sent;
@@ -444,13 +459,18 @@ async function reportForeignShop(){
   const observed_at=Math.floor(Date.now()/1000);
   const rows=snap.rows.slice(0,50);
   const batch={country:snap.country,observed_at,items:rows.map(({item_id,quantity,unit_price})=>({item_id,quantity,unit_price}))};
-  storeStockSnapshot(batch);
   markStockArchived(rows,observed_at);
-  setStockReportStatus('Archived '+rows.length+' items locally · '+load(stockQueueKey,[]).length+' upload batches pending');
+  // Send new DOM readings immediately; only persist locally if delivery fails.
+  // Flush older pending observations separately without blocking the live sample.
   try{
-   const sent=await flushStockQueue();
-   setStockReportStatus('Archived '+rows.length+' items locally · '+sent+' batches uploaded · '+load(stockQueueKey,[]).length+' pending');
-  }catch(e){setStockReportStatus('Archived '+rows.length+' items locally · Upload pending: '+e.message)}
+   await deliverStockBatch(batch);
+   confirmStockMarks(batch);
+   setStockReportStatus('Live DOM: '+rows.length+' observations acknowledged · '+load(stockQueueKey,[]).length+' older batches pending');
+   if(load(stockQueueKey,[]).length)retryStockQueue();
+  }catch(e){
+   storeStockSnapshot(batch);
+   setStockReportStatus('Live DOM: delivery failed ('+e.message+') · saved '+rows.length+' observations locally · '+load(stockQueueKey,[]).length+' pending batches');
+  }
  }catch(e){setStockReportStatus('Archive error: '+e.message);console.warn('[TU Stock Reporter]',e)}
  finally{stockReportingBusy=false}
 }
@@ -462,7 +482,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.9.7');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.9.8');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
