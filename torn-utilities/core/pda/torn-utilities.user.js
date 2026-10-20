@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.23
+// @version      0.4.24
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -26,7 +26,7 @@ const TU_TERMS_VERSION='2026-10-20';
   ];
   const hasAgreement=()=>localStorage.getItem(TU_TERMS_KEY)===TU_TERMS_VERSION;
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.4.23';
+  const TU_VERSION='0.4.24';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -228,13 +228,13 @@ const TU_TERMS_VERSION='2026-10-20';
     alert('TU could not identify your player through the PDA API. Confirm your PDA API key is configured, reload Torn in PDA, then reopen TU. '+identityStatus);
     updatePlayer();
   };
-  updatePlayer();
-  window.addEventListener('focus',()=>{if(!playerInfo)updatePlayer();});
+  if(hasAgreement())updatePlayer();
+  window.addEventListener('focus',()=>{if(hasAgreement()&&!playerInfo)updatePlayer();});
   const api = Object.freeze({
     storage,
     getPlayer,
-    refreshPlayer:updatePlayer,
-    requestPlayerProfile:openProfileHelp,
+    refreshPlayer:()=>hasAgreement()?updatePlayer():Promise.resolve(false),
+    requestPlayerProfile:()=>hasAgreement()?openProfileHelp():showAgreement(),
     closeActiveModule(){stopModule();panel.hidden=false;viewModule=null;render('modules');syncLauncher();},
     register(def) {
       if (!def || typeof def.id !== 'string' || !/^[a-z0-9-]+$/.test(def.id) ||
@@ -313,7 +313,7 @@ const TU_TERMS_VERSION='2026-10-20';
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.23 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.24 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
@@ -333,7 +333,7 @@ const TU_TERMS_VERSION='2026-10-20';
     if(handler)btn.addEventListener('click',handler);
     return btn;
   }
-  let viewCategory=null,viewModule=null;
+  let viewCategory=null,viewModule=null,settingsPage=null;
   const goModules=()=>{viewCategory=null;viewModule=null;render('modules');};
   const addLink=(label,url)=>{
     const a=document.createElement('a');a.href=url;a.textContent=label;a.target='_blank';a.rel='noopener noreferrer';
@@ -369,7 +369,7 @@ const TU_TERMS_VERSION='2026-10-20';
     appendTerms(dialog);
     const confirmLabel=document.createElement('label');confirmLabel.style.cssText='display:flex;gap:10px;align-items:flex-start;margin:15px 0';const check=document.createElement('input');check.type='checkbox';confirmLabel.append(check,document.createTextNode('I have reviewed and agree to the Terms of Use and Information Use Agreement.'));dialog.append(confirmLabel);
     const actions=document.createElement('div');actions.style.cssText='display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap';
-    const decline=makeButton('Decline / Info only',()=>{overlay.remove();render('about');});const accept=makeButton('I Agree — Continue',()=>{if(!check.checked)return;localStorage.setItem(TU_TERMS_KEY,TU_TERMS_VERSION);overlay.remove();render('modules');});accept.disabled=true;check.addEventListener('change',()=>{accept.disabled=!check.checked});actions.append(decline,accept);dialog.append(actions);overlay.append(dialog);document.body.append(overlay);
+    const decline=makeButton('Decline / Info only',()=>{overlay.remove();render('about');});const accept=makeButton('I Agree — Continue',()=>{if(!check.checked)return;localStorage.setItem(TU_TERMS_KEY,TU_TERMS_VERSION);overlay.remove();updatePlayer();render('modules');});accept.disabled=true;check.addEventListener('change',()=>{accept.disabled=!check.checked});actions.append(decline,accept);dialog.append(actions);overlay.append(dialog);document.body.append(overlay);
   }
   function appendTerms(target){
     const version=document.createElement('small');version.textContent='Agreement version '+TU_TERMS_VERSION;target.append(version);
@@ -377,6 +377,7 @@ const TU_TERMS_VERSION='2026-10-20';
   }
   function render(tab) {
     if(!hasAgreement()&&tab!=='about')tab='about';
+    if(tab!=='settings')settingsPage=null;
     currentTab=tab;
     const catalogFooter=panel.querySelector('#tu-catalog-updated');if(catalogFooter)catalogFooter.textContent='Catalog: '+(registryUpdatedAt?new Date(registryUpdatedAt).toLocaleString():'Not refreshed')+(registryStatus.startsWith('Refresh failed')?' · Failed':'');
     panel.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===tab)));
@@ -454,12 +455,43 @@ const TU_TERMS_VERSION='2026-10-20';
         const refresh=makeButton('',refreshRegistry);refresh.style.marginLeft='0';refresh.disabled=registryRefreshing;refresh.innerHTML='<span class="tu-refresh-icon'+(registryRefreshing?' tu-spinning':'')+'">↻</span> '+(registryRefreshing?'Refreshing…':'Refresh catalog');refreshRow.append(refresh);content.append(refreshRow);
       }
     }else if(tab==='settings'){
+      if(!settingsPage){
+        const heading=document.createElement('h3');heading.textContent='Settings';content.append(heading);
+        for(const [id,title,description] of [
+          ['time','Time Display','Local time or Torn City Time (TCT)'],
+          ['storage','Storage & Backups','Export, restore, or clear module data'],
+          ['diagnostics','Diagnostics','Manager and module diagnostic information']
+        ]){
+          const card=document.createElement('div');card.className='tu-card';
+          const body=document.createElement('div');body.style.flex='1';
+          const label=document.createElement('strong');label.textContent=title;
+          const detail=document.createElement('small');detail.textContent=description;body.append(label,detail);
+          card.append(body,makeButton('Open →',()=>{settingsPage=id;render('settings')}));content.append(card);
+        }
+        return;
+      }
+      const back=makeButton('← Settings',()=>{settingsPage=null;render('settings')});back.style.margin='0 0 12px';content.append(back);
+      const section=document.createElement('h3');section.textContent=({time:'Time Display',storage:'Storage & Backups',diagnostics:'Diagnostics'})[settingsPage];content.append(section);
+      if(settingsPage==='diagnostics'){
+        const report=()=>{
+          const result={managerVersion:TU_VERSION,agreementVersion:hasAgreement()?TU_TERMS_VERSION:'not accepted',catalogStatus:registryStatus,catalogUpdatedAt:registryUpdatedAt,registeredModules:[...registered].map(([id,mod])=>({id,version:mod.version})),activeModule:active,playerIdentityStatus:identityStatus,storageNamespaces:storage.namespaces().map(id=>({namespace:id,keys:storage.keys(id).length})),timeDisplay:localStorage.getItem('tu-time-display')==='tct'?'tct':'local',timestamp:new Date().toISOString()};
+          return JSON.stringify(result,null,2);
+        };
+        const output=document.createElement('textarea');output.readOnly=true;output.value=report();output.style.cssText='width:100%;height:300px;box-sizing:border-box;background:#10171b;color:#eee;border:1px solid #806a3e;border-radius:8px;padding:10px';content.append(output);
+        content.append(makeButton('Refresh diagnostics',()=>{output.value=report()}));
+        content.append(makeButton('Copy diagnostics',()=>{if(navigator.clipboard?.writeText)navigator.clipboard.writeText(output.value).catch(()=>alert('Clipboard unavailable'));else{output.select();document.execCommand('copy')}}));
+        return;
+      }
+      if(settingsPage==='time'){
       const timeHeading=document.createElement('strong');timeHeading.textContent='Time Display';content.append(timeHeading);
       const timeDescription=document.createElement('p');timeDescription.textContent='Choose one timezone for TU travel estimates and observation timestamps.';content.append(timeDescription);
       const timeSelect=document.createElement('select');timeSelect.setAttribute('aria-label','TU time display');timeSelect.style.cssText='width:100%;padding:9px;margin:8px 0 18px';
       for(const [value,label] of [['local','Local Time (device)'],['tct','Torn City Time (TCT / UTC)']]){const option=document.createElement('option');option.value=value;option.textContent=label;timeSelect.append(option)}
       timeSelect.value=localStorage.getItem('tu-time-display')==='tct'?'tct':'local';
       timeSelect.addEventListener('change',()=>{localStorage.setItem('tu-time-display',timeSelect.value);pageWindow.dispatchEvent(new CustomEvent('tu-time-display-changed',{detail:{mode:timeSelect.value}}))});content.append(timeSelect);
+      return;
+      }
+      if(settingsPage==='storage'){
       const heading=document.createElement('strong');heading.textContent='Storage & Backups';content.append(heading);
       const summary=document.createElement('p');
       const spaces=storage.namespaces();
@@ -487,8 +519,9 @@ const TU_TERMS_VERSION='2026-10-20';
         const name=document.createElement('span');name.textContent=id+' ('+storage.keys(id).length+' keys)';name.style.flex='1';
         line.append(name,makeButton('Clear data',()=>{if(confirm('Delete all TU data for '+id+'?')){storage.clear(id);render('settings');}}));content.append(line);
       }
+      }
     }else{
-      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.23 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.24 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
       const termsHeading=document.createElement('h3');termsHeading.textContent='Terms of Use and Information Use Agreement';content.append(termsHeading);appendTerms(content);if(!hasAgreement())content.append(makeButton('Review and Accept Terms',showAgreement));
       const guideLink=document.createElement('a');guideLink.href='https://github.com/RelaxSweety/Torn-Scripts/blob/main/torn-utilities/INSTALLATION.md';guideLink.target='_blank';guideLink.rel='noopener noreferrer';guideLink.textContent='TU Installation & Module Setup Guide ↗';guideLink.style.cssText='display:block;margin:12px 0;padding:12px;border:1px solid #806a3e;border-radius:8px;color:#e4c779;text-decoration:underline;font-weight:600';content.append(guideLink);
       // Official-style vector marks; no remote image dependencies.
