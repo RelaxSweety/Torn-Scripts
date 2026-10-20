@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.10.8
+// @version      1.10.9
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -360,7 +360,7 @@ function foreignShopDiagnostic(){
  const headerSamples=labels.map(e=>({label:norm(text(e)),element:shape(e),parent:shape(e.parentElement),grandparent:shape(e.parentElement?.parentElement),siblings:[...e.parentElement?.children||[]].slice(0,8).map(x=>({element:shape(x),label:tokens.has(norm(text(x)))?norm(text(x)):null})),nearbyRows:[...e.parentElement?.parentElement?.children||[]].slice(0,5).map(shape)}));
  const structuralSamples=[...document.querySelectorAll('table,[role="table"],[class*="shop"],[class*="Shop"],[class*="stock"],[class*="Stock"]')].filter(visible).slice(0,25).map(shape);
  const country=travel.country;
- return JSON.stringify({version:'1.10.8',countrySelection:country,path:location.pathname,detectedShops:foreignShopTables().length,shopRows:foreignShopTables().reduce((n,x)=>n+x.rows.length,0),catalogLoaded:!!stockCatalogMap,matchedRows:stockCatalogMap?foreignShopSnapshot()?.rows.length:null,reportingEnabled:stockReportingEnabled(),reportingStatus:stockReportStatus,visibleElements:all.length,headerLabelsFound:labels.length,headerSamples,structuralSamples},null,2);
+ return JSON.stringify({version:'1.10.9',countrySelection:country,path:location.pathname,detectedShops:foreignShopTables().length,shopRows:foreignShopTables().reduce((n,x)=>n+x.rows.length,0),catalogLoaded:!!stockCatalogMap,matchedRows:stockCatalogMap?foreignShopSnapshot()?.rows.length:null,reportingEnabled:stockReportingEnabled(),reportingStatus:stockReportStatus,visibleElements:all.length,headerLabelsFound:labels.length,headerSamples,structuralSamples},null,2);
 }
 function foreignShopCountry(){
  const shops=foreignShopTables();if(!shops.length)return null;
@@ -538,7 +538,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.10.8');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.10.9');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
@@ -572,7 +572,16 @@ function travelUI(){
   toggle.setAttribute('aria-pressed',String(stockReportingEnabled()));
   const details=E('div',panel);details.hidden=true;
   B(row,'ⓘ Info',()=>{details.hidden=!details.hidden});
-  B(row,'Copy shop diagnostics',async()=>{const report=foreignShopDiagnostic();try{await navigator.clipboard.writeText(report);setStockReportStatus('Shop diagnostics copied — paste into ChatGPT')}catch(e){const output=E('textarea',panel);output.value=report;output.readOnly=true;output.style.cssText='width:100%;min-height:150px';output.focus();output.select();setStockReportStatus('Copy diagnostics from the text field below')}});
+  B(row,'Show / Copy diagnostics',()=>{
+   const old=panel.querySelector('#tuim-diagnostics-output');old?.remove();
+   const output=E('textarea',panel);output.id='tuim-diagnostics-output';output.readOnly=true;
+   output.style.cssText='display:block;width:100%;min-height:180px;max-height:40vh;overflow:auto;white-space:pre;font:12px monospace;background:#233039;color:#fff;border:1px solid #d6b65c;user-select:text;-webkit-user-select:text';
+   try{output.value=foreignShopDiagnostic();setStockReportStatus('Diagnostics displayed below; select and copy or use Copy text')}
+   catch(e){output.value='Diagnostic failed: '+(e?.message||String(e));setStockReportStatus('Diagnostic error displayed below')}
+   const actions=E('div',panel);actions.className='tuim-travel-actions';output.after(actions);
+   B(actions,'Copy text',async()=>{try{await navigator.clipboard.writeText(output.value);setStockReportStatus('Diagnostics copied')}catch(e){output.focus();output.select();setStockReportStatus('Clipboard blocked; select and copy text manually')}});
+   output.focus();output.select();
+  });
   E('small',details,'Optional and off by default. When enabled and a supported foreign item shop is open, TU reads visible item IDs, inventory quantities, prices, country and observation timestamps every 10 seconds. These are sent to the TU server to improve stock, depletion and restock forecasts. Player information is not transmitted. An orange check indicates pending server delivery; green indicates a server acknowledgment. Failed uploads are retained locally for retry. Reporting stops when the shop is not visible or you disable it. Data may still be associated with network metadata handled by the hosting provider.');
   E('small',panel,stockReportingEnabled()?'DOM observations: orange = queued, green = D1 accepted. API/YATA observations are separate server-sourced data.':'DOM reporting disabled; server API/YATA data is separate');
   const status=E('small',panel,stockReportingEnabled()?stockReportStatus:'Reporting disabled');status.id='tuim-stock-report-status';
@@ -713,5 +722,5 @@ function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=loa
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
 function deactivate(){travelClose();state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.10.8',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'1.10.9',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
