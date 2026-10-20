@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.9.9
+// @version      1.10.0
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -294,6 +294,23 @@ async function travelGet(url){
  try{const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);return parse(await r.text())}
  catch(e){if(typeof PDA_httpGet!=='function')throw e;return parse(await PDA_httpGet(url))}
 }
+function stockHistoryMetrics(history){
+ const points=Array.isArray(history?.points)?history.points:[];
+ const sorted=points.filter(p=>Number.isFinite(Number(p.quantity))&&Number(p.source_observed_at)>0).sort((a,b)=>Number(a.source_observed_at)-Number(b.source_observed_at));
+ const sources={dom:0,api:0,other:0};
+ for(const p of sorted){const src=String(p.source||p.observation_source||p.source_type||'').toLowerCase();if(/dom|direct|tu/.test(src))sources.dom++;else if(/yata|api/.test(src))sources.api++;else sources.other++}
+ const latest=sorted[sorted.length-1];let rate=0,intervals=0,increases=0;
+ for(let i=1;i<sorted.length;i++){
+  const a=sorted[i-1],b=sorted[i],dt=Number(b.source_observed_at)-Number(a.source_observed_at),dq=Number(a.quantity)-Number(b.quantity);
+  if(dq<0)increases++;
+  if(dt>=60&&dt<=3600&&dq>0){rate+=dq/dt;intervals++}
+ }
+ const age=latest?Math.max(0,Date.now()/1000-Number(latest.source_observed_at)):Infinity;
+ // A bounded heuristic, not a forecast: no estimate with sparse or stale observations.
+ const reliable=intervals>=3&&age<=1800;
+ const estimate=reliable?Math.max(0,Math.floor(Number(latest.quantity)-(rate/intervals)*age)):null;
+ return {points:sorted.length,sources,increases,intervals,estimate,age,latest,confidence:reliable?(intervals>=10&&age<=300?'Moderate':'Low'):'Unavailable'};
+}
 function travelMarket(data){
  const found=[];const scan=(x,depth)=>{
   if(!x||depth>5)return;
@@ -502,7 +519,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.9.9');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.10.0');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
@@ -536,7 +553,7 @@ function travelUI(){
   toggle.setAttribute('aria-pressed',String(stockReportingEnabled()));
   const details=E('div',panel);details.hidden=true;
   B(row,'ⓘ Info',()=>{details.hidden=!details.hidden});
-  E('small',details,'Optional and off by default. When enabled and a supported foreign item shop is open, TU reads visible item IDs, inventory quantities, prices, country and observation timestamps every 10 seconds. These are sent to the TU server to improve stock, depletion and restock forecasts. Player information is not transmitted. A green check appears when the item observation is saved locally, even if server upload is pending. Reporting stops when the shop is not visible or you disable it. Data may still be associated with network metadata handled by the hosting provider.');
+  E('small',details,'Optional and off by default. When enabled and a supported foreign item shop is open, TU reads visible item IDs, inventory quantities, prices, country and observation timestamps every 10 seconds. These are sent to the TU server to improve stock, depletion and restock forecasts. Player information is not transmitted. An orange check indicates pending server delivery; green indicates a server acknowledgment. Failed uploads are retained locally for retry. Reporting stops when the shop is not visible or you disable it. Data may still be associated with network metadata handled by the hosting provider.');
   E('small',panel,stockReportingEnabled()?'DOM observations: orange = queued, green = D1 accepted. API/YATA observations are separate server-sourced data.':'DOM reporting disabled; server API/YATA data is separate');
   const status=E('small',panel,stockReportingEnabled()?stockReportStatus:'Reporting disabled');status.id='tuim-stock-report-status';
  }
@@ -597,7 +614,18 @@ function travelUI(){
   }else if(model.flight?.error)E('small',schedule,'Live flight status unavailable: '+model.flight.error);
   line(schedule,'Predicted restock window',forecast?date(start)+' – '+date(end):'Insufficient data');
   line(schedule,'Forecast confidence score',forecast?Math.round(travelNum(model.pred.confidence)*100)+'% (not a probability)':'Unavailable');
-  line(schedule,'Historical stock increases (server API + DOM)',model.pred?.observed_events!=null?String(model.pred.observed_events)+' detected increases':'Unavailable');
+  line(schedule,'Server detected restock events',model.pred?.observed_events!=null?String(model.pred.observed_events):'Unavailable');
+  if(model.metrics){
+   const m=model.metrics;
+   line(schedule,'History observations sampled',m.points+' (latest 200 requested)');
+   line(schedule,'DOM observations (identified)',String(m.sources.dom));
+   line(schedule,'API/YATA observations (identified)',String(m.sources.api));
+   line(schedule,'Unknown-source observations',String(m.sources.other));
+   line(schedule,'Stock increases in sampled history',String(m.increases));
+   line(schedule,'Estimated current stock',m.estimate==null?'Unavailable — insufficient recent depletion data':m.estimate+' items · '+m.confidence+' confidence (heuristic)');
+   line(schedule,'Depletion intervals used',String(m.intervals));
+   if(m.points>0)E('small',schedule,'Source counts reflect only returned history with identifiable source metadata. Restock events and forecasts are computed by the server and may use more history. Current-stock estimate assumes recent depletion continues and excludes purchases/restocks not observed.');
+  }
   if(missed&&end>now&&arrivalNow<=end)E('small',schedule,'Original departure has passed. Departing now may still reach the predicted window; stock is not guaranteed.');
   if(missed&&end>now&&arrivalNow>end)E('small',schedule,'Original departure has passed. The remaining predicted window is shorter than the flight. Next forecast unavailable.');
   if(missed&&end<=now)E('small',schedule,'Predicted window has ended. Next forecast unavailable.');
@@ -639,18 +667,18 @@ function travelUI(){
   const pdaKey='###PDA-APIKEY###';
   const key=!pdaKey.includes('PDA-APIKEY')?pdaKey:(window.TornUtilities?.apiKey||window.TornUtilities?.getApiKey?.()||'');
   const flightPromise=travelCurrentFlight(key);
-  const jobs=[travelGet(base+'history'+query+'&limit=1'),travelGet(base+'prediction'+query+'&lead_seconds='+Math.ceil((minutes+travelNum(travel.buffer))*60+60)),key?travelGet('https://api.torn.com/v2/market/'+id+'/itemmarket?key='+encodeURIComponent(key)):Promise.reject(Error('Torn API key unavailable'))];
+  const jobs=[travelGet(base+'history'+query+'&limit=200'),travelGet(base+'prediction'+query+'&lead_seconds='+Math.ceil((minutes+travelNum(travel.buffer))*60+60)),key?travelGet('https://api.torn.com/v2/market/'+id+'/itemmarket?key='+encodeURIComponent(key)):Promise.reject(Error('Torn API key unavailable'))];
   const settled=await Promise.allSettled(jobs);if(seq!==serial||!w.isConnected)return;
   const [history,pred,market]=settled.map(x=>x.status==='fulfilled'?x.value:null);
   const flight=await flightPromise;if(seq!==serial||!w.isConnected)return;
   if(flight?.traveling&&!flight.arrival&&travel.manualArrival>Date.now()/1000)flight.arrival=travel.manualArrival;
   const issues=settled.map((x,i)=>x.status==='rejected'?['Foreign stock','Prediction','Market price'][i]+': '+x.reason.message:null).filter(Boolean);
-  const latest=history?.points?.[history.points.length-1],buy=Number(latest?.unit_price)>0?Number(latest.unit_price):NaN,sell=market?travelMarket(market):null;
+  const metrics=stockHistoryMetrics(history),latest=metrics.latest,buy=Number(latest?.unit_price)>0?Number(latest.unit_price):NaN,sell=market?travelMarket(market):null;
   const qty=cap;
   const gross=sell&&Number.isFinite(buy)?sell-buy:NaN,fee=sell?travelNum(travel.fee)/100*sell:NaN,net=gross-fee,grossHaul=net*cap,travelCost=travel.mode==='standard'?2*travelCosts[travel.country]:0,haul=grossHaul-travelCost,fullHaul=haul,cash=buy*cap,proceeds=(sell-fee)*cap;
   const depart=pred?.status==='experimental'?pred.expected_start_at-(minutes+travelNum(travel.buffer))*60:null;
   travel.departure=depart&&depart>Date.now()/1000+30?depart:0;travel.armed=false;travelSave();
-  show({minutes,depart,arrive:depart?depart+minutes*60:Date.now()/1000+minutes*60,flight,stock:{quantity:latest?.quantity,observed_at:latest?.source_observed_at},pred,buy,sell,gross,fee,net,haul,grossHaul,travelCost,fullHaul,cash,proceeds,qty,issues});
+  show({minutes,depart,arrive:depart?depart+minutes*60:Date.now()/1000+minutes*60,flight,stock:{quantity:latest?.quantity,observed_at:latest?.source_observed_at},metrics,pred,buy,sell,gross,fee,net,haul,grossHaul,travelCost,fullHaul,cash,proceeds,qty,issues});
   info.textContent=issues.length?'Partial API data · See warnings':'Updated '+new Date().toLocaleTimeString();
  }
  country.onchange=()=>{travel.country=country.value;travel.item='';travelSave();populate()};
