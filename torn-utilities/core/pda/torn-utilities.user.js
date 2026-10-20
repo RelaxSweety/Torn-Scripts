@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.26
+// @version      0.4.27
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -26,7 +26,7 @@ const TU_TERMS_VERSION='2026-10-20';
   ];
   const hasAgreement=()=>localStorage.getItem(TU_TERMS_KEY)===TU_TERMS_VERSION;
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.4.26';
+  const TU_VERSION='0.4.27';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -315,7 +315,7 @@ const TU_TERMS_VERSION='2026-10-20';
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.26 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.27 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
@@ -528,7 +528,7 @@ const TU_TERMS_VERSION='2026-10-20';
       }
       }
     }else{
-      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.26 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.27 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
       if(hasAgreement())content.append(makeButton('Update Public API Key',()=>{const entered=prompt('Enter a public/scoped Torn API key (never a full-access key):','');if(entered===null)return;const key=entered.trim();if(!/^[a-zA-Z0-9]{12,32}$/.test(key))return alert('Invalid API key format');localStorage.setItem(USER_PUBLIC_KEY_STORAGE,key);playerInfo=null;updatePlayer();alert('Public API key saved locally.');}));
       const termsHeading=document.createElement('h3');termsHeading.textContent='Terms of Use and Information Use Agreement';content.append(termsHeading);appendTerms(content);if(!hasAgreement())content.append(makeButton('Review and Accept Terms',showAgreement));
       const guideLink=document.createElement('a');guideLink.href='https://github.com/RelaxSweety/Torn-Scripts/blob/main/torn-utilities/INSTALLATION.md';guideLink.target='_blank';guideLink.rel='noopener noreferrer';guideLink.textContent='TU Installation & Module Setup Guide ↗';guideLink.style.cssText='display:block;margin:12px 0;padding:12px;border:1px solid #806a3e;border-radius:8px;color:#e4c779;text-decoration:underline;font-weight:600';content.append(guideLink);
@@ -560,7 +560,7 @@ const TU_TERMS_VERSION='2026-10-20';
   panel.querySelector('.tu-close').addEventListener('click', () => { closePanel(); });
   panel.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => {if(!hasAgreement()&&b.dataset.tab!=='about'){showAgreement();return;}render(b.dataset.tab);}));
   // Shared floating-window support for TU module panels.
-  const floatIds=['tuim-panel','tuac-panel','tca-panel','tu-pda-panel','sff-root','tpfg-manager'];
+  const floatIds=['tuim-panel','tuac-panel','tca-panel','tu-pda-panel','sff-root','tpfg-manager','tpfg-root'];
   const floatingSetup=new WeakSet();
   const setupFloating=el=>{
     if(!el||floatingSetup.has(el))return;
@@ -594,7 +594,28 @@ const TU_TERMS_VERSION='2026-10-20';
     const end=e=>{if(drag?.id===e.pointerId)drag=null};
     bar.addEventListener('pointerup',end);bar.addEventListener('pointercancel',end);
   };
-  const enhanceFloating=()=>floatIds.forEach(id=>setupFloating(document.getElementById(id)));
+  // Apply a consistent TU window treatment to game panels without changing gameplay DOM.
+  const gameTitles={'flight-game':'Flight Game','stick-fighter':'Stick Fighter','torn-snake':'Slithering Streets','tic-tac-toe':'Tic-Tac-Toe','torn-four':'Torn Four','torn-fleet':'Torn Fleet','chaos-marbles':'Chaos Marbles'};
+  const gameWindowSetup=new WeakSet();
+  const enhanceGameWindows=()=>{
+    if(!active||!gameTitles[active])return;
+    const gamePanels=[...moduleHost.children].filter(el=>el.getClientRects().length&&el.querySelector('button'));
+    for(const el of gamePanels){
+      if(gameWindowSetup.has(el))continue;
+      gameWindowSetup.add(el);
+      el.style.boxSizing='border-box';
+      el.style.maxWidth='calc(100vw - 12px)';
+      el.style.maxHeight='calc(100dvh - 12px)';
+      el.style.overflow='auto';
+      el.style.resize='both';
+      el.style.borderRadius='12px';
+      el.style.borderColor='#a88a49';
+      // Existing game controls stay intact; diagnostics are a separate Manager page.
+      const bar=el.querySelector('header,.tu-header,[style*="sticky"]')||el.firstElementChild;
+      if(bar&&bar!==el){bar.style.position='sticky';bar.style.top='0';bar.style.zIndex='20';bar.style.background=bar.style.background||'#20252e';}
+    }
+  };
+  const enhanceFloating=()=>{floatIds.forEach(id=>setupFloating(document.getElementById(id)));enhanceGameWindows();};
   enhanceFloating();
   const floatingObserver=new MutationObserver(enhanceFloating);
   floatingObserver.observe(document.body,{childList:true,subtree:true});
