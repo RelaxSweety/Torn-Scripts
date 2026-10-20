@@ -1,9 +1,11 @@
 // ==UserScript==
 // @name         Torn Multi-Chat Archiver PDA
 // @namespace    RelaxSweety.Torn
-// @version      0.1.7
+// @version      0.1.8
 // @description  Mobile/PDA chat archiver based on desktop v1.9; touch-friendly controls
 // @match        https://www.torn.com/*
+// @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/chat-archiver/pda/src/torn-multi-chat-archiver-pda.user.js
+// @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/chat-archiver/pda/src/torn-multi-chat-archiver-pda.user.js
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -3538,7 +3540,7 @@
       const panel=document.getElementById('tca-panel'); if(panel) panel.style.display='none';
       const playbar=document.getElementById('tca-playbar'); if(playbar) playbar.style.display='none';
     }
-    const definition={id:'chat-archiver',version:'0.1.7',activate:activateFromTU,deactivate:deactivateFromTU};
+    const definition={id:'chat-archiver',version:'0.1.8',activate:activateFromTU,deactivate:deactivateFromTU};
     function registerTU(){if(window.TornUtilities?.register) window.TornUtilities.register(definition);}
     window.addEventListener('torn-utilities-ready',registerTU); registerTU();
 
