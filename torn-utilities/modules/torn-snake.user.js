@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Slithering Streets
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.2.12
+// @version      0.2.13
 // @description  Torn Utilities mobile-friendly Snake arcade
 // @match        https://www.torn.com/*
 // @grant        unsafeWindow
