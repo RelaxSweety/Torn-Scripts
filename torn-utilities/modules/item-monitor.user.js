@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.10.7
+// @version      1.10.8
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -360,7 +360,7 @@ function foreignShopDiagnostic(){
  const headerSamples=labels.map(e=>({label:norm(text(e)),element:shape(e),parent:shape(e.parentElement),grandparent:shape(e.parentElement?.parentElement),siblings:[...e.parentElement?.children||[]].slice(0,8).map(x=>({element:shape(x),label:tokens.has(norm(text(x)))?norm(text(x)):null})),nearbyRows:[...e.parentElement?.parentElement?.children||[]].slice(0,5).map(shape)}));
  const structuralSamples=[...document.querySelectorAll('table,[role="table"],[class*="shop"],[class*="Shop"],[class*="stock"],[class*="Stock"]')].filter(visible).slice(0,25).map(shape);
  const country=travel.country;
- return JSON.stringify({version:'1.10.6',countrySelection:country,path:location.pathname,detectedShops:foreignShopTables().length,visibleElements:all.length,headerLabelsFound:labels.length,headerSamples,structuralSamples},null,2);
+ return JSON.stringify({version:'1.10.8',countrySelection:country,path:location.pathname,detectedShops:foreignShopTables().length,shopRows:foreignShopTables().reduce((n,x)=>n+x.rows.length,0),catalogLoaded:!!stockCatalogMap,matchedRows:stockCatalogMap?foreignShopSnapshot()?.rows.length:null,reportingEnabled:stockReportingEnabled(),reportingStatus:stockReportStatus,visibleElements:all.length,headerLabelsFound:labels.length,headerSamples,structuralSamples},null,2);
 }
 function foreignShopCountry(){
  const shops=foreignShopTables();if(!shops.length)return null;
@@ -413,10 +413,10 @@ function foreignShopSnapshot(){
    if(!nameCell||!stockCell||!costCell)continue;
    const id=foreignItemId(nameCell);if(!id||seen.has(id))continue;
    const quantityLabel=text(stockCell).replace(/stock/ig,'').replace(/,/g,'').trim();
-   const quantityMatch=quantityLabel.match(/\\b(\\d+)\\b/);
+   const quantityMatch=quantityLabel.match(/\b(\d+)\b/);
    if(!quantityMatch)continue;
    const quantity=Number(quantityMatch[1]);
-   const priceMatch=text(costCell).match(/\\$\\s*([\\d,]+)/);
+   const priceMatch=text(costCell).match(/\$\s*([\d,]+)/);
    const unit_price=priceMatch?Number(priceMatch[1].replace(/,/g,'')):null;
    if(!Number.isSafeInteger(quantity)||quantity<0)continue;
    seen.add(id);rows.push({item_id:id,quantity,unit_price,node:nameCell});
@@ -538,7 +538,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.10.7');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.10.8');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
@@ -713,5 +713,5 @@ function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=loa
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
 function deactivate(){travelClose();state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.10.7',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'1.10.8',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
