@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.10.15
+// @version      1.10.16
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -352,7 +352,7 @@ function foreignShopTables(){
  return found;
 }
 function foreignShopDiagnostic(){
- const report={version:'1.10.15',timestamp:new Date().toISOString(),countrySelection:travel.country,path:location.pathname,reportingEnabled:stockReportingEnabled(),reportingBusy:stockReportingBusy,reportingStatus:stockReportStatus,endpointConfigured:!!stockEndpoint,catalogLoaded:!!stockCatalogMap,catalogSize:stockCatalogMap?.size||0,queueBatches:load(stockQueueKey,[]).length,checks:document.querySelectorAll('[data-tu-stock-reported]').length,shops:[],errors:[]};
+ const report={version:'1.10.16',timestamp:new Date().toISOString(),countrySelection:travel.country,path:location.pathname,reportingEnabled:stockReportingEnabled(),reportingBusy:stockReportingBusy,reportingStatus:stockReportStatus,endpointConfigured:!!stockEndpoint,catalogLoaded:!!stockCatalogMap,catalogSize:stockCatalogMap?.size||0,queueBatches:load(stockQueueKey,[]).length,checks:document.querySelectorAll('[data-tu-stock-reported]').length,shops:[],errors:[]};
  const safe=(fn,fallback=null)=>{try{return fn()}catch(e){report.errors.push(String(e?.message||e));return fallback}};
  const sample=e=>e?{tag:e.tagName,cls:String(e.className||'').slice(0,90),text:String(text(e)).slice(0,100),title:e.getAttribute?.('title')?.slice(0,100)||null,aria:e.getAttribute?.('aria-label')?.slice(0,100)||null,html:String(e.outerHTML||'').slice(0,320)}:null;
  const shops=safe(()=>foreignShopTables(),[])||[];
@@ -584,7 +584,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.10.15');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.10.16');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
@@ -602,7 +602,7 @@ function travelUI(){
  const info=E('small',body,'Loading item catalog...');
  const output=E('div',body);output.className='tuim-travel-output';
  const reportingPanel=E('div',body);reportingPanel.className='tuim-travel-output';
- const timeLabel=E('label',body,'Time display (shared TU preference)');const timeSelect=E('select',timeLabel);for(const [v,n] of [['local','Local time'],['tct','Torn City Time (TCT / UTC)']]){const o=E('option',timeSelect,n);o.value=v}timeSelect.value=localStorage.getItem('tu-time-display')||'local';timeSelect.onchange=()=>{localStorage.setItem('tu-time-display',timeSelect.value);refresh()};
+ window.addEventListener('tu-time-display-changed',()=>{if(w.isConnected)refresh()},{signal:undefined});
  const actions=E('div',body);actions.className='tuim-travel-actions';
  B(actions,'Refresh travel plan',refresh);
  B(actions,'Arm departure reminder',()=>{if(!travel.departure||travel.departure*1000<=Date.now()+30000)return alert('No future recommended departure');travel.armed=true;travelAlerted=0;travelSave();alert('Reminder armed; keep PDA active')});
