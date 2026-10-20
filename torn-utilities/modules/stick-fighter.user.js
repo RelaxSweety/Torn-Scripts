@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Stick Fighter
 // @namespace    https://www.torn.com/
-// @version      0.2.4
+// @version      0.2.5
 // @description  Standalone TU Stick Fighter module, playable anytime
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
