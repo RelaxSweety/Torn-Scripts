@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.29
+// @version      0.4.30
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -29,7 +29,7 @@ const TU_TERMS_VERSION='2026-10-20';
   async function serverAgreement(key,accept){const response=await fetch(ACCESS_URL+(accept?'':'?check=1'),{method:accept?'POST':'GET',headers:{'content-type':'application/json','x-torn-public-key':key},...(accept?{body:JSON.stringify({accepted:true,version:TU_TERMS_VERSION})}:{})});let data={};try{data=await response.json()}catch{}if(!response.ok||!data.accessConfirmed)throw Error(data.error||'Backend confirmation failed ('+response.status+')');return data;}
 
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.4.29';
+  const TU_VERSION='0.4.30';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -318,7 +318,7 @@ const TU_TERMS_VERSION='2026-10-20';
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.29 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.30 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
@@ -538,8 +538,18 @@ const TU_TERMS_VERSION='2026-10-20';
       }
       }
     }else{
-      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.29 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
-      if(hasAgreement())content.append(makeButton('Update Public API Key',()=>{const entered=prompt('Enter a public/scoped Torn API key (never a full-access key):','');if(entered===null)return;const key=entered.trim();if(!/^[a-zA-Z0-9]{12,32}$/.test(key))return alert('Invalid API key format');localStorage.setItem(USER_PUBLIC_KEY_STORAGE,key);playerInfo=null;updatePlayer();alert('Public API key saved locally.');}));
+      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.30 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      {
+        const apiSection=document.createElement('section');apiSection.style.cssText='border:1px solid #806a3e;border-radius:8px;padding:12px;margin:12px 0';
+        const title=document.createElement('h3');title.textContent='Public Only Torn API Key';apiSection.append(title);
+        const note=document.createElement('p');note.textContent='Manage the key stored by TU on this device. A key supplied by Torn PDA itself is managed in PDA settings.';apiSection.append(note);
+        const field=document.createElement('input');field.type='password';field.autocomplete='off';field.spellcheck=false;field.value=localStorage.getItem(USER_PUBLIC_KEY_STORAGE)||'';field.placeholder=getPublicApiKey()?'PDA-provided key (not stored by TU)':'No TU API key saved';field.style.cssText='width:100%;box-sizing:border-box;padding:10px';apiSection.append(field);
+        const buttons=document.createElement('div');buttons.style.cssText='display:flex;flex-wrap:wrap;gap:8px;margin-top:10px';
+        const view=makeButton('Show API Key',()=>{field.type=field.type==='password'?'text':'password';view.textContent=field.type==='password'?'Show API Key':'Hide API Key';});
+        const save=makeButton('Save / Update',()=>{const key=field.value.trim();if(!/^[A-Za-z0-9]{16}$/.test(key))return alert('Enter a valid 16-character Public Only API key.');localStorage.setItem(USER_PUBLIC_KEY_STORAGE,key);field.value=key;field.type='password';view.textContent='Show API Key';playerInfo=null;updatePlayer();alert('TU API key saved on this device.');});
+        const del=makeButton('Delete Saved API Key',()=>{if(!localStorage.getItem(USER_PUBLIC_KEY_STORAGE))return alert('No TU-saved key to delete.');if(!confirm('Delete the API key saved by TU on this device? This will not delete a key configured separately in Torn PDA.'))return;localStorage.removeItem(USER_PUBLIC_KEY_STORAGE);field.value='';field.type='password';view.textContent='Show API Key';playerInfo=null;render('about');});
+        buttons.append(view,save,del);apiSection.append(buttons);content.append(apiSection);
+      }
       const termsHeading=document.createElement('h3');termsHeading.textContent='Terms of Use and Information Use Agreement';content.append(termsHeading);appendTerms(content);if(!hasAgreement())content.append(makeButton('Review and Accept Terms',showAgreement));
       const guideLink=document.createElement('a');guideLink.href='https://github.com/RelaxSweety/Torn-Scripts/blob/main/torn-utilities/INSTALLATION.md';guideLink.target='_blank';guideLink.rel='noopener noreferrer';guideLink.textContent='TU Installation & Module Setup Guide ↗';guideLink.style.cssText='display:block;margin:12px 0;padding:12px;border:1px solid #806a3e;border-radius:8px;color:#e4c779;text-decoration:underline;font-weight:600';content.append(guideLink);
       // Official-style vector marks; no remote image dependencies.
