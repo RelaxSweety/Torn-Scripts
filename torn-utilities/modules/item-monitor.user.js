@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.10.0
+// @version      1.10.1
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -298,7 +298,7 @@ function stockHistoryMetrics(history){
  const points=Array.isArray(history?.points)?history.points:[];
  const sorted=points.filter(p=>Number.isFinite(Number(p.quantity))&&Number(p.source_observed_at)>0).sort((a,b)=>Number(a.source_observed_at)-Number(b.source_observed_at));
  const sources={dom:0,api:0,other:0};
- for(const p of sorted){const src=String(p.source||p.observation_source||p.source_type||'').toLowerCase();if(/dom|direct|tu/.test(src))sources.dom++;else if(/yata|api/.test(src))sources.api++;else sources.other++}
+ for(const p of sorted){const src=String(p.provider||p.source||p.observation_source||p.source_type||'').toLowerCase();if(/dom|direct|tu/.test(src))sources.dom++;else if(/yata|api/.test(src))sources.api++;else sources.other++}
  const latest=sorted[sorted.length-1];let rate=0,intervals=0,increases=0;
  for(let i=1;i<sorted.length;i++){
   const a=sorted[i-1],b=sorted[i],dt=Number(b.source_observed_at)-Number(a.source_observed_at),dq=Number(a.quantity)-Number(b.quantity);
@@ -519,7 +519,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.10.0');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.10.1');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
