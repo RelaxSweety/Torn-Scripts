@@ -501,6 +501,12 @@
         const refresh=makeButton('',refreshRegistry);refresh.style.marginLeft='0';refresh.disabled=registryRefreshing;refresh.innerHTML='<span class="tu-refresh-icon'+(registryRefreshing?' tu-spinning':'')+'">↻</span> '+(registryRefreshing?'Refreshing…':'Refresh catalog');refreshRow.append(refresh);content.append(refreshRow);
       }
     }else if(tab==='settings'){
+      const timeHeading=document.createElement('strong');timeHeading.textContent='Time Display';content.append(timeHeading);
+      const timeDescription=document.createElement('p');timeDescription.textContent='Choose one timezone for TU travel estimates and observation timestamps.';content.append(timeDescription);
+      const timeSelect=document.createElement('select');timeSelect.setAttribute('aria-label','TU time display');timeSelect.style.cssText='width:100%;padding:9px;margin:8px 0 18px';
+      for(const [value,label] of [['local','Local Time (device)'],['tct','Torn City Time (TCT / UTC)']]){const option=document.createElement('option');option.value=value;option.textContent=label;timeSelect.append(option)}
+      timeSelect.value=localStorage.getItem('tu-time-display')==='tct'?'tct':'local';
+      timeSelect.addEventListener('change',()=>{localStorage.setItem('tu-time-display',timeSelect.value);pageWindow.dispatchEvent(new CustomEvent('tu-time-display-changed',{detail:{mode:timeSelect.value}}))});content.append(timeSelect);
       const headingAuth=document.createElement('strong');headingAuth.textContent='Torn Public Only API Key';content.append(headingAuth);
       const notice=document.createElement('p');notice.textContent='Key sent to Torn over HTTPS. Optional saved Public Only key is stored locally without encryption or a passphrase, excluded from TU backups, and never shared by TU. Other scripts running on Torn pages may be able to read browser storage. This verification does not grant WHO server access.';content.append(notice);
       const form=document.createElement('form');form.autocomplete='off';
