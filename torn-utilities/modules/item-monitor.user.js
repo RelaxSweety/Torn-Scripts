@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.10.10
+// @version      1.10.11
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -351,16 +351,26 @@ function foreignShopTables(){
  return found;
 }
 function foreignShopDiagnostic(){
- // Capture structural clues only. Never include entire page text, API keys, or player data.
- const visible=e=>!!e?.getClientRects?.().length&&!e.closest('#tuim-panel,#tuim-travel-window');
- const tokens=new Set(['item','name','stock','cost','buy']);
- const all=[...document.querySelectorAll('body *')].filter(visible);
- const labels=all.filter(e=>e.parentElement&&e.children.length<=2&&tokens.has(norm(text(e)))).slice(0,12);
- const shape=e=>e?({tag:e.tagName,cls:String(e.className||'').slice(0,110),role:e?.getAttribute?.('role')??null,children:e.children.length}):null;
- const headerSamples=labels.filter(e=>e.parentElement).map(e=>({label:norm(text(e)),element:shape(e),parent:shape(e.parentElement),grandparent:shape(e.parentElement?.parentElement),siblings:[...(e.parentElement?.children||[])].slice(0,8).map(x=>({element:shape(x),label:tokens.has(norm(text(x)))?norm(text(x)):null})),nearbyRows:[...(e.parentElement?.parentElement?.children||[])].slice(0,5).map(shape)}));
- const structuralSamples=[...document.querySelectorAll('table,[role="table"],[class*="shop"],[class*="Shop"],[class*="stock"],[class*="Stock"]')].filter(visible).slice(0,25).map(shape);
- const country=travel.country;
- return JSON.stringify({version:'1.10.10',countrySelection:country,path:location.pathname,detectedShops:foreignShopTables().length,shopRows:foreignShopTables().reduce((n,x)=>n+x.rows.length,0),catalogLoaded:!!stockCatalogMap,matchedRows:stockCatalogMap?foreignShopSnapshot()?.rows.length:null,reportingEnabled:stockReportingEnabled(),reportingStatus:stockReportStatus,visibleElements:all.length,headerLabelsFound:labels.length,headerSamples,structuralSamples},null,2);
+ const report={version:'1.10.11',timestamp:new Date().toISOString(),countrySelection:travel.country,path:location.pathname,reportingEnabled:stockReportingEnabled(),reportingBusy:stockReportingBusy,reportingStatus:stockReportStatus,catalogLoaded:!!stockCatalogMap,catalogSize:stockCatalogMap?.size||0,queueBatches:load(stockQueueKey,[]).length,checks:document.querySelectorAll('[data-tu-stock-reported]').length,shops:[],errors:[]};
+ const safe=(fn,fallback=null)=>{try{return fn()}catch(e){report.errors.push(String(e?.message||e));return fallback}};
+ const sample=e=>e?{tag:e.tagName,cls:String(e.className||'').slice(0,90),text:String(text(e)).slice(0,100),title:e.getAttribute?.('title')?.slice(0,100)||null,aria:e.getAttribute?.('aria-label')?.slice(0,100)||null,html:String(e.outerHTML||'').slice(0,320)}:null;
+ const shops=safe(()=>foreignShopTables(),[])||[];
+ report.detectedShops=shops.length;
+ report.detectedCountry=safe(()=>foreignShopCountry());
+ for(const shop of shops){
+  const data={kind:shop.kind,headers:shop.headers,rowCount:shop.rows.length,rows:[]};
+  for(const row of shop.rows.slice(0,5)){
+   safe(()=>{
+    const cells=[...row.children],name=shop.kind==='torn-abroad'?row.querySelector('[class*="tabletColB"]'):cells[shop.headers.indexOf('name')],stock=shop.kind==='torn-abroad'?row.querySelector('[class*="tabletColC"]'):cells[shop.headers.indexOf('stock')],cost=shop.kind==='torn-abroad'?row.querySelector('[class*="tabletColD"]'):cells[shop.headers.indexOf('cost')];
+    const entry={name:sample(name),stock:sample(stock),cost:sample(cost),itemId:stockCatalogMap&&name?safe(()=>foreignItemId(name)):null,quantityText:stock?text(stock).replace(/stock/ig,'').trim():null,quantityMatch:stock?text(stock).replace(/stock/ig,'').replace(/,/g,'').match(/\b(\d+)\b/)?.[1]??null:null,mark:!!name?.querySelector('[data-tu-stock-reported]')};
+    data.rows.push(entry);
+   });
+  }
+  report.shops.push(data);
+ }
+ report.totalRows=shops.reduce((n,x)=>n+x.rows.length,0);
+ report.matchedRows=stockCatalogMap?safe(()=>foreignShopSnapshot()?.rows.length):null;
+ return JSON.stringify(report,null,2);
 }
 function foreignShopCountry(){
  const shops=foreignShopTables();if(!shops.length)return null;
@@ -393,7 +403,7 @@ function foreignItemId(cell){
    if(m&&stockCatalogIds?.has(Number(m[1])))return Number(m[1]);
   }
  }
- const labels=[cell.getAttribute('title'),cell.getAttribute('aria-label'),...cell.querySelectorAll('[title],[aria-label],img[alt]').values()].map(x=>typeof x==='string'?x:(x.getAttribute('title')||x.getAttribute('aria-label')||x.getAttribute('alt'))).filter(Boolean);
+ const labels=[cell.getAttribute('title'),cell.getAttribute('aria-label'),...cell.querySelectorAll('[title],[aria-label],img[alt]')].map(x=>typeof x==='string'?x:(x?.getAttribute?.('title')||x?.getAttribute?.('aria-label')||x?.getAttribute?.('alt'))).filter(Boolean);
  labels.push(text(cell));
  for(const label of labels){const key=norm(label).replace(/\s*[.…]+$/,'').trim();if(stockCatalogMap.has(key))return stockCatalogMap.get(key)}
  // Truncated names are only matched if exactly one catalog entry shares the prefix.
@@ -538,7 +548,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.10.10');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.10.11');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
@@ -722,5 +732,5 @@ function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=loa
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
 function deactivate(){travelClose();state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.10.10',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'1.10.11',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
