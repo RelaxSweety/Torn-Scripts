@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Flight Game
 // @namespace    https://www.torn.com/
-// @version      0.12.5
+// @version      0.12.6
 // @description  Standalone TU Flight Game module, playable anytime
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
