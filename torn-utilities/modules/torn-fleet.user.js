@@ -56,7 +56,7 @@ const roomInfo=E("div",panel);roomInfo.className="room";const playerInfo=E("div"
 render();if(session)action("/"+session.room+"/state");timer=setInterval(()=>{if(session&&panel)action("/"+session.room+"/state")},2500);
 }
 function deactivate(){clearInterval(timer);timer=null;panel?.remove();panel=null;mount=null;context=null}
-const register=()=>(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register({id:ID,version:"0.2.3",activate,deactivate});
+const register=()=>(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register({id:ID,version:"0.2.4",activate,deactivate});
 if(!register())window.addEventListener("torn-utilities-ready",register,{once:true});
   // TU cross-world registration: retry after manager startup and SPA initialization.
   // Stop once this exact module is visible in the shared manager registry.
