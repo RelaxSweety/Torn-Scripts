@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.10.13
+// @version      1.10.14
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -352,7 +352,7 @@ function foreignShopTables(){
  return found;
 }
 function foreignShopDiagnostic(){
- const report={version:'1.10.13',timestamp:new Date().toISOString(),countrySelection:travel.country,path:location.pathname,reportingEnabled:stockReportingEnabled(),reportingBusy:stockReportingBusy,reportingStatus:stockReportStatus,endpointConfigured:!!stockEndpoint,catalogLoaded:!!stockCatalogMap,catalogSize:stockCatalogMap?.size||0,queueBatches:load(stockQueueKey,[]).length,checks:document.querySelectorAll('[data-tu-stock-reported]').length,shops:[],errors:[]};
+ const report={version:'1.10.14',timestamp:new Date().toISOString(),countrySelection:travel.country,path:location.pathname,reportingEnabled:stockReportingEnabled(),reportingBusy:stockReportingBusy,reportingStatus:stockReportStatus,endpointConfigured:!!stockEndpoint,catalogLoaded:!!stockCatalogMap,catalogSize:stockCatalogMap?.size||0,queueBatches:load(stockQueueKey,[]).length,checks:document.querySelectorAll('[data-tu-stock-reported]').length,shops:[],errors:[]};
  const safe=(fn,fallback=null)=>{try{return fn()}catch(e){report.errors.push(String(e?.message||e));return fallback}};
  const sample=e=>e?{tag:e.tagName,cls:String(e.className||'').slice(0,90),text:String(text(e)).slice(0,100),title:e.getAttribute?.('title')?.slice(0,100)||null,aria:e.getAttribute?.('aria-label')?.slice(0,100)||null,html:String(e.outerHTML||'').slice(0,320)}:null;
  const shops=safe(()=>foreignShopTables(),[])||[];
@@ -537,35 +537,46 @@ async function retryStockQueue(){
 setInterval(()=>{if(load(stockQueueKey,[]).length)retryStockQueue()},15000);
 window.addEventListener('online',retryStockQueue);
 window.addEventListener('pageshow',retryStockQueue);
+let lastVisibleInventory=null,lastVisibleUploadAt=0;
+function visibleInventorySignature(snap){
+ return snap.country+'|'+snap.rows.map(r=>r.item_id+':'+r.quantity+':'+(r.unit_price??'')).sort().join('|');
+}
 async function reportForeignShop(){
  if(!stockReportingEnabled()||stockReportingBusy||document.hidden)return;
+ if(Date.now()-lastVisibleUploadAt<5000)return;
  stockReportingBusy=true;
  try{
   const country=foreignShopCountry();
-  if(!country){setStockReportStatus('Foreign shop not detected; verify destination in Travel Assistant');return}
-  setStockReportStatus('Reading shop inventory...');
+  if(!country){lastVisibleInventory=null;return}
   try{await ensureStockCatalog()}catch(e){setStockReportStatus('Catalog unavailable; using DOM item IDs: '+e.message)}
   const snap=foreignShopSnapshot();
-  if(!snap?.rows.length){setStockReportStatus('No shop rows recognized — nothing archived');return}
+  if(!snap?.rows.length)return;
+  const signature=visibleInventorySignature(snap);
+  if(lastVisibleInventory===null){
+   lastVisibleInventory=signature;
+   setStockReportStatus('Inventory baseline captured · waiting for visible changes');
+   return;
+  }
+  if(signature===lastVisibleInventory)return;
   const observed_at=Math.floor(Date.now()/1000);
   const rows=snap.rows.slice(0,50);
   const batch={country:snap.country,observed_at,items:rows.map(({item_id,quantity,unit_price})=>({item_id,quantity,unit_price}))};
+  lastVisibleInventory=signature;
+  lastVisibleUploadAt=Date.now();
   markStockArchived(rows,observed_at);
-  // Send new DOM readings immediately; only persist locally if delivery fails.
-  // Flush older pending observations separately without blocking the live sample.
   try{
    await deliverStockBatch(batch);
    confirmStockMarks(batch);
-   setStockReportStatus('Live DOM: '+rows.length+' observations acknowledged · '+load(stockQueueKey,[]).length+' older batches pending');
+   setStockReportStatus('Inventory changed: '+rows.length+' observations acknowledged · '+load(stockQueueKey,[]).length+' older batches pending');
    if(load(stockQueueKey,[]).length)retryStockQueue();
   }catch(e){
    storeStockSnapshot(batch);
-   setStockReportStatus('Live DOM: delivery failed ('+e.message+') · saved '+rows.length+' observations locally · '+load(stockQueueKey,[]).length+' pending batches');
+   setStockReportStatus('Changed inventory: delivery failed ('+e.message+') · saved '+rows.length+' observations locally · '+load(stockQueueKey,[]).length+' pending batches');
   }
  }catch(e){setStockReportStatus('Archive error: '+e.message);console.warn('[TU Stock Reporter]',e)}
  finally{stockReportingBusy=false}
 }
-setInterval(reportForeignShop,10000);
+setInterval(reportForeignShop,1000);
 let travelWindow=null,travelEpoch=0;
 function travelClose(){travelEpoch++;travelWindow?.remove();travelWindow=null}
 function travelUI(){
@@ -573,7 +584,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.10.13');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.10.14');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
