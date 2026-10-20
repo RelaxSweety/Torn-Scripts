@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.10.4
+// @version      1.10.5
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        none
@@ -342,6 +342,12 @@ function foreignShopTables(){
  // Keep only the most specific matching container for each row.
  const used=new Set();return found.map(t=>({...t,rows:t.rows.filter(r=>{if(used.has(r))return false;used.add(r);return true})})).filter(t=>t.rows.length);
 }
+function foreignShopDiagnostic(){
+ const candidates=[...document.querySelectorAll('table,[role="table"],tr,[role="row"],div,section,ul,li')].filter(e=>!e.closest('#tuim-panel,#tuim-travel-window')&&e.getClientRects().length);
+ const headers=candidates.filter(e=>{const t=norm(text(e));return t.length<180&&/\\bname\\b/.test(t)&&/\\bstock\\b/.test(t)&&/\\bcost\\b/.test(t)&&/\\bbuy\\b/.test(t)}).sort((a,b)=>text(a).length-text(b).length).slice(0,5);
+ const sample=headers.map(h=>({tag:h.tagName,classes:String(h.className||'').slice(0,100),children:[...h.children].slice(0,9).map(x=>({tag:x.tagName,cls:String(x.className||'').slice(0,60),text:text(x).trim().slice(0,90)})),parentTag:h.parentElement?.tagName,parentClass:String(h.parentElement?.className||'').slice(0,100),siblings:[...h.parentElement?.children||[]].slice(0,5).map(x=>({tag:x.tagName,cls:String(x.className||'').slice(0,60),text:text(x).trim().slice(0,100)}))}));
+ return JSON.stringify({version:'1.10.5',countrySelection:travel.country,path:location.pathname,detectedShops:foreignShopTables().length,visibleElements:candidates.length,headerCandidates:sample},null,2);
+}
 function foreignShopCountry(){
  const shops=foreignShopTables();if(!shops.length)return null;
  const pageText=[document.title,document.querySelector('main')?.innerText?.slice(0,1200)||'',...document.querySelectorAll('h1,h2,h3,[class*="country"],[class*="location"]')].map(e=>typeof e==='string'?e:(e.getClientRects().length?text(e):'')).join(' ').toLowerCase();
@@ -512,7 +518,7 @@ function travelUI(){
  if(travelWindow?.isConnected){travelWindow.hidden=false;return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.10.4');B(head,'×',travelClose);
+ E('strong',head,'Travel Assistant v1.10.5');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
@@ -546,6 +552,7 @@ function travelUI(){
   toggle.setAttribute('aria-pressed',String(stockReportingEnabled()));
   const details=E('div',panel);details.hidden=true;
   B(row,'ⓘ Info',()=>{details.hidden=!details.hidden});
+  B(row,'Copy shop diagnostics',async()=>{const report=foreignShopDiagnostic();try{await navigator.clipboard.writeText(report);setStockReportStatus('Shop diagnostics copied — paste into ChatGPT')}catch(e){const output=E('textarea',panel);output.value=report;output.readOnly=true;output.style.cssText='width:100%;min-height:150px';output.focus();output.select();setStockReportStatus('Copy diagnostics from the text field below')}});
   E('small',details,'Optional and off by default. When enabled and a supported foreign item shop is open, TU reads visible item IDs, inventory quantities, prices, country and observation timestamps every 10 seconds. These are sent to the TU server to improve stock, depletion and restock forecasts. Player information is not transmitted. An orange check indicates pending server delivery; green indicates a server acknowledgment. Failed uploads are retained locally for retry. Reporting stops when the shop is not visible or you disable it. Data may still be associated with network metadata handled by the hosting provider.');
   E('small',panel,stockReportingEnabled()?'DOM observations: orange = queued, green = D1 accepted. API/YATA observations are separate server-sourced data.':'DOM reporting disabled; server API/YATA data is separate');
   const status=E('small',panel,stockReportingEnabled()?stockReportStatus:'Reporting disabled');status.id='tuim-stock-report-status';
@@ -686,5 +693,5 @@ function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=loa
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
 function deactivate(){travelClose();state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.10.4',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'1.10.5',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
