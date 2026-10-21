@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.33
+// @version      0.4.34
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -282,7 +282,7 @@ const TU_TERMS_VERSION='2026-10-20';
     moduleHost.hidden=false;
     try {
       active=id;
-      mod.activate(Object.freeze({mount:moduleHost, close:()=>{stopModule();panel.hidden=false;viewModule=null;render('modules');syncLauncher();},minimize:()=>{panel.hidden=true;syncLauncher();}}));
+      mod.activate(Object.freeze({mount:moduleHost, close:()=>{stopModule();panel.hidden=false;viewModule=null;render('modules');syncLauncher();},minimize:()=>{tuMinimize();syncLauncher();}}));
       return true;
     } catch(e) {
       console.error('[TU] module activation failed', id, e);
@@ -294,6 +294,17 @@ const TU_TERMS_VERSION='2026-10-20';
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch {}
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch {} };
+  const tuNav={history:[],current:'tu-pda-panel',minimized:true,exited:true};
+  const tuRoots=['tu-pda-panel','tuim-panel','tuim-catalog','tuac-panel','tca-panel','tca-playbar','tpfg-root','tpfg-manager','tpfg-prompt','sff-root','tu-diagnostics-window'];
+  const tuRoot=id=>document.getElementById(id);
+  const tuHideAll=()=>tuRoots.forEach(id=>{const el=tuRoot(id);if(el)el.hidden=true;});
+  const tuShow=id=>{const el=tuRoot(id);if(!el)return false;tuHideAll();el.hidden=false;tuNav.current=id;tuNav.minimized=false;tuNav.exited=false;return true;};
+  const tuOpen=id=>{if(tuNav.current!==id&&tuRoot(tuNav.current))tuNav.history.push(tuNav.current);return tuShow(id);};
+  const tuBack=()=>{while(tuNav.history.length){const id=tuNav.history.pop();if(tuRoot(id))return tuShow(id);}return tuShow('tu-pda-panel');};
+  const tuMinimize=()=>{tuNav.minimized=true;tuHideAll();launcher.hidden=false;};
+  const tuExit=()=>{tuNav.history.length=0;tuNav.current='tu-pda-panel';tuNav.exited=true;tuMinimize();stopModule();};
+  const tuRestore=()=>{if(tuNav.exited){tuNav.history.length=0;tuNav.current='tu-pda-panel';render('modules');}return tuShow(tuRoot(tuNav.current)?tuNav.current:'tu-pda-panel');};
+  window.TUWindowNavigation=Object.freeze({open:tuOpen,back:tuBack,minimize:tuMinimize,exit:tuExit,restore:tuRestore});
   const style = document.createElement('style');
   style.textContent = `
 #tu-pda-panel .tu-refresh-icon{display:inline-block}#tu-pda-panel .tu-spinning{animation:tu-refresh-spin .8s linear infinite}@keyframes tu-refresh-spin{to{transform:rotate(360deg)}}
@@ -303,7 +314,7 @@ const TU_TERMS_VERSION='2026-10-20';
 #tu-pda-panel{position:fixed;z-index:2147483644;inset:8% 3% auto 3%;max-width:440px;margin:auto;max-height:82vh;overflow:auto;background:#101417;color:#eee;border:1px solid #c49a46;border-radius:18px;box-shadow:0 10px 35px #000d;font:14px system-ui,Arial,sans-serif}
 #tu-pda-panel[hidden]{display:none}
 #tu-pda-panel *{box-sizing:border-box}
-#tu-pda-panel header{display:flex;align-items:center;gap:12px;padding:17px;border-bottom:1px solid #4a3c21}
+#tu-pda-panel header{display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px solid #4a3c21;position:sticky;top:0;z-index:100;background:#101417}
 #tu-pda-panel .tu-logo{font:bold italic 29px Georgia,serif;color:#f1ce72}
 #tu-pda-panel h2{font-size:22px;margin:0;color:#f1ce72}
 #tu-pda-panel p{margin:4px 0;color:#aeb4bd}
@@ -330,7 +341,7 @@ const TU_TERMS_VERSION='2026-10-20';
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.33 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.34 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
@@ -556,7 +567,7 @@ const TU_TERMS_VERSION='2026-10-20';
       }
       }
     }else{
-      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.33 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.34 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
       {
         const apiSection=document.createElement('section');apiSection.style.cssText='border:1px solid #806a3e;border-radius:8px;padding:12px;margin:12px 0';
         const title=document.createElement('h3');title.textContent='Public Only Torn API Key';apiSection.append(title);
@@ -589,15 +600,22 @@ const TU_TERMS_VERSION='2026-10-20';
   };
   const syncLauncher=()=>{
     const moduleVisible=!!active&&(['tuim-panel','tuim-catalog','tpfg-root','tpfg-manager','tpfg-prompt','sff-root','tca-panel','tca-playbar','tuac-panel'].some(isVisible)||[...moduleHost.children].some(el=>isVisible(el.id)||(!el.hidden&&el.getClientRects().length>0)));
-    const hide=!panel.hidden||moduleVisible;
+    const hide=tuNav.minimized||tuNav.exited?false:(!panel.hidden||moduleVisible);
     if(launcher.hidden!==hide)launcher.hidden=hide;
   };
-  const closePanel = () => { panel.hidden = true; syncLauncher(); };
-  const togglePanel = () => { if(active==='item-monitor'&&document.getElementById('tuim-panel')?.hidden){registered.get(active)?.activate(Object.freeze({mount:moduleHost,close:()=>{stopModule();panel.hidden=false;viewModule=null;render('modules');syncLauncher();},minimize:()=>{panel.hidden=true;syncLauncher();}}));panel.hidden=true;syncLauncher();return;} if(active)stopModule(); panel.hidden=!panel.hidden; if(!panel.hidden){viewModule=null;render(hasAgreement()?'modules':'about');if(!hasAgreement())showAgreement();} syncLauncher(); };
-  panel.querySelector('.tu-close').addEventListener('click', () => { closePanel(); });
+  const closePanel = () => { tuMinimize(); syncLauncher(); };
+  const togglePanel=()=>{if(tuNav.minimized||tuNav.exited)tuRestore();else tuMinimize();syncLauncher();};
+  const navHeader=panel.querySelector('header');
+  for(const [label,title,fn] of [['←','Back',tuBack],['−','Minimize',tuMinimize]]){
+    const b=document.createElement('button');b.type='button';b.textContent=label;b.title=title;b.setAttribute('aria-label',title);
+    b.addEventListener('click',e=>{e.stopPropagation();fn();syncLauncher();});navHeader.prepend(b);
+  }
+  panel.querySelector('.tu-close').title='Exit';
+  panel.querySelector('.tu-close').setAttribute('aria-label','Exit');
+  panel.querySelector('.tu-close').addEventListener('click',()=>{tuExit();syncLauncher();});
   panel.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => {if(!hasAgreement()&&b.dataset.tab!=='about'){showAgreement();return;}render(b.dataset.tab);}));
   // Shared floating-window support for TU module panels.
-  const floatIds=['tuim-panel','tuac-panel','tca-panel','tu-pda-panel','sff-root','tpfg-manager','tpfg-root'];
+  const floatIds=['tuim-panel','tuim-catalog','tuac-panel','tca-panel','tu-pda-panel','sff-root','tpfg-manager','tpfg-root','tpfg-prompt','tu-diagnostics-window'];
   const floatingSetup=new WeakSet();
   const setupFloating=el=>{
     if(!el||floatingSetup.has(el))return;
@@ -652,7 +670,20 @@ const TU_TERMS_VERSION='2026-10-20';
       if(bar&&bar!==el){bar.style.position='sticky';bar.style.top='0';bar.style.zIndex='20';bar.style.background=bar.style.background||'#20252e';}
     }
   };
-  const enhanceFloating=()=>{floatIds.forEach(id=>setupFloating(document.getElementById(id)));enhanceGameWindows();};
+  const tuEnhanceHeaders=()=>{
+    for(const id of floatIds){if(id==='tu-pda-panel')continue;
+      const el=tuRoot(id);if(!el||el.dataset.tuNavHeader)continue;
+      const bar=el.querySelector('header,.tu-header,.tuim-header,.tuac-header');if(!bar)continue;
+      el.dataset.tuNavHeader='1';bar.style.position='sticky';bar.style.top='0';bar.style.zIndex='100';bar.style.background='#101417';
+      const controls=document.createElement('span');controls.style.cssText='margin-left:auto;display:flex;gap:5px';
+      for(const [label,title,fn] of [['←','Back',tuBack],['−','Minimize',tuMinimize],['×','Exit',tuExit]]){
+        const b=document.createElement('button');b.type='button';b.textContent=label;b.title=title;b.setAttribute('aria-label',title);
+        b.style.cssText='padding:4px 9px;background:#252a2e;color:#f1ce72;border:1px solid #806a3e;border-radius:5px';
+        b.addEventListener('click',e=>{e.stopPropagation();fn();syncLauncher();});controls.append(b);
+      }bar.append(controls);
+    }
+  };
+  const enhanceFloating=()=>{floatIds.forEach(id=>setupFloating(document.getElementById(id)));enhanceGameWindows();tuEnhanceHeaders();};
   enhanceFloating();
   const floatingObserver=new MutationObserver(enhanceFloating);
   floatingObserver.observe(document.body,{childList:true,subtree:true});
