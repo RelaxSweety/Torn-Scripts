@@ -298,7 +298,7 @@
     getFaction:()=>playerInfo?.factionId?Object.freeze({id:playerInfo.factionId,name:playerInfo.factionName||null}):null,
     refreshPlayer:()=>Promise.resolve(!!playerInfo),
     requestPlayerProfile:openProfileHelp,
-    closeActiveModule(){stopModule();panel.hidden=false;viewModule=null;render('modules');syncLauncher();},
+    closeActiveModule(){stopModule();tuShow('tu-pda-panel');viewModule=null;render('modules');syncLauncher();},
     register(def) {
       if (!def || typeof def.id !== 'string' || !/^[a-z0-9-]+$/.test(def.id) ||
           typeof def.activate !== 'function' || typeof def.deactivate !== 'function' ||
@@ -338,7 +338,8 @@
     moduleHost.hidden=false;
     try {
       active=id;
-      mod.activate(Object.freeze({mount:moduleHost, close:()=>{stopModule();panel.hidden=false;viewModule=null;render('modules');syncLauncher();},minimize:()=>{panel.hidden=true;syncLauncher();}}));
+      tuNav.history.push('tu-pda-panel');tuNav.current=id;tuNav.minimized=false;tuNav.exited=false;
+      mod.activate(Object.freeze({mount:moduleHost, close:()=>{stopModule();panel.hidden=false;viewModule=null;render('modules');syncLauncher();},minimize:()=>{tuMinimize();syncLauncher();}}));
       return true;
     } catch(e) {
       console.error('[TU] module activation failed', id, e);
@@ -350,6 +351,18 @@
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch {}
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch {} };
+  // TU unified window navigation (test release).
+  const tuNav={history:[],current:'tu-pda-panel',minimized:true,exited:true};
+  const tuRoots=['tu-pda-panel','tuim-panel','tuim-catalog','tuac-panel','tca-panel','tca-playbar','tpfg-root','tpfg-manager','tpfg-prompt','sff-root','tu-diagnostics-window'];
+  const tuRoot=id=>document.getElementById(id);
+  const tuHideAll=()=>tuRoots.forEach(id=>{const el=tuRoot(id);if(el)el.hidden=true;});
+  const tuShow=id=>{const el=tuRoot(id);if(!el)return false;tuHideAll();el.hidden=false;tuNav.current=id;tuNav.minimized=false;tuNav.exited=false;return true;};
+  const tuOpen=id=>{if(tuNav.current!==id&&tuRoot(tuNav.current))tuNav.history.push(tuNav.current);return tuShow(id);};
+  const tuBack=()=>{while(tuNav.history.length){const id=tuNav.history.pop();if(tuRoot(id))return tuShow(id);}return tuShow('tu-pda-panel');};
+  const tuMinimize=()=>{tuNav.minimized=true;tuHideAll();launcher.hidden=false;};
+  const tuExit=()=>{tuNav.history.length=0;tuNav.current='tu-pda-panel';tuNav.exited=true;tuMinimize();stopModule();};
+  const tuRestore=()=>{if(tuNav.exited){tuNav.history.length=0;tuNav.current='tu-pda-panel';render('modules');}return tuShow(tuRoot(tuNav.current)?tuNav.current:'tu-pda-panel');};
+  pageWindow.TUWindowNavigation=Object.freeze({open:tuOpen,back:tuBack,minimize:tuMinimize,exit:tuExit,restore:tuRestore});
   const style = document.createElement('style');
   style.textContent = `
 #tu-pda-panel .tu-refresh-icon{display:inline-block}#tu-pda-panel .tu-spinning{animation:tu-refresh-spin .8s linear infinite}@keyframes tu-refresh-spin{to{transform:rotate(360deg)}}
@@ -359,7 +372,7 @@
 #tu-pda-panel{position:fixed;z-index:2147483644;inset:8% 3% auto 3%;max-width:440px;margin:auto;max-height:82vh;overflow:auto;background:#101417;color:#eee;border:1px solid #c49a46;border-radius:18px;box-shadow:0 10px 35px #000d;font:14px system-ui,Arial,sans-serif}
 #tu-pda-panel[hidden]{display:none}
 #tu-pda-panel *{box-sizing:border-box}
-#tu-pda-panel header{display:flex;align-items:center;gap:12px;padding:17px;border-bottom:1px solid #4a3c21}
+#tu-pda-panel header{display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px solid #4a3c21;position:sticky;top:0;z-index:100;background:#101417}
 #tu-pda-panel .tu-logo{font:bold italic 29px Georgia,serif;color:#f1ce72}
 #tu-pda-panel h2{font-size:22px;margin:0;color:#f1ce72}
 #tu-pda-panel p{margin:4px 0;color:#aeb4bd}
@@ -700,16 +713,26 @@
   };
   const syncLauncher=()=>{
     const moduleVisible=!!active&&(['tuim-panel','tuim-catalog','tpfg-root','tpfg-manager','tpfg-prompt','sff-root','tca-panel','tca-playbar','tuac-panel'].some(isVisible)||[...moduleHost.children].some(el=>isVisible(el.id)||(!el.hidden&&el.getClientRects().length>0)));
-    const hide=!panel.hidden||moduleVisible;
+    const hide=tuNav.minimized||tuNav.exited?false:(!panel.hidden||moduleVisible);
     if(launcher.hidden!==hide)launcher.hidden=hide;
   };
-  const closePanel = () => { panel.hidden = true; syncLauncher(); };
-  const togglePanel = () => { if(active==='item-monitor'&&document.getElementById('tuim-panel')?.hidden){registered.get(active)?.activate(Object.freeze({mount:moduleHost,close:()=>{stopModule();panel.hidden=false;viewModule=null;render('modules');syncLauncher();},minimize:()=>{panel.hidden=true;syncLauncher();}}));panel.hidden=true;syncLauncher();return;} if(active)stopModule(); panel.hidden=!panel.hidden; if(!panel.hidden){viewModule=null;render(hasAgreement()?'modules':'about');if(!hasAgreement())showAgreement();} syncLauncher(); };
-  panel.querySelector('.tu-close').addEventListener('click', () => { closePanel(); });
+  const closePanel = () => { tuMinimize(); syncLauncher(); };
+  const togglePanel=()=>{if(tuNav.minimized||tuNav.exited)tuRestore();else tuMinimize();syncLauncher();};
+  const navHeader=panel.querySelector('header');
+  const addNavControl=(label,title,handler,before)=>{
+    const b=document.createElement('button');b.type='button';b.textContent=label;b.title=title;b.setAttribute('aria-label',title);b.className='tu-nav-control';
+    b.addEventListener('click',e=>{e.stopPropagation();handler();syncLauncher();});
+    if(before)navHeader.prepend(b);else navHeader.append(b);return b;
+  };
+  addNavControl('←','Back',tuBack,true);
+  addNavControl('−','Minimize',tuMinimize,false);
+  panel.querySelector('.tu-close').title='Exit';
+  panel.querySelector('.tu-close').setAttribute('aria-label','Exit');
+  panel.querySelector('.tu-close').addEventListener('click',()=>{tuExit();syncLauncher();});
   panel.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => {if(!hasAgreement()&&b.dataset.tab!=='about'){showAgreement();return;}render(b.dataset.tab);}));
   // Shared floating-window support for TU module panels.
   // Persist each TU window's user-selected size and position independently.
-  const floatIds=['tu-diagnostics-window','tuim-panel','tuac-panel','tca-panel','tu-pda-panel','sff-root','tpfg-manager','tpfg-root'];
+  const floatIds=['tu-diagnostics-window','tuim-panel','tuim-catalog','tuac-panel','tca-panel','tu-pda-panel','sff-root','tpfg-manager','tpfg-root','tpfg-prompt'];
   const floatingSetup=new WeakSet();
   const FLOAT_KEY='tu:window-layout:v1:';
   const getLayout=id=>{try{return JSON.parse(localStorage.getItem(FLOAT_KEY+id)||'null')}catch(_){return null}};
@@ -771,8 +794,23 @@
     bar.addEventListener('pointerup',end);bar.addEventListener('pointercancel',end);
   };
   const enhanceFloating=()=>floatIds.forEach(id=>setupFloating(document.getElementById(id)));
-  enhanceFloating();
-  const floatingObserver=new MutationObserver(enhanceFloating);
+  const tuEnhanceHeaders=()=>{
+    for(const id of floatIds){
+      if(id==='tu-pda-panel')continue;
+      const el=tuRoot(id);if(!el||el.dataset.tuNavHeader)continue;
+      const bar=el.querySelector('header,.tu-header,.tuim-header,.tuac-header');if(!bar)continue;
+      el.dataset.tuNavHeader='1';bar.style.position='sticky';bar.style.top='0';bar.style.zIndex='100';bar.style.background='#101417';
+      const controls=document.createElement('span');controls.style.cssText='margin-left:auto;display:flex;gap:5px';
+      for(const [label,title,fn] of [['←','Back',tuBack],['−','Minimize',tuMinimize],['×','Exit',tuExit]]){
+        const b=document.createElement('button');b.type='button';b.textContent=label;b.title=title;b.setAttribute('aria-label',title);
+        b.style.cssText='padding:4px 9px;background:#252a2e;color:#f1ce72;border:1px solid #806a3e;border-radius:5px';
+        b.addEventListener('click',e=>{e.stopPropagation();fn();syncLauncher();});controls.append(b);
+      }
+      bar.append(controls);
+    }
+  };
+  enhanceFloating();tuEnhanceHeaders();
+  const floatingObserver=new MutationObserver(()=>{enhanceFloating();tuEnhanceHeaders();});
   floatingObserver.observe(document.body,{childList:true,subtree:true});
   const visibilityObserver=new MutationObserver(syncLauncher);
   visibilityObserver.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['style','hidden','class']});
