@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.10.21
+// @version      1.10.22
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -580,14 +580,16 @@ setInterval(reportForeignShop,1000);
 let travelWindow=null,travelEpoch=0,travelDataWindow=null,travelDataModel=null;
 function travelClose(){travelEpoch++;travelWindow?.remove();travelWindow=null;travelDataWindow?.remove();travelDataWindow=null;travelDataModel=null}
 function travelDataRender(){if(!travelDataWindow?.isConnected)return;const area=travelDataWindow.querySelector('.tuim-data-body');if(!area)return;area.replaceChildren();const model=travelDataModel;if(!model){E('small',area,'Waiting for travel data...');return}const card=E('div',area);card.className='tuim-travel-card';const lineData=(label,value)=>{const row=E('div',card);row.className='tuim-travel-line';E('span',row,label);E('strong',row,String(value))};lineData('Server detected restock events',model.pred?.observed_events??'Unavailable');if(model.metrics){const m=model.metrics;lineData('History observations sampled',m.points+' (latest 200 requested)');lineData('Real Time Reporting',model.realTimeReportingTotal!=null?model.realTimeReportingTotal:m.sources.dom);lineData('API/YATA observations (identified)',m.sources.api);lineData('Unknown-source observations',m.sources.other);lineData('Stock increases in sampled history',m.increases);lineData('Depletion intervals used',m.intervals);if(m.points>0)E('small',area,'Real Time Reporting counts all stored app-submitted observations for this item in D1. Other source counts reflect only the latest sampled history. Restock events and forecasts may use additional history.')}else E('small',area,'History metrics unavailable')}
+// Enforce hidden state regardless of module CSS display rules.
+(function(){const id='tuim-window-visibility';if(document.getElementById(id))return;const st=E('style',document.head||document.documentElement);st.id=id;st.textContent='#tuim-panel[hidden],#tuim-travel-window[hidden],#tuim-data-window[hidden],#tuim-catalog[hidden]{display:none!important}';})();
 function tuModuleOpen(id){const el=document.getElementById(id);if(!el)return;const nav=window.TUWindowNavigation;if(nav?.open?.(id))return;for(const other of ['tuim-panel','tuim-travel-window','tuim-data-window','tuim-catalog']){const w=document.getElementById(other);if(w&&other!==id)w.hidden=true;}el.hidden=false;}
 function tuModuleHeader(w,head,parentId){
  w.dataset.tuModuleNav='1';
  const controls=E('span',head);controls.dataset.tuNavControls='1';controls.style.cssText='margin-left:auto;display:flex;gap:6px;flex-shrink:0';
- const button=(symbol,title,action)=>{const b=B(controls,symbol,action);b.title=title;b.setAttribute('aria-label',title);b.style.cssText='background:#252a2e;color:#f1ce72;border:1px solid #806a3e;border-radius:5px;padding:6px 10px;min-width:35px';};
- button('←','Back',()=>{if(!window.TUWindowNavigation?.back?.(w.id)){w.hidden=true;const p=document.getElementById(parentId);if(p)p.hidden=false;}});
- button('−','Minimize',()=>{if(!window.TUWindowNavigation?.minimize?.(w.id))w.hidden=true;});
- button('×','Exit',()=>{if(!window.TUWindowNavigation?.exit?.(w.id)){w.hidden=true;state.context?.close?.();}});
+ const button=(symbol,title,action)=>{const b=B(controls,symbol,(event)=>{event?.stopPropagation();event?.preventDefault();action();});b.title=title;b.setAttribute('aria-label',title);b.style.cssText='background:#252a2e;color:#f1ce72;border:1px solid #806a3e;border-radius:5px;padding:6px 10px;min-width:35px';};
+ button('←','Back',()=>{const nav=window.TUWindowNavigation;const result=nav?.back?.(w.id);if(result!==true){w.hidden=true;const p=document.getElementById(parentId);if(p)p.hidden=false;}else{w.hidden=true;}});
+ button('−','Minimize',()=>{window.TUWindowNavigation?.minimize?.(w.id);w.hidden=true;});
+ button('×','Exit',()=>{w.hidden=true;if(window.TUWindowNavigation?.exit)window.TUWindowNavigation.exit(w.id);else state.context?.close?.();});
 }
 function travelDataOpen(){if(travelDataWindow?.isConnected){tuModuleOpen('tuim-data-window');return}const w=E('section',document.body);w.id='tuim-data-window';travelDataWindow=w;const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);E('strong',head,'Data Used');tuModuleHeader(w,head,'tuim-travel-window');const area=E('div',w);area.className='tuim-data-body';travelDataRender();tuModuleOpen('tuim-data-window')}
 function travelUI(){
@@ -595,7 +597,7 @@ function travelUI(){
  if(travelWindow?.isConnected){tuModuleOpen('tuim-travel-window');return}
  const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
- E('strong',head,'Travel Assistant v1.10.21');tuModuleHeader(w,head,'tuim-panel');
+ E('strong',head,'Travel Assistant v1.10.22');tuModuleHeader(w,head,'tuim-panel');
  const body=E('div',w);body.className='tuim-travel-body';tuModuleOpen('tuim-travel-window');
  const intro=E('small',body,'Travel planner · Experimental restock predictions');
  const controls=E('div',body);controls.className='tuim-travel-grid';
@@ -770,5 +772,5 @@ function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=loa
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();scan()}
 function deactivate(){travelClose();state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:'1.10.21',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:'1.10.22',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
