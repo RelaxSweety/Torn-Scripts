@@ -187,7 +187,7 @@ function catalogGroups(item){
 function openCatalog(){
  style();
  state.catalogWindow?.remove();
- const w=E('section',document.body);state.catalogWindow=w;w.id='tuim-catalog';
+ const w=E('section',document.body);state.catalogWindow=w;w.id='tuim-catalog';window.TUWindowNavigation?.open?.('tuim-catalog');
  w.style.cssText='position:fixed;z-index:2147483645;left:5vw;top:8vh;width:min(90vw,530px);height:min(80dvh,680px);background:#11191d;color:#eee;border:1px solid #cba953;border-radius:12px;padding:12px;display:flex;flex-direction:column;font:14px system-ui;box-sizing:border-box;box-shadow:0 10px 30px #000b';
  const head=E('div',w);head.style.cssText='display:flex;align-items:center;gap:8px;cursor:move;touch-action:none;padding:5px 0 12px';
  E('strong',head,'Select Item from Complete List').style.flex='1';
@@ -580,11 +580,11 @@ setInterval(reportForeignShop,1000);
 let travelWindow=null,travelEpoch=0,travelDataWindow=null,travelDataModel=null;
 function travelClose(){travelEpoch++;travelWindow?.remove();travelWindow=null;travelDataWindow?.remove();travelDataWindow=null;travelDataModel=null}
 function travelDataRender(){if(!travelDataWindow?.isConnected)return;const area=travelDataWindow.querySelector('.tuim-data-body');if(!area)return;area.replaceChildren();const model=travelDataModel;if(!model){E('small',area,'Waiting for travel data...');return}const card=E('div',area);card.className='tuim-travel-card';const lineData=(label,value)=>{const row=E('div',card);row.className='tuim-travel-line';E('span',row,label);E('strong',row,String(value))};lineData('Server detected restock events',model.pred?.observed_events??'Unavailable');if(model.metrics){const m=model.metrics;lineData('History observations sampled',m.points+' (latest 200 requested)');lineData('Real Time Reporting',model.realTimeReportingTotal!=null?model.realTimeReportingTotal:m.sources.dom);lineData('API/YATA observations (identified)',m.sources.api);lineData('Unknown-source observations',m.sources.other);lineData('Stock increases in sampled history',m.increases);lineData('Depletion intervals used',m.intervals);if(m.points>0)E('small',area,'Real Time Reporting counts all stored app-submitted observations for this item in D1. Other source counts reflect only the latest sampled history. Restock events and forecasts may use additional history.')}else E('small',area,'History metrics unavailable')}
-function travelDataOpen(){if(travelDataWindow?.isConnected){travelDataWindow.hidden=false;return}const w=E('section',document.body);w.id='tuim-data-window';travelDataWindow=w;const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);E('strong',head,'Data Used');B(head,'−',()=>{w.hidden=true});B(head,'×',()=>{w.remove();travelDataWindow=null});const area=E('div',w);area.className='tuim-data-body';travelDataRender()}
+function travelDataOpen(){if(travelDataWindow?.isConnected){window.TUWindowNavigation?.open?.('tuim-data-window');return}const w=E('section',document.body);w.id='tuim-data-window';travelDataWindow=w;window.TUWindowNavigation?.open?.('tuim-data-window');const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);E('strong',head,'Data Used');B(head,'−',()=>{w.hidden=true});B(head,'×',()=>{w.remove();travelDataWindow=null});const area=E('div',w);area.className='tuim-data-body';travelDataRender()}
 function travelUI(){
  travelStyle();
- if(travelWindow?.isConnected){travelWindow.hidden=false;return}
- const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';
+ if(travelWindow?.isConnected){window.TUWindowNavigation?.open?.('tuim-travel-window');return}
+ const w=E('section',document.body);travelWindow=w;w.id='tuim-travel-window';window.TUWindowNavigation?.open?.('tuim-travel-window');
  const head=E('div',w);head.className='tuim-travel-header';draggable(w,head);
  E('strong',head,'Travel Assistant v1.10.19');B(head,'×',travelClose);
  const body=E('div',w);body.className='tuim-travel-body';
