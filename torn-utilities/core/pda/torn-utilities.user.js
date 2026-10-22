@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.34
+// @version      0.4.35
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -41,7 +41,7 @@ const TU_TERMS_VERSION='2026-10-20';
   }
 
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.4.33';
+  const TU_VERSION='0.4.35';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -341,7 +341,7 @@ const TU_TERMS_VERSION='2026-10-20';
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.34 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.35 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
@@ -418,6 +418,32 @@ const TU_TERMS_VERSION='2026-10-20';
     const version=document.createElement('small');version.textContent='Agreement version '+TU_TERMS_VERSION;target.append(version);
     for(const [title,body] of TU_TERMS){const h=document.createElement('h3');h.textContent=title;h.style.margin='14px 0 4px';const p=document.createElement('p');p.textContent=body;p.style.margin='0 0 8px';target.append(h,p);}
   }
+  // Script update check is informational: PDA manages installed script replacement.
+  const tuScriptPath='torn-utilities/core/pda/torn-utilities.user.js';
+  const tuScriptUrl='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/'+tuScriptPath;
+  let tuUpdateStatus='Not checked';
+  const tuCheckUpdates=async()=>{
+    tuUpdateStatus='Checking GitHub…';render('settings');
+    try{
+      const response=await fetch(tuScriptUrl+'?tu_check='+Date.now(),{cache:'no-store'});
+      if(!response.ok)throw Error('HTTP '+response.status);
+      const source=await response.text();
+      const latest=source.match(/^\/\/\s*@version\s+([^\s]+)/m)?.[1];
+      if(!latest)throw Error('No userscript version found');
+      tuUpdateStatus=versionCompare(TU_VERSION,latest)<0?'Update available: '+latest:'Manager current: '+TU_VERSION+' (GitHub '+latest+')';
+    }catch(e){tuUpdateStatus='Could not check GitHub: '+(e.message||e);}
+    render('settings');
+  };
+  const tuShowUpdateTools=()=>{
+    const box=document.createElement('div');box.className='tu-card';box.style.cssText+=';display:block';
+    const h=document.createElement('strong');h.textContent='Script updates';box.append(h);
+    const p=document.createElement('p');p.textContent='Installed Manager: '+TU_VERSION+' · '+tuUpdateStatus;box.append(p);
+    const note=document.createElement('p');note.textContent='Catalog refresh only updates the list of available modules. PDA does not automatically replace installed scripts through TU Manager. To update, open PDA Settings > Advanced Browser Settings > Manage Scripts, select TU Manager, then Fetch and Load the latest script URL.';box.append(note);
+    const buttons=document.createElement('div');buttons.style.cssText='display:flex;flex-wrap:wrap;gap:8px';
+    const check=makeButton('Check Manager update',tuCheckUpdates);check.style.marginLeft='0';buttons.append(check);
+    const link=document.createElement('a');link.href=tuScriptUrl;link.target='_blank';link.rel='noopener noreferrer';link.textContent='View latest Manager script';link.style.cssText='color:#f1ce72;padding:8px';buttons.append(link);
+    box.append(buttons);content.append(box);
+  };
   function render(tab) {
     if(!hasAgreement()&&tab!=='about')tab='about';
     if(tab!=='settings')settingsPage=null;
@@ -499,6 +525,7 @@ const TU_TERMS_VERSION='2026-10-20';
         const refresh=makeButton('',refreshRegistry);refresh.style.marginLeft='0';refresh.disabled=registryRefreshing;refresh.innerHTML='<span class="tu-refresh-icon'+(registryRefreshing?' tu-spinning':'')+'">↻</span> '+(registryRefreshing?'Refreshing…':'Refresh catalog');refreshRow.append(refresh);content.append(refreshRow);
       }
     }else if(tab==='settings'){
+      if(!settingsPage)tuShowUpdateTools();
       if(!settingsPage){diagnosticModule=null;
         const heading=document.createElement('h3');heading.textContent='Settings';content.append(heading);
         for(const [id,title,description] of [
@@ -567,7 +594,7 @@ const TU_TERMS_VERSION='2026-10-20';
       }
       }
     }else{
-      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.34 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.35 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
       {
         const apiSection=document.createElement('section');apiSection.style.cssText='border:1px solid #806a3e;border-radius:8px;padding:12px;margin:12px 0';
         const title=document.createElement('h3');title.textContent='Public Only Torn API Key';apiSection.append(title);
