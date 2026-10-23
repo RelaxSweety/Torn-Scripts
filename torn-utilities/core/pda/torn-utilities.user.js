@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.52-dev
+// @version      0.4.53-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -140,7 +140,7 @@ const TU_TERMS_VERSION='1.0';
   }
 
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.4.52-dev';
+  const TU_VERSION='0.4.53-dev';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -397,7 +397,7 @@ const TU_TERMS_VERSION='1.0';
   const tuRoots=['tu-pda-panel','tuim-panel','tuim-catalog','tuim-travel-window','tuim-data-window','tuac-panel','tca-panel','tca-playbar','tpfg-root','tpfg-manager','tpfg-prompt','sff-root','tu-diagnostics-window'];
   const tuRoot=id=>document.getElementById(id);
   const tuHideAll=()=>tuRoots.forEach(id=>{const el=tuRoot(id);if(el){el.hidden=true;if(id==='tpfg-root')el.style.display='none';}});
-  const tuShow=id=>{const el=tuRoot(id);if(!el)return false;tuHideAll();el.hidden=false;if(id==='tpfg-root')el.style.display='block';tuNav.current=id;tuNav.minimized=false;tuNav.exited=false;return true;};
+  const tuShow=id=>{if(!hasAgreement()&&id!=='tu-pda-panel'){id='tu-pda-panel';render('about');showAgreement();}const el=tuRoot(id);if(!el)return false;tuHideAll();el.hidden=false;if(id==='tpfg-root')el.style.display='block';tuNav.current=id;tuNav.minimized=false;tuNav.exited=false;return true;};
   const tuOpen=id=>{if(!tuRoot(id))return false;if(tuNav.current!==id&&tuRoot(tuNav.current))tuNav.history.push(tuNav.current);return tuShow(id);};
   const tuBack=(source)=>{const parents={'tuim-travel-window':'tuim-panel','tuim-data-window':'tuim-travel-window','tuim-catalog':'tuim-panel'};const parent=parents[source];if(parent&&tuRoot(parent)){if(tuNav.history[tuNav.history.length-1]===parent)tuNav.history.pop();return tuShow(parent);}if(source&&tuRoot(source))tuNav.current=source;while(tuNav.history.length){const id=tuNav.history.pop();if(tuRoot(id))return tuShow(id);}return tuShow('tu-pda-panel');};
   const tuMinimize=(source)=>{if(source&&tuRoot(source))tuNav.current=source;
@@ -409,6 +409,7 @@ const TU_TERMS_VERSION='1.0';
   };
   const tuExit=(source)=>{tuNav.history.length=0;tuNav.current='tu-pda-panel';tuMinimize();tuNav.exited=true;stopModule();};
   const tuRestore=()=>{
+    if(!hasAgreement()){tuNav.current='tu-pda-panel';tuNav.history.length=0;render('about');showAgreement();return tuShow('tu-pda-panel');}
     if(tuNav.exited){tuNav.history.length=0;tuNav.current='tu-pda-panel';render(hasAgreement()?'modules':'about');if(!hasAgreement())showAgreement();}
     let id=tuNav.current;
     if(!tuRoot(id)&&active){id=({'item-monitor':'tuim-panel','flight-game':'tpfg-root','stick-fighter':'sff-root'}[active]||id);}
@@ -451,7 +452,7 @@ const TU_TERMS_VERSION='1.0';
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.52-dev (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.53-dev (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
@@ -772,7 +773,7 @@ const TU_TERMS_VERSION='1.0';
         const buttons=document.createElement('div');buttons.style.cssText='display:flex;flex-wrap:wrap;gap:8px;margin-top:10px';
         const view=makeButton('Show API Key',()=>{field.type=field.type==='password'?'text':'password';view.textContent=field.type==='password'?'Show API Key':'Hide API Key';});
         const save=makeButton('Save / Update',()=>{const key=field.value.trim();if(!/^[A-Za-z0-9]{16}$/.test(key))return alert('Enter a valid 16-character Public Only API key.');localStorage.setItem(USER_PUBLIC_KEY_STORAGE,key);localStorage.removeItem('tu:agreement:verified-key:v1');localStorage.removeItem(TU_TERMS_KEY);field.value='';field.type='password';view.textContent='Show API Key';playerInfo=null;updatePlayer();alert('API key saved. Verify your key and accept the agreement again.');showAgreement();});
-        const del=makeButton('Delete Saved API Key',async()=>{if(!localStorage.getItem(USER_PUBLIC_KEY_STORAGE))return alert('No TU-saved key to delete.');if(!confirm('Delete the API key saved by TU on this device? This will not delete a key configured separately in Torn PDA.'))return;try{await devCancel();}catch(error){alert('Cancellation not confirmed; API key retained: '+error.message);return;}localStorage.removeItem(USER_PUBLIC_KEY_STORAGE);localStorage.removeItem('tu:agreement:verified-key:v1');localStorage.removeItem(TU_TERMS_KEY);field.value='';field.type='password';view.textContent='Show API Key';playerInfo=null;render('about');showAgreement();});
+        const del=makeButton('Delete Saved API Key',async()=>{if(!localStorage.getItem(USER_PUBLIC_KEY_STORAGE))return alert('No TU-saved key to delete.');if(!confirm('Delete the API key saved by TU on this device? This will not delete a key configured separately in Torn PDA.'))return;try{await devCancel();}catch(error){alert('Cancellation not confirmed; API key retained: '+error.message);return;}localStorage.removeItem(USER_PUBLIC_KEY_STORAGE);localStorage.removeItem('tu:agreement:verified-key:v1');localStorage.removeItem(TU_TERMS_KEY);field.value='';field.type='password';view.textContent='Show API Key';playerInfo=null;tuNav.history.length=0;tuNav.current='tu-pda-panel';tuNav.exited=true;stopModule();render('about');showAgreement();});
         buttons.append(view,save,del);apiSection.append(buttons);content.append(apiSection);
       }
       const termsHeading=document.createElement('h3');termsHeading.textContent='Terms of Use and Information Use Agreement';content.append(termsHeading);appendTerms(content);if(!hasAgreement())content.append(makeButton('Review and Accept Terms',showAgreement));
