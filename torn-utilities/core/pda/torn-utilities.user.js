@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.49-dev
+// @version      0.4.50-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -82,6 +82,20 @@ const TU_TERMS_VERSION='1.0';
     sessionStorage.setItem(DEV_SESSION_KEY,token);
     return status;
   }
+  // Recover an existing server-accepted agreement when PDA discards sessionStorage.
+  // Local cache only controls the prompt; protected endpoints still require a live bearer token.
+  async function restoreDevSession(){
+    if(devToken()||!hasAgreement())return;
+    const key=getPublicApiKey();
+    if(!/^[A-Za-z0-9]{16}$/.test(key))return;
+    try{
+      const registration=await devRequest('/api/auth/register','POST',{api_key:key,platform:'pda'},'');
+      if(!registration.token)return;
+      const status=await devRequest('/api/auth/agreement','GET',null,registration.token);
+      if(status.accepted)sessionStorage.setItem(DEV_SESSION_KEY,registration.token);
+      else await devRequest('/api/auth/logout','POST',{},registration.token);
+    }catch(_){/* Keep the local prompt cache during temporary PDA network failures. */}
+  }
   async function devCancel(){
     const token=devToken();
     if(!token)throw Error('No development session available; cannot confirm cancellation');
@@ -97,7 +111,7 @@ const TU_TERMS_VERSION='1.0';
     ['User choice','You can decline and still read this Info page, but the Manager will not open modules. You can stop using TU and remove local data through browser or PDA storage controls. Contact the project maintainer through the links on this Info page for questions about information handling.'],
     ['Agreement','By selecting I Agree, you confirm that you have reviewed these terms and consent to the described processing for TU features. Acceptance is recorded by the TU backend against your verified Torn player ID and cached on this device; renewed acceptance may be required when terms change.']
   ];
-  const hasAgreement=()=>!!devToken()&&localStorage.getItem(TU_TERMS_KEY)===TU_TERMS_VERSION&&!!localStorage.getItem('tu:agreement:verified-key:v1')&&localStorage.getItem('tu:agreement:verified-key:v1')===localStorage.getItem('tu:public-api-key:v1');
+  const hasAgreement=()=>localStorage.getItem(TU_TERMS_KEY)===TU_TERMS_VERSION&&!!localStorage.getItem('tu:agreement:verified-key:v1')&&localStorage.getItem('tu:agreement:verified-key:v1')===localStorage.getItem('tu:public-api-key:v1');
   const ACCESS_URL='https://tu-multiplayer-server.tuserver.workers.dev/api/access/agreements';
   async function serverAgreement(key,accept){
     const url=ACCESS_URL+(accept?'':'?check=1');
@@ -114,7 +128,7 @@ const TU_TERMS_VERSION='1.0';
   }
 
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.4.49-dev';
+  const TU_VERSION='0.4.50-dev';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -425,7 +439,7 @@ const TU_TERMS_VERSION='1.0';
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.49-dev (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.50-dev (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
@@ -757,6 +771,7 @@ const TU_TERMS_VERSION='1.0';
       const tornLogo=document.createElement('img');tornLogo.src='https://www.torn.com/favicon.ico';tornLogo.alt='Torn';tornLogo.width=30;tornLogo.height=30;tornLink.append(tornLogo);content.append(tornLink);
     }
   }
+  restoreDevSession();
   render(hasAgreement()?'modules':'about');
   refreshRegistry();
   // Do not interrupt first-run API requests with an immediate alert.
