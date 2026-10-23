@@ -53,7 +53,7 @@ let currentAgreement=null;
     // A POST may have reached the server even when PDA returns an invalid response.
     // Never replay a mutation over a different transport after an uncertain outcome.
     if(method==='POST'&&typeof PDA_httpPost==='function'){
-      try{return parse(await PDA_httpPost(url,payload,headers),'PDA_httpPost')}
+      try{return parse(await PDA_httpPost(url,body??{},headers),'PDA_httpPost')}
       catch(error){throw Error('PDA_httpPost: '+error.message+'; POST not retried to prevent duplicate mutation')}
     }
     if(method==='GET'&&typeof PDA_httpGet==='function'){
