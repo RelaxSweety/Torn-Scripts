@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.63-dev
+// @version      0.4.64-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -165,7 +165,7 @@ let currentAgreement=null;
   }
 
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.4.63-dev';
+  const TU_VERSION='0.4.64-dev';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -477,7 +477,7 @@ let currentAgreement=null;
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.63-dev (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.64-dev (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
@@ -749,20 +749,15 @@ let currentAgreement=null;
           }
         }));
         const revokeTest=makeButton('Test Agreement Cancellation Revocation',async()=>{
-          if(!confirm('This test cancels your current agreement, revokes your sessions, and requires agreement acceptance again. Continue?'))return;
+          if(!confirm('This test cancels your current agreement and revokes your sessions. You will need to accept the agreement again. Continue?'))return;
           revokeTest.disabled=true;
-          securityStatus.textContent='Checking active session before cancellation…';
-          try{
-            const token=await restoreDevSession();
-            await devRequest('/api/auth/me','GET',null,token);
-            securityStatus.textContent='Active session confirmed. Cancelling agreement…';
-            await devRequest('/api/auth/agreement','POST',{action:'cancelled',request_id:crypto.randomUUID()},token);
+          const requestId=crypto.randomUUID();
+          let stage='session verification',cancellation='NOT SENT',verification='NOT RUN';
+          const show=(message)=>{securityStatus.textContent='Stage: '+stage+'\\nCancellation: '+cancellation+'\\nRevoked-token check: '+verification+'\\nRequest ID: '+requestId+'\\n'+message};
+          const isUnauthorized=(error)=>/Unauthorized|HTTP 401/i.test(String(error?.message||''));
+          const isTransportFailure=(error)=>/invalid server response|returned no response|Failed to fetch|network error|timed out|timeout/i.test(String(error?.message||''));
+          const resetLocal=()=>{
             sessionStorage.removeItem(DEV_SESSION_KEY);
-            // The original bearer must be rejected by the protected endpoint.
-            let rejected=false;
-            try{await devRequest('/api/auth/me','GET',null,token)}
-            catch(error){rejected=/Unauthorized|HTTP 401/i.test(error.message)}
-            // Cancellation succeeded regardless of the enforcement test outcome.
             localStorage.removeItem(USER_PUBLIC_KEY_STORAGE);
             localStorage.removeItem('tu:agreement:verified-key:v1');
             localStorage.removeItem(TU_TERMS_KEY);
@@ -771,11 +766,38 @@ let currentAgreement=null;
             tuNav.current='tu-pda-panel';
             tuNav.exited=true;
             stopModule();
-            securityStatus.textContent='Agreement cancellation: CONFIRMED\\nRevoked token rejected by /api/auth/me: '+(rejected?'PASS (HTTP 401 / Unauthorized)':'FAIL — protected endpoint did not confirm rejection')+'\\nLocal TU key and agreement cleared. Reaccept the agreement to continue.';
+          };
+          try{
+            // Keep the original bearer in memory; do not use restoreDevSession(), which can
+            // create a different token and masks failures in the initial verification step.
+            const token=devToken();
+            if(!token){show('INCOMPLETE: No current session token. Reopen TU Manager and authenticate before testing.');return}
+            show('Verifying the existing bearer with the protected endpoint…');
+            try{await devRequest('/api/auth/me','GET',null,token)}
+            catch(error){show('INCONCLUSIVE: Initial authorization check failed: '+error.message);return}
+            stage='agreement cancellation';
+            show('Submitting cancellation once (no automatic POST retry)…');
+            try{
+              await devRequest('/api/auth/agreement','POST',{action:'cancelled',request_id:requestId},token);
+              cancellation='CONFIRMED';
+            }catch(error){
+              cancellation=isTransportFailure(error)?'UNKNOWN — response unavailable':'NOT CONFIRMED';
+              show('INCONCLUSIVE: Cancellation response was not confirmed: '+error.message+'\\nDo not repeat the cancellation test until the request ID has been checked against backend agreement events.');
+              return;
+            }
+            // Only a confirmed cancellation allows clearing credentials.
+            resetLocal();
+            stage='revoked-token verification';
+            show('Checking the same token after cancellation…');
+            try{
+              await devRequest('/api/auth/me','GET',null,token);
+              verification='FAIL — revoked token still authorized';
+            }catch(error){
+              verification=isUnauthorized(error)?'PASS — HTTP 401 Unauthorized':isTransportFailure(error)?'INCONCLUSIVE — network response unavailable':'INCONCLUSIVE — '+error.message;
+            }
+            show('Cancellation confirmed; local TU credentials cleared. Reaccept the agreement to continue.');
             alert(securityStatus.textContent);
             showAgreement();
-          }catch(error){
-            securityStatus.textContent='Test incomplete: '+error.message+'\\nLocal agreement and API key retained unless cancellation already succeeded.';
           }finally{revokeTest.disabled=false}
         });
         revokeTest.style.margin='10px 0';
