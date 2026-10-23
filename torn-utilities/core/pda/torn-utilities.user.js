@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.46-dev
+// @version      0.4.47-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -113,7 +113,7 @@ const TU_TERMS_VERSION='1.0';
   }
 
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.4.46-dev';
+  const TU_VERSION='0.4.47-dev';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -424,7 +424,7 @@ const TU_TERMS_VERSION='1.0';
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.46-dev (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.47-dev (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
@@ -634,6 +634,39 @@ const TU_TERMS_VERSION='1.0';
           return JSON.stringify(result,null,2);
         };
         const output=document.createElement('textarea');output.readOnly=true;output.value=report();output.style.cssText='width:100%;height:300px;box-sizing:border-box;background:#10171b;color:#eee;border:1px solid #806a3e;border-radius:8px;padding:10px';content.append(output);
+        const securityStatus=document.createElement('p');securityStatus.setAttribute('role','status');securityStatus.style.cssText='white-space:pre-wrap;font-size:12px';content.append(securityStatus);
+        content.append(makeButton('Test Development Authorization',async()=>{
+          const key=getPublicApiKey();
+          if(!/^[A-Za-z0-9]{16}$/.test(key)){securityStatus.textContent='No saved Public Only key available. Test not started.';return;}
+          securityStatus.textContent='Running isolated authorization checks…';
+          let temporaryToken='';
+          try{
+            const registration=await devRequest('/api/auth/register','POST',{api_key:key,platform:'pda'},'');
+            temporaryToken=registration.token;
+            if(!temporaryToken)throw Error('Temporary registration returned no token');
+            const current=await devRequest('/api/auth/agreement','GET',null,temporaryToken);
+            if(!current.accepted)throw Error('Current agreement not accepted');
+            const moduleId='item-monitor';
+            let permission;
+            try{
+              const result=await devRequest('/api/auth/module-access?module_id='+encodeURIComponent(moduleId),'GET',null,temporaryToken);
+              permission=result.allowed===true?'ALLOWED':'DENIED';
+            }catch(error){
+              permission=/permission not granted|HTTP 403|not authorized|Account not active/i.test(error.message)?'DENIED (expected policy)':'ERROR: '+error.message;
+            }
+            if(permission.startsWith('ERROR'))throw Error(permission);
+            await devRequest('/api/auth/logout','POST',{},temporaryToken);
+            let rejected=false;
+            try{await devRequest('/api/auth/me','GET',null,temporaryToken)}
+            catch(error){rejected=/Unauthorized|HTTP 401/i.test(error.message)}
+            securityStatus.textContent='Agreement: accepted\\nModule '+moduleId+': '+permission+'\\nRevoked token rejected: '+(rejected?'PASS':'NOT CONFIRMED')+'\\nCurrent Manager session unchanged.';
+          }catch(error){
+            securityStatus.textContent='Test incomplete: '+error.message+'\\nCurrent Manager session unchanged.';
+          }finally{
+            // Never persist the temporary token. Best-effort cleanup if a test failed early.
+            if(temporaryToken)try{await devRequest('/api/auth/logout','POST',{},temporaryToken)}catch(_){}
+          }
+        }));
         content.append(makeButton('Refresh diagnostics',()=>{output.value=report()}));
         content.append(makeButton('Copy diagnostics',()=>{if(navigator.clipboard?.writeText)navigator.clipboard.writeText(output.value).catch(()=>alert('Clipboard unavailable'));else{output.select();document.execCommand('copy')}}));
         return;
