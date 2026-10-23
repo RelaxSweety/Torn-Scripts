@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.47-dev
+// @version      0.4.48-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -30,6 +30,7 @@ const TU_TERMS_VERSION='1.0';
       if(value&&typeof value==='object'&&('responseText' in value||'data' in value||'body' in value||'response' in value))value=value.responseText??value.data??value.body??value.response;
       if(typeof value==='string'){try{value=JSON.parse(value)}catch{throw Error(transport+': invalid JSON response')}}
       if(!value||typeof value!=='object')throw Error(transport+': invalid server response');
+      if(typeof value.error==='string'&&value.error)throw Error('HTTP response: '+value.error);
       return value;
     };
     const failures=[];
@@ -113,7 +114,7 @@ const TU_TERMS_VERSION='1.0';
   }
 
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.4.47-dev';
+  const TU_VERSION='0.4.48-dev';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -424,7 +425,7 @@ const TU_TERMS_VERSION='1.0';
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.47-dev (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.48-dev (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
@@ -656,10 +657,10 @@ const TU_TERMS_VERSION='1.0';
             }
             if(permission.startsWith('ERROR'))throw Error(permission);
             await devRequest('/api/auth/logout','POST',{},temporaryToken);
-            let rejected=false;
-            try{await devRequest('/api/auth/me','GET',null,temporaryToken)}
-            catch(error){rejected=/Unauthorized|HTTP 401/i.test(error.message)}
-            securityStatus.textContent='Agreement: accepted\\nModule '+moduleId+': '+permission+'\\nRevoked token rejected: '+(rejected?'PASS':'NOT CONFIRMED')+'\\nCurrent Manager session unchanged.';
+            let rejected=false,revocationDetail='No rejection received';
+            try{const result=await devRequest('/api/auth/me','GET',null,temporaryToken);revocationDetail='Unexpected successful response: '+JSON.stringify(result).slice(0,200)}
+            catch(error){revocationDetail=error.message;rejected=/Unauthorized|HTTP 401/i.test(error.message)}
+            securityStatus.textContent='Agreement: accepted\\nModule '+moduleId+': '+permission+'\\nRevoked token rejected: '+(rejected?'PASS':'NOT CONFIRMED')+'\\nRevocation response: '+revocationDetail+'\\nCurrent Manager session unchanged.';
           }catch(error){
             securityStatus.textContent='Test incomplete: '+error.message+'\\nCurrent Manager session unchanged.';
           }finally{
