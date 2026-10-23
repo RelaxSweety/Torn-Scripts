@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.34
+// @version      0.5.35-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -14,8 +14,8 @@
 // @connect      raw.githubusercontent.com
 // @connect      api.github.com
 // @run-at       document-idle
-// @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/core/cross-platform/torn-utilities.user.js
-// @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/core/cross-platform/torn-utilities.user.js
+// @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/agreement-lifecycle-integration/torn-utilities/core/cross-platform/torn-utilities.user.js
+// @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/agreement-lifecycle-integration/torn-utilities/core/cross-platform/torn-utilities.user.js
 // ==/UserScript==
 (() => {
   'use strict';
@@ -25,7 +25,7 @@
   if (pageWindow.__RELAX_TORN_UTILITIES_PDA__) return;
   pageWindow.__RELAX_TORN_UTILITIES_PDA__ = true;
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.5.34';
+  const TU_VERSION='0.5.35-dev';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -312,7 +312,35 @@
   });
   Object.defineProperty(pageWindow, 'TornUtilities', {value:api, configurable:false, writable:false});
   pageWindow.dispatchEvent(new Event('torn-utilities-ready'));
-  const TU_TERMS_VERSION='2026-10-20';
+  const TU_TERMS_VERSION='1.0';
+
+  // DEVELOPMENT BUILD ONLY. This code is not deployed from main.
+  const DEV_BASE='https://tu-multiplayer-server-dev.tuserver.workers.dev';
+  const DEV_AGREEMENT={agreement_version:'1.0',agreement_number:1,agreement_date:'2026-10-22'};
+  const DEV_SESSION_KEY='tu:dev:auth:session:v1';
+  const devToken=()=>sessionStorage.getItem(DEV_SESSION_KEY)||'';
+  async function devRequest(path,method='GET',body,token=devToken()){
+    const response=await fetch(DEV_BASE+path,{method,headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{})},...(body?{body:JSON.stringify(body)}:{}),cache:'no-store'});
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok)throw Error(result.error||('Development server HTTP '+response.status));
+    return result;
+  }
+  async function devAccept(key,platform){
+    const registration=await devRequest('/api/auth/register','POST',{api_key:key,platform},'');
+    if(!registration.token)throw Error('Registration returned no session');
+    const token=registration.token;
+    await devRequest('/api/auth/agreement','POST',{action:'accepted',request_id:crypto.randomUUID(),...DEV_AGREEMENT},token);
+    const status=await devRequest('/api/auth/agreement','GET',null,token);
+    if(!status.accepted)throw Error('Development agreement was not confirmed');
+    sessionStorage.setItem(DEV_SESSION_KEY,token);
+    return status;
+  }
+  async function devCancel(){
+    const token=devToken();
+    if(!token)throw Error('No development session available; cannot confirm cancellation');
+    await devRequest('/api/auth/agreement','POST',{action:'cancelled',request_id:crypto.randomUUID()},token);
+    sessionStorage.removeItem(DEV_SESSION_KEY);
+  }
   const TU_TERMS_KEY='tu:agreement:accepted';
   const TU_TERMS=[
     ['Terms of Use','Torn Utilities is an independent optional collection of Torn City userscripts, not endorsed by Torn City. Use is at your own risk and subject to Torn rules. Features, predictions and availability are not guaranteed.'],
@@ -321,7 +349,7 @@
     ['Services and Retention','TU uses Torn API, GitHub, and TU-hosted services including Cloudflare. Server-side observations and game records may be retained for functionality and analysis. A complete retention and deletion schedule is not yet published. Network metadata may be handled by service providers.'],
     ['Consent and Choice','Declining restricts Manager functionality to the Info page. You can stop using TU, uninstall scripts and clear local data. Acceptance is stored locally and may be requested again after terms updates. Contact the maintainer using the links below with questions.']
   ];
-  const hasAgreement=()=>localStorage.getItem(TU_TERMS_KEY)===TU_TERMS_VERSION;
+  const hasAgreement=()=>!!devToken()&&localStorage.getItem(TU_TERMS_KEY)===TU_TERMS_VERSION;
   let currentTab='modules',settingsPage=null,diagnosticModule=null;
   // PDA Scripts installs modules independently; TU only manages registered modules.
   function stopModule() {
@@ -472,7 +500,7 @@
     const accept=makeButton('I Agree — Continue',async()=>{
       if(!check.checked)return;
       const supplied=key.value.trim();if(supplied&&!/^[a-zA-Z0-9]{16}$/.test(supplied)){status.textContent='Enter a valid 16-character Public Only key';return;}
-      if(supplied){status.textContent='Verifying key with Torn API…';accept.disabled=true;const ok=await updatePlayer(supplied);if(!ok){status.textContent='API key verification failed; check the Public Only key';accept.disabled=false;return;}saveKey(supplied);}
+      const selected=supplied||readSavedKey();if(!/^[A-Za-z0-9]{16}$/.test(selected)){status.textContent='A 16-character Public Only key is required';return;}accept.disabled=true;try{status.textContent='Registering and recording development agreement…';await devAccept(selected,'tampermonkey');if(supplied)saveKey(supplied);await updatePlayer(selected);}catch(error){status.textContent='Development agreement failed: '+error.message;accept.disabled=false;return;}
       localStorage.setItem(TU_TERMS_KEY,TU_TERMS_VERSION);overlay.remove();render('modules');
     });
     buttons.append(decline,accept);dialog.append(buttons);overlay.append(dialog);document.body.append(overlay);
@@ -640,9 +668,9 @@
         const close=makeButton('Close',()=>{field.value='';keyDetails.replaceChildren();keyDetails.style.display='none';});
         keyDetails.append(field,show,close);keyDetails.style.display='block';
       });
-      const remove=makeButton('Remove saved API Key',()=>{
+      const remove=makeButton('Remove saved API Key',async()=>{
         if(confirm('Remove saved Public Only API key from this browser?')){
-          removeSavedKey();vaultStatus.textContent='No saved API key';
+          try{await devCancel();}catch(error){alert('Cancellation not confirmed; key retained: '+error.message);return;}removeSavedKey();localStorage.removeItem(TU_TERMS_KEY);vaultStatus.textContent='No saved API key';
           keyDetails.replaceChildren();keyDetails.style.display='none';
         }
       });
