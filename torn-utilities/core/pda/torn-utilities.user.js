@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.43-dev
+// @version      0.4.44-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -22,7 +22,15 @@ const TU_TERMS_VERSION='1.0';
   const DEV_SESSION_KEY='tu:dev:auth:session:v1';
   const devToken=()=>sessionStorage.getItem(DEV_SESSION_KEY)||'';
   async function devRequest(path,method='GET',body,token=devToken()){
-    const response=await fetch(DEV_BASE+path,{method,headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{})},...(body?{body:JSON.stringify(body)}:{}),cache:'no-store'});
+    const url=DEV_BASE+path;
+    const headers={'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{})};
+    const payload=body?JSON.stringify(body):undefined;
+    let response;
+    try{response=await fetch(url,{method,headers,...(payload?{body:payload}:{}),cache:'no-store'});}
+    catch(error){
+      if(typeof GM_xmlhttpRequest!=='function')throw Error('PDA blocked the development Worker request: '+error.message);
+      response=await new Promise((resolve,reject)=>GM_xmlhttpRequest({method,url,headers,data:payload,timeout:15000,onload:r=>resolve({ok:r.status>=200&&r.status<300,status:r.status,json:async()=>JSON.parse(r.responseText)}),onerror:()=>reject(Error('PDA network request failed')),ontimeout:()=>reject(Error('PDA development Worker request timed out'))}));
+    }
     const result=await response.json().catch(()=>({}));
     if(!response.ok)throw Error(result.error||('Development server HTTP '+response.status));
     return result;
@@ -69,7 +77,7 @@ const TU_TERMS_VERSION='1.0';
   }
 
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.4.43-dev';
+  const TU_VERSION='0.4.44-dev';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
