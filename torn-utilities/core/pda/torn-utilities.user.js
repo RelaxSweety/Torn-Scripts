@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.53-dev
+// @version      0.4.54-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -14,11 +14,11 @@
   'use strict';
   if (window.__RELAX_TORN_UTILITIES_PDA__) return;
   window.__RELAX_TORN_UTILITIES_PDA__ = true;
-const TU_TERMS_VERSION='1.0';
+const TU_TERMS_VERSION='1.1';
 
   // DEVELOPMENT BUILD ONLY. This code is not deployed from main.
   const DEV_BASE='https://tu-multiplayer-server-dev.tuserver.workers.dev';
-  const DEV_AGREEMENT={agreement_version:'1.0',agreement_number:1,agreement_date:'2026-10-22'};
+  const DEV_AGREEMENT={agreement_version:'1.1',agreement_number:2,agreement_date:'2026-10-23'};
   const DEV_SESSION_KEY='tu:dev:auth:session:v1';
   const devToken=()=>sessionStorage.getItem(DEV_SESSION_KEY)||'';
   async function devRequest(path,method='GET',body,token=devToken()){
@@ -120,6 +120,7 @@ const TU_TERMS_VERSION='1.0';
     ['Information Use Agreement','TU may read your Torn player ID and name, publicly accessible game information, inventory and market information visible to the script, and information you enter in module settings. Certain features transmit observations, gameplay session information, or multiplayer actions to TU services for processing and shared functionality. Foreign shop stock observations may be sent to the TU Cloudflare server and stored for restock analysis.'],
     ['API keys and local storage','The Manager uses the public or otherwise appropriately scoped Torn API key configured in Torn PDA to retrieve identity information. Do not provide a full-access or sensitive API key. TU stores preferences, a local agreement confirmation cache, and module data in browser storage; agreement acceptance is also recorded on the TU server. Backups may include module data and should be handled privately. API keys should not be included in diagnostics or shared exports.'],
     ['Third-party services and retention','TU features may use Torn API, GitHub, and TU-hosted services, including Cloudflare. Shared observations and gameplay records may be retained for service functionality and analysis. A comprehensive retention schedule, deletion procedure, and third-party data-sharing inventory have not yet been published; do not assume data is anonymous or immediately deleted.'],
+    ['Prohibited Activities','Unauthorized modification, redistribution, or manipulation of TU scripts; tampering with TU server connections, requests, authentication, or reporting; and automated scraping, bulk extraction, reverse engineering of nonpublic service interfaces, or data mining of TU-hosted information are strictly prohibited. These restrictions do not prohibit normal use of approved TU features, access to your own information, security research permitted by applicable law, or other rights that cannot lawfully be restricted.'],
     ['User choice','You can decline and still read this Info page, but the Manager will not open modules. You can stop using TU and remove local data through browser or PDA storage controls. Contact the project maintainer through the links on this Info page for questions about information handling.'],
     ['Agreement','By selecting I Agree, you confirm that you have reviewed these terms and consent to the described processing for TU features. Acceptance is recorded by the TU backend against your verified Torn player ID and cached on this device; renewed acceptance may be required when terms change.']
   ];
@@ -140,7 +141,7 @@ const TU_TERMS_VERSION='1.0';
   }
 
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.4.53-dev';
+  const TU_VERSION='0.4.54-dev';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -452,7 +453,7 @@ const TU_TERMS_VERSION='1.0';
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.53-dev (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.54-dev (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
