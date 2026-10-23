@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.62-dev
+// @version      0.4.63-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -165,7 +165,7 @@ let currentAgreement=null;
   }
 
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.4.62-dev';
+  const TU_VERSION='0.4.63-dev';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -477,7 +477,7 @@ let currentAgreement=null;
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.62-dev (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.63-dev (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
@@ -748,6 +748,38 @@ let currentAgreement=null;
             if(temporaryToken)try{await devRequest('/api/auth/logout','POST',{},temporaryToken)}catch(_){}
           }
         }));
+        const revokeTest=makeButton('Test Agreement Cancellation Revocation',async()=>{
+          if(!confirm('This test cancels your current agreement, revokes your sessions, and requires agreement acceptance again. Continue?'))return;
+          revokeTest.disabled=true;
+          securityStatus.textContent='Checking active session before cancellation…';
+          try{
+            const token=await restoreDevSession();
+            await devRequest('/api/auth/me','GET',null,token);
+            securityStatus.textContent='Active session confirmed. Cancelling agreement…';
+            await devRequest('/api/auth/agreement','POST',{action:'cancelled',request_id:crypto.randomUUID()},token);
+            sessionStorage.removeItem(DEV_SESSION_KEY);
+            // The original bearer must be rejected by the protected endpoint.
+            let rejected=false;
+            try{await devRequest('/api/auth/me','GET',null,token)}
+            catch(error){rejected=/Unauthorized|HTTP 401/i.test(error.message)}
+            // Cancellation succeeded regardless of the enforcement test outcome.
+            localStorage.removeItem(USER_PUBLIC_KEY_STORAGE);
+            localStorage.removeItem('tu:agreement:verified-key:v1');
+            localStorage.removeItem(TU_TERMS_KEY);
+            playerInfo=null;
+            tuNav.history.length=0;
+            tuNav.current='tu-pda-panel';
+            tuNav.exited=true;
+            stopModule();
+            securityStatus.textContent='Agreement cancellation: CONFIRMED\\nRevoked token rejected by /api/auth/me: '+(rejected?'PASS (HTTP 401 / Unauthorized)':'FAIL — protected endpoint did not confirm rejection')+'\\nLocal TU key and agreement cleared. Reaccept the agreement to continue.';
+            alert(securityStatus.textContent);
+            showAgreement();
+          }catch(error){
+            securityStatus.textContent='Test incomplete: '+error.message+'\\nLocal agreement and API key retained unless cancellation already succeeded.';
+          }finally{revokeTest.disabled=false}
+        });
+        revokeTest.style.margin='10px 0';
+        content.append(revokeTest);
         const sessionsHeading=document.createElement('h4');sessionsHeading.textContent='Development Sessions';content.append(sessionsHeading);
         const sessionsBox=document.createElement('div');sessionsBox.style.cssText='display:grid;gap:8px;margin:8px 0 16px';content.append(sessionsBox);
         const loadSessions=async()=>{
