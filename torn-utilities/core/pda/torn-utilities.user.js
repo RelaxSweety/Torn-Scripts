@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.51-dev
+// @version      0.4.52-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -39,14 +39,14 @@ const TU_TERMS_VERSION='1.0';
     if(method==='POST'&&typeof PDA_httpPost==='function'){
       try{return parse(await PDA_httpPost(url,payload,headers),'PDA_httpPost')}
       catch(error){
-        if(/HTTP\s*[45]\d\d|status\s*[45]\d\d/i.test(error.message))throw error;
+        if(/HTTP\s*[45]\d\d|status\s*[45]\d\d|HTTP response:\s*(Unauthorized|Forbidden|Invalid|Session|Account|Module|Current agreement)/i.test(error.message))throw error;
         failures.push('PDA_httpPost: '+error.message);
       }
     }
     if(method==='GET'&&typeof PDA_httpGet==='function'){
       try{return parse(await PDA_httpGet(url,headers),'PDA_httpGet')}
       catch(error){
-        if(/HTTP\s*[45]\d\d|status\s*[45]\d\d/i.test(error.message))throw error;
+        if(/HTTP\s*[45]\d\d|status\s*[45]\d\d|HTTP response:\s*(Unauthorized|Forbidden|Invalid|Session|Account|Module|Current agreement)/i.test(error.message))throw error;
         failures.push('PDA_httpGet: '+error.message);
       }
     }
@@ -58,14 +58,14 @@ const TU_TERMS_VERSION='1.0';
         if(response.status<200||response.status>=300)throw Error(result.error||'HTTP '+response.status);
         return result;
       }catch(error){
-        if(/HTTP\s*[45]\d\d/i.test(error.message))throw error;
+        if(/HTTP\s*[45]\d\d|status\s*[45]\d\d|HTTP response:\s*(Unauthorized|Forbidden|Invalid|Session|Account|Module|Current agreement)/i.test(error.message))throw error;
         failures.push('GM_xmlhttpRequest: '+error.message);
       }
     }
     try{
       const response=await fetch(url,{method,headers,...(payload?{body:payload}:{}),cache:'no-store'});
       const result=parse(await response.text(),'fetch');
-      if(!response.ok)throw Error(result.error||'HTTP '+response.status);
+      if(!response.ok)throw Error('HTTP '+response.status+': '+(result.error||'Request rejected'));
       return result;
     }catch(error){
       failures.push('fetch: '+error.message);
@@ -140,7 +140,7 @@ const TU_TERMS_VERSION='1.0';
   }
 
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.4.51-dev';
+  const TU_VERSION='0.4.52-dev';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -451,7 +451,7 @@ const TU_TERMS_VERSION='1.0';
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.51-dev (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.52-dev (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
