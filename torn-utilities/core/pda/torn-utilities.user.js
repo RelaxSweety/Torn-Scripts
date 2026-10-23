@@ -32,50 +32,47 @@ let currentAgreement=null;
   async function devRequest(path,method='GET',body,token=devToken()){
     const url=DEV_BASE+path;
     const headers={'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})};
-    const payload=body?JSON.stringify(body):undefined;
-    const parse=(raw,transport)=>{
+    const payload=body===undefined||body===null?undefined:JSON.stringify(body);
+    const failures=[];
+    const parse=(raw,transport,status)=>{
       let value=raw;
-      if(value&&typeof value==='object'&&('responseText' in value||'data' in value||'body' in value||'response' in value))value=value.responseText??value.data??value.body??value.response;
-      if(typeof value==='string'){try{value=JSON.parse(value)}catch{throw Error(transport+': invalid JSON response ('+value.slice(0,180)+')')}}
-      if(!value||typeof value!=='object')throw Error(transport+': invalid server response ('+String(value).slice(0,180)+')');
+      if(value instanceof Map)value=Object.fromEntries(value);
+      if(value&&typeof value==='object'&&('responseText' in value||'data' in value||'body' in value||'response' in value)){
+        value=value.responseText??value.data??value.body??value.response;
+        if(value instanceof Map)value=Object.fromEntries(value);
+      }
+      if(typeof value==='string'){
+        try{value=JSON.parse(value)}catch{throw Error(transport+': invalid JSON response ('+value.slice(0,180)+')')}
+      }
+      if(!value||typeof value!=='object'||Array.isArray(value))throw Error(transport+': invalid server response ('+String(value).slice(0,180)+')');
+      if(typeof status==='number'&&(status<200||status>=300))throw Error('HTTP '+status+': '+(value.error||'Request rejected'));
       if(typeof value.error==='string'&&value.error)throw Error('HTTP response: '+value.error);
       return value;
     };
-    const failures=[];
-    // Match the verified Item Monitor transport priority. HTTP errors are final,
-    // not reasons to retry sensitive registration or agreement mutations.
+    const isHttpError=error=>/HTTP\\s*[45]\\d\\d|status\\s*[45]\\d\\d|HTTP response:/i.test(String(error?.message||error));
+    // A POST may have reached the server even when PDA returns an invalid response.
+    // Never replay a mutation over a different transport after an uncertain outcome.
     if(method==='POST'&&typeof PDA_httpPost==='function'){
       try{return parse(await PDA_httpPost(url,payload,headers),'PDA_httpPost')}
-      catch(error){
-        if(/HTTP\s*[45]\d\d|status\s*[45]\d\d|HTTP response:\s*(Unauthorized|Forbidden|Invalid|Session|Account|Module|Current agreement)/i.test(error.message))throw error;
-        failures.push('PDA_httpPost: '+error.message);
-      }
+      catch(error){throw Error('PDA_httpPost: '+error.message+'; POST not retried to prevent duplicate mutation')}
     }
     if(method==='GET'&&typeof PDA_httpGet==='function'){
       try{return parse(await PDA_httpGet(url,headers),'PDA_httpGet')}
-      catch(error){
-        if(/HTTP\s*[45]\d\d|status\s*[45]\d\d|HTTP response:\s*(Unauthorized|Forbidden|Invalid|Session|Account|Module|Current agreement)/i.test(error.message))throw error;
-        failures.push('PDA_httpGet: '+error.message);
-      }
+      catch(error){if(isHttpError(error))throw error;failures.push('PDA_httpGet: '+error.message)}
     }
     const gm=typeof GM_xmlhttpRequest==='function'?GM_xmlhttpRequest:typeof GM!=='undefined'&&typeof GM.xmlHttpRequest==='function'?GM.xmlHttpRequest:null;
     if(gm){
       try{
         const response=await new Promise((resolve,reject)=>gm({method,url,headers,data:payload,timeout:15000,onload:resolve,onerror:()=>reject(Error('network error')),ontimeout:()=>reject(Error('timeout'))}));
-        const result=parse(response,'GM_xmlhttpRequest');
-        if(response.status<200||response.status>=300)throw Error(result.error||'HTTP '+response.status);
-        return result;
-      }catch(error){
-        if(/HTTP\s*[45]\d\d|status\s*[45]\d\d|HTTP response:\s*(Unauthorized|Forbidden|Invalid|Session|Account|Module|Current agreement)/i.test(error.message))throw error;
-        failures.push('GM_xmlhttpRequest: '+error.message);
-      }
+        return parse(response,'GM_xmlhttpRequest',response.status);
+      }catch(error){if(isHttpError(error)||method!=='GET')throw error;failures.push('GM_xmlhttpRequest: '+error.message)}
     }
+    if(method!=='GET')throw Error('No safe PDA POST transport available; request not retried');
     try{
-      const response=await fetch(url,{method,headers,...(payload?{body:payload}:{}),cache:'no-store'});
-      const result=parse(await response.text(),'fetch');
-      if(!response.ok)throw Error('HTTP '+response.status+': '+(result.error||'Request rejected'));
-      return result;
+      const response=await fetch(url,{method,headers,cache:'no-store'});
+      return parse(await response.text(),'fetch',response.status);
     }catch(error){
+      if(isHttpError(error))throw error;
       failures.push('fetch: '+error.message);
       throw Error(failures.join(' | '));
     }
