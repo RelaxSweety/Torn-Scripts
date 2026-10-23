@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.44-dev
+// @version      0.4.45-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -23,17 +23,53 @@ const TU_TERMS_VERSION='1.0';
   const devToken=()=>sessionStorage.getItem(DEV_SESSION_KEY)||'';
   async function devRequest(path,method='GET',body,token=devToken()){
     const url=DEV_BASE+path;
-    const headers={'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{})};
+    const headers={'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})};
     const payload=body?JSON.stringify(body):undefined;
-    let response;
-    try{response=await fetch(url,{method,headers,...(payload?{body:payload}:{}),cache:'no-store'});}
-    catch(error){
-      if(typeof GM_xmlhttpRequest!=='function')throw Error('PDA blocked the development Worker request: '+error.message);
-      response=await new Promise((resolve,reject)=>GM_xmlhttpRequest({method,url,headers,data:payload,timeout:15000,onload:r=>resolve({ok:r.status>=200&&r.status<300,status:r.status,json:async()=>JSON.parse(r.responseText)}),onerror:()=>reject(Error('PDA network request failed')),ontimeout:()=>reject(Error('PDA development Worker request timed out'))}));
+    const parse=(raw,transport)=>{
+      let value=raw;
+      if(value&&typeof value==='object'&&('responseText' in value||'data' in value||'body' in value||'response' in value))value=value.responseText??value.data??value.body??value.response;
+      if(typeof value==='string'){try{value=JSON.parse(value)}catch{throw Error(transport+': invalid JSON response')}}
+      if(!value||typeof value!=='object')throw Error(transport+': invalid server response');
+      return value;
+    };
+    const failures=[];
+    // Match the verified Item Monitor transport priority. HTTP errors are final,
+    // not reasons to retry sensitive registration or agreement mutations.
+    if(method==='POST'&&typeof PDA_httpPost==='function'){
+      try{return parse(await PDA_httpPost(url,payload,headers),'PDA_httpPost')}
+      catch(error){
+        if(/HTTP\s*[45]\d\d|status\s*[45]\d\d/i.test(error.message))throw error;
+        failures.push('PDA_httpPost: '+error.message);
+      }
     }
-    const result=await response.json().catch(()=>({}));
-    if(!response.ok)throw Error(result.error||('Development server HTTP '+response.status));
-    return result;
+    if(method==='GET'&&typeof PDA_httpGet==='function'){
+      try{return parse(await PDA_httpGet(url,headers),'PDA_httpGet')}
+      catch(error){
+        if(/HTTP\s*[45]\d\d|status\s*[45]\d\d/i.test(error.message))throw error;
+        failures.push('PDA_httpGet: '+error.message);
+      }
+    }
+    const gm=typeof GM_xmlhttpRequest==='function'?GM_xmlhttpRequest:typeof GM!=='undefined'&&typeof GM.xmlHttpRequest==='function'?GM.xmlHttpRequest:null;
+    if(gm){
+      try{
+        const response=await new Promise((resolve,reject)=>gm({method,url,headers,data:payload,timeout:15000,onload:resolve,onerror:()=>reject(Error('network error')),ontimeout:()=>reject(Error('timeout'))}));
+        const result=parse(response,'GM_xmlhttpRequest');
+        if(response.status<200||response.status>=300)throw Error(result.error||'HTTP '+response.status);
+        return result;
+      }catch(error){
+        if(/HTTP\s*[45]\d\d/i.test(error.message))throw error;
+        failures.push('GM_xmlhttpRequest: '+error.message);
+      }
+    }
+    try{
+      const response=await fetch(url,{method,headers,...(payload?{body:payload}:{}),cache:'no-store'});
+      const result=parse(await response.text(),'fetch');
+      if(!response.ok)throw Error(result.error||'HTTP '+response.status);
+      return result;
+    }catch(error){
+      failures.push('fetch: '+error.message);
+      throw Error(failures.join(' | '));
+    }
   }
   async function devAccept(key,platform){
     const registration=await devRequest('/api/auth/register','POST',{api_key:key,platform},'');
@@ -77,7 +113,7 @@ const TU_TERMS_VERSION='1.0';
   }
 
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.4.44-dev';
+  const TU_VERSION='0.4.45-dev';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
