@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.60-dev
+// @version      0.4.61-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -126,8 +126,24 @@ let currentAgreement=null;
     try{return await sessionRecovery}finally{sessionRecovery=null}
   }
   async function devCancel(){
-    const token=devToken();
-    if(!token)throw Error('No development session available; cannot confirm cancellation');
+    let token=devToken();
+    if(token){
+      try{await devRequest('/api/auth/me','GET',null,token)}
+      catch(error){
+        if(!/Unauthorized|HTTP 401/i.test(error.message))throw error;
+        sessionStorage.removeItem(DEV_SESSION_KEY);
+        token='';
+      }
+    }
+    if(!token){
+      // Reauthenticate only for cancellation. Do not record another acceptance.
+      const key=localStorage.getItem('tu:public-api-key:v1')||'';
+      if(!/^[A-Za-z0-9]{16}$/.test(key))throw Error('Saved Public Only API key unavailable for cancellation');
+      const registration=await devRequest('/api/auth/register','POST',{api_key:key,platform:'pda'},'');
+      if(!registration.token)throw Error('Cancellation reauthentication returned no session');
+      token=registration.token;
+      sessionStorage.setItem(DEV_SESSION_KEY,token);
+    }
     await devRequest('/api/auth/agreement','POST',{action:'cancelled',request_id:crypto.randomUUID()},token);
     sessionStorage.removeItem(DEV_SESSION_KEY);
   }
@@ -149,7 +165,7 @@ let currentAgreement=null;
   }
 
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.4.60-dev';
+  const TU_VERSION='0.4.61-dev';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -461,7 +477,7 @@ let currentAgreement=null;
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.60-dev (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.61-dev (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
