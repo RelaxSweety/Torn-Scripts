@@ -57,13 +57,18 @@ let currentAgreement=null;
       catch(error){throw Error('PDA_httpPost: '+error.message+'; POST not retried to prevent duplicate mutation')}
     }
     if(method==='GET'&&typeof PDA_httpGet==='function'){
-      try{return parse(await PDA_httpGet(url,headers),'PDA_httpGet')}
-      catch(error){if(isHttpError(error))throw error;failures.push('PDA_httpGet: '+error.message)}
+      try{
+        // PDA's native helper is normally called with URL only. Some versions
+        // return undefined when an unsupported headers argument is supplied.
+        const response=token?await PDA_httpGet(url,headers):await PDA_httpGet(url);
+        return parse(response,'PDA_httpGet');
+      }catch(error){if(isHttpError(error))throw error;failures.push('PDA_httpGet: '+error.message)}
     }
     const gm=typeof GM_xmlhttpRequest==='function'?GM_xmlhttpRequest:typeof GM!=='undefined'&&typeof GM.xmlHttpRequest==='function'?GM.xmlHttpRequest:null;
     if(gm){
       try{
         const response=await new Promise((resolve,reject)=>gm({method,url,headers,data:payload,timeout:15000,onload:resolve,onerror:()=>reject(Error('network error')),ontimeout:()=>reject(Error('timeout'))}));
+        if(!response)throw Error('GM_xmlhttpRequest returned no response (check PDA script grants)');
         return parse(response,'GM_xmlhttpRequest',response.status);
       }catch(error){if(isHttpError(error)||method!=='GET')throw error;failures.push('GM_xmlhttpRequest: '+error.message)}
     }
