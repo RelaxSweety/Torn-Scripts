@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.46-dev
+// @version      0.5.47-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -282,11 +282,31 @@
     refreshIdentity();
     if(typeof render==='function'&&currentTab==='settings')render('settings');
   }
+  // Central TU design tokens. Modules consume CSS variables, not hard-coded colors.
+  const TU_THEME_KEY='tu:ui:theme:v1';
+  const TU_DENSITY_KEY='tu:ui:density:v1';
+  const TU_THEMES={
+    gold:{bg:'#11191d',panel:'#1b252b',header:'#101417',accent:'#d6b65c',border:'#cba953',input:'#283239',text:'#eeeeee',muted:'#c3c9cd',buttonText:'#111111'},
+    blue:{bg:'#111d2b',panel:'#1a3047',header:'#102238',accent:'#63b9ee',border:'#438cb8',input:'#263e53',text:'#f4f4f4',muted:'#c0d1df',buttonText:'#071723'},
+    light:{bg:'#f2f3f5',panel:'#ffffff',header:'#e8ebef',accent:'#b68a36',border:'#a78343',input:'#ffffff',text:'#20252b',muted:'#58616d',buttonText:'#161616'}
+  };
+  const getTUTheme=()=>TU_THEMES[localStorage.getItem(TU_THEME_KEY)]?localStorage.getItem(TU_THEME_KEY):'gold';
+  const getTUDensity=()=>['compact','standard','touch'].includes(localStorage.getItem(TU_DENSITY_KEY))?localStorage.getItem(TU_DENSITY_KEY):'standard';
+  const tuThemeStyle=document.createElement('style');tuThemeStyle.id='tu-design-system';(document.head||document.documentElement).appendChild(tuThemeStyle);
+  const applyTUTheme=()=>{
+    const t=TU_THEMES[getTUTheme()],density=getTUDensity(),space=density==='compact'?6:density==='touch'?16:12;
+    const root=document.documentElement;
+    for(const [key,value] of Object.entries({...t,spacing:space+'px',controlHeight:(density==='compact'?30:density==='touch'?48:36)+'px'}))root.style.setProperty('--tu-'+key.replace(/[A-Z]/g,m=>'-'+m.toLowerCase()),value);
+    tuThemeStyle.textContent=`#tu-pda-panel,#tuim-panel,#tuim-travel-window,#tuim-data-window,#tuim-catalog{background:var(--tu-bg)!important;color:var(--tu-text)!important;border-color:var(--tu-border)!important}#tu-pda-panel header,[data-tu-window-header]{background:var(--tu-header)!important;color:var(--tu-text)!important}#tu-pda-panel button:not(.tu-close),#tuim-panel button:not([data-tu-nav-controls] button),#tuim-travel-window button:not([data-tu-nav-controls] button),#tuim-data-window button:not([data-tu-nav-controls] button){background:var(--tu-accent)!important;color:var(--tu-button-text)!important;min-height:var(--tu-control-height)}#tuim-panel input,#tuim-panel select,#tuim-travel-window input,#tuim-travel-window select{background:var(--tu-input)!important;color:var(--tu-text)!important}#tuim-panel .tuim-header,#tuim-travel-window .tuim-travel-header,#tuim-data-window .tuim-travel-header{background:var(--tu-header)!important}#tuim-travel-window .tuim-travel-card,#tuim-data-window .tuim-travel-card{background:var(--tu-panel)!important;color:var(--tu-text)!important}#tu-pda-panel .tu-card{background:var(--tu-panel)!important;color:var(--tu-text)!important}`;
+    pageWindow.dispatchEvent(new CustomEvent('tu-theme-change',{detail:{theme:getTUTheme(),density}}));
+  };
+  applyTUTheme();
   let authorizationVerified=false;
   const authorized=()=>authorizationVerified&&!!devToken()&&!!readSavedKey()&&localStorage.getItem('tu:agreement:accepted')==='1.1';
   const publishAuthorization=ok=>{authorizationVerified=!!ok;pageWindow.dispatchEvent(new CustomEvent('tu-authorization-change',{detail:{authorized:authorized()}}));if(!authorized())stopModule();};
   const api = Object.freeze({
     isAuthorized:()=>authorized(),
+    getTheme:()=>Object.freeze({theme:getTUTheme(),density:getTUDensity()}),
     storage,
     getPlayer,
     async requestTorn(path,{format='json'}={}){
@@ -749,12 +769,25 @@
       if(!settingsPage)tuShowUpdateTools();
       if(!settingsPage){diagnosticModule=null;
         const h=document.createElement('h3');h.textContent='Settings';content.append(h);
-        for(const [id,name,desc] of [['time','Time Display','Local or TCT'],['api','Public Only API Key','Verify, view or remove key'],['storage','Storage & Backups','Export, restore or clear module data'],['diagnostics','Diagnostics','Manager and module reports']]){
+        for(const [id,name,desc] of [['theme','Appearance','Theme and layout density'],['time','Time Display','Local or TCT'],['api','Public Only API Key','Verify, view or remove key'],['storage','Storage & Backups','Export, restore or clear module data'],['diagnostics','Diagnostics','Manager and module reports']]){
           const card=document.createElement('div');card.className='tu-card';const body=document.createElement('div');body.style.flex='1';const label=document.createElement('strong');label.textContent=name;const detail=document.createElement('small');detail.textContent=desc;body.append(label,detail);card.append(body,makeButton('Open →',()=>{settingsPage=id;render('settings')}));content.append(card);
         }return;
       }
       const back=makeButton('← Settings',()=>{settingsPage=null;diagnosticModule=null;render('settings')});back.style.margin='0 0 12px';content.append(back);
-      const heading=document.createElement('h3');heading.textContent=({time:'Time Display',api:'Public Only API Key',storage:'Storage & Backups',diagnostics:'Diagnostics'})[settingsPage];content.append(heading);
+      const heading=document.createElement('h3');heading.textContent=({theme:'Appearance',time:'Time Display',api:'Public Only API Key',storage:'Storage & Backups',diagnostics:'Diagnostics'})[settingsPage];content.append(heading);
+      if(settingsPage==='theme'){
+        const selectSetting=(label,key,options)=>{
+          const wrap=document.createElement('label');wrap.textContent=label;wrap.style.cssText='display:block;margin:12px 0;color:var(--tu-text)';
+          const select=document.createElement('select');select.style.cssText='display:block;width:100%;min-height:40px;padding:8px;background:var(--tu-input);color:var(--tu-text);border:1px solid var(--tu-border);border-radius:6px';
+          for(const [value,text] of options){const opt=document.createElement('option');opt.value=value;opt.textContent=text;select.append(opt)}
+          select.value=key===TU_THEME_KEY?getTUTheme():getTUDensity();
+          select.addEventListener('change',()=>{localStorage.setItem(key,select.value);applyTUTheme()});
+          wrap.append(select);content.append(wrap);
+        };
+        selectSetting('Theme',TU_THEME_KEY,[['gold','TU Gold'],['blue','Blue'],['light','Light']]);
+        selectSetting('Layout density',TU_DENSITY_KEY,[['compact','Compact'],['standard','Standard'],['touch','Touch-friendly']]);
+        const note=document.createElement('p');note.textContent='Appearance changes apply immediately to compatible TU windows. Module-specific layouts will be migrated progressively.';content.append(note);
+      }
       if(settingsPage==='time'){
       const timeHeading=document.createElement('strong');timeHeading.textContent='Time Display';content.append(timeHeading);
       const timeDescription=document.createElement('p');timeDescription.textContent='Choose one timezone for TU travel estimates and observation timestamps.';content.append(timeDescription);
