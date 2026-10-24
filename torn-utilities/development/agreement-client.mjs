@@ -1,6 +1,6 @@
 // Development-only protocol adapter for TU Manager integration.
 // Not loaded by production Manager. No Torn API key is logged or persisted here.
-export const AGREEMENT=Object.freeze({agreement_version:"1.0",agreement_number:1,agreement_date:"2026-10-22"});
+export const AGREEMENT=Object.freeze({agreement_version:"1.1",agreement_number:2,agreement_date:"2026-10-23"});
 export const BASE="https://tu-multiplayer-server-dev.tuserver.workers.dev";
 export async function request(path,{method="GET",token,body}={}){
  const response=await fetch(BASE+path,{method,headers:{"content-type":"application/json",...(token?{authorization:"Bearer "+token}:{})},...(body?{body:JSON.stringify(body)}:{}),cache:"no-store"});
