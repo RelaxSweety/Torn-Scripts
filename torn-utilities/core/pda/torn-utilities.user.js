@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.65-dev
+// @version      0.4.66-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -908,7 +908,7 @@ let currentAgreement=null;
       const tornLogo=document.createElement('img');tornLogo.src='https://www.torn.com/favicon.ico';tornLogo.alt='Torn';tornLogo.width=30;tornLogo.height=30;tornLink.append(tornLogo);content.append(tornLink);
     }
   }
-  loadPublishedAgreement(true).then(()=>{render(hasAgreement()?'modules':'about');if(!hasAgreement())showAgreement();return restoreDevSession().catch(()=>{})}).catch(()=>{render('about');showAgreement()});
+  loadPublishedAgreement(true).then(()=>{render(hasAgreement()?'modules':'about');return hasAgreement()?restoreDevSession().catch(()=>{}):undefined}).catch(()=>{render('about')});
   render(hasAgreement()?'modules':'about');
   refreshRegistry();
   // Do not interrupt first-run API requests with an immediate alert.
