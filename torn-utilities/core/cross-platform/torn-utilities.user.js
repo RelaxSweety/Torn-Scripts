@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.40-dev
+// @version      0.5.41-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -13,6 +13,7 @@
 // @connect      api.torn.com
 // @connect      raw.githubusercontent.com
 // @connect      api.github.com
+// @connect      tu-multiplayer-server-dev.tuserver.workers.dev
 // @run-at       document-idle
 // @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/agreement-lifecycle-integration/torn-utilities/core/cross-platform/torn-utilities.user.js
 // @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/agreement-lifecycle-integration/torn-utilities/core/cross-platform/torn-utilities.user.js
@@ -333,8 +334,43 @@
   }
   function resetDevAuthFailure(){devAuthIssue='';devRenewalBlocked=false;}
   async function devRequest(path,method='GET',body,token=devToken()){
-    const response=await fetch(DEV_BASE+path,{method,headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{})},...(body?{body:JSON.stringify(body)}:{}),cache:'no-store'});
-    const result=await response.json().catch(()=>({}));
+    const url=DEV_BASE+path;
+    const headers={'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{})};
+    const payload=body?JSON.stringify(body):undefined;
+    const parse=raw=>{
+      if(raw==null)throw Error('Empty authentication response');
+      if(typeof raw==='string'){try{return JSON.parse(raw)}catch{throw Error('Invalid authentication JSON')}}
+      if(raw instanceof Map)return Object.fromEntries(raw);
+      if(typeof raw==='object'){
+        if(raw.responseText!==undefined)return parse(raw.responseText);
+        if(raw.response!==undefined&&typeof raw.response!=='function')return parse(raw.response);
+        if(raw.body!==undefined&&raw.status!==undefined)return parse(raw.body);
+        return raw;
+      }
+      throw Error('Unexpected authentication response');
+    };
+    const transport=async()=>{
+      const pdaGet=pageWindow.PDA_httpGet||window.PDA_httpGet;
+      const pdaPost=pageWindow.PDA_httpPost||window.PDA_httpPost;
+      // PDA's native bridge is the proven cross-origin transport. The bridge
+      // may return a JSON string or a Dart-backed Map rather than Response.
+      if(method==='GET'&&typeof pdaGet==='function'){
+        try{return {status:200,data:parse(await pdaGet(url))}}catch(error){console.warn('[TU] PDA GET bridge unavailable',error)}
+      }
+      if(method==='POST'&&typeof pdaPost==='function'){
+        try{return {status:200,data:parse(await pdaPost(url,payload,headers))}}catch(error){console.warn('[TU] PDA POST bridge unavailable',error)}
+      }
+      if(typeof GM_xmlhttpRequest==='function'){
+        return await new Promise((resolve,reject)=>GM_xmlhttpRequest({method,url,headers,...(payload?{data:payload}:{}),timeout:20000,
+          onload:r=>{try{resolve({status:r.status||200,data:parse(r.responseText??r.response)})}catch(e){reject(e)}},
+          onerror:()=>reject(Error('GM request network failure')),ontimeout:()=>reject(Error('GM request timeout'))}));
+      }
+      const response=await fetch(url,{method,headers,...(payload?{body:payload}:{}),cache:'no-store'});
+      return {status:response.status,data:await response.json().catch(()=>({}))};
+    };
+    const response=await transport();
+    const result=response.data||{};
+    response.ok=response.status>=200&&response.status<300;
     if(response.status===401&&!devRenewalBlocked&&token&&token===devToken()&&localStorage.getItem(TU_TERMS_KEY)===TU_TERMS_VERSION&&path!=='/api/auth/register'&&path!=='/api/auth/agreement'){
       const renewed=await renewDevSession();
       return devRequest(path,method,body,renewed);
