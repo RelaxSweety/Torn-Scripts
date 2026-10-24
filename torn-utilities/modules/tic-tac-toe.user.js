@@ -12,8 +12,8 @@
 // @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/tic-tac-toe.user.js
 // ==/UserScript==
 (()=>{
-  const TU_MODULE_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)||'0.6.4';
-"use strict";
+  "use strict";
+const TU_MODULE_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)||'0.6.4';
 if(window.__TU_TTT_MODULE__)return;window.__TU_TTT_MODULE__=true;
 const ID="tic-tac-toe";let panel=null,host=null,dragCleanup=null;
 const API="https://tu-multiplayer-server.tuserver.workers.dev",STORE="tu-ttt-pda-session-v1";
