@@ -322,6 +322,10 @@
   async function devRequest(path,method='GET',body,token=devToken()){
     const response=await fetch(DEV_BASE+path,{method,headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{})},...(body?{body:JSON.stringify(body)}:{}),cache:'no-store'});
     const result=await response.json().catch(()=>({}));
+    if(response.status===401&&token&&token===devToken()&&localStorage.getItem(TU_TERMS_KEY)===TU_TERMS_VERSION&&path!=='/api/auth/register'){
+      const renewed=await renewDevSession();
+      return devRequest(path,method,body,renewed);
+    }
     if(!response.ok){const error=Error(result.error||('Development server HTTP '+response.status));error.status=response.status;throw error;}
     return result;
   }
