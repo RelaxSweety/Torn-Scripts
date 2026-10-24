@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.37-dev
+// @version      0.5.38-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -471,7 +471,7 @@
 #tu-pda-panel[hidden]{display:none}
 #tu-pda-panel *{box-sizing:border-box}
 #tu-pda-panel header{display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px solid #4a3c21;position:sticky;top:0;z-index:100;background:#101417}
-#tu-pda-panel .tu-logo{font:bold italic 29px Georgia,serif;color:#f1ce72}
+#tu-pda-panel .tu-logo{flex:0 0 54px;width:54px;height:54px;display:grid;place-items:center;color:#f1ce72}
 #tu-pda-panel h2{font-size:22px;margin:0;color:#f1ce72}
 #tu-pda-panel p{margin:4px 0;color:#aeb4bd}
 #tu-pda-panel button{cursor:pointer}
@@ -491,13 +491,19 @@
   const launcher = document.createElement('button');
   launcher.id = 'tu-pda-launcher';
   launcher.type = 'button';
-  launcher.textContent = 'TU';
+  // One compact monogram shared by the launcher and Manager header.
+  const tuBrandSvg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><rect x="2" y="2" width="60" height="60" rx="15" fill="#101719" stroke="#e3bb57" stroke-width="3"/><text x="32" y="41" text-anchor="middle" fill="#f1ce72" font-family="Georgia,serif" font-size="26" font-weight="bold" font-style="italic" letter-spacing="-3">TU</text></svg>';
+  launcher.innerHTML=tuBrandSvg;
+  launcher.style.padding='0';
+  launcher.querySelector('svg').style.cssText='width:100%;height:100%;display:block';
   launcher.setAttribute('aria-label', 'Open Torn Utilities; drag to reposition');
   document.body.appendChild(launcher);
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.34 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.38-dev</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.querySelector('.tu-logo').innerHTML=tuBrandSvg;
+  panel.querySelector('.tu-logo svg').style.cssText='width:54px;height:54px;display:block';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
