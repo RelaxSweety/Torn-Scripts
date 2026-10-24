@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.46.1-dev
+// @version      0.5.42-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -280,7 +280,7 @@
     const ok=await updatePlayer(key);
     if(!ok)console.warn('[TU] Saved key verification failed:',identityStatus);
     refreshIdentity();
-    if(typeof render==='function'&&(currentTab==='settings'||currentTab==='about'))render(currentTab);
+    if(typeof render==='function'&&currentTab==='settings')render('settings');
   }
   let authorizationVerified=false;
   const authorized=()=>authorizationVerified&&!!devToken()&&!!readSavedKey()&&localStorage.getItem('tu:agreement:accepted')==='1.1';
@@ -539,24 +539,21 @@
 #tu-pda-panel footer{border-top:1px solid #59451d;padding:13px;color:#aeb4bd;font-size:12px}
 `;
   document.head.appendChild(style);
-  const TU_LOGO_IMAGE='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/agreement-lifecycle-integration/torn-utilities/assets/tu-logo-standard.webp';
   const launcher = document.createElement('button');
   launcher.id = 'tu-pda-launcher';
   launcher.type = 'button';
   for(const old of document.querySelectorAll('#tu-pda-launcher'))old.remove();
-  launcher.textContent = '';
-  launcher.style.background=`#080c10 url('${TU_LOGO_IMAGE}') center / contain no-repeat`;
+  launcher.textContent = 'TU';
   launcher.dataset.tuBrand='canonical';
   launcher.setAttribute('aria-label', 'Open Torn Utilities; drag to reposition');
   document.body.appendChild(launcher);
   const brandStyle=document.createElement('style');brandStyle.textContent='.tu-brand-emblem{display:inline-grid;place-items:center;width:32px;height:32px;flex:none;border:2px solid #e3bb57;border-radius:50%;background:radial-gradient(circle at 35% 25%,#293b45,#07090b 70%);color:#f5d87e;font:bold italic 18px Georgia,serif;letter-spacing:-1px;box-shadow:0 2px 9px #000b}';document.head.appendChild(brandStyle);
-  brandStyle.textContent+=`.tu-brand-emblem{background:#080c10 url('${TU_LOGO_IMAGE}') center / contain no-repeat!important;color:transparent!important;font-size:0!important}`;
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
   panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.34 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
-  const headerBrand=panel.querySelector('.tu-logo');if(headerBrand){headerBrand.textContent='';headerBrand.classList.add('tu-brand-emblem');}
+  const headerBrand=panel.querySelector('.tu-logo');if(headerBrand){headerBrand.textContent='TU';headerBrand.classList.add('tu-brand-emblem');}
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
   identityLine.style.cssText='margin:3px 0 0;font-size:12px;color:#e4c779;overflow-wrap:anywhere';
@@ -564,7 +561,6 @@
   const refreshIdentity=()=>{
     const player=getPlayer();
     identityLine.textContent=player?.id?(player.name||'Verified player')+' ['+player.id+']'+(player.factionId?' · '+(player.factionName||'Faction')+' ['+player.factionId+']':''):(identityStatus.startsWith('Verifying')?'Verifying saved player…':'Player not identified');
-    identityLine.title=identityStatus;
   };
   refreshIdentity();
   pageWindow.addEventListener('tu-player-updated',refreshIdentity);
@@ -879,13 +875,6 @@
       }
     }else{
       const p=document.createElement('p');p.textContent='Torn Utilities v0.5.34 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
-      const identityBox=document.createElement('div');identityBox.className='tu-card';identityBox.style.cssText='display:flex;flex-direction:column;gap:6px;margin:12px 0';
-      const identityTitle=document.createElement('strong');identityTitle.textContent='Torn API Identity';identityBox.append(identityTitle);
-      const identityValue=document.createElement('span');const identified=getPlayer();identityValue.textContent=identified?.id?'Player: '+(identified.name||'Verified player')+' ['+identified.id+']':'Player: Not identified';identityBox.append(identityValue);
-      const identityKey=document.createElement('span');identityKey.textContent='Public Only key: '+(readSavedKey()?'Saved':'Missing');identityBox.append(identityKey);
-      const identityState=document.createElement('span');identityState.textContent='Identity verification: '+identityStatus;identityBox.append(identityState);
-      identityBox.append(makeButton('Retry player identification',async()=>{identityState.textContent='Identity verification: Retrying…';await updatePlayer(readSavedKey());refreshIdentity();render('about')}));
-      content.append(identityBox);
       if(devAuthIssue){const issue=document.createElement('p');issue.setAttribute('role','status');issue.textContent=devAuthIssue;content.append(issue,makeButton('Retry saved API key',()=>{resetDevAuthFailure();void restoreDevSession();}));}
       const termsHeading=document.createElement('h3');termsHeading.textContent='Terms of Use and Information Use Agreement';content.append(termsHeading);appendTerms(content);if(!hasAgreement())content.append(makeButton('Review and Accept Terms',showAgreement));
       const guideLink=document.createElement('a');guideLink.href='https://github.com/RelaxSweety/Torn-Scripts/blob/main/torn-utilities/INSTALLATION.md';guideLink.target='_blank';guideLink.rel='noopener noreferrer';guideLink.textContent='TU Installation & Module Setup Guide ↗';guideLink.style.cssText='display:block;margin:12px 0;padding:12px;border:1px solid #806a3e;border-radius:8px;color:#e4c779;text-decoration:underline;font-weight:600';content.append(guideLink);
@@ -944,7 +933,6 @@
     el.style.maxHeight='calc(100dvh - 12px)';
     el.style.overflow='auto';
     el.style.resize='both';
-    el.style.setProperty('resize','both','important');
     el.style.minWidth='220px';
     el.style.minHeight='120px';
     el.style.overflowWrap='anywhere';
@@ -1011,10 +999,10 @@
     for(const id of floatIds){
       if(id==='tu-pda-panel')continue;
       const el=tuRoot(id);if(!el||el.dataset.tuModuleNav==='1')continue;
-      const bar=el.querySelector('header,.tu-header,.tuim-header,.tuim-travel-header,.tuac-header,[data-tu-window-header]')||el.firstElementChild;if(!bar)continue;
-      el.dataset.tuNavHeader='1';bar.dataset.tuWindowHeader='1';for(const oldButton of [...bar.querySelectorAll('button')]){if(['−','—','×'].includes(oldButton.textContent.trim())&&!oldButton.closest('[data-tu-nav-controls]'))oldButton.style.display='none';}
-      if(!bar.querySelector('[data-tu-brand-emblem]')){const emblem=document.createElement('span');emblem.className='tu-brand-emblem';emblem.dataset.tuBrandEmblem='1';emblem.textContent='';bar.prepend(emblem);}
-      if(bar.querySelector('[data-tu-nav-controls]'))continue;bar.style.position='sticky';bar.style.top='0';bar.style.zIndex='100';bar.style.background='#101417';if(id==='tuim-panel'){bar.style.setProperty('top','-12px');bar.style.setProperty('margin-top','-12px');bar.style.setProperty('padding-top','18px');bar.style.setProperty('background','#101417');}bar.style.display='flex';bar.style.alignItems='center';bar.style.flexWrap='wrap';bar.style.gap='6px';
+      const bar=el.querySelector('header,.tu-header,.tuim-header,.tuim-travel-header,.tuac-header');if(!bar)continue;
+      el.dataset.tuNavHeader='1';for(const oldButton of [...bar.querySelectorAll('button')]){if(['−','—','×'].includes(oldButton.textContent.trim())&&!oldButton.closest('[data-tu-nav-controls]'))oldButton.style.display='none';}
+      if(!bar.querySelector('[data-tu-brand-emblem]')){const emblem=document.createElement('span');emblem.className='tu-brand-emblem';emblem.dataset.tuBrandEmblem='1';emblem.textContent='TU';bar.prepend(emblem);}
+      if(bar.querySelector('[data-tu-nav-controls]'))continue;bar.style.position='sticky';bar.style.top='0';bar.style.zIndex='100';bar.style.background='#101417';
       const controls=document.createElement('span');controls.dataset.tuNavControls='1';controls.style.cssText='margin-left:auto;display:flex;gap:5px';
       for(const [label,title,fn] of [['←','Back',tuBack],['−','Minimize',tuMinimize],['×','Exit',tuExit]]){
         const b=document.createElement('button');b.type='button';b.textContent=label;b.title=title;b.setAttribute('aria-label',title);
