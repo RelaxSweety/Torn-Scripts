@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.44-dev
+// @version      0.5.37-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -25,10 +25,7 @@
   if (pageWindow.__RELAX_TORN_UTILITIES_PDA__) return;
   pageWindow.__RELAX_TORN_UTILITIES_PDA__ = true;
   const KEY = 'relaxsweety_tu_pda_v1';
-  // The userscript header is authoritative; PDA may not expose GM_info.
-  const TU_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)
-    ||document.currentScript?.textContent?.match(/^\/\/\s*@version\s+([^\s]+)/m)?.[1]
-    ||'0.5.44-dev';
+  const TU_VERSION='0.5.35-dev';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -284,10 +281,7 @@
     refreshIdentity();
     if(typeof render==='function'&&currentTab==='settings')render('settings');
   }
-  let serverAuthorized=false;
-  const setAuthorization=(value)=>{serverAuthorized=!!value;pageWindow.dispatchEvent(new CustomEvent('tu-authorization-change',{detail:{authorized:serverAuthorized}}));if(!serverAuthorized)stopModule();};
   const api = Object.freeze({
-    isAuthorized:()=>serverAuthorized&&hasAgreement(),
     storage,
     getPlayer,
     async requestTorn(path,{format='json'}={}){
@@ -373,7 +367,7 @@
       if(token){
         try{
           const status=await devRequest('/api/auth/agreement','GET',null,token);
-          if(status.accepted){setAuthorization(true);return;}
+          if(status.accepted)return;
           localStorage.removeItem(TU_TERMS_KEY);
           sessionStorage.removeItem(DEV_SESSION_KEY);
           return;
@@ -382,11 +376,9 @@
         }
       }
       await renewDevSession();
-      setAuthorization(true);
       resetDevAuthFailure();
       render('modules');
     }catch(error){
-      setAuthorization(false);
       console.warn('[TU] Session restore unavailable:',error.message);
       render('about');
     }
@@ -400,7 +392,6 @@
     if(!status.accepted)throw Error('Development agreement was not confirmed');
     sessionStorage.setItem(DEV_SESSION_KEY,token);
     resetDevAuthFailure();
-    setAuthorization(true);
     return status;
   }
   async function devCancel(){
@@ -408,7 +399,6 @@
     if(!token)throw Error('No development session available; cannot confirm cancellation');
     await devRequest('/api/auth/agreement','POST',{action:'cancelled',request_id:crypto.randomUUID()},token);
     sessionStorage.removeItem(DEV_SESSION_KEY);
-    setAuthorization(false);
   }
   const TU_TERMS_KEY='tu:agreement:accepted';
   const TU_TERMS=[
@@ -428,7 +418,7 @@
     moduleHost.replaceChildren(); moduleHost.hidden=true;
   }
   function openModule(id) {
-    if(!serverAuthorized||!hasAgreement()){showAgreement();return false;}
+    if(!hasAgreement()){showAgreement();return false;}
     const mod=registered.get(id);
     if (!mod || saved.disabled?.[id]) return false;
     stopModule();
@@ -453,7 +443,7 @@
   const tuRoots=['tu-pda-panel','tuim-panel','tuim-catalog','tuim-travel-window','tuim-data-window','tuac-panel','tca-panel','tca-playbar','tpfg-root','tpfg-manager','tpfg-prompt','sff-root','tu-diagnostics-window'];
   const tuRoot=id=>document.getElementById(id);
   const tuHideAll=()=>tuRoots.forEach(id=>{const el=tuRoot(id);if(el){el.hidden=true;if(id==='tpfg-root')el.style.display='none';}});
-  const tuShow=id=>{const el=tuRoot(id);if(!el)return false;tuHideAll();el.hidden=false;el.style.removeProperty('display');if(id==='tpfg-root')el.style.display='block';if(id==='tu-pda-panel'){el.style.setProperty('position','fixed','important');el.style.setProperty('z-index','2147483647','important');el.style.setProperty('visibility','visible','important');el.style.setProperty('pointer-events','auto','important');}tuNav.current=id;tuNav.minimized=false;tuNav.exited=false;return true;};
+  const tuShow=id=>{const el=tuRoot(id);if(!el)return false;tuHideAll();el.hidden=false;if(id==='tpfg-root')el.style.display='block';tuNav.current=id;tuNav.minimized=false;tuNav.exited=false;return true;};
   const tuOpen=id=>{if(!tuRoot(id))return false;if(tuNav.current!==id&&tuRoot(tuNav.current))tuNav.history.push(tuNav.current);return tuShow(id);};
   const tuBack=(source)=>{const parents={'tuim-travel-window':'tuim-panel','tuim-data-window':'tuim-travel-window','tuim-catalog':'tuim-panel'};const parent=parents[source];if(parent&&tuRoot(parent)){if(tuNav.history[tuNav.history.length-1]===parent)tuNav.history.pop();return tuShow(parent);}if(source&&tuRoot(source))tuNav.current=source;while(tuNav.history.length){const id=tuNav.history.pop();if(tuRoot(id))return tuShow(id);}return tuShow('tu-pda-panel');};
   const tuMinimize=(source)=>{if(source&&tuRoot(source))tuNav.current=source;
@@ -465,16 +455,7 @@
   };
   const tuExit=(source)=>{tuNav.history.length=0;tuNav.current='tu-pda-panel';tuMinimize();tuNav.exited=true;stopModule();};
   const tuRestore=()=>{
-    if(!serverAuthorized||!hasAgreement()){
-      tuNav.history.length=0;tuNav.current='tu-pda-panel';
-      tuNav.minimized=false;tuNav.exited=false;
-      tuShow('tu-pda-panel');
-      showAgreement();
-      return true;
-    }
-    const staleAgreement=document.getElementById('tu-agreement-overlay');
-    if(staleAgreement)staleAgreement.remove();
-    if(tuNav.exited){tuNav.history.length=0;tuNav.current='tu-pda-panel';render('modules');}
+    if(tuNav.exited){tuNav.history.length=0;tuNav.current='tu-pda-panel';render(hasAgreement()?'modules':'about');if(!hasAgreement())showAgreement();}
     let id=tuNav.current;
     if(!tuRoot(id)&&active){id=({'item-monitor':'tuim-panel','flight-game':'tpfg-root','stick-fighter':'sff-root'}[active]||id);}
     return tuShow(tuRoot(id)?id:'tu-pda-panel');
@@ -483,14 +464,14 @@
   const style = document.createElement('style');
   style.textContent = `
 #tu-pda-panel .tu-refresh-icon{display:inline-block}#tu-pda-panel .tu-spinning{animation:tu-refresh-spin .8s linear infinite}@keyframes tu-refresh-spin{to{transform:rotate(360deg)}}
-#tu-pda-launcher{position:fixed;left:12px;top:38%;z-index:2147483645;touch-action:none;width:43px;height:43px;border-radius:12px;border:0;background:transparent;color:#f5d87e;box-shadow:0 2px 9px #000b,inset 0 0 4px #f5d87e66;font:bold italic 23px 'Palatino Linotype','Book Antiqua',Georgia,serif;letter-spacing:-2px;padding:0 2px 0 0;display:flex;align-items:center;justify-content:center;line-height:1;cursor:grab;user-select:none;-webkit-user-select:none}
+#tu-pda-launcher{position:fixed;left:12px;top:38%;z-index:2147483645;touch-action:none;width:43px;height:43px;border-radius:50%;border:2px solid #e3bb57;background:radial-gradient(circle at 35% 25%,#293b45,#07090b 70%);color:#f5d87e;box-shadow:0 2px 9px #000b,inset 0 0 4px #f5d87e66;font:bold italic 23px 'Palatino Linotype','Book Antiqua',Georgia,serif;letter-spacing:-2px;padding:0 2px 0 0;display:flex;align-items:center;justify-content:center;line-height:1;cursor:grab;user-select:none;-webkit-user-select:none}
 #tu-pda-launcher:active{cursor:grabbing}
 #tu-pda-launcher[hidden]{display:none!important}
 #tu-pda-panel{position:fixed;z-index:2147483644;inset:8% 3% auto 3%;max-width:440px;margin:auto;max-height:82vh;overflow:auto;background:#101417;color:#eee;border:1px solid #c49a46;border-radius:18px;box-shadow:0 10px 35px #000d;font:14px system-ui,Arial,sans-serif}
 #tu-pda-panel[hidden]{display:none}
 #tu-pda-panel *{box-sizing:border-box}
 #tu-pda-panel header{display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px solid #4a3c21;position:sticky;top:0;z-index:100;background:#101417}
-#tu-pda-panel .tu-logo{flex:0 0 54px;width:54px;height:54px;display:grid;place-items:center;color:#f1ce72}
+#tu-pda-panel .tu-logo{font:bold italic 29px Georgia,serif;color:#f1ce72}
 #tu-pda-panel h2{font-size:22px;margin:0;color:#f1ce72}
 #tu-pda-panel p{margin:4px 0;color:#aeb4bd}
 #tu-pda-panel button{cursor:pointer}
@@ -510,19 +491,13 @@
   const launcher = document.createElement('button');
   launcher.id = 'tu-pda-launcher';
   launcher.type = 'button';
-  // One compact monogram shared by the launcher and Manager header.
-  const tuBrandSvg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><rect x="2" y="2" width="60" height="60" rx="15" fill="#101719" stroke="#e3bb57" stroke-width="3"/><text x="32" y="41" text-anchor="middle" fill="#f1ce72" font-family="Georgia,serif" font-size="26" font-weight="bold" font-style="italic" letter-spacing="-3">TU</text></svg>';
-  launcher.innerHTML=tuBrandSvg;
-  launcher.style.padding='0';
-  launcher.querySelector('svg').style.cssText='width:100%;height:100%;display:block';
+  launcher.textContent = 'TU';
   launcher.setAttribute('aria-label', 'Open Torn Utilities; drag to reposition');
   document.body.appendChild(launcher);
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v'+TU_VERSION+'</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
-  panel.querySelector('.tu-logo').innerHTML=tuBrandSvg;
-  panel.querySelector('.tu-logo svg').style.cssText='width:54px;height:54px;display:block';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.34 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
@@ -570,10 +545,10 @@
     for(const [title,body] of TU_TERMS){const h=document.createElement('h3');h.textContent=title;const p=document.createElement('p');p.textContent=body;target.append(h,p);}
   }
   function showAgreement(){
-    panel.hidden=false;if(currentTab!=='about')render('about');
-    const existing=document.getElementById('tu-agreement-overlay');if(existing){existing.hidden=false;existing.style.display='flex';tuNav.minimized=false;tuNav.exited=false;panel.hidden=false;launcher.hidden=true;return;}
-    const overlay=document.createElement('div');overlay.id='tu-agreement-overlay';overlay.style.cssText='position:fixed!important;inset:0!important;z-index:2147483647!important;background:transparent;display:flex;align-items:flex-start;justify-content:center;padding:12px;pointer-events:none';
-    const dialog=document.createElement('section');dialog.style.cssText='background:#182026;color:#eee;border:2px solid #cba953;border-radius:12px;width:min(96vw,580px);max-height:90dvh;overflow:auto;padding:18px;position:relative;z-index:2147483647;font:14px/1.5 system-ui;pointer-events:auto;box-shadow:0 10px 35px #000d';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');
+    panel.hidden=false;render('about');
+    const existing=document.getElementById('tu-agreement-overlay');if(existing){existing.hidden=false;return;}
+    const overlay=document.createElement('div');overlay.id='tu-agreement-overlay';overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#000d;display:flex;align-items:center;justify-content:center;padding:12px';
+    const dialog=document.createElement('section');dialog.style.cssText='background:#182026;color:#eee;border:2px solid #cba953;border-radius:12px;width:min(96vw,580px);max-height:90dvh;overflow:auto;padding:18px;font:14px/1.5 system-ui';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');
     const h=document.createElement('h2');h.textContent='TU Terms and Information Use Agreement';dialog.append(h);appendTerms(dialog);
     const keyInfo=document.createElement('p');keyInfo.textContent='Public Only Torn API key: enter an optional key below to verify your identity. Never use a full-access key.';dialog.append(keyInfo);
     const key=document.createElement('input');key.type='password';key.autocomplete='off';key.maxLength=16;key.placeholder=readSavedKey()?'Public Only key already saved':'16-character Public Only API key';key.style.cssText='width:100%;box-sizing:border-box;padding:10px';dialog.append(key);
@@ -585,11 +560,11 @@
       if(!check.checked)return;
       const supplied=key.value.trim();if(supplied&&!/^[a-zA-Z0-9]{16}$/.test(supplied)){status.textContent='Enter a valid 16-character Public Only key';return;}
       const selected=supplied||readSavedKey();if(!/^[A-Za-z0-9]{16}$/.test(selected)){status.textContent='A 16-character Public Only key is required';return;}accept.disabled=true;try{status.textContent='Registering and recording development agreement…';await devAccept(selected,'tampermonkey');if(supplied)saveKey(supplied);await updatePlayer(selected);}catch(error){status.textContent='Development agreement failed: '+error.message;accept.disabled=false;return;}
-      localStorage.setItem(TU_TERMS_KEY,TU_TERMS_VERSION);setAuthorization(true);overlay.remove();render('modules');
+      localStorage.setItem(TU_TERMS_KEY,TU_TERMS_VERSION);overlay.remove();render('modules');
     });
     buttons.append(decline,accept);dialog.append(buttons);overlay.append(dialog);document.body.append(overlay);
     // Minimize the consent dialog without accepting; the user may visit Torn to retrieve an API key.
-    const minimizeAgreement=()=>{overlay.hidden=true;overlay.style.display='none';tuNav.minimized=true;tuNav.exited=false;panel.hidden=true;launcher.hidden=false;};
+    const minimizeAgreement=()=>{overlay.hidden=true;panel.hidden=true;launcher.hidden=false;};
     const agreementBar=document.createElement('div');agreementBar.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;background:#172026;z-index:2;padding:6px 0';
     const agreementTitle=document.createElement('strong');agreementTitle.textContent='TU Agreement';
     const minimizeButton=makeButton('− Minimize',minimizeAgreement);minimizeButton.setAttribute('aria-label','Minimize agreement to retrieve Torn API key');
@@ -840,7 +815,7 @@
       }
       }
     }else{
-      const p=document.createElement('p');p.textContent='Torn Utilities v'+TU_VERSION+' by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      const p=document.createElement('p');p.textContent='Torn Utilities v0.5.34 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
       if(devAuthIssue){const issue=document.createElement('p');issue.setAttribute('role','status');issue.textContent=devAuthIssue;content.append(issue,makeButton('Retry saved API key',()=>{resetDevAuthFailure();void restoreDevSession();}));}
       const termsHeading=document.createElement('h3');termsHeading.textContent='Terms of Use and Information Use Agreement';content.append(termsHeading);appendTerms(content);if(!hasAgreement())content.append(makeButton('Review and Accept Terms',showAgreement));
       const guideLink=document.createElement('a');guideLink.href='https://github.com/RelaxSweety/Torn-Scripts/blob/main/torn-utilities/INSTALLATION.md';guideLink.target='_blank';guideLink.rel='noopener noreferrer';guideLink.textContent='TU Installation & Module Setup Guide ↗';guideLink.style.cssText='display:block;margin:12px 0;padding:12px;border:1px solid #806a3e;border-radius:8px;color:#e4c779;text-decoration:underline;font-weight:600';content.append(guideLink);
@@ -864,14 +839,12 @@
     return !!el&&el.isConnected&&!el.hidden&&getComputedStyle(el).display!=='none'&&getComputedStyle(el).visibility!=='hidden';
   };
   const syncLauncher=()=>{
-    const consent=document.getElementById('tu-agreement-overlay');
-    if(consent&&!consent.hidden&&consent.style.display!=='none'){launcher.hidden=true;return;}
     const moduleVisible=!!active&&(['tuim-panel','tuim-catalog','tpfg-root','tpfg-manager','tpfg-prompt','sff-root','tca-panel','tca-playbar','tuac-panel'].some(isVisible)||[...moduleHost.children].some(el=>isVisible(el.id)||(!el.hidden&&el.getClientRects().length>0)));
     const hide=tuNav.minimized||tuNav.exited?false:(!panel.hidden||moduleVisible);
     if(launcher.hidden!==hide)launcher.hidden=hide;
   };
   const closePanel = () => { tuMinimize(); syncLauncher(); };
-  const togglePanel=()=>{try{if(tuNav.minimized||tuNav.exited||panel.hidden)tuRestore();else tuMinimize();}catch(error){console.error('[TU] Launcher restore failed',error);const overlay=document.getElementById('tu-agreement-overlay');if(overlay){overlay.hidden=true;overlay.style.display='none';}panel.hidden=true;tuNav.minimized=true;tuNav.exited=false;launcher.hidden=false;}syncLauncher();};
+  const togglePanel=()=>{if(tuNav.minimized||tuNav.exited)tuRestore();else tuMinimize();syncLauncher();};
   const navHeader=panel.querySelector('header');
   const addNavControl=(label,title,handler,before)=>{
     const b=document.createElement('button');b.type='button';b.textContent=label;b.title=title;b.setAttribute('aria-label',title);b.className='tu-nav-control';
@@ -980,8 +953,8 @@
   enhanceFloating();tuEnhanceHeaders();
   const floatingObserver=new MutationObserver(()=>{enhanceFloating();tuEnhanceHeaders();});
   floatingObserver.observe(document.body,{childList:true,subtree:true});
-  const visibilityObserver=new MutationObserver(()=>{if(!document.body.contains(launcher))return;syncLauncher();});
-  visibilityObserver.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['hidden']});
+  const visibilityObserver=new MutationObserver(syncLauncher);
+  visibilityObserver.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['style','hidden','class']});
   syncLauncher();
   const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
   const setPos = (x, y) => {
@@ -1001,16 +974,11 @@
     if (Math.hypot(dx,dy)>6) gesture.moved=true;
     if (gesture.moved) setPos(gesture.x+dx,gesture.y+dy);
   });
-  let suppressLauncherClick=false;
   launcher.addEventListener('pointerup', e => {
     if (!gesture || gesture.id !== e.pointerId) return;
     const moved=gesture.moved; gesture=null;
-    if (moved) { saved.x=launcher.offsetLeft; saved.y=launcher.offsetTop; persist(); suppressLauncherClick=true; }
-    // Click handles normal taps and keyboard activation.
-  });
-  launcher.addEventListener('click', e => {
-    if(suppressLauncherClick){suppressLauncherClick=false;e.preventDefault();return;}
-    togglePanel();
+    if (moved) { saved.x=launcher.offsetLeft; saved.y=launcher.offsetTop; persist(); }
+    else { togglePanel(); }
   });
   launcher.addEventListener('pointercancel', () => { gesture=null; });
   window.addEventListener('resize', () => {
