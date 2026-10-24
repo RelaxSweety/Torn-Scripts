@@ -12,7 +12,8 @@
 // @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/chaos-marbles.user.js
 // ==/UserScript==
 (()=>{
-  const TU_MODULE_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)||'0.2.4';'use strict';
+  'use strict';
+const TU_MODULE_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)||'0.2.4';
 const ID="chaos-marbles",KEY="tu:chaos-marbles:game",HISTORY="tu:chaos-marbles:history";
 const COLORS=["#dc6059","#e4b951","#5fb2da","#8fd17b"],NAMES=["Crimson","Gold","Azure","Emerald"];
 let panel=null,game=null,notice="",view="play",active=false,session=null,timer=null,busy=false,rolling=false,dieValue=1,rollTimer=null;const API="https://tu-multiplayer-server.tuserver.workers.dev/api/marbles",SESSION="tu:chaos-marbles:session";
