@@ -11,7 +11,8 @@
 // @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/torn-fleet.user.js
 // @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/torn-fleet.user.js
 // ==/UserScript==
-(()=>{'use strict';
+(()=>{
+  const TU_MODULE_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)||'0.2.4';'use strict';
 const ID="torn-fleet",API="https://tu-multiplayer-server.tuserver.workers.dev/api/battleship",STORE="tu:"+ID+":session";
 let mount=null,panel=null,timer=null,session=null,game=null,context=null,placement=[],fleet=[];
 try{session=JSON.parse(localStorage.getItem(STORE)||"null")}catch{}
@@ -56,7 +57,7 @@ const roomInfo=E("div",panel);roomInfo.className="room";const playerInfo=E("div"
 render();if(session)action("/"+session.room+"/state");timer=setInterval(()=>{if(session&&panel)action("/"+session.room+"/state")},2500);
 }
 function deactivate(){clearInterval(timer);timer=null;panel?.remove();panel=null;mount=null;context=null}
-const register=()=>(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register({id:ID,version:"0.2.4",activate,deactivate});
+const register=()=>(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register({id:ID,version:TU_MODULE_VERSION,activate,deactivate});
 if(!register())window.addEventListener("torn-utilities-ready",register,{once:true});
   // TU cross-world registration: retry after manager startup and SPA initialization.
   // Stop once this exact module is visible in the shared manager registry.
