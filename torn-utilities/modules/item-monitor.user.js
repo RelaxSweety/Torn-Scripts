@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.10.23
+// @version      1.10.24
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -10,6 +10,23 @@
 // @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/item-monitor.user.js
 // @run-at       document-idle
 // ==/UserScript==
+// TU Manager authorization gate (development): no module initialization before verified consent.
+(()=>{
+  let started=false;
+  const host=typeof unsafeWindow!=='undefined'?unsafeWindow:window;
+  const run=()=>{
+    if(started||host.TornUtilities?.isAuthorized?.()!==true)return;
+    started=true;
+    startModule();
+  };
+  const onAuth=e=>{
+    if(e?.detail?.authorized===false&&started){location.reload();return;}
+    run();
+  };
+  host.addEventListener('tu-authorization-change',onAuth);
+  host.addEventListener('torn-utilities-ready',run);
+  function startModule(){
+
 (()=>{
   'use strict';const TU_MODULE_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)||'1.10.23';
 if(window.__TU_ITEM_MONITOR__)return;window.__TU_ITEM_MONITOR__=true;
@@ -775,4 +792,7 @@ function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E(
 function deactivate(){travelClose();state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
 const definition={id:ID,version:TU_MODULE_VERSION,activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+})();
+  }
+  run();
 })();
