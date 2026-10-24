@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.46-dev
+// @version      0.5.46.1-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -280,7 +280,7 @@
     const ok=await updatePlayer(key);
     if(!ok)console.warn('[TU] Saved key verification failed:',identityStatus);
     refreshIdentity();
-    if(typeof render==='function'&&currentTab==='settings')render('settings');
+    if(typeof render==='function'&&(currentTab==='settings'||currentTab==='about'))render(currentTab);
   }
   let authorizationVerified=false;
   const authorized=()=>authorizationVerified&&!!devToken()&&!!readSavedKey()&&localStorage.getItem('tu:agreement:accepted')==='1.1';
@@ -564,6 +564,7 @@
   const refreshIdentity=()=>{
     const player=getPlayer();
     identityLine.textContent=player?.id?(player.name||'Verified player')+' ['+player.id+']'+(player.factionId?' · '+(player.factionName||'Faction')+' ['+player.factionId+']':''):(identityStatus.startsWith('Verifying')?'Verifying saved player…':'Player not identified');
+    identityLine.title=identityStatus;
   };
   refreshIdentity();
   pageWindow.addEventListener('tu-player-updated',refreshIdentity);
@@ -878,6 +879,13 @@
       }
     }else{
       const p=document.createElement('p');p.textContent='Torn Utilities v0.5.34 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      const identityBox=document.createElement('div');identityBox.className='tu-card';identityBox.style.cssText='display:flex;flex-direction:column;gap:6px;margin:12px 0';
+      const identityTitle=document.createElement('strong');identityTitle.textContent='Torn API Identity';identityBox.append(identityTitle);
+      const identityValue=document.createElement('span');const identified=getPlayer();identityValue.textContent=identified?.id?'Player: '+(identified.name||'Verified player')+' ['+identified.id+']':'Player: Not identified';identityBox.append(identityValue);
+      const identityKey=document.createElement('span');identityKey.textContent='Public Only key: '+(readSavedKey()?'Saved':'Missing');identityBox.append(identityKey);
+      const identityState=document.createElement('span');identityState.textContent='Identity verification: '+identityStatus;identityBox.append(identityState);
+      identityBox.append(makeButton('Retry player identification',async()=>{identityState.textContent='Identity verification: Retrying…';await updatePlayer(readSavedKey());refreshIdentity();render('about')}));
+      content.append(identityBox);
       if(devAuthIssue){const issue=document.createElement('p');issue.setAttribute('role','status');issue.textContent=devAuthIssue;content.append(issue,makeButton('Retry saved API key',()=>{resetDevAuthFailure();void restoreDevSession();}));}
       const termsHeading=document.createElement('h3');termsHeading.textContent='Terms of Use and Information Use Agreement';content.append(termsHeading);appendTerms(content);if(!hasAgreement())content.append(makeButton('Review and Accept Terms',showAgreement));
       const guideLink=document.createElement('a');guideLink.href='https://github.com/RelaxSweety/Torn-Scripts/blob/main/torn-utilities/INSTALLATION.md';guideLink.target='_blank';guideLink.rel='noopener noreferrer';guideLink.textContent='TU Installation & Module Setup Guide ↗';guideLink.style.cssText='display:block;margin:12px 0;padding:12px;border:1px solid #806a3e;border-radius:8px;color:#e4c779;text-decoration:underline;font-weight:600';content.append(guideLink);
