@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.64-dev
+// @version      0.4.65-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -81,6 +81,26 @@ let currentAgreement=null;
       failures.push('fetch: '+error.message);
       throw Error(failures.join(' | '));
     }
+  }
+  // Status-aware diagnostic: do not interpret PDA's undefined response as HTTP 401.
+  // Fetch is attempted first because it exposes Response.status when CORS permits.
+  async function devProbeAuthStatus(token){
+    const url=DEV_BASE+'/api/auth/me';
+    const headers={Authorization:'Bearer '+token};
+    const errors=[];
+    try{
+      const response=await fetch(url,{method:'GET',headers,cache:'no-store'});
+      return {status:response.status,transport:'fetch'};
+    }catch(error){errors.push('fetch: '+error.message)}
+    const gm=typeof GM_xmlhttpRequest==='function'?GM_xmlhttpRequest:typeof GM!=='undefined'&&typeof GM.xmlHttpRequest==='function'?GM.xmlHttpRequest:null;
+    if(gm){
+      try{
+        const response=await new Promise((resolve,reject)=>gm({method:'GET',url,headers,timeout:15000,onload:resolve,onerror:()=>reject(Error('network error')),ontimeout:()=>reject(Error('timeout'))}));
+        if(response&&typeof response.status==='number')return {status:response.status,transport:'GM_xmlhttpRequest'};
+        errors.push('GM_xmlhttpRequest: no HTTP status exposed');
+      }catch(error){errors.push('GM_xmlhttpRequest: '+error.message)}
+    }
+    return {status:null,transport:'none',detail:errors.join(' | ')||'No status-aware transport available'};
   }
   async function devAccept(key,platform){
     let stage='register';
@@ -165,7 +185,7 @@ let currentAgreement=null;
   }
 
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.4.64-dev';
+  const TU_VERSION='0.4.65-dev';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -477,7 +497,7 @@ let currentAgreement=null;
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.64-dev (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.65-dev (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
@@ -753,7 +773,7 @@ let currentAgreement=null;
           revokeTest.disabled=true;
           const requestId=crypto.randomUUID();
           let stage='session verification',cancellation='NOT SENT',verification='NOT RUN';
-          const show=(message)=>{securityStatus.textContent='Stage: '+stage+'\\nCancellation: '+cancellation+'\\nRevoked-token check: '+verification+'\\nRequest ID: '+requestId+'\\n'+message};
+          const show=(message)=>{securityStatus.textContent='Stage: '+stage+'\nCancellation: '+cancellation+'\nRevoked-token check: '+verification+'\nRequest ID: '+requestId+'\n'+message};
           const isUnauthorized=(error)=>/Unauthorized|HTTP 401/i.test(String(error?.message||''));
           const isTransportFailure=(error)=>/invalid server response|returned no response|Failed to fetch|network error|timed out|timeout/i.test(String(error?.message||''));
           const resetLocal=()=>{
@@ -773,8 +793,8 @@ let currentAgreement=null;
             const token=devToken();
             if(!token){show('INCOMPLETE: No current session token. Reopen TU Manager and authenticate before testing.');return}
             show('Verifying the existing bearer with the protected endpoint…');
-            try{await devRequest('/api/auth/me','GET',null,token)}
-            catch(error){show('INCONCLUSIVE: Initial authorization check failed: '+error.message);return}
+            const initial=await devProbeAuthStatus(token);
+            if(initial.status!==200){show('INCONCLUSIVE: Initial authorization status '+(initial.status??'unavailable')+' via '+initial.transport+'. '+(initial.detail||''));return}
             stage='agreement cancellation';
             show('Submitting cancellation once (no automatic POST retry)…');
             try{
@@ -782,19 +802,15 @@ let currentAgreement=null;
               cancellation='CONFIRMED';
             }catch(error){
               cancellation=isTransportFailure(error)?'UNKNOWN — response unavailable':'NOT CONFIRMED';
-              show('INCONCLUSIVE: Cancellation response was not confirmed: '+error.message+'\\nDo not repeat the cancellation test until the request ID has been checked against backend agreement events.');
+              show('INCONCLUSIVE: Cancellation response was not confirmed: '+error.message+'\nDo not repeat the cancellation test until the request ID has been checked against backend agreement events.');
               return;
             }
             // Only a confirmed cancellation allows clearing credentials.
             resetLocal();
             stage='revoked-token verification';
             show('Checking the same token after cancellation…');
-            try{
-              await devRequest('/api/auth/me','GET',null,token);
-              verification='FAIL — revoked token still authorized';
-            }catch(error){
-              verification=isUnauthorized(error)?'PASS — HTTP 401 Unauthorized':isTransportFailure(error)?'INCONCLUSIVE — network response unavailable':'INCONCLUSIVE — '+error.message;
-            }
+            const probe=await devProbeAuthStatus(token);
+            verification=probe.status===401?'PASS — HTTP 401 via '+probe.transport:probe.status===200?'FAIL — HTTP 200 via '+probe.transport:probe.status===null?'INCONCLUSIVE — HTTP status unavailable ('+probe.detail+')':'INCONCLUSIVE — HTTP '+probe.status+' via '+probe.transport;
             show('Cancellation confirmed; local TU credentials cleared. Reaccept the agreement to continue.');
             alert(securityStatus.textContent);
             showAgreement();
