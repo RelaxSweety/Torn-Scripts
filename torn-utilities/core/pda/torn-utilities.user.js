@@ -812,7 +812,7 @@ let currentAgreement=null;
             const probe=await devProbeAuthStatus(token);
             verification=probe.status===401?'PASS — HTTP 401 via '+probe.transport:probe.status===200?'FAIL — HTTP 200 via '+probe.transport:probe.status===null?'INCONCLUSIVE — HTTP status unavailable ('+probe.detail+')':'INCONCLUSIVE — HTTP '+probe.status+' via '+probe.transport;
             show('Cancellation confirmed; local TU credentials cleared. Reaccept the agreement to continue.');
-            alert(securityStatus.textContent);
+            alert(securityStatus.textContent.replaceAll(String.fromCharCode(92,110),String.fromCharCode(10)));
             showAgreement();
           }finally{revokeTest.disabled=false}
         });
