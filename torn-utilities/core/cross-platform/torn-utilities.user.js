@@ -312,18 +312,61 @@
   });
   Object.defineProperty(pageWindow, 'TornUtilities', {value:api, configurable:false, writable:false});
   pageWindow.dispatchEvent(new Event('torn-utilities-ready'));
-  const TU_TERMS_VERSION='1.0';
+  const TU_TERMS_VERSION='1.1';
 
   // DEVELOPMENT BUILD ONLY. This code is not deployed from main.
   const DEV_BASE='https://tu-multiplayer-server-dev.tuserver.workers.dev';
-  const DEV_AGREEMENT={agreement_version:'1.0',agreement_number:1,agreement_date:'2026-10-22'};
+  const DEV_AGREEMENT={agreement_version:'1.1',agreement_number:2,agreement_date:'2026-10-23'};
   const DEV_SESSION_KEY='tu:dev:auth:session:v1';
   const devToken=()=>sessionStorage.getItem(DEV_SESSION_KEY)||'';
   async function devRequest(path,method='GET',body,token=devToken()){
     const response=await fetch(DEV_BASE+path,{method,headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{})},...(body?{body:JSON.stringify(body)}:{}),cache:'no-store'});
     const result=await response.json().catch(()=>({}));
-    if(!response.ok)throw Error(result.error||('Development server HTTP '+response.status));
+    if(!response.ok){const error=Error(result.error||('Development server HTTP '+response.status));error.status=response.status;throw error;}
     return result;
+  }
+  // Renew expired sessions using the user's saved Public Only key. Never accept terms automatically.
+  let devRenewal=null;
+  async function renewDevSession(){
+    if(devRenewal)return devRenewal;
+    const key=readSavedKey();
+    if(!/^[A-Za-z0-9]{16}$/.test(key||''))throw Error('Saved Public Only API key required to renew session');
+    devRenewal=(async()=>{
+      const registration=await devRequest('/api/auth/register','POST',{api_key:key,platform:'tampermonkey'},'');
+      if(!registration.token)throw Error('Session renewal returned no token');
+      const status=await devRequest('/api/auth/agreement','GET',null,registration.token);
+      if(!status.accepted){
+        sessionStorage.removeItem(DEV_SESSION_KEY);
+        localStorage.removeItem(TU_TERMS_KEY);
+        throw Error('Current agreement requires acceptance');
+      }
+      sessionStorage.setItem(DEV_SESSION_KEY,registration.token);
+      localStorage.setItem(TU_TERMS_KEY,TU_TERMS_VERSION);
+      return registration.token;
+    })().finally(()=>{devRenewal=null});
+    return devRenewal;
+  }
+  async function restoreDevSession(){
+    if(!readSavedKey()||localStorage.getItem(TU_TERMS_KEY)!==TU_TERMS_VERSION)return;
+    try{
+      const token=devToken();
+      if(token){
+        try{
+          const status=await devRequest('/api/auth/agreement','GET',null,token);
+          if(status.accepted)return;
+          localStorage.removeItem(TU_TERMS_KEY);
+          sessionStorage.removeItem(DEV_SESSION_KEY);
+          return;
+        }catch(error){
+          if(error.status!==401)throw error;
+        }
+      }
+      await renewDevSession();
+      render('modules');
+    }catch(error){
+      console.warn('[TU] Session restore unavailable:',error.message);
+      render('about');
+    }
   }
   async function devAccept(key,platform){
     const registration=await devRequest('/api/auth/register','POST',{api_key:key,platform},'');
@@ -769,6 +812,7 @@
   render(hasAgreement()?'modules':'about');
   refreshRegistry();
   restoreSavedIdentity();
+  void restoreDevSession();
   // Do not interrupt first-run API requests with an immediate alert.
   window.addEventListener('torn-utilities-ready',()=>render(currentTab));
   // A module script can be installed separately, but remains inert until Open is pressed.
