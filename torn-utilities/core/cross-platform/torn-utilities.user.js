@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.38-dev
+// @version      0.5.39-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -559,8 +559,8 @@
   function showAgreement(){
     panel.hidden=false;render('about');
     const existing=document.getElementById('tu-agreement-overlay');if(existing){existing.hidden=false;existing.style.display='flex';tuNav.minimized=false;tuNav.exited=false;launcher.hidden=true;return;}
-    const overlay=document.createElement('div');overlay.id='tu-agreement-overlay';overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#000d;display:flex;align-items:center;justify-content:center;padding:12px';
-    const dialog=document.createElement('section');dialog.style.cssText='background:#182026;color:#eee;border:2px solid #cba953;border-radius:12px;width:min(96vw,580px);max-height:90dvh;overflow:auto;padding:18px;font:14px/1.5 system-ui';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');
+    const overlay=document.createElement('div');overlay.id='tu-agreement-overlay';overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#000d;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;overflow:hidden';
+    const dialog=document.createElement('section');dialog.style.cssText='background:#182026;color:#eee;border:2px solid #cba953;border-radius:12px;width:min(96vw,580px);max-height:calc(100dvh - 110px);height:min(780px,calc(100dvh - 110px));display:flex;flex-direction:column;overflow:hidden;padding:0;font:14px/1.5 system-ui;box-sizing:border-box;min-height:0';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');
     const h=document.createElement('h2');h.textContent='TU Terms and Information Use Agreement';dialog.append(h);appendTerms(dialog);
     const keyInfo=document.createElement('p');keyInfo.textContent='Public Only Torn API key: enter an optional key below to verify your identity. Never use a full-access key.';dialog.append(keyInfo);
     const key=document.createElement('input');key.type='password';key.autocomplete='off';key.maxLength=16;key.placeholder=readSavedKey()?'Public Only key already saved':'16-character Public Only API key';key.style.cssText='width:100%;box-sizing:border-box;padding:10px';dialog.append(key);
@@ -580,7 +580,10 @@
     const agreementBar=document.createElement('div');agreementBar.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;background:#172026;z-index:2;padding:6px 0';
     const agreementTitle=document.createElement('strong');agreementTitle.textContent='TU Agreement';
     const minimizeButton=makeButton('− Minimize',minimizeAgreement);minimizeButton.setAttribute('aria-label','Minimize agreement to retrieve Torn API key');
-    agreementBar.append(agreementTitle,minimizeButton);dialog.prepend(agreementBar);
+    agreementBar.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none;background:#172026;z-index:2;padding:12px 16px;border-bottom:1px solid #806a3e';
+    const scrollBody=document.createElement('div');scrollBody.style.cssText='flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:16px;box-sizing:border-box';
+    while(dialog.firstChild)scrollBody.appendChild(dialog.firstChild);
+    dialog.append(agreementBar,scrollBody);
 
   }
   // Script update check is informational: PDA manages installed script replacement.
