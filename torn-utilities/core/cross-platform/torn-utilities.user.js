@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.37-dev
+// @version      0.5.38-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -281,7 +281,11 @@
     refreshIdentity();
     if(typeof render==='function'&&currentTab==='settings')render('settings');
   }
+  let authorizationVerified=false;
+  const authorized=()=>authorizationVerified&&!!devToken()&&!!readSavedKey()&&localStorage.getItem('tu:agreement:accepted')==='1.1';
+  const publishAuthorization=ok=>{authorizationVerified=!!ok;pageWindow.dispatchEvent(new CustomEvent('tu-authorization-change',{detail:{authorized:authorized()}}));if(!authorized())stopModule();};
   const api = Object.freeze({
+    isAuthorized:()=>authorized(),
     storage,
     getPlayer,
     async requestTorn(path,{format='json'}={}){
@@ -367,7 +371,7 @@
       if(token){
         try{
           const status=await devRequest('/api/auth/agreement','GET',null,token);
-          if(status.accepted)return;
+          if(status.accepted){publishAuthorization(true);return;}
           localStorage.removeItem(TU_TERMS_KEY);
           sessionStorage.removeItem(DEV_SESSION_KEY);
           return;
@@ -376,9 +380,11 @@
         }
       }
       await renewDevSession();
+      publishAuthorization(true);
       resetDevAuthFailure();
       render('modules');
     }catch(error){
+      publishAuthorization(false);
       console.warn('[TU] Session restore unavailable:',error.message);
       render('about');
     }
@@ -399,6 +405,7 @@
     if(!token)throw Error('No development session available; cannot confirm cancellation');
     await devRequest('/api/auth/agreement','POST',{action:'cancelled',request_id:crypto.randomUUID()},token);
     sessionStorage.removeItem(DEV_SESSION_KEY);
+    publishAuthorization(false);
   }
   const TU_TERMS_KEY='tu:agreement:accepted';
   const TU_TERMS=[
@@ -418,7 +425,7 @@
     moduleHost.replaceChildren(); moduleHost.hidden=true;
   }
   function openModule(id) {
-    if(!hasAgreement()){showAgreement();return false;}
+    if(!authorized()){showAgreement();return false;}
     const mod=registered.get(id);
     if (!mod || saved.disabled?.[id]) return false;
     stopModule();
@@ -455,7 +462,8 @@
   };
   const tuExit=(source)=>{tuNav.history.length=0;tuNav.current='tu-pda-panel';tuMinimize();tuNav.exited=true;stopModule();};
   const tuRestore=()=>{
-    if(tuNav.exited){tuNav.history.length=0;tuNav.current='tu-pda-panel';render(hasAgreement()?'modules':'about');if(!hasAgreement())showAgreement();}
+    if(tuNav.exited){tuNav.history.length=0;tuNav.current='tu-pda-panel';render(authorized()?'modules':'about');}
+    if(!authorized()){tuShow('tu-pda-panel');showAgreement();return true;}
     let id=tuNav.current;
     if(!tuRoot(id)&&active){id=({'item-monitor':'tuim-panel','flight-game':'tpfg-root','stick-fighter':'sff-root'}[active]||id);}
     return tuShow(tuRoot(id)?id:'tu-pda-panel');
@@ -491,14 +499,18 @@
   const launcher = document.createElement('button');
   launcher.id = 'tu-pda-launcher';
   launcher.type = 'button';
+  for(const old of document.querySelectorAll('#tu-pda-launcher'))old.remove();
   launcher.textContent = 'TU';
+  launcher.dataset.tuBrand='canonical';
   launcher.setAttribute('aria-label', 'Open Torn Utilities; drag to reposition');
   document.body.appendChild(launcher);
+  const brandStyle=document.createElement('style');brandStyle.textContent='.tu-brand-emblem{display:inline-grid;place-items:center;width:32px;height:32px;flex:none;border:2px solid #e3bb57;border-radius:50%;background:radial-gradient(circle at 35% 25%,#293b45,#07090b 70%);color:#f5d87e;font:bold italic 18px Georgia,serif;letter-spacing:-1px;box-shadow:0 2px 9px #000b}';document.head.appendChild(brandStyle);
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
   panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.34 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
+  const headerBrand=panel.querySelector('.tu-logo');if(headerBrand){headerBrand.textContent='TU';headerBrand.classList.add('tu-brand-emblem');}
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
   identityLine.style.cssText='margin:3px 0 0;font-size:12px;color:#e4c779;overflow-wrap:anywhere';
@@ -546,7 +558,7 @@
   }
   function showAgreement(){
     panel.hidden=false;render('about');
-    const existing=document.getElementById('tu-agreement-overlay');if(existing){existing.hidden=false;return;}
+    const existing=document.getElementById('tu-agreement-overlay');if(existing){existing.hidden=false;existing.style.display='flex';tuNav.minimized=false;tuNav.exited=false;launcher.hidden=true;return;}
     const overlay=document.createElement('div');overlay.id='tu-agreement-overlay';overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#000d;display:flex;align-items:center;justify-content:center;padding:12px';
     const dialog=document.createElement('section');dialog.style.cssText='background:#182026;color:#eee;border:2px solid #cba953;border-radius:12px;width:min(96vw,580px);max-height:90dvh;overflow:auto;padding:18px;font:14px/1.5 system-ui';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');
     const h=document.createElement('h2');h.textContent='TU Terms and Information Use Agreement';dialog.append(h);appendTerms(dialog);
@@ -560,11 +572,11 @@
       if(!check.checked)return;
       const supplied=key.value.trim();if(supplied&&!/^[a-zA-Z0-9]{16}$/.test(supplied)){status.textContent='Enter a valid 16-character Public Only key';return;}
       const selected=supplied||readSavedKey();if(!/^[A-Za-z0-9]{16}$/.test(selected)){status.textContent='A 16-character Public Only key is required';return;}accept.disabled=true;try{status.textContent='Registering and recording development agreement…';await devAccept(selected,'tampermonkey');if(supplied)saveKey(supplied);await updatePlayer(selected);}catch(error){status.textContent='Development agreement failed: '+error.message;accept.disabled=false;return;}
-      localStorage.setItem(TU_TERMS_KEY,TU_TERMS_VERSION);overlay.remove();render('modules');
+      localStorage.setItem(TU_TERMS_KEY,TU_TERMS_VERSION);publishAuthorization(true);overlay.remove();render('modules');
     });
     buttons.append(decline,accept);dialog.append(buttons);overlay.append(dialog);document.body.append(overlay);
     // Minimize the consent dialog without accepting; the user may visit Torn to retrieve an API key.
-    const minimizeAgreement=()=>{overlay.hidden=true;panel.hidden=true;launcher.hidden=false;};
+    const minimizeAgreement=()=>{overlay.hidden=true;overlay.style.display='none';tuNav.minimized=true;tuNav.exited=false;panel.hidden=true;launcher.hidden=false;};
     const agreementBar=document.createElement('div');agreementBar.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;background:#172026;z-index:2;padding:6px 0';
     const agreementTitle=document.createElement('strong');agreementTitle.textContent='TU Agreement';
     const minimizeButton=makeButton('− Minimize',minimizeAgreement);minimizeButton.setAttribute('aria-label','Minimize agreement to retrieve Torn API key');
@@ -729,7 +741,7 @@
       });
       const remove=makeButton('Remove saved API Key',async()=>{
         if(confirm('Remove saved Public Only API key from this browser?')){
-          try{await devCancel();}catch(error){alert('Cancellation not confirmed; key retained: '+error.message);return;}removeSavedKey();resetDevAuthFailure();localStorage.removeItem(TU_TERMS_KEY);vaultStatus.textContent='No saved API key';
+          try{await devCancel();}catch(error){alert('Cancellation not confirmed; key retained: '+error.message);return;}removeSavedKey();resetDevAuthFailure();localStorage.removeItem(TU_TERMS_KEY);publishAuthorization(false);vaultStatus.textContent='No saved API key';
           keyDetails.replaceChildren();keyDetails.style.display='none';
         }
       });
@@ -830,6 +842,7 @@
   refreshRegistry();
   restoreSavedIdentity();
   void restoreDevSession();
+  setInterval(()=>{if(authorizationVerified&&!authorized())publishAuthorization(false);},1000);
   // Do not interrupt first-run API requests with an immediate alert.
   window.addEventListener('torn-utilities-ready',()=>render(currentTab));
   // A module script can be installed separately, but remains inert until Open is pressed.
@@ -840,7 +853,8 @@
   };
   const syncLauncher=()=>{
     const moduleVisible=!!active&&(['tuim-panel','tuim-catalog','tpfg-root','tpfg-manager','tpfg-prompt','sff-root','tca-panel','tca-playbar','tuac-panel'].some(isVisible)||[...moduleHost.children].some(el=>isVisible(el.id)||(!el.hidden&&el.getClientRects().length>0)));
-    const hide=tuNav.minimized||tuNav.exited?false:(!panel.hidden||moduleVisible);
+    const consent=document.getElementById('tu-agreement-overlay');
+    const hide=consent&&!consent.hidden&&consent.style.display!=='none'?true:(tuNav.minimized||tuNav.exited?false:(!panel.hidden||moduleVisible));
     if(launcher.hidden!==hide)launcher.hidden=hide;
   };
   const closePanel = () => { tuMinimize(); syncLauncher(); };
