@@ -8,7 +8,8 @@
 // @run-at       document-idle
 // ==/UserScript==
 (()=>{
-  const TU_MODULE_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)||'0.4.0';'use strict';if(window.__TU_ALERT_CALC__)return;window.__TU_ALERT_CALC__=true;
+  'use strict';const TU_MODULE_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)||'0.4.0';
+if(window.__TU_ALERT_CALC__)return;window.__TU_ALERT_CALC__=true;
 const ID='stock-calculations',state={panel:null,tab:'stocks',stock:null,minimized:false,context:null,pick:null,audio:null};
 const cfg=(()=>{try{return JSON.parse(localStorage.getItem('tu-stock-calc-settings')||'{}')}catch{return {}}})();
 const save=()=>{try{localStorage.setItem('tu-stock-calc-settings',JSON.stringify(cfg))}catch{}};
