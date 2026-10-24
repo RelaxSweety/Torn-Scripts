@@ -10,7 +10,8 @@
 // @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/torn-snake.user.js
 // ==/UserScript==
 (()=>{
-  const TU_MODULE_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)||'0.2.13';'use strict';const ID="torn-snake";let panel=null,canvas=null,ctx=null,timer=null,head=null,score=0,food=null,dir=[1,0],next=[1,0],snake=[],running=false;
+  'use strict';const TU_MODULE_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)||'0.2.13';
+const ID="torn-snake";let panel=null,canvas=null,ctx=null,timer=null,head=null,score=0,food=null,dir=[1,0],next=[1,0],snake=[],running=false;
 const E=(tag,parent,text)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;parent.append(e);return e};
 function spawn(){do{food=Math.floor(Math.random()*400)}while(snake.includes(food))}
 function draw(){if(!ctx)return;ctx.fillStyle="#17232c";ctx.fillRect(0,0,320,320);ctx.fillStyle="#d6a950";ctx.fillRect(food%20*16,Math.floor(food/20)*16,15,15);ctx.fillStyle="#62c68b";for(const n of snake)ctx.fillRect(n%20*16,Math.floor(n/20)*16,15,15);panel?._statsUpdate?.()}
