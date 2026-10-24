@@ -7,7 +7,8 @@
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
-(()=>{'use strict';if(window.__TU_ALERT_CALC__)return;window.__TU_ALERT_CALC__=true;
+(()=>{
+  const TU_MODULE_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)||'0.4.0';'use strict';if(window.__TU_ALERT_CALC__)return;window.__TU_ALERT_CALC__=true;
 const ID='stock-calculations',state={panel:null,tab:'stocks',stock:null,minimized:false,context:null,pick:null,audio:null};
 const cfg=(()=>{try{return JSON.parse(localStorage.getItem('tu-stock-calc-settings')||'{}')}catch{return {}}})();
 const save=()=>{try{localStorage.setItem('tu-stock-calc-settings',JSON.stringify(cfg))}catch{}};
@@ -31,5 +32,5 @@ else{const a=F(root,'First / original value','mathA','');const b=F(root,'Second 
 function activate(ctx){state.context=ctx; if(!state.panel){const style=E('style',document.head);style.textContent='#tuac-panel{position:fixed;z-index:2147483642;top:10vh;left:4vw;width:min(92vw,440px);max-height:80vh;overflow:auto;background:#11191d;color:#eee;border:1px solid #cba953;border-radius:14px;padding:14px;font:14px system-ui;box-shadow:0 10px 30px #000c}#tuac-panel[hidden]{display:none!important}#tuac-panel button{margin:4px;padding:9px;background:#d6b65c;color:#111;border:0;border-radius:6px;font-weight:700}#tuac-panel nav{display:flex}#tuac-panel nav button{flex:1}#tuac-panel label{display:block;margin-top:10px}#tuac-panel input,#tuac-panel select{display:block;width:100%;box-sizing:border-box;background:#283239;color:#fff;border:1px solid #647077;border-radius:5px;padding:9px;font-size:16px}#tuac-panel pre{white-space:pre-wrap}.tuac-monitored{outline:3px solid #1ce15e!important;outline-offset:-2px!important}.tuac-alert{outline:4px solid #00ff69!important;outline-offset:-2px!important}';state.panel=E('section',document.body);state.panel.id='tuac-panel'}state.panel.hidden=false;render()}
 function deactivate(){stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 ensureHighlightStyle();restoreWatches();
-const definition={id:ID,version:'0.4.0',activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:TU_MODULE_VERSION,activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
 })();
