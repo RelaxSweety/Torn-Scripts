@@ -458,6 +458,8 @@
   };
   const tuExit=(source)=>{tuNav.history.length=0;tuNav.current='tu-pda-panel';tuMinimize();tuNav.exited=true;stopModule();};
   const tuRestore=()=>{
+    const agreementOverlay=document.getElementById('tu-agreement-overlay');
+    if(agreementOverlay&&!hasAgreement()){showAgreement();tuNav.minimized=false;tuNav.exited=false;return true;}
     if(tuNav.exited){tuNav.history.length=0;tuNav.current='tu-pda-panel';render(hasAgreement()?'modules':'about');if(!hasAgreement())showAgreement();}
     let id=tuNav.current;
     if(!tuRoot(id)&&active){id=({'item-monitor':'tuim-panel','flight-game':'tpfg-root','stick-fighter':'sff-root'}[active]||id);}
@@ -467,7 +469,7 @@
   const style = document.createElement('style');
   style.textContent = `
 #tu-pda-panel .tu-refresh-icon{display:inline-block}#tu-pda-panel .tu-spinning{animation:tu-refresh-spin .8s linear infinite}@keyframes tu-refresh-spin{to{transform:rotate(360deg)}}
-#tu-pda-launcher{position:fixed;left:12px;top:38%;z-index:2147483645;touch-action:none;width:43px;height:43px;border-radius:50%;border:2px solid #e3bb57;background:radial-gradient(circle at 35% 25%,#293b45,#07090b 70%);color:#f5d87e;box-shadow:0 2px 9px #000b,inset 0 0 4px #f5d87e66;font:bold italic 23px 'Palatino Linotype','Book Antiqua',Georgia,serif;letter-spacing:-2px;padding:0 2px 0 0;display:flex;align-items:center;justify-content:center;line-height:1;cursor:grab;user-select:none;-webkit-user-select:none}
+#tu-pda-launcher{position:fixed;left:12px;top:38%;z-index:2147483645;touch-action:none;width:43px;height:43px;border-radius:12px;border:0;background:transparent;color:#f5d87e;box-shadow:0 2px 9px #000b,inset 0 0 4px #f5d87e66;font:bold italic 23px 'Palatino Linotype','Book Antiqua',Georgia,serif;letter-spacing:-2px;padding:0 2px 0 0;display:flex;align-items:center;justify-content:center;line-height:1;cursor:grab;user-select:none;-webkit-user-select:none}
 #tu-pda-launcher:active{cursor:grabbing}
 #tu-pda-launcher[hidden]{display:none!important}
 #tu-pda-panel{position:fixed;z-index:2147483644;inset:8% 3% auto 3%;max-width:440px;margin:auto;max-height:82vh;overflow:auto;background:#101417;color:#eee;border:1px solid #c49a46;border-radius:18px;box-shadow:0 10px 35px #000d;font:14px system-ui,Arial,sans-serif}
@@ -555,7 +557,7 @@
   }
   function showAgreement(){
     panel.hidden=false;render('about');
-    const existing=document.getElementById('tu-agreement-overlay');if(existing){existing.hidden=false;return;}
+    const existing=document.getElementById('tu-agreement-overlay');if(existing){existing.hidden=false;existing.style.display='flex';tuNav.minimized=false;tuNav.exited=false;launcher.hidden=true;return;}
     const overlay=document.createElement('div');overlay.id='tu-agreement-overlay';overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#000d;display:flex;align-items:center;justify-content:center;padding:12px';
     const dialog=document.createElement('section');dialog.style.cssText='background:#182026;color:#eee;border:2px solid #cba953;border-radius:12px;width:min(96vw,580px);max-height:90dvh;overflow:auto;padding:18px;font:14px/1.5 system-ui';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');
     const h=document.createElement('h2');h.textContent='TU Terms and Information Use Agreement';dialog.append(h);appendTerms(dialog);
@@ -573,7 +575,7 @@
     });
     buttons.append(decline,accept);dialog.append(buttons);overlay.append(dialog);document.body.append(overlay);
     // Minimize the consent dialog without accepting; the user may visit Torn to retrieve an API key.
-    const minimizeAgreement=()=>{overlay.hidden=true;panel.hidden=true;launcher.hidden=false;};
+    const minimizeAgreement=()=>{overlay.hidden=true;overlay.style.display='none';tuNav.minimized=true;tuNav.exited=false;panel.hidden=true;launcher.hidden=false;};
     const agreementBar=document.createElement('div');agreementBar.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;background:#172026;z-index:2;padding:6px 0';
     const agreementTitle=document.createElement('strong');agreementTitle.textContent='TU Agreement';
     const minimizeButton=makeButton('− Minimize',minimizeAgreement);minimizeButton.setAttribute('aria-label','Minimize agreement to retrieve Torn API key');
@@ -848,6 +850,8 @@
     return !!el&&el.isConnected&&!el.hidden&&getComputedStyle(el).display!=='none'&&getComputedStyle(el).visibility!=='hidden';
   };
   const syncLauncher=()=>{
+    const consent=document.getElementById('tu-agreement-overlay');
+    if(consent&&!consent.hidden&&consent.style.display!=='none'){launcher.hidden=true;return;}
     const moduleVisible=!!active&&(['tuim-panel','tuim-catalog','tpfg-root','tpfg-manager','tpfg-prompt','sff-root','tca-panel','tca-playbar','tuac-panel'].some(isVisible)||[...moduleHost.children].some(el=>isVisible(el.id)||(!el.hidden&&el.getClientRects().length>0)));
     const hide=tuNav.minimized||tuNav.exited?false:(!panel.hidden||moduleVisible);
     if(launcher.hidden!==hide)launcher.hidden=hide;
