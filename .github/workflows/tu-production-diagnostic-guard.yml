@@ -1,0 +1,19 @@
+name: TU Production Diagnostic Guard
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'torn-utilities/core/pda/torn-utilities.user.js'
+      - 'scripts/check-tu-production.mjs'
+permissions:
+  contents: read
+jobs:
+  verify-production-candidate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Block DEV diagnostics from production candidate
+        run: node scripts/check-tu-production.mjs torn-utilities/core/pda/torn-utilities.user.js
