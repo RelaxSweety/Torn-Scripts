@@ -1,12 +1,29 @@
 // ==UserScript==
 // @name         TU Stock and Calculations
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.0
+// @version      0.4.1
 // @description  Stock cash targets, foreign stock alerts and calculator
 // @match        https://www.torn.com/*
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
+// TU Manager authorization gate (development): no module initialization before verified consent.
+(()=>{
+  let started=false;
+  const host=typeof unsafeWindow!=='undefined'?unsafeWindow:window;
+  const run=()=>{
+    if(started||host.TornUtilities?.isAuthorized?.()!==true)return;
+    started=true;
+    startModule();
+  };
+  const onAuth=e=>{
+    if(e?.detail?.authorized===false&&started){location.reload();return;}
+    run();
+  };
+  host.addEventListener('tu-authorization-change',onAuth);
+  host.addEventListener('torn-utilities-ready',run);
+  function startModule(){
+
 (()=>{
   'use strict';const TU_MODULE_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)||'0.4.0';
 if(window.__TU_ALERT_CALC__)return;window.__TU_ALERT_CALC__=true;
@@ -34,4 +51,7 @@ function activate(ctx){state.context=ctx; if(!state.panel){const style=E('style'
 function deactivate(){stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 ensureHighlightStyle();restoreWatches();
 const definition={id:ID,version:TU_MODULE_VERSION,activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+})();
+  }
+  run();
 })();
