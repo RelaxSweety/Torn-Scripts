@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.36-dev
+// @version      0.5.37-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -319,10 +319,19 @@
   const DEV_AGREEMENT={agreement_version:'1.1',agreement_number:2,agreement_date:'2026-10-23'};
   const DEV_SESSION_KEY='tu:dev:auth:session:v1';
   const devToken=()=>sessionStorage.getItem(DEV_SESSION_KEY)||'';
+  let devAuthIssue='',devRenewalBlocked=false;
+  function devAuthFailure(error){
+    const status=error?.status;
+    devAuthIssue=status===401||status===403?'Saved API key rejected. Replace it in TU Settings.':status===429?'Authentication rate-limited. Retry later.':status>=500||!status?'Authentication service unavailable. Retry later.':error?.message||'Session renewal failed.';
+    devRenewalBlocked=true;
+    sessionStorage.removeItem(DEV_SESSION_KEY);
+    if(!panel.hidden)render('about');
+  }
+  function resetDevAuthFailure(){devAuthIssue='';devRenewalBlocked=false;}
   async function devRequest(path,method='GET',body,token=devToken()){
     const response=await fetch(DEV_BASE+path,{method,headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{})},...(body?{body:JSON.stringify(body)}:{}),cache:'no-store'});
     const result=await response.json().catch(()=>({}));
-    if(response.status===401&&token&&token===devToken()&&localStorage.getItem(TU_TERMS_KEY)===TU_TERMS_VERSION&&path!=='/api/auth/register'){
+    if(response.status===401&&!devRenewalBlocked&&token&&token===devToken()&&localStorage.getItem(TU_TERMS_KEY)===TU_TERMS_VERSION&&path!=='/api/auth/register'&&path!=='/api/auth/agreement'){
       const renewed=await renewDevSession();
       return devRequest(path,method,body,renewed);
     }
@@ -333,6 +342,7 @@
   let devRenewal=null;
   async function renewDevSession(){
     if(devRenewal)return devRenewal;
+    if(devRenewalBlocked)throw Error(devAuthIssue||'Session renewal paused');
     const key=readSavedKey();
     if(!/^[A-Za-z0-9]{16}$/.test(key||''))throw Error('Saved Public Only API key required to renew session');
     devRenewal=(async()=>{
@@ -347,7 +357,7 @@
       sessionStorage.setItem(DEV_SESSION_KEY,registration.token);
       localStorage.setItem(TU_TERMS_KEY,TU_TERMS_VERSION);
       return registration.token;
-    })().finally(()=>{devRenewal=null});
+    })().catch(error=>{devAuthFailure(error);throw error;}).finally(()=>{devRenewal=null});
     return devRenewal;
   }
   async function restoreDevSession(){
@@ -366,6 +376,7 @@
         }
       }
       await renewDevSession();
+      resetDevAuthFailure();
       render('modules');
     }catch(error){
       console.warn('[TU] Session restore unavailable:',error.message);
@@ -380,6 +391,7 @@
     const status=await devRequest('/api/auth/agreement','GET',null,token);
     if(!status.accepted)throw Error('Development agreement was not confirmed');
     sessionStorage.setItem(DEV_SESSION_KEY,token);
+    resetDevAuthFailure();
     return status;
   }
   async function devCancel(){
@@ -697,7 +709,7 @@
       const input=document.createElement('input');input.type='password';input.maxLength=16;input.autocomplete='off';input.placeholder='16-character Public Only key';input.style.cssText='width:100%;box-sizing:border-box;padding:9px';
       const status=document.createElement('p');status.textContent=identityStatus;status.setAttribute('role','status');
       const submit=makeButton('Verify & Save Key');submit.type='submit';
-      form.addEventListener('submit',async e=>{e.preventDefault();const key=input.value.trim();input.value='';submit.disabled=true;status.textContent='Verifying…';const verified=await updatePlayer(key);if(verified){try{saveKey(key);vaultStatus.textContent='Public Only API key saved on this device';}catch(err){vaultStatus.textContent='Key verified, but saving failed: '+err.message;}}submit.disabled=false;status.textContent=identityStatus;refreshIdentity();});
+      form.addEventListener('submit',async e=>{e.preventDefault();const key=input.value.trim();input.value='';submit.disabled=true;status.textContent='Verifying…';const verified=await updatePlayer(key);if(verified){try{saveKey(key);resetDevAuthFailure();vaultStatus.textContent='Public Only API key saved on this device';}catch(err){vaultStatus.textContent='Key verified, but saving failed: '+err.message;}}submit.disabled=false;status.textContent=identityStatus;refreshIdentity();});
       form.append(input,submit);content.append(form);
       content.append(makeButton('Clear session',()=>{clearPlayer();status.textContent=identityStatus;refreshIdentity();}),status);
       const vaultStatus=document.createElement('p');vaultStatus.textContent=readSavedKey()?'Public Only API key saved on this device':'No saved API key';
@@ -717,7 +729,7 @@
       });
       const remove=makeButton('Remove saved API Key',async()=>{
         if(confirm('Remove saved Public Only API key from this browser?')){
-          try{await devCancel();}catch(error){alert('Cancellation not confirmed; key retained: '+error.message);return;}removeSavedKey();localStorage.removeItem(TU_TERMS_KEY);vaultStatus.textContent='No saved API key';
+          try{await devCancel();}catch(error){alert('Cancellation not confirmed; key retained: '+error.message);return;}removeSavedKey();resetDevAuthFailure();localStorage.removeItem(TU_TERMS_KEY);vaultStatus.textContent='No saved API key';
           keyDetails.replaceChildren();keyDetails.style.display='none';
         }
       });
@@ -804,6 +816,7 @@
       }
     }else{
       const p=document.createElement('p');p.textContent='Torn Utilities v0.5.34 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      if(devAuthIssue){const issue=document.createElement('p');issue.setAttribute('role','status');issue.textContent=devAuthIssue;content.append(issue,makeButton('Retry saved API key',()=>{resetDevAuthFailure();void restoreDevSession();}));}
       const termsHeading=document.createElement('h3');termsHeading.textContent='Terms of Use and Information Use Agreement';content.append(termsHeading);appendTerms(content);if(!hasAgreement())content.append(makeButton('Review and Accept Terms',showAgreement));
       const guideLink=document.createElement('a');guideLink.href='https://github.com/RelaxSweety/Torn-Scripts/blob/main/torn-utilities/INSTALLATION.md';guideLink.target='_blank';guideLink.rel='noopener noreferrer';guideLink.textContent='TU Installation & Module Setup Guide ↗';guideLink.style.cssText='display:block;margin:12px 0;padding:12px;border:1px solid #806a3e;border-radius:8px;color:#e4c779;text-decoration:underline;font-weight:600';content.append(guideLink);
       // Official-style vector marks; no remote image dependencies.
