@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Flight Game
 // @namespace    https://www.torn.com/
-// @version      0.12.6
+// @version      0.12.7
 // @description  Standalone TU Flight Game module, playable anytime
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -9,6 +9,23 @@
 // @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/flight-game.user.js
 // @grant        unsafeWindow
 // ==/UserScript==
+// TU Manager authorization gate (development): no module initialization before verified consent.
+(()=>{
+  let started=false;
+  const host=typeof unsafeWindow!=='undefined'?unsafeWindow:window;
+  const run=()=>{
+    if(started||host.TornUtilities?.isAuthorized?.()!==true)return;
+    started=true;
+    startModule();
+  };
+  const onAuth=e=>{
+    if(e?.detail?.authorized===false&&started){location.reload();return;}
+    run();
+  };
+  host.addEventListener('tu-authorization-change',onAuth);
+  host.addEventListener('torn-utilities-ready',run);
+  function startModule(){
+
 
 /*
  * TORN PDA ARCADE - RELEASE NOTES
@@ -843,4 +860,7 @@
     }
   }
 
+})();
+  }
+  run();
 })();
