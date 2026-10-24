@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.49-dev
+// @version      0.5.46-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -282,34 +282,11 @@
     refreshIdentity();
     if(typeof render==='function'&&currentTab==='settings')render('settings');
   }
-  // Central TU design tokens. Modules consume CSS variables, not hard-coded colors.
-  const TU_THEME_KEY='tu:ui:theme:v1';
-  const TU_DENSITY_KEY='tu:ui:density:v1';
-  const TU_THEMES={
-    gold:{bg:'#11191d',panel:'#1b252b',header:'#101417',accent:'#d6b65c',border:'#8d783f',input:'#283239',text:'#f5f5f5',muted:'#c3c9cd',buttonText:'#17130a',headerText:'#f6e5b1',control:'#263139',controlText:'#f5f5f5',success:'#57c995',warning:'#e7b45c',danger:'#ee8585',logo:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/agreement-lifecycle-integration/torn-utilities/assets/tu-logo-standard.webp'},
-    blue:{bg:'#101c29',panel:'#1b2d40',header:'#102238',accent:'#75c7f5',border:'#567c99',input:'#263e53',text:'#f6f9fc',muted:'#c4d5e2',buttonText:'#092235',headerText:'#dceefa',control:'#294359',controlText:'#f6f9fc',success:'#61d4a0',warning:'#f0bf71',danger:'#f19a9a',logo:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/agreement-lifecycle-integration/torn-utilities/assets/tu-logo-blue.svg'},
-    light:{bg:'#f2f4f7',panel:'#ffffff',header:'#e8edf3',accent:'#7d571f',border:'#8b929b',input:'#ffffff',text:'#20252b',muted:'#505d6a',buttonText:'#ffffff',headerText:'#1d2c3b',control:'#dce3ea',controlText:'#20252b',success:'#176e45',warning:'#8c5700',danger:'#ae2d38',logo:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/agreement-lifecycle-integration/torn-utilities/assets/tu-logo-light.svg'}
-  };
-  const getTUTheme=()=>TU_THEMES[localStorage.getItem(TU_THEME_KEY)]?localStorage.getItem(TU_THEME_KEY):'gold';
-  const getTUDensity=()=>['compact','standard','touch'].includes(localStorage.getItem(TU_DENSITY_KEY))?localStorage.getItem(TU_DENSITY_KEY):'standard';
-  const tuThemeStyle=document.createElement('style');tuThemeStyle.id='tu-design-system';(document.head||document.documentElement).appendChild(tuThemeStyle);
-  const applyTUTheme=()=>{
-    const t=TU_THEMES[getTUTheme()],density=getTUDensity(),space=density==='compact'?6:density==='touch'?16:12;
-    const root=document.documentElement;
-    for(const [key,value] of Object.entries({...t,spacing:space+'px',controlHeight:(density==='compact'?30:density==='touch'?48:36)+'px'}))root.style.setProperty('--tu-'+key.replace(/[A-Z]/g,m=>'-'+m.toLowerCase()),value);
-    tuThemeStyle.textContent=`#tu-pda-panel,#tuim-panel,#tuim-travel-window,#tuim-data-window,#tuim-catalog{background:var(--tu-bg)!important;color:var(--tu-text)!important;border-color:var(--tu-border)!important}#tu-pda-panel header,[data-tu-window-header]{background:var(--tu-header)!important;color:var(--tu-text)!important}#tu-pda-panel button:not(.tu-close),#tuim-panel button:not([data-tu-nav-controls] button),#tuim-travel-window button:not([data-tu-nav-controls] button),#tuim-data-window button:not([data-tu-nav-controls] button){background:var(--tu-accent)!important;color:var(--tu-button-text)!important;min-height:var(--tu-control-height);border-radius:var(--tu-radius)}#tuim-panel input,#tuim-panel select,#tuim-travel-window input,#tuim-travel-window select{background:var(--tu-input)!important;color:var(--tu-text)!important}#tuim-panel .tuim-header,#tuim-travel-window .tuim-travel-header,#tuim-data-window .tuim-travel-header{background:var(--tu-header)!important}#tuim-travel-window .tuim-travel-card,#tuim-data-window .tuim-travel-card{background:var(--tu-panel)!important;color:var(--tu-text)!important}#tu-pda-panel .tu-card{background:var(--tu-panel)!important;color:var(--tu-text)!important}#tuim-travel-window .tuim-travel-card,#tuim-data-window .tuim-travel-card{padding:var(--tu-spacing)!important;border-radius:var(--tu-radius)!important}`;
-    root.style.setProperty('--tu-logo-image','url("'+t.logo+'")');
-    root.style.setProperty('--tu-radius',density==='compact'?'6px':density==='touch'?'14px':'10px');
-    tuThemeStyle.textContent+=`#tu-pda-launcher,.tu-brand-emblem{background-image:var(--tu-logo-image)!important;background-position:center!important;background-size:contain!important;background-repeat:no-repeat!important}#tu-pda-panel header,[data-tu-window-header]{color:var(--tu-header-text)!important;border-color:var(--tu-border)!important}#tu-pda-panel header button,[data-tu-window-header] button{background:var(--tu-control)!important;color:var(--tu-control-text)!important;border-color:var(--tu-border)!important}#tu-pda-panel button:focus-visible,[data-tu-window-header] button:focus-visible{outline:2px solid var(--tu-accent)!important;outline-offset:2px}#tu-pda-panel button:disabled{opacity:.55}#tu-pda-panel .tu-brand-emblem,[data-tu-window-header] .tu-brand-emblem{border-color:var(--tu-border)!important}`;
-    pageWindow.dispatchEvent(new CustomEvent('tu-theme-change',{detail:{theme:getTUTheme(),density}}));
-  };
-  applyTUTheme();
   let authorizationVerified=false;
   const authorized=()=>authorizationVerified&&!!devToken()&&!!readSavedKey()&&localStorage.getItem('tu:agreement:accepted')==='1.1';
   const publishAuthorization=ok=>{authorizationVerified=!!ok;pageWindow.dispatchEvent(new CustomEvent('tu-authorization-change',{detail:{authorized:authorized()}}));if(!authorized())stopModule();};
   const api = Object.freeze({
     isAuthorized:()=>authorized(),
-    getTheme:()=>Object.freeze({theme:getTUTheme(),density:getTUDensity()}),
     storage,
     getPlayer,
     async requestTorn(path,{format='json'}={}){
@@ -772,26 +749,12 @@
       if(!settingsPage)tuShowUpdateTools();
       if(!settingsPage){diagnosticModule=null;
         const h=document.createElement('h3');h.textContent='Settings';content.append(h);
-        for(const [id,name,desc] of [['theme','Appearance','Theme and layout density'],['time','Time Display','Local or TCT'],['api','Public Only API Key','Verify, view or remove key'],['storage','Storage & Backups','Export, restore or clear module data'],['diagnostics','Diagnostics','Manager and module reports']]){
+        for(const [id,name,desc] of [['time','Time Display','Local or TCT'],['api','Public Only API Key','Verify, view or remove key'],['storage','Storage & Backups','Export, restore or clear module data'],['diagnostics','Diagnostics','Manager and module reports']]){
           const card=document.createElement('div');card.className='tu-card';const body=document.createElement('div');body.style.flex='1';const label=document.createElement('strong');label.textContent=name;const detail=document.createElement('small');detail.textContent=desc;body.append(label,detail);card.append(body,makeButton('Open →',()=>{settingsPage=id;render('settings')}));content.append(card);
         }return;
       }
       const back=makeButton('← Settings',()=>{settingsPage=null;diagnosticModule=null;render('settings')});back.style.margin='0 0 12px';content.append(back);
-      const heading=document.createElement('h3');heading.textContent=({theme:'Appearance',time:'Time Display',api:'Public Only API Key',storage:'Storage & Backups',diagnostics:'Diagnostics'})[settingsPage];content.append(heading);
-      if(settingsPage==='theme'){
-        const selectSetting=(label,key,options)=>{
-          const wrap=document.createElement('label');wrap.textContent=label;wrap.style.cssText='display:block;margin:12px 0;color:var(--tu-text)';
-          const select=document.createElement('select');select.style.cssText='display:block;width:100%;min-height:40px;padding:8px;background:var(--tu-input);color:var(--tu-text);border:1px solid var(--tu-border);border-radius:6px';
-          for(const [value,text] of options){const opt=document.createElement('option');opt.value=value;opt.textContent=text;select.append(opt)}
-          select.value=key===TU_THEME_KEY?getTUTheme():getTUDensity();
-          select.addEventListener('change',()=>{localStorage.setItem(key,select.value);applyTUTheme()});
-          wrap.append(select);content.append(wrap);
-        };
-        selectSetting('Theme',TU_THEME_KEY,[['gold','TU Gold'],['blue','Blue'],['light','Light']]);
-        selectSetting('Layout density',TU_DENSITY_KEY,[['compact','Compact'],['standard','Standard'],['touch','Touch-friendly']]);
-        const note=document.createElement('p');note.textContent='Appearance changes apply immediately to compatible TU windows. Module-specific layouts will be migrated progressively.';content.append(note);
-        return;
-      }
+      const heading=document.createElement('h3');heading.textContent=({time:'Time Display',api:'Public Only API Key',storage:'Storage & Backups',diagnostics:'Diagnostics'})[settingsPage];content.append(heading);
       if(settingsPage==='time'){
       const timeHeading=document.createElement('strong');timeHeading.textContent='Time Display';content.append(timeHeading);
       const timeDescription=document.createElement('p');timeDescription.textContent='Choose one timezone for TU travel estimates and observation timestamps.';content.append(timeDescription);
@@ -915,13 +878,6 @@
       }
     }else{
       const p=document.createElement('p');p.textContent='Torn Utilities v0.5.34 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
-      const apiSummary=document.createElement('div');apiSummary.className='tu-card';apiSummary.style.cssText='display:flex;flex-direction:column;gap:5px;margin:12px 0';
-      const apiTitle=document.createElement('strong');apiTitle.textContent='User API Information';apiSummary.append(apiTitle);
-      const apiPlayer=getPlayer();
-      const apiIdentity=document.createElement('span');apiIdentity.textContent=apiPlayer?.id?'Player: '+(apiPlayer.name||'Verified player')+' ['+apiPlayer.id+']':'Player: Not identified';apiSummary.append(apiIdentity);
-      const apiState=document.createElement('span');apiState.textContent='Public Only API key: '+(readSavedKey()?'Saved (hidden)':'Not saved');apiSummary.append(apiState);
-      const apiVerify=document.createElement('span');apiVerify.textContent='TU authorization: '+(authorized()?'Verified':'Not verified');apiSummary.append(apiVerify);
-      const apiManage=makeButton('Manage API key →',()=>{settingsPage='api';render('settings')});apiSummary.append(apiManage);content.append(apiSummary);
       if(devAuthIssue){const issue=document.createElement('p');issue.setAttribute('role','status');issue.textContent=devAuthIssue;content.append(issue,makeButton('Retry saved API key',()=>{resetDevAuthFailure();void restoreDevSession();}));}
       const termsHeading=document.createElement('h3');termsHeading.textContent='Terms of Use and Information Use Agreement';content.append(termsHeading);appendTerms(content);if(!hasAgreement())content.append(makeButton('Review and Accept Terms',showAgreement));
       const guideLink=document.createElement('a');guideLink.href='https://github.com/RelaxSweety/Torn-Scripts/blob/main/torn-utilities/INSTALLATION.md';guideLink.target='_blank';guideLink.rel='noopener noreferrer';guideLink.textContent='TU Installation & Module Setup Guide ↗';guideLink.style.cssText='display:block;margin:12px 0;padding:12px;border:1px solid #806a3e;border-radius:8px;color:#e4c779;text-decoration:underline;font-weight:600';content.append(guideLink);
@@ -959,7 +915,7 @@
     b.addEventListener('click',e=>{e.stopPropagation();handler();syncLauncher();});
     if(before)navHeader.prepend(b);else navHeader.append(b);return b;
   };
-  // Manager is the navigation root; back is only available inside child modules.
+  addNavControl('←','Back',tuBack,true);
   addNavControl('−','Minimize',tuMinimize,false);
   panel.querySelector('.tu-close').title='Exit';
   panel.querySelector('.tu-close').setAttribute('aria-label','Exit');
