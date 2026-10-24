@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.39-dev
+// @version      0.5.40-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -581,6 +581,7 @@
     const agreementTitle=document.createElement('strong');agreementTitle.textContent='TU Agreement';
     const minimizeButton=makeButton('− Minimize',minimizeAgreement);minimizeButton.setAttribute('aria-label','Minimize agreement to retrieve Torn API key');
     agreementBar.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none;background:#172026;z-index:2;padding:12px 16px;border-bottom:1px solid #806a3e';
+    agreementBar.append(agreementTitle,minimizeButton);
     const scrollBody=document.createElement('div');scrollBody.style.cssText='flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:16px;box-sizing:border-box';
     while(dialog.firstChild)scrollBody.appendChild(dialog.firstChild);
     dialog.append(agreementBar,scrollBody);
