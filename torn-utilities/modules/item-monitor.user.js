@@ -11,7 +11,8 @@
 // @run-at       document-idle
 // ==/UserScript==
 (()=>{
-  const TU_MODULE_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)||'1.10.23';'use strict';if(window.__TU_ITEM_MONITOR__)return;window.__TU_ITEM_MONITOR__=true;
+  'use strict';const TU_MODULE_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)||'1.10.23';
+if(window.__TU_ITEM_MONITOR__)return;window.__TU_ITEM_MONITOR__=true;
 const ID='item-monitor',KEY='tu-item-monitor-v1',OLD='tuac-watches';
 const load=(k,f)=>{try{return JSON.parse(localStorage.getItem(k)||'null')??f}catch{return f}};
 const state={items:load(KEY,[]),cfg:load('tuac-settings',{}),panel:null,context:null,picking:false,selected:null,observer:null,alarmTimers:[],audio:null,muted:false,catalog:null,catalogWindow:null};
