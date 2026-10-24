@@ -821,7 +821,7 @@
       }
       }
     }else{
-      const p=document.createElement('p');p.textContent='Torn Utilities v0.5.34 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      const p=document.createElement('p');p.textContent='Torn Utilities v0.5.38-dev by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
       if(devAuthIssue){const issue=document.createElement('p');issue.setAttribute('role','status');issue.textContent=devAuthIssue;content.append(issue,makeButton('Retry saved API key',()=>{resetDevAuthFailure();void restoreDevSession();}));}
       const termsHeading=document.createElement('h3');termsHeading.textContent='Terms of Use and Information Use Agreement';content.append(termsHeading);appendTerms(content);if(!hasAgreement())content.append(makeButton('Review and Accept Terms',showAgreement));
       const guideLink=document.createElement('a');guideLink.href='https://github.com/RelaxSweety/Torn-Scripts/blob/main/torn-utilities/INSTALLATION.md';guideLink.target='_blank';guideLink.rel='noopener noreferrer';guideLink.textContent='TU Installation & Module Setup Guide ↗';guideLink.style.cssText='display:block;margin:12px 0;padding:12px;border:1px solid #806a3e;border-radius:8px;color:#e4c779;text-decoration:underline;font-weight:600';content.append(guideLink);
