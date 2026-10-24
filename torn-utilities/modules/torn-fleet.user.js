@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Torn Fleet
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.2.4
+// @version      0.2.5
 // @description  Torn Utilities Torn Fleet multiplayer module
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -11,6 +11,23 @@
 // @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/torn-fleet.user.js
 // @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/torn-fleet.user.js
 // ==/UserScript==
+// TU Manager authorization gate (development): no module initialization before verified consent.
+(()=>{
+  let started=false;
+  const host=typeof unsafeWindow!=='undefined'?unsafeWindow:window;
+  const run=()=>{
+    if(started||host.TornUtilities?.isAuthorized?.()!==true)return;
+    started=true;
+    startModule();
+  };
+  const onAuth=e=>{
+    if(e?.detail?.authorized===false&&started){location.reload();return;}
+    run();
+  };
+  host.addEventListener('tu-authorization-change',onAuth);
+  host.addEventListener('torn-utilities-ready',run);
+  function startModule(){
+
 (()=>{
   'use strict';
 const TU_MODULE_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)||'0.2.4';
@@ -80,4 +97,7 @@ if(!register())window.addEventListener("torn-utilities-ready",register,{once:tru
     }
   }
 
+})();
+  }
+  run();
 })();
