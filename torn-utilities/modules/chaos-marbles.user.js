@@ -11,7 +11,8 @@
 // @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/chaos-marbles.user.js
 // @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/chaos-marbles.user.js
 // ==/UserScript==
-(()=>{'use strict';
+(()=>{
+  const TU_MODULE_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)||'0.2.4';'use strict';
 const ID="chaos-marbles",KEY="tu:chaos-marbles:game",HISTORY="tu:chaos-marbles:history";
 const COLORS=["#dc6059","#e4b951","#5fb2da","#8fd17b"],NAMES=["Crimson","Gold","Azure","Emerald"];
 let panel=null,game=null,notice="",view="play",active=false,session=null,timer=null,busy=false,rolling=false,dieValue=1,rollTimer=null;const API="https://tu-multiplayer-server.tuserver.workers.dev/api/marbles",SESSION="tu:chaos-marbles:session";
@@ -61,7 +62,7 @@ let drag=null;bar.addEventListener("pointerdown",e=>{if(e.target.closest("button
 const grip=E("div",panel,"◢");grip.style.cssText="position:absolute;right:3px;bottom:2px;width:30px;height:30px;display:flex;align-items:end;justify-content:end;padding:3px;box-sizing:border-box;cursor:nwse-resize;touch-action:none;color:#d6b96a;font-size:21px";let resize=null;grip.onpointerdown=e=>{e.preventDefault();const r=panel.getBoundingClientRect();resize={x:e.clientX,y:e.clientY,w:r.width,h:r.height,l:r.left,t:r.top};panel.style.transform="none";panel.style.left=r.left+"px";panel.style.top=r.top+"px";grip.setPointerCapture(e.pointerId)};grip.onpointermove=e=>{if(!resize)return;panel.style.width=Math.max(260,Math.min(innerWidth-resize.l-8,resize.w+e.clientX-resize.x))+"px";panel.style.height=Math.max(320,Math.min(innerHeight-resize.t-8,resize.h+e.clientY-resize.y))+"px"};grip.onpointerup=()=>resize=null;grip.onpointercancel=()=>resize=null;
 E("style",panel,"@keyframes chaosSpin{from{transform:rotate(-14deg) scale(.9)}to{transform:rotate(14deg) scale(1.1)}}");E("div",panel).className="body";session=read(SESSION,null);render();if(session)action("/"+session.room+"/state");timer=setInterval(()=>{if(session&&!busy&&panel)action("/"+session.room+"/state")},2500)}
 function deactivate(){clearInterval(timer);clearInterval(rollTimer);timer=null;rollTimer=null;panel?.remove();panel=null}
-function register(){return (typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register({id:ID,version:"0.2.4",activate,deactivate})}
+function register(){return (typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register({id:ID,version:TU_MODULE_VERSION,activate,deactivate})}
 if(!register())window.addEventListener("torn-utilities-ready",register,{once:true});
   // TU cross-world registration: retry after manager startup and SPA initialization.
   // Stop once this exact module is visible in the shared manager registry.
