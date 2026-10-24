@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.41-dev
+// @version      0.5.42-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -28,7 +28,7 @@
   // The userscript header is authoritative; PDA may not expose GM_info.
   const TU_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)
     ||document.currentScript?.textContent?.match(/^\/\/\s*@version\s+([^\s]+)/m)?.[1]
-    ||'0.5.41-dev';
+    ||'0.5.42-dev';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -458,9 +458,16 @@
   };
   const tuExit=(source)=>{tuNav.history.length=0;tuNav.current='tu-pda-panel';tuMinimize();tuNav.exited=true;stopModule();};
   const tuRestore=()=>{
-    const agreementOverlay=document.getElementById('tu-agreement-overlay');
-    if(agreementOverlay&&!hasAgreement()){showAgreement();tuNav.minimized=false;tuNav.exited=false;return true;}
-    if(tuNav.exited){tuNav.history.length=0;tuNav.current='tu-pda-panel';render(hasAgreement()?'modules':'about');if(!hasAgreement())showAgreement();}
+    if(!hasAgreement()){
+      tuNav.history.length=0;tuNav.current='tu-pda-panel';
+      tuNav.minimized=false;tuNav.exited=false;
+      tuShow('tu-pda-panel');
+      showAgreement();
+      return true;
+    }
+    const staleAgreement=document.getElementById('tu-agreement-overlay');
+    if(staleAgreement)staleAgreement.remove();
+    if(tuNav.exited){tuNav.history.length=0;tuNav.current='tu-pda-panel';render('modules');}
     let id=tuNav.current;
     if(!tuRoot(id)&&active){id=({'item-monitor':'tuim-panel','flight-game':'tpfg-root','stick-fighter':'sff-root'}[active]||id);}
     return tuShow(tuRoot(id)?id:'tu-pda-panel');
@@ -557,7 +564,7 @@
   }
   function showAgreement(){
     panel.hidden=false;if(currentTab!=='about')render('about');
-    const existing=document.getElementById('tu-agreement-overlay');if(existing){existing.hidden=false;existing.style.display='flex';tuNav.minimized=false;tuNav.exited=false;launcher.hidden=true;return;}
+    const existing=document.getElementById('tu-agreement-overlay');if(existing){existing.hidden=false;existing.style.display='flex';tuNav.minimized=false;tuNav.exited=false;panel.hidden=false;launcher.hidden=true;return;}
     const overlay=document.createElement('div');overlay.id='tu-agreement-overlay';overlay.style.cssText='position:fixed;inset:0;z-index:2147483646;background:transparent;display:flex;align-items:flex-start;justify-content:center;padding:12px;pointer-events:none';
     const dialog=document.createElement('section');dialog.style.cssText='background:#182026;color:#eee;border:2px solid #cba953;border-radius:12px;width:min(96vw,580px);max-height:90dvh;overflow:auto;padding:18px;font:14px/1.5 system-ui;pointer-events:auto;box-shadow:0 10px 35px #000d';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');
     const h=document.createElement('h2');h.textContent='TU Terms and Information Use Agreement';dialog.append(h);appendTerms(dialog);
@@ -857,7 +864,7 @@
     if(launcher.hidden!==hide)launcher.hidden=hide;
   };
   const closePanel = () => { tuMinimize(); syncLauncher(); };
-  const togglePanel=()=>{if(tuNav.minimized||tuNav.exited)tuRestore();else tuMinimize();syncLauncher();};
+  const togglePanel=()=>{try{if(tuNav.minimized||tuNav.exited)tuRestore();else tuMinimize();}catch(error){console.error('[TU] Launcher restore failed',error);const overlay=document.getElementById('tu-agreement-overlay');if(overlay){overlay.hidden=true;overlay.style.display='none';}panel.hidden=true;tuNav.minimized=true;tuNav.exited=false;launcher.hidden=false;}syncLauncher();};
   const navHeader=panel.querySelector('header');
   const addNavControl=(label,title,handler,before)=>{
     const b=document.createElement('button');b.type='button';b.textContent=label;b.title=title;b.setAttribute('aria-label',title);b.className='tu-nav-control';
