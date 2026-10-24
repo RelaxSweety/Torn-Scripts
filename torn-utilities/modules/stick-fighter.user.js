@@ -36,6 +36,7 @@
 
 (() => {
     'use strict';
+  const TU_MODULE_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)||'0.2.5';
     // TU v0.3 storage bridge. Existing legacy keys remain readable and are migrated
     // on first access; modules continue to work if TU loads later or is absent.
     const TU_NAMESPACE = 'stick-fighter';
@@ -815,7 +816,7 @@
       for(const id of ['tpfg-manager','tpfg-prompt','tpfg-game-settings','tpfg-root'])document.getElementById(id)?.remove();
       initialized=false;
     }
-    const definitions=[{id:'stick-fighter',version:'0.2.5',activate:activateStick,deactivate:deactivateFromTU}];
+    const definitions=[{id:'stick-fighter',version:TU_MODULE_VERSION,activate:activateStick,deactivate:deactivateFromTU}];
     function registerTU(){if((typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register)for(const definition of definitions)(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities.register(definition);}
     window.addEventListener('torn-utilities-ready',registerTU);registerTU();
   // TU cross-world registration: retry after manager startup and SPA initialization.
