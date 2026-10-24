@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Stock and Calculations
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.6
+// @version      0.4.7
 // @description  Stock cash targets, foreign stock alerts and calculator
 // @match        https://www.torn.com/*
 // @grant        unsafeWindow
@@ -9,6 +9,23 @@
 // @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/alerts-and-calculations.user.js
 // @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/alerts-and-calculations.user.js
 // ==/UserScript==
+// TU Manager authorization gate (development): no module initialization before verified consent.
+(()=>{
+  let started=false;
+  const host=typeof unsafeWindow!=='undefined'?unsafeWindow:window;
+  const run=()=>{
+    if(started||host.TornUtilities?.isAuthorized?.()!==true)return;
+    started=true;
+    startModule();
+  };
+  const onAuth=e=>{
+    if(e?.detail?.authorized===false&&started){location.reload();return;}
+    run();
+  };
+  host.addEventListener('tu-authorization-change',onAuth);
+  host.addEventListener('torn-utilities-ready',run);
+  function startModule(){
+
 (()=>{'use strict';
   const TU_MODULE_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)||'0.4.6';if(window.__TU_ALERT_CALC__)return;window.__TU_ALERT_CALC__=true;
 const ID='alerts-calculations',state={panel:null,tab:'stocks',stock:null,minimized:false,context:null,pick:null,audio:null};
@@ -55,4 +72,7 @@ const definition={id:ID,version:TU_MODULE_VERSION,activate,deactivate};const reg
     }
   }
 
+})();
+  }
+  run();
 })();
