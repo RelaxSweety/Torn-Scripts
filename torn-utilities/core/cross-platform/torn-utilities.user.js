@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.38-dev
+// @version      0.5.39-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -28,7 +28,7 @@
   // The userscript header is authoritative; PDA may not expose GM_info.
   const TU_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)
     ||document.currentScript?.textContent?.match(/^\/\/\s*@version\s+([^\s]+)/m)?.[1]
-    ||'0.5.38-dev';
+    ||'0.5.39-dev';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -556,7 +556,7 @@
     for(const [title,body] of TU_TERMS){const h=document.createElement('h3');h.textContent=title;const p=document.createElement('p');p.textContent=body;target.append(h,p);}
   }
   function showAgreement(){
-    panel.hidden=false;render('about');
+    panel.hidden=false;if(currentTab!=='about')render('about');
     const existing=document.getElementById('tu-agreement-overlay');if(existing){existing.hidden=false;existing.style.display='flex';tuNav.minimized=false;tuNav.exited=false;launcher.hidden=true;return;}
     const overlay=document.createElement('div');overlay.id='tu-agreement-overlay';overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#000d;display:flex;align-items:center;justify-content:center;padding:12px';
     const dialog=document.createElement('section');dialog.style.cssText='background:#182026;color:#eee;border:2px solid #cba953;border-radius:12px;width:min(96vw,580px);max-height:90dvh;overflow:auto;padding:18px;font:14px/1.5 system-ui';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');
@@ -987,11 +987,16 @@
     if (Math.hypot(dx,dy)>6) gesture.moved=true;
     if (gesture.moved) setPos(gesture.x+dx,gesture.y+dy);
   });
+  let suppressLauncherClick=false;
   launcher.addEventListener('pointerup', e => {
     if (!gesture || gesture.id !== e.pointerId) return;
     const moved=gesture.moved; gesture=null;
-    if (moved) { saved.x=launcher.offsetLeft; saved.y=launcher.offsetTop; persist(); }
-    else { togglePanel(); }
+    if (moved) { saved.x=launcher.offsetLeft; saved.y=launcher.offsetTop; persist(); suppressLauncherClick=true; }
+    // Click handles normal taps and keyboard activation.
+  });
+  launcher.addEventListener('click', e => {
+    if(suppressLauncherClick){suppressLauncherClick=false;e.preventDefault();return;}
+    togglePanel();
   });
   launcher.addEventListener('pointercancel', () => { gesture=null; });
   window.addEventListener('resize', () => {
