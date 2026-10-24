@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.41-dev
+// @version      0.5.42-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -350,21 +350,28 @@
       throw Error('Unexpected authentication response');
     };
     const transport=async()=>{
-      const pdaGet=pageWindow.PDA_httpGet||window.PDA_httpGet;
+      // Auth endpoints require Authorization headers. PDA_httpGet does not
+      // accept them, and PDA_httpPost may ignore its headers argument.
+      // Use GM's cross-origin request when a bearer token is present.
+      const gm=typeof GM_xmlhttpRequest==='function'?GM_xmlhttpRequest:
+        (typeof GM!=='undefined'&&typeof GM.xmlHttpRequest==='function'?GM.xmlHttpRequest:null);
+      if(gm){
+        try{
+          return await new Promise((resolve,reject)=>gm({method,url,headers,...(payload?{data:payload}:{}),timeout:20000,
+            onload:r=>{try{resolve({status:r.status||0,data:parse(r.responseText??r.response)})}catch(e){reject(e)}},
+            onerror:()=>reject(Error('GM request network failure')),ontimeout:()=>reject(Error('GM request timeout'))}));
+        }catch(error){console.warn('[TU] GM authentication transport failed',error.message);}
+      }
+      // Native PDA POST supports JSON bodies but may not support bearer headers.
+      // Do not treat its return value as proof of a confirmed agreement.
       const pdaPost=pageWindow.PDA_httpPost||window.PDA_httpPost;
-      // PDA's native bridge is the proven cross-origin transport. The bridge
-      // may return a JSON string or a Dart-backed Map rather than Response.
-      if(method==='GET'&&typeof pdaGet==='function'){
-        try{return {status:200,data:parse(await pdaGet(url))}}catch(error){console.warn('[TU] PDA GET bridge unavailable',error)}
+      if(method==='POST'&&!token&&typeof pdaPost==='function'){
+        const raw=await pdaPost(url,payload,{'Content-Type':'application/json'});
+        const data=parse(raw);
+        if(!data?.token)throw Error('PDA registration response missing session token');
+        return {status:200,data};
       }
-      if(method==='POST'&&typeof pdaPost==='function'){
-        try{return {status:200,data:parse(await pdaPost(url,payload,headers))}}catch(error){console.warn('[TU] PDA POST bridge unavailable',error)}
-      }
-      if(typeof GM_xmlhttpRequest==='function'){
-        return await new Promise((resolve,reject)=>GM_xmlhttpRequest({method,url,headers,...(payload?{data:payload}:{}),timeout:20000,
-          onload:r=>{try{resolve({status:r.status||200,data:parse(r.responseText??r.response)})}catch(e){reject(e)}},
-          onerror:()=>reject(Error('GM request network failure')),ontimeout:()=>reject(Error('GM request timeout'))}));
-      }
+      // Standard fetch is a last resort on platforms with CORS support.
       const response=await fetch(url,{method,headers,...(payload?{body:payload}:{}),cache:'no-store'});
       return {status:response.status,data:await response.json().catch(()=>({}))};
     };
