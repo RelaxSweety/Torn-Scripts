@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42-dev
+// @version      0.5.43-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -28,7 +28,7 @@
   // The userscript header is authoritative; PDA may not expose GM_info.
   const TU_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)
     ||document.currentScript?.textContent?.match(/^\/\/\s*@version\s+([^\s]+)/m)?.[1]
-    ||'0.5.42-dev';
+    ||'0.5.43-dev';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -284,7 +284,10 @@
     refreshIdentity();
     if(typeof render==='function'&&currentTab==='settings')render('settings');
   }
+  let serverAuthorized=false;
+  const setAuthorization=(value)=>{serverAuthorized=!!value;pageWindow.dispatchEvent(new CustomEvent('tu-authorization-change',{detail:{authorized:serverAuthorized}}));if(!serverAuthorized)stopModule();};
   const api = Object.freeze({
+    isAuthorized:()=>serverAuthorized&&hasAgreement(),
     storage,
     getPlayer,
     async requestTorn(path,{format='json'}={}){
@@ -370,7 +373,7 @@
       if(token){
         try{
           const status=await devRequest('/api/auth/agreement','GET',null,token);
-          if(status.accepted)return;
+          if(status.accepted){setAuthorization(true);return;}
           localStorage.removeItem(TU_TERMS_KEY);
           sessionStorage.removeItem(DEV_SESSION_KEY);
           return;
@@ -379,9 +382,11 @@
         }
       }
       await renewDevSession();
+      setAuthorization(true);
       resetDevAuthFailure();
       render('modules');
     }catch(error){
+      setAuthorization(false);
       console.warn('[TU] Session restore unavailable:',error.message);
       render('about');
     }
@@ -395,6 +400,7 @@
     if(!status.accepted)throw Error('Development agreement was not confirmed');
     sessionStorage.setItem(DEV_SESSION_KEY,token);
     resetDevAuthFailure();
+    setAuthorization(true);
     return status;
   }
   async function devCancel(){
@@ -402,6 +408,7 @@
     if(!token)throw Error('No development session available; cannot confirm cancellation');
     await devRequest('/api/auth/agreement','POST',{action:'cancelled',request_id:crypto.randomUUID()},token);
     sessionStorage.removeItem(DEV_SESSION_KEY);
+    setAuthorization(false);
   }
   const TU_TERMS_KEY='tu:agreement:accepted';
   const TU_TERMS=[
@@ -421,7 +428,7 @@
     moduleHost.replaceChildren(); moduleHost.hidden=true;
   }
   function openModule(id) {
-    if(!hasAgreement()){showAgreement();return false;}
+    if(!serverAuthorized||!hasAgreement()){showAgreement();return false;}
     const mod=registered.get(id);
     if (!mod || saved.disabled?.[id]) return false;
     stopModule();
