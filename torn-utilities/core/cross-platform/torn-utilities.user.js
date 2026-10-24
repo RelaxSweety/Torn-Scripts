@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.39-dev
+// @version      0.5.40-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -28,7 +28,7 @@
   // The userscript header is authoritative; PDA may not expose GM_info.
   const TU_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)
     ||document.currentScript?.textContent?.match(/^\/\/\s*@version\s+([^\s]+)/m)?.[1]
-    ||'0.5.39-dev';
+    ||'0.5.40-dev';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -966,8 +966,8 @@
   enhanceFloating();tuEnhanceHeaders();
   const floatingObserver=new MutationObserver(()=>{enhanceFloating();tuEnhanceHeaders();});
   floatingObserver.observe(document.body,{childList:true,subtree:true});
-  const visibilityObserver=new MutationObserver(syncLauncher);
-  visibilityObserver.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['style','hidden','class']});
+  const visibilityObserver=new MutationObserver(()=>{if(!document.body.contains(launcher))return;syncLauncher();});
+  visibilityObserver.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['hidden']});
   syncLauncher();
   const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
   const setPos = (x, y) => {
