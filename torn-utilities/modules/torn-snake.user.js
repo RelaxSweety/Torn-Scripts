@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Slithering Streets
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.2.13
+// @version      0.2.14
 // @description  Torn Utilities mobile-friendly Snake arcade
 // @match        https://www.torn.com/*
 // @grant        unsafeWindow
@@ -9,6 +9,23 @@
 // @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/torn-snake.user.js
 // @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/torn-snake.user.js
 // ==/UserScript==
+// TU Manager authorization gate (development): no module initialization before verified consent.
+(()=>{
+  let started=false;
+  const host=typeof unsafeWindow!=='undefined'?unsafeWindow:window;
+  const run=()=>{
+    if(started||host.TornUtilities?.isAuthorized?.()!==true)return;
+    started=true;
+    startModule();
+  };
+  const onAuth=e=>{
+    if(e?.detail?.authorized===false&&started){location.reload();return;}
+    run();
+  };
+  host.addEventListener('tu-authorization-change',onAuth);
+  host.addEventListener('torn-utilities-ready',run);
+  function startModule(){
+
 (()=>{
   'use strict';const TU_MODULE_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)||'0.2.13';
 const ID="torn-snake";let panel=null,canvas=null,ctx=null,timer=null,head=null,score=0,food=null,dir=[1,0],next=[1,0],snake=[],running=false;
@@ -51,4 +68,7 @@ const register=()=>(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornU
     }
   }
 
+})();
+  }
+  run();
 })();
