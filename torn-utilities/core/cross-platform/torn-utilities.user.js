@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.47-dev
+// @version      0.5.48-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -286,9 +286,9 @@
   const TU_THEME_KEY='tu:ui:theme:v1';
   const TU_DENSITY_KEY='tu:ui:density:v1';
   const TU_THEMES={
-    gold:{bg:'#11191d',panel:'#1b252b',header:'#101417',accent:'#d6b65c',border:'#cba953',input:'#283239',text:'#eeeeee',muted:'#c3c9cd',buttonText:'#111111'},
-    blue:{bg:'#111d2b',panel:'#1a3047',header:'#102238',accent:'#63b9ee',border:'#438cb8',input:'#263e53',text:'#f4f4f4',muted:'#c0d1df',buttonText:'#071723'},
-    light:{bg:'#f2f3f5',panel:'#ffffff',header:'#e8ebef',accent:'#b68a36',border:'#a78343',input:'#ffffff',text:'#20252b',muted:'#58616d',buttonText:'#161616'}
+    gold:{bg:'#11191d',panel:'#1b252b',header:'#101417',accent:'#d6b65c',border:'#8d783f',input:'#283239',text:'#f5f5f5',muted:'#c3c9cd',buttonText:'#17130a',headerText:'#f6e5b1',control:'#263139',controlText:'#f5f5f5',success:'#57c995',warning:'#e7b45c',danger:'#ee8585',logo:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/agreement-lifecycle-integration/torn-utilities/assets/tu-logo-standard.webp'},
+    blue:{bg:'#101c29',panel:'#1b2d40',header:'#102238',accent:'#75c7f5',border:'#567c99',input:'#263e53',text:'#f6f9fc',muted:'#c4d5e2',buttonText:'#092235',headerText:'#dceefa',control:'#294359',controlText:'#f6f9fc',success:'#61d4a0',warning:'#f0bf71',danger:'#f19a9a',logo:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/agreement-lifecycle-integration/torn-utilities/assets/tu-logo-blue.svg'},
+    light:{bg:'#f2f4f7',panel:'#ffffff',header:'#e8edf3',accent:'#7d571f',border:'#8b929b',input:'#ffffff',text:'#20252b',muted:'#505d6a',buttonText:'#ffffff',headerText:'#1d2c3b',control:'#dce3ea',controlText:'#20252b',success:'#176e45',warning:'#8c5700',danger:'#ae2d38',logo:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/agreement-lifecycle-integration/torn-utilities/assets/tu-logo-light.svg'}
   };
   const getTUTheme=()=>TU_THEMES[localStorage.getItem(TU_THEME_KEY)]?localStorage.getItem(TU_THEME_KEY):'gold';
   const getTUDensity=()=>['compact','standard','touch'].includes(localStorage.getItem(TU_DENSITY_KEY))?localStorage.getItem(TU_DENSITY_KEY):'standard';
@@ -298,7 +298,9 @@
     const root=document.documentElement;
     for(const [key,value] of Object.entries({...t,spacing:space+'px',controlHeight:(density==='compact'?30:density==='touch'?48:36)+'px'}))root.style.setProperty('--tu-'+key.replace(/[A-Z]/g,m=>'-'+m.toLowerCase()),value);
     tuThemeStyle.textContent=`#tu-pda-panel,#tuim-panel,#tuim-travel-window,#tuim-data-window,#tuim-catalog{background:var(--tu-bg)!important;color:var(--tu-text)!important;border-color:var(--tu-border)!important}#tu-pda-panel header,[data-tu-window-header]{background:var(--tu-header)!important;color:var(--tu-text)!important}#tu-pda-panel button:not(.tu-close),#tuim-panel button:not([data-tu-nav-controls] button),#tuim-travel-window button:not([data-tu-nav-controls] button),#tuim-data-window button:not([data-tu-nav-controls] button){background:var(--tu-accent)!important;color:var(--tu-button-text)!important;min-height:var(--tu-control-height);border-radius:var(--tu-radius)}#tuim-panel input,#tuim-panel select,#tuim-travel-window input,#tuim-travel-window select{background:var(--tu-input)!important;color:var(--tu-text)!important}#tuim-panel .tuim-header,#tuim-travel-window .tuim-travel-header,#tuim-data-window .tuim-travel-header{background:var(--tu-header)!important}#tuim-travel-window .tuim-travel-card,#tuim-data-window .tuim-travel-card{background:var(--tu-panel)!important;color:var(--tu-text)!important}#tu-pda-panel .tu-card{background:var(--tu-panel)!important;color:var(--tu-text)!important}#tuim-travel-window .tuim-travel-card,#tuim-data-window .tuim-travel-card{padding:var(--tu-spacing)!important;border-radius:var(--tu-radius)!important}`;
+    root.style.setProperty('--tu-logo-image','url("'+t.logo+'")');
     root.style.setProperty('--tu-radius',density==='compact'?'6px':density==='touch'?'14px':'10px');
+    tuThemeStyle.textContent+=`#tu-pda-launcher,.tu-brand-emblem{background-image:var(--tu-logo-image)!important;background-position:center!important;background-size:contain!important;background-repeat:no-repeat!important}#tu-pda-panel header,[data-tu-window-header]{color:var(--tu-header-text)!important;border-color:var(--tu-border)!important}#tu-pda-panel header button,[data-tu-window-header] button{background:var(--tu-control)!important;color:var(--tu-control-text)!important;border-color:var(--tu-border)!important}#tu-pda-panel button:focus-visible,[data-tu-window-header] button:focus-visible{outline:2px solid var(--tu-accent)!important;outline-offset:2px}#tu-pda-panel button:disabled{opacity:.55}#tu-pda-panel .tu-brand-emblem,[data-tu-window-header] .tu-brand-emblem{border-color:var(--tu-border)!important}`;
     pageWindow.dispatchEvent(new CustomEvent('tu-theme-change',{detail:{theme:getTUTheme(),density}}));
   };
   applyTUTheme();
