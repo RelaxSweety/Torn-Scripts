@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.43-dev
+// @version      0.5.44-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -539,13 +539,13 @@
 #tu-pda-panel footer{border-top:1px solid #59451d;padding:13px;color:#aeb4bd;font-size:12px}
 `;
   document.head.appendChild(style);
-  const TU_LOGO_IMAGE='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/agreement-lifecycle-integration/torn-utilities/assets/tu-logo-standard.svg';
+  const TU_LOGO_IMAGE='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/agreement-lifecycle-integration/torn-utilities/assets/tu-logo-standard.webp';
   const launcher = document.createElement('button');
   launcher.id = 'tu-pda-launcher';
   launcher.type = 'button';
   for(const old of document.querySelectorAll('#tu-pda-launcher'))old.remove();
   launcher.textContent = '';
-  launcher.style.background=`#080c10 url('${TU_LOGO_IMAGE }') center / contain no-repeat`;
+  launcher.style.background=`#080c10 url('${TU_LOGO_IMAGE}') center / contain no-repeat`;
   launcher.dataset.tuBrand='canonical';
   launcher.setAttribute('aria-label', 'Open Torn Utilities; drag to reposition');
   document.body.appendChild(launcher);
