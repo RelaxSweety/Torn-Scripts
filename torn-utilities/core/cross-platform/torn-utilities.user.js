@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.45-dev
+// @version      0.5.46-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -1006,7 +1006,7 @@
       const bar=el.querySelector('header,.tu-header,.tuim-header,.tuim-travel-header,.tuac-header,[data-tu-window-header]')||el.firstElementChild;if(!bar)continue;
       el.dataset.tuNavHeader='1';bar.dataset.tuWindowHeader='1';for(const oldButton of [...bar.querySelectorAll('button')]){if(['−','—','×'].includes(oldButton.textContent.trim())&&!oldButton.closest('[data-tu-nav-controls]'))oldButton.style.display='none';}
       if(!bar.querySelector('[data-tu-brand-emblem]')){const emblem=document.createElement('span');emblem.className='tu-brand-emblem';emblem.dataset.tuBrandEmblem='1';emblem.textContent='';bar.prepend(emblem);}
-      if(bar.querySelector('[data-tu-nav-controls]'))continue;bar.style.position='sticky';bar.style.top='0';bar.style.zIndex='100';bar.style.background='#101417';bar.style.display='flex';bar.style.alignItems='center';bar.style.flexWrap='wrap';bar.style.gap='6px';
+      if(bar.querySelector('[data-tu-nav-controls]'))continue;bar.style.position='sticky';bar.style.top='0';bar.style.zIndex='100';bar.style.background='#101417';if(id==='tuim-panel'){bar.style.setProperty('top','-12px');bar.style.setProperty('margin-top','-12px');bar.style.setProperty('padding-top','18px');bar.style.setProperty('background','#101417');}bar.style.display='flex';bar.style.alignItems='center';bar.style.flexWrap='wrap';bar.style.gap='6px';
       const controls=document.createElement('span');controls.dataset.tuNavControls='1';controls.style.cssText='margin-left:auto;display:flex;gap:5px';
       for(const [label,title,fn] of [['←','Back',tuBack],['−','Minimize',tuMinimize],['×','Exit',tuExit]]){
         const b=document.createElement('button');b.type='button';b.textContent=label;b.title=title;b.setAttribute('aria-label',title);
