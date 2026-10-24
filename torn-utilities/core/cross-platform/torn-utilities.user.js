@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.48-dev
+// @version      0.5.49-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -915,6 +915,13 @@
       }
     }else{
       const p=document.createElement('p');p.textContent='Torn Utilities v0.5.34 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      const apiSummary=document.createElement('div');apiSummary.className='tu-card';apiSummary.style.cssText='display:flex;flex-direction:column;gap:5px;margin:12px 0';
+      const apiTitle=document.createElement('strong');apiTitle.textContent='User API Information';apiSummary.append(apiTitle);
+      const apiPlayer=getPlayer();
+      const apiIdentity=document.createElement('span');apiIdentity.textContent=apiPlayer?.id?'Player: '+(apiPlayer.name||'Verified player')+' ['+apiPlayer.id+']':'Player: Not identified';apiSummary.append(apiIdentity);
+      const apiState=document.createElement('span');apiState.textContent='Public Only API key: '+(readSavedKey()?'Saved (hidden)':'Not saved');apiSummary.append(apiState);
+      const apiVerify=document.createElement('span');apiVerify.textContent='TU authorization: '+(authorized()?'Verified':'Not verified');apiSummary.append(apiVerify);
+      const apiManage=makeButton('Manage API key →',()=>{settingsPage='api';render('settings')});apiSummary.append(apiManage);content.append(apiSummary);
       if(devAuthIssue){const issue=document.createElement('p');issue.setAttribute('role','status');issue.textContent=devAuthIssue;content.append(issue,makeButton('Retry saved API key',()=>{resetDevAuthFailure();void restoreDevSession();}));}
       const termsHeading=document.createElement('h3');termsHeading.textContent='Terms of Use and Information Use Agreement';content.append(termsHeading);appendTerms(content);if(!hasAgreement())content.append(makeButton('Review and Accept Terms',showAgreement));
       const guideLink=document.createElement('a');guideLink.href='https://github.com/RelaxSweety/Torn-Scripts/blob/main/torn-utilities/INSTALLATION.md';guideLink.target='_blank';guideLink.rel='noopener noreferrer';guideLink.textContent='TU Installation & Module Setup Guide ↗';guideLink.style.cssText='display:block;margin:12px 0;padding:12px;border:1px solid #806a3e;border-radius:8px;color:#e4c779;text-decoration:underline;font-weight:600';content.append(guideLink);
@@ -952,7 +959,7 @@
     b.addEventListener('click',e=>{e.stopPropagation();handler();syncLauncher();});
     if(before)navHeader.prepend(b);else navHeader.append(b);return b;
   };
-  addNavControl('←','Back',tuBack,true);
+  // Manager is the navigation root; back is only available inside child modules.
   addNavControl('−','Minimize',tuMinimize,false);
   panel.querySelector('.tu-close').title='Exit';
   panel.querySelector('.tu-close').setAttribute('aria-label','Exit');
