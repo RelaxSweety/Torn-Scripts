@@ -12,7 +12,8 @@
 // @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/torn-fleet.user.js
 // ==/UserScript==
 (()=>{
-  const TU_MODULE_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)||'0.2.4';'use strict';
+  'use strict';
+const TU_MODULE_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)||'0.2.4';
 const ID="torn-fleet",API="https://tu-multiplayer-server.tuserver.workers.dev/api/battleship",STORE="tu:"+ID+":session";
 let mount=null,panel=null,timer=null,session=null,game=null,context=null,placement=[],fleet=[];
 try{session=JSON.parse(localStorage.getItem(STORE)||"null")}catch{}
