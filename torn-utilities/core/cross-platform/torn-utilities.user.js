@@ -15,8 +15,8 @@
 // @connect      api.github.com
 // @connect      tu-multiplayer-server-dev.tuserver.workers.dev
 // @run-at       document-idle
-// @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/agreement-lifecycle-integration/torn-utilities/core/cross-platform/torn-utilities.user.js
-// @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/agreement-lifecycle-integration/torn-utilities/core/cross-platform/torn-utilities.user.js
+// @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/stable-05424-who/torn-utilities/core/cross-platform/torn-utilities.user.js
+// @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/stable-05424-who/torn-utilities/core/cross-platform/torn-utilities.user.js
 // ==/UserScript==
 (() => {
   'use strict';
@@ -27,7 +27,7 @@
   pageWindow.__RELAX_TORN_UTILITIES_PDA__ = true;
   const KEY = 'relaxsweety_tu_pda_v1';
   const TU_VERSION='0.5.42.5-who-dev';
-  const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
+  const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/stable-05424-who/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
     {id:'business',name:'Business Tools',icon:'▥',order:10},
