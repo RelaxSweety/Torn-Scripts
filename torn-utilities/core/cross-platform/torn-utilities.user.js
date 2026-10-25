@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.2-dev
+// @version      0.5.42.3-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -523,7 +523,7 @@
 #tu-pda-panel[hidden]{display:none}
 #tu-pda-panel *{box-sizing:border-box}
 #tu-pda-panel header{display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px solid #4a3c21;position:sticky;top:0;z-index:100;background:#101417}
-#tu-pda-panel .tu-logo{font:bold italic 29px Georgia,serif;color:#f1ce72}
+#tu-pda-panel .tu-logo{font-size:0;line-height:0;color:transparent;overflow:hidden;vertical-align:middle}
 #tu-pda-panel h2{font-size:22px;margin:0;color:#f1ce72}
 #tu-pda-panel p{margin:4px 0;color:#aeb4bd}
 #tu-pda-panel button{cursor:pointer}
@@ -554,7 +554,7 @@
   panel.hidden = true;
   panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.34 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
-  const headerBrand=panel.querySelector('.tu-logo');if(headerBrand){headerBrand.textContent='TU';headerBrand.classList.add('tu-brand-emblem');}
+  const headerBrand=panel.querySelector('.tu-logo');if(headerBrand){headerBrand.textContent='';headerBrand.classList.add('tu-brand-emblem');headerBrand.setAttribute('role','img');headerBrand.setAttribute('aria-label','Torn Utilities');}
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
   identityLine.style.cssText='margin:3px 0 0;font-size:12px;color:#e4c779;overflow-wrap:anywhere';
