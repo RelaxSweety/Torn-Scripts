@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42-dev
+// @version      0.5.42.1-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -657,7 +657,7 @@
     box.append(buttons);content.append(box);
   };
   function render(tab) {
-    if(!hasAgreement()&&tab!=='about')tab='about';
+    if(!authorized()&&tab!=='about')tab='about';
     if(tab!=='settings')settingsPage=null;
     currentTab=tab;
     const catalogFooter=panel.querySelector('#tu-catalog-updated');if(catalogFooter)catalogFooter.textContent='Catalog: '+(registryUpdatedAt?new Date(registryUpdatedAt).toLocaleString():'Not refreshed')+(registryStatus.startsWith('Refresh failed')?' · '+registryStatus:'');
@@ -788,8 +788,9 @@
       });
       const remove=makeButton('Remove saved API Key',async()=>{
         if(confirm('Remove saved Public Only API key from this browser?')){
-          try{await devCancel();}catch(error){alert('Cancellation not confirmed; key retained: '+error.message);return;}removeSavedKey();resetDevAuthFailure();localStorage.removeItem(TU_TERMS_KEY);publishAuthorization(false);vaultStatus.textContent='No saved API key';
+          try{await devCancel();}catch(error){alert('Cancellation not confirmed; key retained: '+error.message);return;}removeSavedKey();resetDevAuthFailure();localStorage.removeItem(TU_TERMS_KEY);sessionStorage.removeItem(DEV_SESSION_KEY);clearPlayer();publishAuthorization(false);tuNav.history.length=0;tuNav.current='tu-pda-panel';tuNav.exited=false;tuNav.minimized=false;vaultStatus.textContent='No saved API key';
           keyDetails.replaceChildren();keyDetails.style.display='none';
+          showAgreement();syncLauncher();
         }
       });
       content.append(view,keyDetails,remove,vaultStatus);
@@ -917,7 +918,7 @@
   panel.querySelector('.tu-close').title='Exit';
   panel.querySelector('.tu-close').setAttribute('aria-label','Exit');
   panel.querySelector('.tu-close').addEventListener('click',()=>{tuExit();syncLauncher();});
-  panel.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => {if(!hasAgreement()&&b.dataset.tab!=='about'){showAgreement();return;}render(b.dataset.tab);}));
+  panel.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => {if(!authorized()&&b.dataset.tab!=='about'){showAgreement();return;}render(b.dataset.tab);}));
   // Shared floating-window support for TU module panels.
   // Persist each TU window's user-selected size and position independently.
   const floatIds=['tu-diagnostics-window','tuim-panel','tuim-catalog','tuac-panel','tca-panel','tu-pda-panel','sff-root','tpfg-manager','tpfg-root','tpfg-prompt'];
