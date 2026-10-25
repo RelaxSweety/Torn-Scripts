@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.8-who-dev
+// @version      0.5.42.9-who-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -26,7 +26,7 @@
   if (pageWindow.__RELAX_TORN_UTILITIES_PDA__) return;
   pageWindow.__RELAX_TORN_UTILITIES_PDA__ = true;
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.5.42.8-who-dev';
+  const TU_VERSION='0.5.42.9-who-dev';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/stable-05424-who/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -223,7 +223,8 @@
   }
   // Public Only key stored locally on this device; no passphrase or GM grants.
   const VAULT='tu:identity:public-only-key:v1';
-  const readSavedKey=()=>{try{const local=localStorage.getItem(VAULT)||'';if(local)return local;}catch(_){}try{const backup=typeof GM_getValue==='function'?GM_getValue(VAULT,''):'';if(backup){try{localStorage.setItem(VAULT,backup)}catch(_){}return backup}}catch(_){}return ''};
+  const normalizeKey=v=>{if(typeof v!=='string')return '';let x=v.trim();for(let i=0;i<3;i++){if(x.startsWith('GMV2_')){x=x.slice(5);continue;}if(x.startsWith('"')&&x.endsWith('"')){try{const y=JSON.parse(x);if(typeof y==='string'){x=y.trim();continue}}catch{}}break;}return /^[A-Za-z0-9]{16}$/.test(x)?x:'';};
+  const readSavedKey=()=>{let v='';try{v=localStorage.getItem(VAULT)||''}catch{}let key=normalizeKey(v);if(key){if(key!==v)try{localStorage.setItem(VAULT,key)}catch{}return key;}try{key=normalizeKey(typeof GM_getValue==='function'?GM_getValue(VAULT,''):'');if(key){try{localStorage.setItem(VAULT,key)}catch{}return key}}catch{}return ''};
   const saveKey=key=>{let stored=false;try{localStorage.setItem(VAULT,key);stored=true}catch(_){}try{if(typeof GM_setValue==='function'){GM_setValue(VAULT,key);stored=true}}catch(_){}if(!stored)throw Error('No persistent key storage available')};
   const removeSavedKey=()=>{try{localStorage.removeItem(VAULT)}catch(_){}try{if(typeof GM_deleteValue==='function')GM_deleteValue(VAULT)}catch(_){}};
   // Explicit user-provided Public Only key; never persisted or broadcast.
@@ -553,7 +554,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.8-who-dev (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.9-who-dev (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const headerBrand=panel.querySelector('.tu-logo');if(headerBrand){headerBrand.textContent='';headerBrand.classList.add('tu-brand-emblem');headerBrand.setAttribute('role','img');headerBrand.setAttribute('aria-label','Torn Utilities');}
   const identityLine=document.createElement('p');
