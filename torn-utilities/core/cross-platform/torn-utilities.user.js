@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.5-who-dev
+// @version      0.5.42.6-who-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -26,7 +26,7 @@
   if (pageWindow.__RELAX_TORN_UTILITIES_PDA__) return;
   pageWindow.__RELAX_TORN_UTILITIES_PDA__ = true;
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.5.42.5-who-dev';
+  const TU_VERSION='0.5.42.6-who-dev';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/stable-05424-who/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -778,8 +778,10 @@
           try{
             const info=await requestIdentity(key);
             if(info?.error)throw Error(info.error.error||'Torn rejected key');
-            const level=String(info?.access?.level||info?.access_level||info?.access||'').toLowerCase();
-            if(level!=='limited')throw Error('Torn did not confirm Limited Access; nothing saved');
+            const level=String(info?.info?.access?.type??info?.info?.access??'').trim();
+            if(level!=='Limited Access')throw Error('Expected Limited Access, received '+(level||'no access type')+'; nothing saved');
+            const owner=Number(info?.info?.user?.id);
+            if(!Number.isSafeInteger(owner)||owner<=0)throw Error('Torn did not confirm key owner; nothing saved');
             localStorage.setItem(STORAGE,key);
             status.textContent='Limited Access key verified and saved. WHO-specific permissions are not yet confirmed.';
           }catch(error){status.textContent='Not saved: '+error.message;}
