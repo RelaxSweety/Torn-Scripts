@@ -128,6 +128,14 @@
       "version": "0.7.9",
       "description": "Active ranked war discovery, war-page navigation, synchronized dual-faction API and DOM monitoring, and comparison exports",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/war-status-diagnostic.user.js"
+    },
+    {
+      "id": "war-hit-organizer",
+      "name": "War Hit Organizer (WHO)",
+      "category": "other",
+      "version": "0.1.0-dev",
+      "description": "WHO development module foundation; live attack tracking not yet enabled",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/stable-05424-who/torn-utilities/modules/war-hit-organizer.user.js"
     }
   ]
 }
