@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.4-dev
+// @version      0.5.42.5-who-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -748,12 +748,12 @@
       if(!settingsPage)tuShowUpdateTools();
       if(!settingsPage){diagnosticModule=null;
         const h=document.createElement('h3');h.textContent='Settings';content.append(h);
-        for(const [id,name,desc] of [['time','Time Display','Local or TCT'],['api','Public Only API Key','Verify, view or remove key'],['storage','Storage & Backups','Export, restore or clear module data'],['diagnostics','Diagnostics','Manager and module reports']]){
+        for(const [id,name,desc] of [['time','Time Display','Local or TCT'],['api','Public Only API Key','Verify, view or remove key'],['who-api','WHO Limited Access API','Optional independently verified key'],['storage','Storage & Backups','Export, restore or clear module data'],['diagnostics','Diagnostics','Manager and module reports']]){
           const card=document.createElement('div');card.className='tu-card';const body=document.createElement('div');body.style.flex='1';const label=document.createElement('strong');label.textContent=name;const detail=document.createElement('small');detail.textContent=desc;body.append(label,detail);card.append(body,makeButton('Open →',()=>{settingsPage=id;render('settings')}));content.append(card);
         }return;
       }
       const back=makeButton('← Settings',()=>{settingsPage=null;diagnosticModule=null;render('settings')});back.style.margin='0 0 12px';content.append(back);
-      const heading=document.createElement('h3');heading.textContent=({time:'Time Display',api:'Public Only API Key',storage:'Storage & Backups',diagnostics:'Diagnostics'})[settingsPage];content.append(heading);
+      const heading=document.createElement('h3');heading.textContent=({time:'Time Display',api:'Public Only API Key','who-api':'WHO Limited Access API',storage:'Storage & Backups',diagnostics:'Diagnostics'})[settingsPage];content.append(heading);
       if(settingsPage==='time'){
       const timeHeading=document.createElement('strong');timeHeading.textContent='Time Display';content.append(timeHeading);
       const timeDescription=document.createElement('p');timeDescription.textContent='Choose one timezone for TU travel estimates and observation timestamps.';content.append(timeDescription);
@@ -762,6 +762,32 @@
       timeSelect.value=localStorage.getItem('tu-time-display')==='tct'?'tct':'local';
       timeSelect.addEventListener('change',()=>{localStorage.setItem('tu-time-display',timeSelect.value);pageWindow.dispatchEvent(new CustomEvent('tu-time-display-changed',{detail:{mode:timeSelect.value}}))});content.append(timeSelect);
       return;
+      }
+      if(settingsPage==='who-api'){
+        const STORAGE='tu:who:limited-api-key:v1';
+        const description=document.createElement('p');description.textContent='Optional WHO API key. Public Only authentication and agreement remain unchanged. This key is saved separately on this device after verification. Browser storage is not encrypted and can be accessed by other scripts on Torn pages.';content.append(description);
+        const form=document.createElement('form');form.autocomplete='off';
+        const input=document.createElement('input');input.type='password';input.maxLength=16;input.autocomplete='off';input.placeholder='16-character Limited Access key';input.style.cssText='width:100%;box-sizing:border-box;padding:9px';form.append(input);
+        const status=document.createElement('p');status.setAttribute('role','status');status.textContent=localStorage.getItem(STORAGE)?'WHO key saved on this device (permission recheck required)':'No WHO key saved';
+        const reveal=makeButton('Show / Hide',()=>{input.type=input.type==='password'?'text':'password'});form.append(reveal);
+        const submit=makeButton('Verify & Save');submit.type='submit';form.append(submit);
+        form.addEventListener('submit',async event=>{
+          event.preventDefault();const candidate=input.value.trim();input.value='';
+          if(!/^[a-zA-Z0-9]{16}$/.test(candidate)){status.textContent='Enter a 16-character key';return;}
+          submit.disabled=true;status.textContent='Verifying Torn API permissions…';
+          try{
+            const info=await requestIdentity(candidate);
+            if(info?.error)throw Error(info.error.error||'Torn rejected this key');
+            const level=String(info?.access?.level||info?.access_level||info?.access||'').toLowerCase();
+            if(level!=='limited')throw Error('Torn did not confirm Limited Access; no changes saved');
+            localStorage.setItem(STORAGE,candidate);
+            status.textContent='Limited Access verified and saved. WHO faction attack permissions require separate validation.';
+          }catch(error){status.textContent='Not saved: '+error.message;}
+          finally{submit.disabled=false;}
+        });
+        content.append(form,status);
+        content.append(makeButton('Remove WHO API Key',()=>{localStorage.removeItem(STORAGE);input.value='';status.textContent='WHO key removed';}));
+        return;
       }
       if(settingsPage==='api'){
       const headingAuth=document.createElement('strong');headingAuth.textContent='Torn Public Only API Key';content.append(headingAuth);
