@@ -516,6 +516,7 @@
   style.textContent = `
 #tu-pda-panel .tu-refresh-icon{display:inline-block}#tu-pda-panel .tu-spinning{animation:tu-refresh-spin .8s linear infinite}@keyframes tu-refresh-spin{to{transform:rotate(360deg)}}
 #tu-pda-launcher{position:fixed;left:12px;top:38%;z-index:2147483645;touch-action:none;width:43px;height:43px;border-radius:50%;border:2px solid #e3bb57;background:radial-gradient(circle at 35% 25%,#293b45,#07090b 70%);color:#f5d87e;box-shadow:0 2px 9px #000b,inset 0 0 4px #f5d87e66;font:bold italic 23px 'Palatino Linotype','Book Antiqua',Georgia,serif;letter-spacing:-2px;padding:0 2px 0 0;display:flex;align-items:center;justify-content:center;line-height:1;cursor:grab;user-select:none;-webkit-user-select:none}
+#tu-pda-launcher{border-radius:10px;border:2px solid #d5ad54;background:linear-gradient(145deg,#202225,#050607 72%);color:#f2cf78;box-shadow:0 2px 9px #000b,inset 0 0 0 1px #8b6b30;font:bold 22px Georgia,serif;letter-spacing:-2px;padding:0 2px 0 0}
 #tu-pda-launcher:active{cursor:grabbing}
 #tu-pda-launcher[hidden]{display:none!important}
 #tu-pda-panel{position:fixed;z-index:2147483644;inset:8% 3% auto 3%;max-width:440px;margin:auto;max-height:82vh;overflow:auto;background:#101417;color:#eee;border:1px solid #c49a46;border-radius:18px;box-shadow:0 10px 35px #000d;font:14px system-ui,Arial,sans-serif}
@@ -547,7 +548,7 @@
   launcher.dataset.tuBrand='canonical';
   launcher.setAttribute('aria-label', 'Open Torn Utilities; drag to reposition');
   document.body.appendChild(launcher);
-  const brandStyle=document.createElement('style');brandStyle.textContent='.tu-brand-emblem{display:inline-grid;place-items:center;width:32px;height:32px;flex:none;border:2px solid #e3bb57;border-radius:50%;background:radial-gradient(circle at 35% 25%,#293b45,#07090b 70%);color:#f5d87e;font:bold italic 18px Georgia,serif;letter-spacing:-1px;box-shadow:0 2px 9px #000b}';document.head.appendChild(brandStyle);
+  const brandStyle=document.createElement('style');brandStyle.textContent='.tu-brand-emblem{display:inline-grid;place-items:center;width:32px;height:32px;flex:none;border:2px solid #e3bb57;border-radius:7px;background:linear-gradient(145deg,#202225,#050607 72%);color:#f2cf78;font:bold 18px Georgia,serif;letter-spacing:-1px;box-shadow:0 2px 9px #000b}';document.head.appendChild(brandStyle);
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
