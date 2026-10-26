@@ -133,7 +133,7 @@
       "id": "war-hit-organizer",
       "name": "War Hit Organizer (WHO)",
       "category": "other",
-      "version": "0.2.0-dev",
+      "version": "0.2.1-dev",
       "description": "War setup, target assignments, local persistence, and Limited Access faction API test (development)",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/stable-05424-who/torn-utilities/modules/war-hit-organizer.user.js"
     }
