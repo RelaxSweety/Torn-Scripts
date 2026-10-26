@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU War Organizer
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.3.13-dev
+// @version      0.3.14-dev
 // @description  Compact War Organizer target board and reservation design preview
 // @match        https://www.torn.com/*
 // @grant        none
@@ -40,12 +40,52 @@ const data=await api.requestTorn('/v2/faction/'+fid+'/members');if(data?.error)t
 const members=membersOf(data);if(!members.length)throw Error('No faction members returned');
 if(run!==rosterEpoch)return;
 const updated={};for(const m of members){const id=String(m.id||m.player_id||m.user_id||'');if(!/^\d+$/.test(id))continue;const previous=state.targets[id]||{};const status=String(m.status?.state||m.status?.description||'Unknown');updated[id]={...previous,name:m.name||previous.name||id,level:Number(m.level)||0,status,activity:activityOf(m),releaseAt:status==='Hospital'&&Number(m.status?.until)>0?Number(m.status.until):null,source:'API',lastObserved:Date.now()}}
-state.targets=updated;rosterFaction=fid;enemyOnline=onlineCount(members);rosterUpdated=Date.now();rosterError='';save();void hydrateHealth(run);
+state.targets=updated;rosterFaction=fid;enemyOnline=onlineCount(members);rosterUpdated=Date.now();rosterError='';save();void hydrateHealth();
 const own=ownFactionId();if(/^\d+$/.test(own)&&own!==fid){try{const friendly=await api.requestTorn('/v2/faction/'+own+'/members');if(run===rosterEpoch)ownOnline=onlineCount(membersOf(friendly))}catch{}}
 }catch(e){if(run===rosterEpoch)rosterError='Roster API: '+e.message}finally{if(run===rosterEpoch){rosterLoading=false;if(root&&!root.hidden)render()}}
 }
 let hpWorkerActive=false;
-async function hydrateHealth(run){if(hpWorkerActive)return;hpWorkerActive=true;const faction=String(state.factionId);try{const api=window.TornUtilities;for(const id of Object.keys(state.targets)){if(faction!==String(state.factionId)||!root||root.hidden)break;const target=state.targets[id];if(target.hpObservedAt&&Date.now()-target.hpObservedAt<600000)continue;try{const data=await (api.requestWhoTorn?api.requestWhoTorn('/v2/user/'+id+'/profile'):Promise.reject(Error('TU Manager WHO API unavailable')));if(faction!==String(state.factionId))break;const life=data?.profile?.life??data?.life;const current=Number(life?.current),maximum=Number(life?.maximum);if(life&&Number.isFinite(current)&&Number.isFinite(maximum)&&maximum>0){const live=state.targets[id];if(live&&(!live.hpObservedAt||live.hpObservedAt<=Date.now())){live.hp=current;live.maxHp=maximum;live.hpObservedAt=Date.now();live.hpSource='Torn API';delete live.hpError;save();const health=root?.querySelector('[data-hp-id="'+id+'"]');if(health){health.textContent='HP '+format(current)+'/'+format(maximum)+' · Torn API';const bar=root.querySelector('[data-hp-bar="'+id+'"]');if(bar)bar.style.width=Math.max(0,Math.min(100,100*current/maximum))+'%'}}}}catch(error){console.warn('[TU WHO] HP unavailable for player '+id+': '+String(error?.message||error));const live=state.targets[id];if(live){live.hpError=String(error?.message||error);const health=root?.querySelector('[data-hp-id="'+id+'"]');if(health)health.textContent='HP unavailable · '+live.hpError}}await new Promise(resolve=>setTimeout(resolve,1600));}}finally{hpWorkerActive=false}}
+function paintHealth(id){
+ const t=state.targets[id];if(!t||!root)return;
+ const label=root.querySelector('[data-hp-id="'+id+'"]'),bar=root.querySelector('[data-hp-bar="'+id+'"]');
+ const valid=Number.isFinite(Number(t.hp))&&t.hp!==undefined&&Number(t.maxHp)>0;
+ if(label)label.textContent=valid?'HP '+format(t.hp)+'/'+format(t.maxHp)+' · '+(t.hpSource||'Torn API'):(t.maxHp>0?'HP ?/'+format(t.maxHp)+' · Current unavailable':'HP Unknown · '+(t.hpError||'Awaiting profile'));
+ if(bar)bar.style.width=valid?Math.max(0,Math.min(100,100*Number(t.hp)/Number(t.maxHp)))+'%':'0%';
+}
+async function hydrateHealth(){
+ if(hpWorkerActive)return;
+ hpWorkerActive=true;
+ const faction=String(state.factionId);
+ try{
+  const api=window.TornUtilities;
+  for(const id of Object.keys(state.targets)){
+   if(faction!==String(state.factionId)||!root||root.hidden)break;
+   const target=state.targets[id];
+   if(target.hpObservedAt&&Date.now()-target.hpObservedAt<600000)continue;
+   try{
+    const data=await (api.requestWhoTorn?api.requestWhoTorn('/v2/user/'+id+'/profile'):Promise.reject(Error('TU Manager WHO API unavailable')));
+    if(faction!==String(state.factionId))break;
+    const life=data?.profile?.life??data?.life;
+    const live=state.targets[id];if(!live)continue;
+    const current=life?.current===null||life?.current===undefined?NaN:Number(life.current);
+    const maximum=life?.maximum===null||life?.maximum===undefined?NaN:Number(life.maximum);
+    if(Number.isFinite(maximum)&&maximum>0)live.maxHp=maximum;
+    if(Number.isFinite(current))live.hp=current;
+    if(Number.isFinite(current)&&Number.isFinite(Number(live.maxHp))&&Number(live.maxHp)>0){
+     live.hpObservedAt=Date.now();live.hpSource='Torn API';delete live.hpError;
+    }else{
+     live.hpError='Profile health unavailable';
+    }
+    save();paintHealth(id);
+   }catch(error){
+    const live=state.targets[id];
+    if(live){live.hpError=String(error?.message||error);paintHealth(id)}
+    console.warn('[TU WHO] HP unavailable for player '+id+': '+String(error?.message||error));
+   }
+   await new Promise(resolve=>setTimeout(resolve,1600));
+  }
+ }finally{hpWorkerActive=false}
+}
 function startRoster(){if(rosterTimer)clearTimeout(rosterTimer);if(!state.factionId)return;refreshRoster();const loop=()=>{rosterTimer=setTimeout(()=>{if(root&&!root.hidden&&state.factionId)refreshRoster();loop()},15000)};loop()}
 function render(){
 if(!root)return;const oldContent=root.querySelector('.who-content');const previousScroll=oldContent?.scrollTop||0;const preservedGrip=root.querySelector('.who-resize-grip');root.replaceChildren();
@@ -72,8 +112,8 @@ const list=el('div',content,undefined,'who-list');
 entries.forEach(([id,t])=>{
 const row=el('div',list,undefined,'who-row'),left=el('div',row,undefined,'who-left'),line=el('div',left,undefined,'who-line');
 const reservedBy=state.reservations[id],canAttack=!reservedBy||own(reservedBy)||isAdmin();const playerLink=el(canAttack?'a':'span',line,t.name||'Player '+id);if(canAttack){playerLink.href='https://www.torn.com/loader.php?sid=attack&user2ID='+encodeURIComponent(id);playerLink.style.cssText='color:#f0ce77!important;text-decoration:underline!important;cursor:pointer';}else{playerLink.style.cssText='color:#89949a!important;cursor:not-allowed';playerLink.title='Reserved by '+(reservedBy.name||'another player')+' — attack link unavailable';}el('small',line,'L'+(t.level||'?'));
-const health=el('div',left,undefined,'who-health');const hpText=el('small',health,'HP '+(t.hp===undefined?'Unknown':format(t.hp)+'/'+format(t.maxHp))+' · '+(t.hpSource||t.hpError||'Awaiting profile'));hpText.dataset.hpId=id;
-const bar=el('div',left,undefined,'who-bar');const fill=el('div',bar);fill.dataset.hpBar=id;fill.style.width=t.maxHp&&t.hp!==undefined?Math.max(0,Math.min(100,100*t.hp/t.maxHp))+'%':'0%';
+const health=el('div',left,undefined,'who-health');const hpText=el('small',health,'HP Unknown · Awaiting profile');hpText.dataset.hpId=id;
+const bar=el('div',left,undefined,'who-bar');const fill=el('div',bar);fill.dataset.hpBar=id;fill.style.width='0%';paintHealth(id);
 const right=el('div',row,undefined,'who-right'),status=el('div',right,undefined,'who-status');
 const rem=seconds(t.releaseAt),hospital=t.status==='Hospital'&&rem!==null;
 el('span',status,hospital?'Hospital':(t.status||'Unknown'));
@@ -163,6 +203,6 @@ const beginGesture=(e,resize)=>{if(e.button!==undefined&&e.button!==0)return;if(
 root.addEventListener('pointerdown',e=>{if(e.target===grip)beginGesture(e,true);else if(e.target.closest('.who-header'))beginGesture(e,false)});
 root.addEventListener('touchmove',()=>{lastUserScroll=Date.now()},{passive:true});root.addEventListener('wheel',()=>{lastUserScroll=Date.now()},{passive:true});document.body.append(root);render();startRoster();poll=setInterval(()=>{if(!root||root.hidden||tab!=='targets')return;for(const clock of root.querySelectorAll('.who-countdown')){const remaining=seconds(Number(clock.dataset.releaseAt));if(remaining===null)continue;clock.textContent=formatCountdown(remaining);clock.style.color=remaining>0&&remaining<=state.reservationTimer?'#8fe0a8':'#f0b85c';}for(const button of root.querySelectorAll('.who-reserve')){const id=button.dataset.targetId;if(id&&state.targets[id])button.disabled=!isOpen(state.targets[id]);}},1000);
 }
-function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.13-dev',activate, deactivate:close})}
+function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.14-dev',activate, deactivate:close})}
 if(window.TornUtilities)register();else window.addEventListener('torn-utilities-ready',register,{once:true});
 })();
