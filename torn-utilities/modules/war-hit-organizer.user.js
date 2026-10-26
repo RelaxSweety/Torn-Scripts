@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU War Organizer
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.3.11-dev
+// @version      0.3.12-dev
 // @description  Compact War Organizer target board and reservation design preview
 // @match        https://www.torn.com/*
 // @grant        none
@@ -45,7 +45,7 @@ const own=ownFactionId();if(/^\d+$/.test(own)&&own!==fid){try{const friendly=awa
 }catch(e){if(run===rosterEpoch)rosterError='Roster API: '+e.message}finally{if(run===rosterEpoch){rosterLoading=false;if(root&&!root.hidden)render()}}
 }
 let hpWorkerActive=false;
-async function hydrateHealth(run){if(hpWorkerActive)return;hpWorkerActive=true;const faction=String(state.factionId);try{const api=window.TornUtilities;for(const id of Object.keys(state.targets)){if(faction!==String(state.factionId)||!root||root.hidden)break;const target=state.targets[id];if(target.hpObservedAt&&Date.now()-target.hpObservedAt<600000)continue;try{const data=await api.requestTorn('/v2/user/'+id+'/profile');if(faction!==String(state.factionId))break;const life=data?.profile?.life??data?.life;const current=Number(life?.current),maximum=Number(life?.maximum);if(life&&Number.isFinite(current)&&Number.isFinite(maximum)&&maximum>0){const live=state.targets[id];if(live&&(!live.hpObservedAt||live.hpObservedAt<=Date.now())){live.hp=current;live.maxHp=maximum;live.hpObservedAt=Date.now();live.hpSource='Torn API';save();const health=root?.querySelector('[data-hp-id="'+id+'"]');if(health){health.textContent='HP '+format(current)+'/'+format(maximum)+' · Torn API';const bar=root.querySelector('[data-hp-bar="'+id+'"]');if(bar)bar.style.width=Math.max(0,Math.min(100,100*current/maximum))+'%'}}}}}catch(error){console.warn('[TU WHO] HP unavailable for player '+id+': '+String(error?.message||error))}await new Promise(resolve=>setTimeout(resolve,1600));}}finally{hpWorkerActive=false}}
+async function hydrateHealth(run){if(hpWorkerActive)return;hpWorkerActive=true;const faction=String(state.factionId);try{const api=window.TornUtilities;for(const id of Object.keys(state.targets)){if(faction!==String(state.factionId)||!root||root.hidden)break;const target=state.targets[id];if(target.hpObservedAt&&Date.now()-target.hpObservedAt<600000)continue;try{const data=await api.requestTorn('/v2/user/'+id+'/profile');if(faction!==String(state.factionId))break;const life=data?.profile?.life??data?.life;const current=Number(life?.current),maximum=Number(life?.maximum);if(life&&Number.isFinite(current)&&Number.isFinite(maximum)&&maximum>0){const live=state.targets[id];if(live&&(!live.hpObservedAt||live.hpObservedAt<=Date.now())){live.hp=current;live.maxHp=maximum;live.hpObservedAt=Date.now();live.hpSource='Torn API';save();const health=root?.querySelector('[data-hp-id="'+id+'"]');if(health){health.textContent='HP '+format(current)+'/'+format(maximum)+' · Torn API';const bar=root.querySelector('[data-hp-bar="'+id+'"]');if(bar)bar.style.width=Math.max(0,Math.min(100,100*current/maximum))+'%'}}}}catch(error){console.warn('[TU WHO] HP unavailable for player '+id+': '+String(error?.message||error))}await new Promise(resolve=>setTimeout(resolve,1600));}}finally{hpWorkerActive=false}}
 function startRoster(){if(rosterTimer)clearTimeout(rosterTimer);if(!state.factionId)return;refreshRoster();const loop=()=>{rosterTimer=setTimeout(()=>{if(root&&!root.hidden&&state.factionId)refreshRoster();loop()},15000)};loop()}
 function render(){
 if(!root)return;const oldContent=root.querySelector('.who-content');const previousScroll=oldContent?.scrollTop||0;const preservedGrip=root.querySelector('.who-resize-grip');root.replaceChildren();
@@ -163,6 +163,6 @@ const beginGesture=(e,resize)=>{if(e.button!==undefined&&e.button!==0)return;if(
 root.addEventListener('pointerdown',e=>{if(e.target===grip)beginGesture(e,true);else if(e.target.closest('.who-header'))beginGesture(e,false)});
 root.addEventListener('touchmove',()=>{lastUserScroll=Date.now()},{passive:true});root.addEventListener('wheel',()=>{lastUserScroll=Date.now()},{passive:true});document.body.append(root);render();startRoster();poll=setInterval(()=>{if(!root||root.hidden||tab!=='targets')return;for(const clock of root.querySelectorAll('.who-countdown')){const remaining=seconds(Number(clock.dataset.releaseAt));if(remaining===null)continue;clock.textContent=formatCountdown(remaining);clock.style.color=remaining>0&&remaining<=state.reservationTimer?'#8fe0a8':'#f0b85c';}for(const button of root.querySelectorAll('.who-reserve')){const id=button.dataset.targetId;if(id&&state.targets[id])button.disabled=!isOpen(state.targets[id]);}},1000);
 }
-function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.11-dev',activate, deactivate:close})}
+function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.12-dev',activate, deactivate:close})}
 if(window.TornUtilities)register();else window.addEventListener('torn-utilities-ready',register,{once:true});
 })();
