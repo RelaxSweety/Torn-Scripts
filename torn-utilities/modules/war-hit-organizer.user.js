@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU War Organizer
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.3.14-dev
+// @version      0.3.15-dev
 // @description  Compact War Organizer target board and reservation design preview
 // @match        https://www.torn.com/*
 // @grant        none
@@ -48,9 +48,11 @@ let hpWorkerActive=false;
 function paintHealth(id){
  const t=state.targets[id];if(!t||!root)return;
  const label=root.querySelector('[data-hp-id="'+id+'"]'),bar=root.querySelector('[data-hp-bar="'+id+'"]');
- const valid=Number.isFinite(Number(t.hp))&&t.hp!==undefined&&Number(t.maxHp)>0;
- if(label)label.textContent=valid?'HP '+format(t.hp)+'/'+format(t.maxHp)+' · '+(t.hpSource||'Torn API'):(t.maxHp>0?'HP ?/'+format(t.maxHp)+' · Current unavailable':'HP Unknown · '+(t.hpError||'Awaiting profile'));
- if(bar)bar.style.width=valid?Math.max(0,Math.min(100,100*Number(t.hp)/Number(t.maxHp)))+'%':'0%';
+ const hasCurrent=t.hp!==undefined&&t.hp!==null&&Number.isFinite(Number(t.hp));
+ const hasMaximum=t.maxHp!==undefined&&t.maxHp!==null&&Number.isFinite(Number(t.maxHp))&&Number(t.maxHp)>0;
+ const hp=hasCurrent?format(t.hp):'?',max=hasMaximum?format(t.maxHp):'?';
+ if(label)label.textContent=hasCurrent||hasMaximum?'HP '+hp+'/'+max+' · '+(t.hpSource||'Torn API'):'HP Unknown · '+(t.hpError||'Profile health unavailable');
+ if(bar)bar.style.width=hasCurrent&&hasMaximum?Math.max(0,Math.min(100,100*Number(t.hp)/Number(t.maxHp)))+'%':'0%';
 }
 async function hydrateHealth(){
  if(hpWorkerActive)return;
@@ -58,23 +60,23 @@ async function hydrateHealth(){
  const faction=String(state.factionId);
  try{
   const api=window.TornUtilities;
-  for(const id of Object.keys(state.targets)){
+  for(const id of Object.keys(state.targets).sort((a,b)=>Number(state.targets[b]?.status==='Hospital')-Number(state.targets[a]?.status==='Hospital'))){
    if(faction!==String(state.factionId)||!root||root.hidden)break;
    const target=state.targets[id];
    if(target.hpObservedAt&&Date.now()-target.hpObservedAt<600000)continue;
    try{
     const data=await (api.requestWhoTorn?api.requestWhoTorn('/v2/user/'+id+'/profile'):Promise.reject(Error('TU Manager WHO API unavailable')));
     if(faction!==String(state.factionId))break;
-    const life=data?.profile?.life??data?.life;
+    const life=data?.profile?.life??data?.life??data?.profile?.health??data?.health;
     const live=state.targets[id];if(!live)continue;
     const current=life?.current===null||life?.current===undefined?NaN:Number(life.current);
     const maximum=life?.maximum===null||life?.maximum===undefined?NaN:Number(life.maximum);
     if(Number.isFinite(maximum)&&maximum>0)live.maxHp=maximum;
     if(Number.isFinite(current))live.hp=current;
-    if(Number.isFinite(current)&&Number.isFinite(Number(live.maxHp))&&Number(live.maxHp)>0){
+    if(Number.isFinite(current)||Number.isFinite(maximum)&&maximum>0){
      live.hpObservedAt=Date.now();live.hpSource='Torn API';delete live.hpError;
     }else{
-     live.hpError='Profile health unavailable';
+     live.hpError=String(data?.error?.error||'Profile health fields absent');
     }
     save();paintHealth(id);
    }catch(error){
@@ -203,6 +205,6 @@ const beginGesture=(e,resize)=>{if(e.button!==undefined&&e.button!==0)return;if(
 root.addEventListener('pointerdown',e=>{if(e.target===grip)beginGesture(e,true);else if(e.target.closest('.who-header'))beginGesture(e,false)});
 root.addEventListener('touchmove',()=>{lastUserScroll=Date.now()},{passive:true});root.addEventListener('wheel',()=>{lastUserScroll=Date.now()},{passive:true});document.body.append(root);render();startRoster();poll=setInterval(()=>{if(!root||root.hidden||tab!=='targets')return;for(const clock of root.querySelectorAll('.who-countdown')){const remaining=seconds(Number(clock.dataset.releaseAt));if(remaining===null)continue;clock.textContent=formatCountdown(remaining);clock.style.color=remaining>0&&remaining<=state.reservationTimer?'#8fe0a8':'#f0b85c';}for(const button of root.querySelectorAll('.who-reserve')){const id=button.dataset.targetId;if(id&&state.targets[id])button.disabled=!isOpen(state.targets[id]);}},1000);
 }
-function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.14-dev',activate, deactivate:close})}
+function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.15-dev',activate, deactivate:close})}
 if(window.TornUtilities)register();else window.addEventListener('torn-utilities-ready',register,{once:true});
 })();
