@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU War Organizer
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.3.6-dev
+// @version      0.3.7-dev
 // @description  Compact War Organizer target board and reservation design preview
 // @match        https://www.torn.com/*
 // @grant        none
@@ -50,7 +50,7 @@ const head=el('header',root,undefined,'who-header');const img=el('img',head,unde
 el('strong',head,'War Organizer','who-heading');
 btn(head,'−',()=>{root.hidden=true;ctx?.minimize?.()},'who-icon');
 btn(head,'×',()=>ctx?.close?ctx.close():close(),'who-icon');
-const content=el('div',root,undefined,'who-content');content.scrollTop=previousScroll;
+const content=el('div',root,undefined,'who-content');if(previousScroll>0){requestAnimationFrame(()=>{if(content.isConnected)content.scrollTop=previousScroll})}
 const banner=el('div',content,undefined,'who-factions');
 const f1=el('div',banner);el('b',f1,'Chaos Cartel');el('small',f1,'● Online: '+(ownOnline===null?'—':ownOnline),'who-online');
 const f2=el('div',banner);el('b',f2,state.factionName||'Opposing faction');el('small',f2,'● Online: '+(enemyOnline===null?'—':enemyOnline),'who-online');
@@ -154,8 +154,8 @@ stylesheet=document.createElement('style');stylesheet.textContent=`
 #tu-who-panel .who-list{display:flex;flex-direction:column;gap:1px;background:#374149}#tu-who-panel .who-row{background:#1c262d;display:flex;align-items:center;gap:6px;padding:5px 6px;min-height:44px}#tu-who-panel .who-left{min-width:0;flex:1}#tu-who-panel .who-line{display:flex;gap:5px;align-items:center;white-space:nowrap;overflow:hidden}#tu-who-panel .who-line b{overflow:hidden;text-overflow:ellipsis}#tu-who-panel .who-line small,#tu-who-panel .who-health{color:#afbbc2;font-size:10px}#tu-who-panel .who-bar{height:3px;background:#3d4a51;margin-top:3px}#tu-who-panel .who-bar>div{height:100%;background:#63ba8e}
 #tu-who-panel .who-right{width:112px;flex-shrink:0;display:flex;flex-direction:column;align-items:stretch;gap:3px}#tu-who-panel .who-status{display:flex;justify-content:flex-end;align-items:center;gap:5px;font-size:10px;white-space:nowrap}#tu-who-panel .who-dot{height:8px;width:8px;border-radius:50%;background:#77828b;flex-shrink:0}#tu-who-panel .who-dot.online{background:#48cd7b}#tu-who-panel .who-dot.idle{background:#e9b84b}#tu-who-panel .who-dot.offline{background:#9aa4ae}#tu-who-panel .who-reserved{background:#34443c;color:#93e2b0}#tu-who-panel .who-expand{background:transparent;color:#ddd;padding:3px}#tu-who-panel .who-detail{padding:7px;background:#2b363e;color:#d4dfe3}#tu-who-panel .who-field{display:block;margin:8px 0;color:#d4dfe3}#tu-who-panel .who-field input,#tu-who-panel .who-field select{display:block;width:100%;margin-top:3px}#tu-who-panel .who-message{color:#e9b84b;padding:5px}#tu-who-panel .who-picker{display:flex;flex-direction:column;gap:5px;margin:5px 0 10px}#tu-who-panel .who-picker-trigger{width:100%;text-align:left!important;background:#28343b!important;color:#f0ce77!important;border:1px solid #6d5b35!important}#tu-who-panel .who-picker-results{max-height:210px;overflow-y:auto;overscroll-behavior:contain;background:#182229;border:1px solid #50606a;border-radius:6px}#tu-who-panel .who-picker-results button{display:block;width:100%;text-align:left!important;background:#202d35!important;color:#e8edf0!important;border-bottom:1px solid #374149!important;border-radius:0!important;padding:8px!important}#tu-who-panel .who-refresh{background:#28343b!important;color:#f0ce77!important}#tu-who-panel .who-field-label{font-weight:600;margin-top:8px}
 `;document.head.append(stylesheet);
-root.addEventListener('touchmove',()=>{lastUserScroll=Date.now()},{passive:true});root.addEventListener('wheel',()=>{lastUserScroll=Date.now()},{passive:true});document.body.append(root);render();startRoster();poll=setInterval(()=>{if(root&&!root.hidden&&tab==='targets'&&Object.values(state.targets).some(t=>t.status==='Hospital'&&t.releaseAt)){const scrolling=root.querySelector('.who-content');if(scrolling&&Date.now()-lastUserScroll<1400)return;render()}},1000);
+root.addEventListener('touchmove',()=>{lastUserScroll=Date.now()},{passive:true});root.addEventListener('wheel',()=>{lastUserScroll=Date.now()},{passive:true});document.body.append(root);render();startRoster();poll=setInterval(()=>{if(root&&!root.hidden&&tab==='targets'&&Object.values(state.targets).some(t=>t.status==='Hospital'&&t.releaseAt)){const scrolling=root.querySelector('.who-content');if(scrolling&&(Date.now()-lastUserScroll<5000||scrolling.matches(':active')))return;render()}},1000);
 }
-function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.6-dev',activate, deactivate:close})}
+function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.7-dev',activate, deactivate:close})}
 if(window.TornUtilities)register();else window.addEventListener('torn-utilities-ready',register,{once:true});
 })();
