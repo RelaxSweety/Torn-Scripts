@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU War Hit Organizer
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.2.1-dev
+// @version      0.2.2-dev
 // @description  WHO war target assignments and optional faction attack-log review
 // @match        https://www.torn.com/*
 // @grant        none
@@ -25,7 +25,7 @@
   if(!root)return;
   root.replaceChildren();
   const header=element('div',undefined,root);header.style.cssText='display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#101417;padding:0 0 10px';
-  element('strong','War Hit Organizer · 0.2.1-dev',header);
+  element('strong','War Hit Organizer · 0.2.2-dev',header);
   button('Minimize',header,()=>{root.hidden=true;ctx?.minimize?.()});
   button('Exit',header,()=>{if(ctx?.close)ctx.close();else deactivate()});
   const note=element('p','Local planning workspace. Assignments are stored on this device, not synchronized across your faction.',root);note.style.color='#bbb';
@@ -61,6 +61,18 @@
       result.textContent='Faction attacks endpoint responded. Returned attack records: '+count+'. Live tracking is not enabled.';
     }catch(err){result.textContent='API check failed: '+err.message+(String(err.message).includes('Incorrect ID-entity relation')?' — Check your faction role permissions for API access to faction attacks. Limited Access key level alone is not sufficient.':'')}
   });
+  const hpTest=element('section',undefined,root);hpTest.style.cssText='border-top:1px solid #66552f;padding-top:12px';
+  element('h3','Player health API diagnostic',hpTest);
+  const hpId=input('Opposing player ID',hpTest);
+  const hpResult=element('pre','No test performed.',hpTest);hpResult.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere;color:#ddd';
+  button('Test Player Health',hpTest,async()=>{
+    const id=hpId.value.trim();if(!/^[0-9]+$/.test(id)){hpResult.textContent='Enter a numeric player ID';return;}
+    hpResult.textContent='Checking player profile...';
+    try{const data=await window.TornUtilities.requestWhoTorn('/v2/user/'+id+'/profile');
+      const life=data?.life??data?.profile?.life??null;
+      hpResult.textContent='Profile API succeeded. Life: '+(life===null?'NOT PRESENT':JSON.stringify(life))+'\\nTop-level fields: '+Object.keys(data||{}).join(', ');
+    }catch(e){hpResult.textContent='Profile API failed: '+e.message;}
+  });
   element('p','Automated hit attribution, role permissions, cross-device synchronization and hospital-release targeting require additional implementation.',root).style.color='#aaa';
  }
  function activate(context){
@@ -71,6 +83,6 @@
    root.style.cssText='position:fixed;z-index:2147483646;top:12%;left:6%;width:min(480px,86vw);max-height:78vh;overflow:auto;padding:14px;background:#101417;border:1px solid #c49a46;border-radius:14px;color:#eee;font:14px system-ui;box-shadow:0 8px 28px #000b';
    document.body.append(root);render();
  }
- function register(){window.TornUtilities?.register?.({id:ID,version:'0.2.1-dev',activate,deactivate})}
+ function register(){window.TornUtilities?.register?.({id:ID,version:'0.2.2-dev',activate,deactivate})}
  if(window.TornUtilities)register();else window.addEventListener('torn-utilities-ready',register,{once:true});
 })();
