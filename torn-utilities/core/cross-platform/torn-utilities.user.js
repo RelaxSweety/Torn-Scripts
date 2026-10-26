@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.13-who-dev
+// @version      0.5.42.14-who-dev
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -283,7 +283,7 @@
     refreshIdentity();
     if(typeof render==='function'&&currentTab==='settings')render('settings');
   }
-  let authorizationVerified=false;
+  let authorizationVerified=false,authRestorePending=true,authOpenRequested=false;
   const authorized=()=>authorizationVerified&&!!devToken()&&!!readSavedKey()&&localStorage.getItem('tu:agreement:accepted')==='1.1';
   const publishAuthorization=ok=>{authorizationVerified=!!ok;pageWindow.dispatchEvent(new CustomEvent('tu-authorization-change',{detail:{authorized:authorized()}}));if(!authorized())stopModule();};
   const api = Object.freeze({
@@ -422,13 +422,13 @@
     return devRenewal;
   }
   async function restoreDevSession(){
-    if(!readSavedKey()||localStorage.getItem(TU_TERMS_KEY)!==TU_TERMS_VERSION)return;
     try{
+      if(!readSavedKey()||localStorage.getItem(TU_TERMS_KEY)!==TU_TERMS_VERSION)return;
       const token=devToken();
       if(token){
         try{
           const status=await devRequest('/api/auth/agreement','GET',null,token);
-          if(status.accepted){publishAuthorization(true);return;}
+          if(status.accepted){publishAuthorization(true);resetDevAuthFailure();render('modules');return;}
           localStorage.removeItem(TU_TERMS_KEY);
           sessionStorage.removeItem(DEV_SESSION_KEY);
           return;
@@ -444,6 +444,9 @@
       publishAuthorization(false);
       console.warn('[TU] Session restore unavailable:',error.message);
       render('about');
+    }finally{
+      authRestorePending=false;
+      if(authOpenRequested){authOpenRequested=false;tuRestore();syncLauncher();}
     }
   }
   async function devAccept(key,platform){
@@ -519,6 +522,7 @@
   };
   const tuExit=(source)=>{tuNav.history.length=0;tuNav.current='tu-pda-panel';tuMinimize();tuNav.exited=true;stopModule();};
   const tuRestore=()=>{
+    if(authRestorePending){authOpenRequested=true;tuNav.minimized=true;tuNav.exited=false;panel.hidden=true;launcher.hidden=false;return true;}
     if(tuNav.exited){tuNav.history.length=0;tuNav.current='tu-pda-panel';render(authorized()?'modules':'about');}
     if(!authorized()){tuShow('tu-pda-panel');showAgreement();return true;}
     let id=tuNav.current;
