@@ -133,7 +133,7 @@
       "id": "war-hit-organizer",
       "name": "War Organizer",
       "category": "other",
-      "version": "0.3.13-dev",
+      "version": "0.3.14-dev",
       "description": "Compact war target board, reservation controls, timer and local development settings",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/stable-05424-who/torn-utilities/modules/war-hit-organizer.user.js"
     }
