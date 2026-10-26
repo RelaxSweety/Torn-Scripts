@@ -46,12 +46,12 @@ const own=ownFactionId();if(/^\d+$/.test(own)&&own!==fid){try{const friendly=awa
 }
 function startRoster(){if(rosterTimer)clearTimeout(rosterTimer);if(!state.factionId)return;refreshRoster();const loop=()=>{rosterTimer=setTimeout(()=>{if(root&&!root.hidden&&state.factionId)refreshRoster();loop()},15000)};loop()}
 function render(){
-if(!root)return;const oldContent=root.querySelector('.who-content');const previousScroll=oldContent?.scrollTop||0;root.replaceChildren();
+if(!root)return;const oldContent=root.querySelector('.who-content');const previousScroll=oldContent?.scrollTop||0;const preservedGrip=root.querySelector('.who-resize-grip');root.replaceChildren();
 const head=el('header',root,undefined,'who-header');head.style.touchAction='none';const img=el('img',head,undefined,'who-logo');img.src=LOGO;img.alt='TU';
 el('strong',head,'War Organizer','who-heading');
 btn(head,'−',()=>{root.hidden=true;ctx?.minimize?.()},'who-icon');
 btn(head,'×',()=>ctx?.close?ctx.close():close(),'who-icon');
-const content=el('div',root,undefined,'who-content');const resizeGrip=root.querySelector('.who-resize-grip');if(resizeGrip)root.append(resizeGrip);if(previousScroll>0){requestAnimationFrame(()=>{if(content.isConnected)content.scrollTop=previousScroll})}
+const content=el('div',root,undefined,'who-content');if(preservedGrip)root.append(preservedGrip);if(previousScroll>0){requestAnimationFrame(()=>{if(content.isConnected)content.scrollTop=previousScroll})}
 const banner=el('div',content,undefined,'who-factions');
 const f1=el('div',banner);el('b',f1,'Chaos Cartel');el('small',f1,'● Online: '+(ownOnline===null?'—':ownOnline),'who-online');
 const f2=el('div',banner);el('b',f2,state.factionName||'Opposing faction');el('small',f2,'● Online: '+(enemyOnline===null?'—':enemyOnline),'who-online');
