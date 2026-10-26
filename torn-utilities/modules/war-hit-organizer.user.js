@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU War Organizer
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.3.5-dev
+// @version      0.3.6-dev
 // @description  Compact War Organizer target board and reservation design preview
 // @match        https://www.torn.com/*
 // @grant        none
@@ -121,6 +121,20 @@ function settings(parent){
 el('h3',parent,'War settings');
 el('div',parent,'Opposing faction','who-field-label');
 picker(parent);
+if(state.factionId){
+  btn(parent,'Clear selected faction',()=>{
+    if(!confirm('Remove '+(state.factionName||'the selected faction')+' from War Organizer? This also clears its locally stored targets and reservations.'))return;
+    rosterEpoch++;if(rosterTimer)clearTimeout(rosterTimer);rosterTimer=null;rosterLoading=false;
+    state.factionId='';state.factionName='';state.targets={};state.reservations={};
+    rosterFaction='';rosterError='';rosterUpdated=0;enemyOnline=null;ownOnline=null;
+    pickerOpen=false;pickerQuery='';filter='all';query='';expanded='';message='Selected faction and local selections cleared.';
+    save();render();
+  },'who-clear-faction');
+  btn(parent,'Clear target reservations',()=>{
+    if(!confirm('Clear all locally stored target reservations for this faction?'))return;
+    state.reservations={};message='Local target reservations cleared.';save();render();
+  },'who-clear-reservations');
+}
 const mode=dropdown(parent,'War mode',[['real','Real War'],['offline','Offline Only']],state.mode||'real');
 const limit=dropdown(parent,'Reservation Limit',[['1','Single (1 target per player)'],['2','Double (2 targets per player)'],['3','Triple (3 targets per player)']],String(state.reservationLimit));
 const timer=field(parent,'Reservation Timer (1–30 seconds before hospital release)',state.reservationTimer,'number');timer.min='1';timer.max='30';timer.step='1';
@@ -142,6 +156,6 @@ stylesheet=document.createElement('style');stylesheet.textContent=`
 `;document.head.append(stylesheet);
 root.addEventListener('touchmove',()=>{lastUserScroll=Date.now()},{passive:true});root.addEventListener('wheel',()=>{lastUserScroll=Date.now()},{passive:true});document.body.append(root);render();startRoster();poll=setInterval(()=>{if(root&&!root.hidden&&tab==='targets'&&Object.values(state.targets).some(t=>t.status==='Hospital'&&t.releaseAt)){const scrolling=root.querySelector('.who-content');if(scrolling&&Date.now()-lastUserScroll<1400)return;render()}},1000);
 }
-function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.5-dev',activate, deactivate:close})}
+function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.6-dev',activate, deactivate:close})}
 if(window.TornUtilities)register();else window.addEventListener('torn-utilities-ready',register,{once:true});
 })();
