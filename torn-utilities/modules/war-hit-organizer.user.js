@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU War Organizer
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.3.1-dev
+// @version      0.3.2-dev
 // @description  Compact War Organizer target board and reservation design preview
 // @match        https://www.torn.com/*
 // @grant        none
@@ -40,7 +40,7 @@ el('div',content,'Faction counts pending live roster integration','who-hint');
 const nav=el('div',content,undefined,'who-tabs');
 [['targets','Targets'],['assignments','Reservations'],['settings','Settings']].forEach(([id,name])=>btn(nav,name,()=>{tab=id;render()},tab===id?'active':''));
 if(message)el('div',content,message,'who-message');
-if(tab==='settings'){settings(content);return}
+if(tab==='settings'){settings(content);if(!directoryLoaded&&!directoryError){loadDirectory().then(()=>{if(root&&tab==='settings')render()}).catch(e=>{directoryError='Directory error: '+e.message;if(root&&tab==='settings')render()})}return}
 if(tab==='assignments'){el('h3',content,'Current reservations');const rows=Object.entries(state.reservations);if(!rows.length)el('p',content,'No local reservations.');rows.forEach(([id,r])=>{const row=el('div',content,undefined,'who-row');el('span',row,(state.targets[id]?.name||id)+' · '+r.name);btn(row,'Details',()=>promptRelease(id,r))});el('p',content,'Shared faction reservations and permission verification require backend integration.','who-hint');return}
 const tools=el('div',content,undefined,'who-tools');const search=el('input',tools);search.placeholder='Search targets';search.value=query;search.oninput=()=>{query=search.value;render();const next=root.querySelector('.who-tools input');next?.focus();next?.setSelectionRange(query.length,query.length)};
 const order=el('select',tools);[['release','Release'],['level','Level'],['name','Name']].forEach(([v,t])=>{const o=el('option',order,t);o.value=v});order.value=sort;order.onchange=()=>{sort=order.value;render()};
@@ -67,21 +67,49 @@ el('p',content,'Local development board. No live faction synchronization or auto
 function isOpen(t){const s=seconds(t.releaseAt);return t.status==='Hospital'&&s!==null&&s>0&&s<=state.reservationTimer}
 function reserve(id,t){if(!isOpen(t))return;const who=identity();if(!who.id||!who.name){alert('Verified Torn identity is required to reserve.');return}if(Object.values(state.reservations).filter(r=>Number(r.playerId)===who.id).length>=state.reservationLimit){alert('Your reservation limit has been reached.');return}if(state.reservations[id]){render();return}state.reservations[id]={playerId:who.id,name:who.name,createdAt:Date.now()};save();render()}
 function promptRelease(id,r){if(!own(r)&&!isAdmin()){alert('Only the reserving player or an authorized moderator/administrator can remove this reservation.');return}if(!confirm('Remove '+r.name+' reservation for '+(state.targets[id]?.name||id)+'?'))return;if(state.reservations[id]?.playerId!==r.playerId)return;delete state.reservations[id];save();render()}
+
+const DIRECTORY_CACHE='tu:factions:directory:v1';
+let directory=[],directoryLoaded=false,directoryError='',pickerQuery='',pickerOpen=false;
+function parseCSV(text){
+const rows=[];let row=[],cell='',quoted=false;
+for(let i=0;i<text.length;i++){const ch=text[i];if(ch==='"'){if(quoted&&text[i+1]==='"'){cell+='"';i++}else quoted=!quoted}else if(ch===','&&!quoted){row.push(cell);cell=''}else if((ch==='\\n'||ch==='\\r')&&!quoted){if(ch==='\\r'&&text[i+1]==='\\n')i++;row.push(cell);if(row.some(Boolean))rows.push(row);row=[];cell=''}else cell+=ch}
+if(cell||row.length){row.push(cell);rows.push(row)}if(!rows.length)throw Error('Empty faction directory');
+const heads=rows.shift().map(x=>x.trim().toLowerCase().replace(/^\\ufeff/,''));const idCol=heads.indexOf('id'),nameCol=heads.indexOf('name');
+if(idCol<0||nameCol<0)throw Error('Faction directory has no id/name columns');
+return rows.map(r=>({id:String(r[idCol]||'').trim(),name:String(r[nameCol]||'').trim()})).filter(x=>/^\\d+$/.test(x.id)&&x.name);
+}
+async function loadDirectory(force=false){
+if(!force){try{const cached=JSON.parse(localStorage.getItem(DIRECTORY_CACHE)||'null');if(cached?.saved&&Date.now()-cached.saved<86400000&&cached.rows?.length){directory=cached.rows;directoryLoaded=true;directoryError='';return}}catch{}}
+const api=window.TornUtilities;if(!api?.requestTorn)throw Error('TU Manager API unavailable');
+const body=await api.requestTorn('/v2/faction/snapshot',{format:'text'});
+let csv=typeof body==='string'?body:typeof body?.csv==='string'?body.csv:typeof body?.data==='string'?body.data:'';
+if(csv.trim().startsWith('{')){const parsed=JSON.parse(csv);if(parsed.error)throw Error(parsed.error.error||'API error');csv=parsed.csv||parsed.data||parsed.snapshot||''}
+const rows=parseCSV(csv);if(!rows.length)throw Error('Faction directory returned no factions');
+directory=rows;directoryLoaded=true;directoryError='';try{localStorage.setItem(DIRECTORY_CACHE,JSON.stringify({saved:Date.now(),rows}))}catch{}
+}
+function picker(parent){
+const wrap=el('div',parent,undefined,'who-picker');
+const selected=directory.find(x=>x.id===String(state.factionId));
+const choose=btn(wrap,selected?selected.name+' ['+selected.id+']':'Select opposing faction',()=>{pickerOpen=!pickerOpen;render()},'who-picker-trigger');
+if(!pickerOpen)return;
+const search=el('input',wrap);search.placeholder='Search faction name or ID';search.value=pickerQuery;
+const status=el('small',wrap,undefined,'who-hint');
+const results=el('div',wrap,undefined,'who-picker-results');
+function update(){pickerQuery=search.value;results.replaceChildren();const q=pickerQuery.trim().toLowerCase();const matches=directory.filter(x=>x.name.toLowerCase().includes(q)||x.id.includes(q));status.textContent=directoryLoaded?directory.length+' factions · '+matches.length+' matches'+(matches.length>100?' · first 100 shown':''):directoryError||'Loading faction directory…';for(const item of matches.slice(0,100))btn(results,item.name+' ['+item.id+']',()=>{state.factionId=item.id;state.factionName=item.name;save();pickerOpen=false;pickerQuery='';render()},'who-faction-option')}
+search.oninput=update;update();
+btn(wrap,'Refresh faction directory',async()=>{status.textContent='Refreshing faction directory…';try{await loadDirectory(true)}catch(e){directoryError='API error: '+e.message}if(root)render()},'who-refresh');
+}
 function settings(parent){
 el('h3',parent,'War settings');
-const fid=field(parent,'Opposing faction ID',state.factionId||'');
-const fname=field(parent,'Opposing faction name',state.factionName||'');
+el('div',parent,'Opposing faction','who-field-label');
+picker(parent);
 const mode=dropdown(parent,'War mode',[['real','Real War'],['offline','Offline Only']],state.mode||'real');
-const limit=dropdown(parent,'Reservation Limit',[['1','Single (1 target)'],['2','Double (2 targets)'],['3','Triple (3 targets)']],String(state.reservationLimit));
+const limit=dropdown(parent,'Reservation Limit',[['1','Single (1 target per player)'],['2','Double (2 targets per player)'],['3','Triple (3 targets per player)']],String(state.reservationLimit));
 const timer=field(parent,'Reservation Timer (1–30 seconds before hospital release)',state.reservationTimer,'number');timer.min='1';timer.max='30';timer.step='1';
-btn(parent,'Save Settings',()=>{if(fid.value&&!/^\d+$/.test(fid.value)){alert('Invalid faction ID');return}const v=Number(timer.value);if(!Number.isInteger(v)||v<1||v>30){alert('Reservation timer must be 1–30 seconds');return}state.factionId=fid.value;state.factionName=fname.value.slice(0,80);state.mode=mode.value;state.reservationLimit=Number(limit.value);state.reservationTimer=v;save();message='Saved locally. Administrator authorization and faction-wide synchronization are not yet implemented.';render()});
-el('p',parent,'Default reservation timer: 5 seconds. Settings are local to this device until administrator roles and backend are implemented.','who-hint');
-el('h3',parent,'Development target editor');
-const id=field(parent,'Player ID');const name=field(parent,'Player name');const level=field(parent,'Level','','number');const status=dropdown(parent,'Status',[['Hospital','Hospital'],['Okay','Okay'],['Traveling','Traveling'],['Unknown','Unknown']],'Hospital');const activity=dropdown(parent,'Activity',[['Unknown','Unknown'],['Online','Online'],['Idle','Idle'],['Offline','Offline']],'Unknown');
-const hp=field(parent,'Current HP','','number'),max=field(parent,'Max HP','','number'),release=field(parent,'Hospital release (ISO time, optional)');
-btn(parent,'Add / Update Target',()=>{if(!/^\d+$/.test(id.value)){alert('Numeric player ID required');return}const prev=state.targets[id.value]||{};state.targets[id.value]={...prev,name:name.value.slice(0,80),level:Number(level.value)||0,status:status.value,activity:activity.value,hp:hp.value===''?undefined:Number(hp.value),maxHp:max.value===''?undefined:Number(max.value),releaseAt:release.value||null,source:'API'};save();render()});
-Object.entries(state.targets).forEach(([tid,t])=>{const row=el('div',parent,undefined,'who-row');el('span',row,(t.name||tid)+' ['+tid+']');btn(row,'Edit',()=>{id.value=tid;name.value=t.name||'';level.value=t.level||'';status.value=t.status||'Unknown';activity.value=t.activity||'Unknown';hp.value=t.hp??'';max.value=t.maxHp??'';release.value=t.releaseAt||'';id.focus()});btn(row,'Remove',()=>{if(!confirm('Remove target '+tid+'?'))return;delete state.targets[tid];delete state.reservations[tid];save();render()})});
+btn(parent,'Save Settings',()=>{const v=Number(timer.value);if(!Number.isInteger(v)||v<1||v>30){alert('Reservation timer must be 1–30 seconds');return}state.mode=mode.value;state.reservationLimit=Number(limit.value);state.reservationTimer=v;save();message='Settings saved locally. Shared administrator permissions are not yet connected.';render()});
+el('p',parent,'Faction names and IDs come from the Torn API. The directory is cached for up to 24 hours. Player roster integration is the next step.','who-hint');
 }
+
 function activate(context){if(!window.TornUtilities?.isAuthorized?.())return;ctx=context||null;if(root?.isConnected){root.hidden=false;render();return}
 root=document.createElement('section');root.id='tu-who-panel';root.style.cssText='position:fixed;z-index:2147483646;top:10%;left:5%;width:min(560px,90vw);max-height:82vh;background:#11191d;border:1px solid #a58a48;border-radius:12px;color:#e8edf0;font:12px system-ui;box-shadow:0 8px 28px #000b;display:flex;flex-direction:column;overflow:hidden';
 stylesheet=document.createElement('style');stylesheet.textContent=`
@@ -92,10 +120,10 @@ stylesheet=document.createElement('style');stylesheet.textContent=`
 #tu-who-panel .who-hint{font-size:10px;color:#aeb8bd;margin:7px 0}#tu-who-panel .who-tabs,#tu-who-panel .who-filters{display:flex;gap:4px;margin:8px 0}#tu-who-panel .who-tabs button,#tu-who-panel .who-filters button{flex:1;background:#28343b;color:#dce5e9}#tu-who-panel .who-tabs .active,#tu-who-panel .who-filters .active{background:#9c7b3b;color:#101417}
 #tu-who-panel .who-tools{display:flex;gap:5px}#tu-who-panel .who-tools input{min-width:0;flex:1}#tu-who-panel input,#tu-who-panel select{background:#28343b;color:#eee;border:1px solid #50606a;border-radius:5px;padding:6px}
 #tu-who-panel .who-list{display:flex;flex-direction:column;gap:1px;background:#374149}#tu-who-panel .who-row{background:#1c262d;display:flex;align-items:center;gap:6px;padding:5px 6px;min-height:44px}#tu-who-panel .who-left{min-width:0;flex:1}#tu-who-panel .who-line{display:flex;gap:5px;align-items:center;white-space:nowrap;overflow:hidden}#tu-who-panel .who-line b{overflow:hidden;text-overflow:ellipsis}#tu-who-panel .who-line small,#tu-who-panel .who-health{color:#afbbc2;font-size:10px}#tu-who-panel .who-bar{height:3px;background:#3d4a51;margin-top:3px}#tu-who-panel .who-bar>div{height:100%;background:#63ba8e}
-#tu-who-panel .who-right{width:112px;flex-shrink:0;display:flex;flex-direction:column;align-items:stretch;gap:3px}#tu-who-panel .who-status{display:flex;justify-content:flex-end;align-items:center;gap:5px;font-size:10px;white-space:nowrap}#tu-who-panel .who-dot{height:8px;width:8px;border-radius:50%;background:#77828b;flex-shrink:0}#tu-who-panel .who-dot.online{background:#48cd7b}#tu-who-panel .who-dot.idle{background:#e9b84b}#tu-who-panel .who-dot.offline{background:#9aa4ae}#tu-who-panel .who-reserved{background:#34443c;color:#93e2b0}#tu-who-panel .who-expand{background:transparent;color:#ddd;padding:3px}#tu-who-panel .who-detail{padding:7px;background:#2b363e;color:#d4dfe3}#tu-who-panel .who-field{display:block;margin:8px 0;color:#d4dfe3}#tu-who-panel .who-field input,#tu-who-panel .who-field select{display:block;width:100%;margin-top:3px}#tu-who-panel .who-message{color:#e9b84b;padding:5px}
+#tu-who-panel .who-right{width:112px;flex-shrink:0;display:flex;flex-direction:column;align-items:stretch;gap:3px}#tu-who-panel .who-status{display:flex;justify-content:flex-end;align-items:center;gap:5px;font-size:10px;white-space:nowrap}#tu-who-panel .who-dot{height:8px;width:8px;border-radius:50%;background:#77828b;flex-shrink:0}#tu-who-panel .who-dot.online{background:#48cd7b}#tu-who-panel .who-dot.idle{background:#e9b84b}#tu-who-panel .who-dot.offline{background:#9aa4ae}#tu-who-panel .who-reserved{background:#34443c;color:#93e2b0}#tu-who-panel .who-expand{background:transparent;color:#ddd;padding:3px}#tu-who-panel .who-detail{padding:7px;background:#2b363e;color:#d4dfe3}#tu-who-panel .who-field{display:block;margin:8px 0;color:#d4dfe3}#tu-who-panel .who-field input,#tu-who-panel .who-field select{display:block;width:100%;margin-top:3px}#tu-who-panel .who-message{color:#e9b84b;padding:5px}#tu-who-panel .who-picker{display:flex;flex-direction:column;gap:5px;margin:5px 0 10px}#tu-who-panel .who-picker-trigger{width:100%;text-align:left!important;background:#28343b!important;color:#f0ce77!important;border:1px solid #6d5b35!important}#tu-who-panel .who-picker-results{max-height:210px;overflow-y:auto;overscroll-behavior:contain;background:#182229;border:1px solid #50606a;border-radius:6px}#tu-who-panel .who-picker-results button{display:block;width:100%;text-align:left!important;background:#202d35!important;color:#e8edf0!important;border-bottom:1px solid #374149!important;border-radius:0!important;padding:8px!important}#tu-who-panel .who-refresh{background:#28343b!important;color:#f0ce77!important}#tu-who-panel .who-field-label{font-weight:600;margin-top:8px}
 `;document.head.append(stylesheet);
 document.body.append(root);render();poll=setInterval(()=>{if(root&&!root.hidden&&tab==='targets'&&Object.values(state.targets).some(t=>t.status==='Hospital'&&t.releaseAt))render()},1000);
 }
-function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.1-dev',activate, deactivate:close})}
+function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.2-dev',activate, deactivate:close})}
 if(window.TornUtilities)register();else window.addEventListener('torn-utilities-ready',register,{once:true});
 })();
