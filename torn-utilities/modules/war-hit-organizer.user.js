@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU War Organizer
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.3.7-dev
+// @version      0.3.8-dev
 // @description  Compact War Organizer target board and reservation design preview
 // @match        https://www.torn.com/*
 // @grant        none
@@ -24,6 +24,7 @@ const identity=()=>{const api=window.TornUtilities;const i=api?.getPlayer?.()||a
 const own=(r)=>{const i=identity();return !!i.id&&Number(r.playerId)===i.id};
 const isAdmin=()=>false; // Remote moderator/organizer roles not implemented; never assume privileges.
 const format=(n)=>Number.isFinite(Number(n))?Number(n).toLocaleString():'—';
+const formatCountdown=s=>String(Math.floor(Math.max(0,s)/60)).padStart(2,'0')+':'+String(Math.max(0,s)%60).padStart(2,'0');
 const seconds=(t)=>{if(!t)return null;const v=typeof t==='number'?t:Date.parse(t)/1000;return Number.isFinite(v)?Math.ceil(v-Date.now()/1000):null};
 function close(){rosterEpoch++;if(rosterTimer)clearTimeout(rosterTimer);rosterTimer=null;if(poll)clearInterval(poll);poll=null;root?.remove();stylesheet?.remove();stylesheet=null;root=null;ctx=null}
 function membersOf(data){const raw=data?.members??data?.faction?.members??[];return Array.isArray(raw)?raw:Object.entries(raw||{}).filter(([id,v])=>/^\d+$/.test(id)&&v&&typeof v==='object').map(([id,v])=>({...v,id:v.id||Number(id)}))}
@@ -72,10 +73,11 @@ el('b',line,t.name||'Player '+id);el('small',line,'L'+(t.level||'?'));
 const health=el('div',left,undefined,'who-health');el('small',health,'HP '+(t.hp===undefined?'Unknown':format(t.hp)+'/'+format(t.maxHp))+' · '+(t.source||'API'));
 const bar=el('div',left,undefined,'who-bar');const fill=el('div',bar);fill.style.width=t.maxHp&&t.hp!==undefined?Math.max(0,Math.min(100,100*t.hp/t.maxHp))+'%':'0%';
 const right=el('div',row,undefined,'who-right'),status=el('div',right,undefined,'who-status');
-const rem=seconds(t.releaseAt),statusText=t.status==='Hospital'&&rem!==null?(rem>0?'Hospital '+rem+'s':'Release due'):(t.status||'Unknown');
-el('span',status,statusText);
+const rem=seconds(t.releaseAt),hospital=t.status==='Hospital'&&rem!==null;
+el('span',status,hospital?'Hospital':(t.status||'Unknown'));
+if(hospital){const clock=el('span',status,formatCountdown(rem),'who-countdown');clock.dataset.releaseAt=String(t.releaseAt);clock.style.cssText='font-variant-numeric:tabular-nums;font-weight:700;margin-left:6px;color:'+(rem>0&&rem<=state.reservationTimer?'#8fe0a8':'#f0b85c');clock.title='Time until hospital release';}
 const activity=el('span',status,undefined,'who-dot '+({online:'online',idle:'idle',offline:'offline'}[String(t.activity||'').toLowerCase()]||'unknown'));activity.title=t.activity||'Unknown';
-const r=state.reservations[id];btn(right,r?r.name:'Reserve',()=>r?promptRelease(id,r):reserve(id,t),r?'who-reserved':'who-reserve').disabled=!r&&!isOpen(t);
+const r=state.reservations[id];btn(right,r?r.name:'Reserve',()=>r?promptRelease(id,r):reserve(id,t),r?'who-reserved':'who-reserve');const reserveButton=right.lastElementChild;reserveButton.dataset.targetId=id;reserveButton.disabled=!r&&!isOpen(t);
 btn(row,expanded===id?'⌃':'⌄',()=>{expanded=expanded===id?'':id;render()},'who-expand');
 if(expanded===id){const detail=el('div',list,undefined,'who-detail');el('div',detail,'ID: '+id+' · Strength: Unknown');el('div',detail,'Source: '+(t.source||'Unknown')+' · Activity: '+(t.activity||'Unknown'));el('div',detail,'Reservation: '+(r?.name||'Available'))}
 });
@@ -154,8 +156,8 @@ stylesheet=document.createElement('style');stylesheet.textContent=`
 #tu-who-panel .who-list{display:flex;flex-direction:column;gap:1px;background:#374149}#tu-who-panel .who-row{background:#1c262d;display:flex;align-items:center;gap:6px;padding:5px 6px;min-height:44px}#tu-who-panel .who-left{min-width:0;flex:1}#tu-who-panel .who-line{display:flex;gap:5px;align-items:center;white-space:nowrap;overflow:hidden}#tu-who-panel .who-line b{overflow:hidden;text-overflow:ellipsis}#tu-who-panel .who-line small,#tu-who-panel .who-health{color:#afbbc2;font-size:10px}#tu-who-panel .who-bar{height:3px;background:#3d4a51;margin-top:3px}#tu-who-panel .who-bar>div{height:100%;background:#63ba8e}
 #tu-who-panel .who-right{width:112px;flex-shrink:0;display:flex;flex-direction:column;align-items:stretch;gap:3px}#tu-who-panel .who-status{display:flex;justify-content:flex-end;align-items:center;gap:5px;font-size:10px;white-space:nowrap}#tu-who-panel .who-dot{height:8px;width:8px;border-radius:50%;background:#77828b;flex-shrink:0}#tu-who-panel .who-dot.online{background:#48cd7b}#tu-who-panel .who-dot.idle{background:#e9b84b}#tu-who-panel .who-dot.offline{background:#9aa4ae}#tu-who-panel .who-reserved{background:#34443c;color:#93e2b0}#tu-who-panel .who-expand{background:transparent;color:#ddd;padding:3px}#tu-who-panel .who-detail{padding:7px;background:#2b363e;color:#d4dfe3}#tu-who-panel .who-field{display:block;margin:8px 0;color:#d4dfe3}#tu-who-panel .who-field input,#tu-who-panel .who-field select{display:block;width:100%;margin-top:3px}#tu-who-panel .who-message{color:#e9b84b;padding:5px}#tu-who-panel .who-picker{display:flex;flex-direction:column;gap:5px;margin:5px 0 10px}#tu-who-panel .who-picker-trigger{width:100%;text-align:left!important;background:#28343b!important;color:#f0ce77!important;border:1px solid #6d5b35!important}#tu-who-panel .who-picker-results{max-height:210px;overflow-y:auto;overscroll-behavior:contain;background:#182229;border:1px solid #50606a;border-radius:6px}#tu-who-panel .who-picker-results button{display:block;width:100%;text-align:left!important;background:#202d35!important;color:#e8edf0!important;border-bottom:1px solid #374149!important;border-radius:0!important;padding:8px!important}#tu-who-panel .who-refresh{background:#28343b!important;color:#f0ce77!important}#tu-who-panel .who-field-label{font-weight:600;margin-top:8px}
 `;document.head.append(stylesheet);
-root.addEventListener('touchmove',()=>{lastUserScroll=Date.now()},{passive:true});root.addEventListener('wheel',()=>{lastUserScroll=Date.now()},{passive:true});document.body.append(root);render();startRoster();poll=setInterval(()=>{if(root&&!root.hidden&&tab==='targets'&&Object.values(state.targets).some(t=>t.status==='Hospital'&&t.releaseAt)){const scrolling=root.querySelector('.who-content');if(scrolling&&(Date.now()-lastUserScroll<5000||scrolling.matches(':active')))return;render()}},1000);
+root.addEventListener('touchmove',()=>{lastUserScroll=Date.now()},{passive:true});root.addEventListener('wheel',()=>{lastUserScroll=Date.now()},{passive:true});document.body.append(root);render();startRoster();poll=setInterval(()=>{if(!root||root.hidden||tab!=='targets')return;for(const clock of root.querySelectorAll('.who-countdown')){const remaining=seconds(Number(clock.dataset.releaseAt));if(remaining===null)continue;clock.textContent=formatCountdown(remaining);clock.style.color=remaining>0&&remaining<=state.reservationTimer?'#8fe0a8':'#f0b85c';}for(const button of root.querySelectorAll('.who-reserve')){const id=button.dataset.targetId;if(id&&state.targets[id])button.disabled=!isOpen(state.targets[id]);}},1000);
 }
-function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.7-dev',activate, deactivate:close})}
+function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.8-dev',activate, deactivate:close})}
 if(window.TornUtilities)register();else window.addEventListener('torn-utilities-ready',register,{once:true});
 })();
