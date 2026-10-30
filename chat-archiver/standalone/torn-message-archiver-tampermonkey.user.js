@@ -1,20 +1,27 @@
 // ==UserScript==
 // @name         Torn Message Archiver Standalone
 // @namespace    RelaxSweety.Torn.Standalone
-// @version      1.0.2
+// @version      1.0.3
 // @description  Standalone private, faction, global and trade chat archiver with CSV/JSON exports
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
 // @match        https://torn.com/*
 // @noframes
-// @grant        none
+// @sandbox      DOM
+// @grant        GM_info
+// @updateURL    none
 // @run-at       document-idle
 // ==/UserScript==
 
 (function () {
     'use strict';
     // Standalone settings use Torn's local storage; archives remain in memory.
-    const moduleStore = window.localStorage;
+    const fallbackSettings = new Map();
+    const moduleStore = {
+        getItem(key) { try { return window.localStorage.getItem(key); } catch (_) { return fallbackSettings.get(key) ?? null; } },
+        setItem(key, value) { fallbackSettings.set(key, String(value)); try { window.localStorage.setItem(key, String(value)); } catch (_) {} },
+        removeItem(key) { fallbackSettings.delete(key); try { window.localStorage.removeItem(key); } catch (_) {} }
+    };
 
     /* =========================================================
        CONFIG
@@ -1489,7 +1496,7 @@
     ) {
         const select =
             document.getElementById(
-                'tca-chat-select'
+                'tmsa-chat-select'
             );
 
         if (!select) return;
@@ -1560,7 +1567,7 @@
         ) {
             const select =
                 document.getElementById(
-                    'tca-chat-select'
+                    'tmsa-chat-select'
                 );
 
             if (select) {
@@ -1623,27 +1630,27 @@
             resolve => {
                 const overlay =
                     document.getElementById(
-                        'tca-prompt-overlay'
+                        'tmsa-prompt-overlay'
                     );
 
                 const titleEl =
                     document.getElementById(
-                        'tca-prompt-title'
+                        'tmsa-prompt-title'
                     );
 
                 const questionEl =
                     document.getElementById(
-                        'tca-prompt-question'
+                        'tmsa-prompt-question'
                     );
 
                 const yesButton =
                     document.getElementById(
-                        'tca-prompt-yes'
+                        'tmsa-prompt-yes'
                     );
 
                 const noButton =
                     document.getElementById(
-                        'tca-prompt-no'
+                        'tmsa-prompt-no'
                     );
 
                 if (
@@ -2303,7 +2310,7 @@
         const step =
             parseInt(
                 document.getElementById(
-                    'tca-step'
+                    'tmsa-step'
                 )?.value,
                 10
             );
@@ -2311,7 +2318,7 @@
         const delay =
             parseInt(
                 document.getElementById(
-                    'tca-delay'
+                    'tmsa-delay'
                 )?.value,
                 10
             );
@@ -2340,12 +2347,12 @@
 
         const stepInput =
             document.getElementById(
-                'tca-step'
+                'tmsa-step'
             );
 
         const delayInput =
             document.getElementById(
-                'tca-delay'
+                'tmsa-delay'
             );
 
         if (stepInput) {
@@ -2660,9 +2667,9 @@
     }
 
     function updatePlayBar() {
-        const bar = document.getElementById('tca-playbar');
+        const bar = document.getElementById('tmsa-playbar');
         if (!bar) return;
-        const copied = document.getElementById('tca-bar-copied');
+        const copied = document.getElementById('tmsa-bar-copied');
         if (copied) copied.textContent = 'Copied: ' + archive.size.toLocaleString();
         bar.style.display = captureActive ? 'flex' : 'none';
         const state = {
@@ -2671,7 +2678,7 @@
             stop: !captureActive
         };
         for (const [key, active] of Object.entries(state)) {
-            const btn = document.getElementById('tca-bar-' + key);
+            const btn = document.getElementById('tmsa-bar-' + key);
             if (!btn) continue;
             btn.style.background = active ? '#187b38' : '#922b2b';
             btn.style.color = '#fff';
@@ -2680,8 +2687,8 @@
     }
 
     function showFullPanel() {
-        const panel = document.getElementById('tca-panel');
-        const launcher = document.getElementById('tca-launcher');
+        const panel = document.getElementById('tmsa-panel');
+        const launcher = document.getElementById('tmsa-launcher');
         if (!panel) return;
         setMinimized(false);
         panel.style.display = 'block';
@@ -2689,8 +2696,8 @@
     }
 
     function hideFullPanel() {
-        const panel = document.getElementById('tca-panel');
-        const launcher = document.getElementById('tca-launcher');
+        const panel = document.getElementById('tmsa-panel');
+        const launcher = document.getElementById('tmsa-launcher');
         if (!panel) return;
         panel.style.display = 'none';
         if (launcher) launcher.style.display = 'block';
@@ -2729,14 +2736,14 @@
 
     function updateIndicators() {
         setStateButton(
-            'tca-capture-state',
+            'tmsa-capture-state',
             captureActive,
             'CAPTURE ON',
             'CAPTURE OFF'
         );
 
         setStateButton(
-            'tca-auto-state',
+            'tmsa-auto-state',
             autoEnabled,
             'AUTO ON',
             'AUTO OFF'
@@ -2807,7 +2814,7 @@
     function updateStatus() {
         const status =
             document.getElementById(
-                'tca-status'
+                'tmsa-status'
             );
 
         if (!status) return;
@@ -3046,12 +3053,12 @@
     function setMinimized(minimized) {
         const body =
             document.getElementById(
-                'tca-body'
+                'tmsa-body'
             );
 
         const button =
             document.getElementById(
-                'tca-minimize'
+                'tmsa-minimize'
             );
 
         if (
@@ -3087,7 +3094,7 @@
     function createPanel() {
         if (
             document.getElementById(
-                'tca-panel'
+                'tmsa-panel'
             )
         ) {
             return;
@@ -3099,7 +3106,7 @@
             );
 
         panel.id =
-            'tca-panel';
+            'tmsa-panel';
 
         Object.assign(
             panel.style,
@@ -3140,7 +3147,7 @@
 
         panel.innerHTML = `
             <div
-                id="tca-header"
+                id="tmsa-header"
                 style="
                     height:36px;
                     box-sizing:border-box;
@@ -3156,11 +3163,11 @@
                 "
             >
                 <span>
-                    Message Archiver 1.0.2
+                    Message Archiver 1.0.3
                 </span>
 
                 <button
-                    id="tca-minimize"
+                    id="tmsa-minimize"
                     style="
                         width:25px;
                         height:22px;
@@ -3177,7 +3184,7 @@
             </div>
 
             <div
-                id="tca-body"
+                id="tmsa-body"
                 style="
                     padding:9px;
                     box-sizing:border-box;
@@ -3197,7 +3204,7 @@
                     margin-bottom:8px;
                 ">
                     <select
-                        id="tca-chat-select"
+                        id="tmsa-chat-select"
                         style="
                             flex:1;
                             min-width:0;
@@ -3206,7 +3213,7 @@
                     ></select>
 
                     <button
-                        id="tca-refresh"
+                        id="tmsa-refresh"
                         style="
                             width:32px;
                             height:28px;
@@ -3230,20 +3237,20 @@
                     margin-bottom:7px;
                 ">
                     <button
-                        id="tca-capture-state"
+                        id="tmsa-capture-state"
                     >
                         ● CAPTURE OFF
                     </button>
 
                     <button
-                        id="tca-auto-state"
+                        id="tmsa-auto-state"
                     >
                         ● AUTO OFF
                     </button>
                 </div>
 
                 <div
-                    id="tca-status"
+                    id="tmsa-status"
                     style="
                         height:185px;
                         min-height:185px;
@@ -3276,7 +3283,7 @@
                     <span>Step</span>
 
                     <input
-                        id="tca-step"
+                        id="tmsa-step"
                         type="number"
                         min="1"
                         max="50"
@@ -3292,7 +3299,7 @@
                     <span>Delay</span>
 
                     <input
-                        id="tca-delay"
+                        id="tmsa-delay"
                         type="number"
                         min="15"
                         max="500"
@@ -3310,22 +3317,22 @@
                     grid-template-columns:1fr 1fr 1fr;
                     gap:5px;
                 ">
-                    <button id="tca-csv">
+                    <button id="tmsa-csv">
                         CSV
                     </button>
 
-                    <button id="tca-json">
+                    <button id="tmsa-json">
                         JSON
                     </button>
 
-                    <button id="tca-clear">
+                    <button id="tmsa-clear">
                         CLEAR
                     </button>
                 </div>
             </div>
 
             <div
-                id="tca-prompt-overlay"
+                id="tmsa-prompt-overlay"
                 style="
                     display:none;
                     position:absolute;
@@ -3353,7 +3360,7 @@
                     "
                 >
                     <div
-                        id="tca-prompt-title"
+                        id="tmsa-prompt-title"
                         style="
                             font-size:14px;
                             font-weight:bold;
@@ -3365,7 +3372,7 @@
                     </div>
 
                     <div
-                        id="tca-prompt-question"
+                        id="tmsa-prompt-question"
                         style="
                             font-size:12px;
                             line-height:17px;
@@ -3382,7 +3389,7 @@
                         "
                     >
                         <button
-                            id="tca-prompt-yes"
+                            id="tmsa-prompt-yes"
                             style="
                                 height:36px;
                                 background:#176b2c;
@@ -3397,7 +3404,7 @@
                         </button>
 
                         <button
-                            id="tca-prompt-no"
+                            id="tmsa-prompt-no"
                             style="
                                 height:36px;
                                 background:#6e2020;
@@ -3446,7 +3453,7 @@
             };
 
         document.getElementById(
-            'tca-capture-state'
+            'tmsa-capture-state'
         ).onclick =
             () =>
                 captureActive
@@ -3454,18 +3461,18 @@
                     : startCapture();
 
         document.getElementById(
-            'tca-auto-state'
+            'tmsa-auto-state'
         ).onclick =
             toggleAutoSetting;
 
         document.getElementById(
-            'tca-refresh'
+            'tmsa-refresh'
         ).onclick =
             () =>
                 refreshChatSelector(true);
 
         document.getElementById(
-            'tca-chat-select'
+            'tmsa-chat-select'
         ).onchange =
             event =>
                 switchChat(
@@ -3473,28 +3480,28 @@
                 );
 
         document.getElementById(
-            'tca-step'
+            'tmsa-step'
         ).onchange =
             updateScrollSettings;
 
         document.getElementById(
-            'tca-delay'
+            'tmsa-delay'
         ).onchange =
             updateScrollSettings;
 
         const csv =
             document.getElementById(
-                'tca-csv'
+                'tmsa-csv'
             );
 
         const json =
             document.getElementById(
-                'tca-json'
+                'tmsa-json'
             );
 
         const clear =
             document.getElementById(
-                'tca-clear'
+                'tmsa-clear'
             );
 
         styleButton(csv);
@@ -3511,14 +3518,14 @@
             clearCurrentSession;
 
         document.getElementById(
-            'tca-minimize'
+            'tmsa-minimize'
         ).onclick =
             event => {
                 event.stopPropagation();
 
                 const body =
                     document.getElementById(
-                        'tca-body'
+                        'tmsa-body'
                     );
 
                 setMinimized(
@@ -3530,12 +3537,12 @@
         makeDraggable(
             panel,
             document.getElementById(
-                'tca-header'
+                'tmsa-header'
             )
         );
 
         const launcher = document.createElement('button');
-        launcher.id = 'tca-launcher';
+        launcher.id = 'tmsa-launcher';
         launcher.textContent = 'Archive';
         launcher.title = 'Open Message Archiver';
         launcher.style.cssText = 'position:fixed;right:10px;bottom:10px;z-index:1000001;padding:10px 14px;background:#292929;color:#fff;border:1px solid #999;border-radius:7px;font:bold 13px Arial;cursor:pointer;';
@@ -3545,16 +3552,16 @@
 
         // Compact capture controls remain available while the panel is hidden.
         const bar = document.createElement('div');
-        bar.id = 'tca-playbar';
+        bar.id = 'tmsa-playbar';
         bar.style.cssText = 'position:fixed;right:10px;bottom:44px;z-index:1000000;display:none;align-items:center;gap:4px;padding:5px;background:#202020;border:1px solid #777;border-radius:6px;touch-action:none;user-select:none;';
-        bar.innerHTML = '<span id="tca-bar-handle" style="padding:4px 6px;color:#ccc;cursor:move;touch-action:none">⋮⋮</span>' +
-          ['play','pause','stop'].map(k => '<button id="tca-bar-'+k+'" style="border:1px solid #ccc;border-radius:4px;padding:7px 9px;font:bold 12px Arial;color:white">'+k.toUpperCase()+'</button>').join('') +
-          '<span id="tca-bar-copied" style="color:#fff;font:bold 12px Arial;white-space:nowrap;padding:0 4px">Copied: 0</span>';
+        bar.innerHTML = '<span id="tmsa-bar-handle" style="padding:4px 6px;color:#ccc;cursor:move;touch-action:none">⋮⋮</span>' +
+          ['play','pause','stop'].map(k => '<button id="tmsa-bar-'+k+'" style="border:1px solid #ccc;border-radius:4px;padding:7px 9px;font:bold 12px Arial;color:white">'+k.toUpperCase()+'</button>').join('') +
+          '<span id="tmsa-bar-copied" style="color:#fff;font:bold 12px Arial;white-space:nowrap;padding:0 4px">Copied: 0</span>';
         document.body.appendChild(bar);
-        makeDraggable(bar, document.getElementById('tca-bar-handle'));
-        document.getElementById('tca-bar-play').onclick = resumePlayBar;
-        document.getElementById('tca-bar-pause').onclick = pausePlayBar;
-        document.getElementById('tca-bar-stop').onclick = stopPlayBar;
+        makeDraggable(bar, document.getElementById('tmsa-bar-handle'));
+        document.getElementById('tmsa-bar-play').onclick = resumePlayBar;
+        document.getElementById('tmsa-bar-pause').onclick = pausePlayBar;
+        document.getElementById('tmsa-bar-stop').onclick = stopPlayBar;
 
         loadPanelPosition(panel);
 
@@ -3571,7 +3578,7 @@
        ========================================================= */
 
     function initialize() {
-        if (document.getElementById('tca-launcher')) return;
+        if (document.getElementById('tmsa-launcher')) return;
         loadSettings();
         createPanel();
     }
