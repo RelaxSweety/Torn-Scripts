@@ -1,16 +1,15 @@
 // ==UserScript==
 // @name         Torn Message Archiver Standalone PDA
 // @namespace    RelaxSweety.Torn.Standalone
-// @version      1.0.1
+// @version      1.0.2
 // @description  Standalone private, faction, global and trade chat archiver with CSV/JSON exports
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
 // @match        https://torn.com/*
 // @noframes
+// @updateURL    none
 // @grant        none
 // @run-at       document-idle
-// @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/chat-archiver/standalone/torn-message-archiver-pda.user.js
-// @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/chat-archiver/standalone/torn-message-archiver-pda.user.js
 // ==/UserScript==
 
 (function () {
@@ -3158,7 +3157,7 @@
                 "
             >
                 <span>
-                    Message Archiver 1.0.1
+                    Message Archiver 1.0.2
                 </span>
 
                 <button
