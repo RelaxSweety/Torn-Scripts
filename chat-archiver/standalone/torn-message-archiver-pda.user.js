@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Message Archiver Standalone PDA
 // @namespace    RelaxSweety.Torn.Standalone
-// @version      1.0.0
+// @version      1.0.1
 // @description  Standalone private, faction, global and trade chat archiver with CSV/JSON exports
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -2949,6 +2949,70 @@
         } catch {}
     }
 
+
+    function makeLauncherMovable(button) {
+        const key = 'RelaxSweety_TCA_standalone_launcherPosition';
+        let gesture = null;
+        let suppressClick = false;
+        let position = null;
+        const width = button.offsetWidth || 90;
+        const height = button.offsetHeight || 40;
+        function place(left, top) {
+            position = {
+                left: Math.max(0, Math.min(left, Math.max(0, window.innerWidth - width))),
+                top: Math.max(0, Math.min(top, Math.max(0, window.innerHeight - height)))
+            };
+            Object.assign(button.style, {
+                left: position.left + 'px', top: position.top + 'px',
+                right: 'auto', bottom: 'auto'
+            });
+        }
+        try {
+            const saved = JSON.parse(moduleStore.getItem(key));
+            if (saved && Number.isFinite(saved.left) && Number.isFinite(saved.top)) {
+                place(saved.left, saved.top);
+            }
+        } catch (_) {}
+        button.style.touchAction = 'none';
+        button.style.userSelect = 'none';
+        button.addEventListener('pointerdown', event => {
+            if (gesture || (event.button !== undefined && event.button !== 0)) return;
+            suppressClick = false;
+            const rect = button.getBoundingClientRect();
+            gesture = { id: event.pointerId, x: event.clientX, y: event.clientY,
+                left: rect.left, top: rect.top, moved: false };
+            button.setPointerCapture?.(event.pointerId);
+        });
+        button.addEventListener('pointermove', event => {
+            if (!gesture || event.pointerId !== gesture.id) return;
+            const dx = event.clientX - gesture.x, dy = event.clientY - gesture.y;
+            if (!gesture.moved && Math.hypot(dx, dy) < 6) return;
+            gesture.moved = true;
+            suppressClick = true;
+            place(gesture.left + dx, gesture.top + dy);
+            event.preventDefault();
+        });
+        function finish(event) {
+            if (!gesture || event.pointerId !== gesture.id) return;
+            if (gesture.moved && position) {
+                try { moduleStore.setItem(key, JSON.stringify(position)); } catch (_) {}
+            }
+            gesture = null;
+        }
+        button.addEventListener('pointerup', finish);
+        button.addEventListener('pointercancel', finish);
+        button.addEventListener('lostpointercapture', finish);
+        button.addEventListener('click', event => {
+            if (!suppressClick) return;
+            suppressClick = false;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        }, true);
+        window.addEventListener('resize', () => {
+            if (position) place(position.left, position.top);
+        });
+    }
+
     function makeDraggable(panel, handle) {
         let activePointer = null;
         let dx = 0, dy = 0;
@@ -3094,7 +3158,7 @@
                 "
             >
                 <span>
-                    Message Archiver 1.0.0
+                    Message Archiver 1.0.1
                 </span>
 
                 <button
@@ -3479,6 +3543,7 @@
         launcher.style.cssText = 'position:fixed;right:10px;bottom:10px;z-index:1000001;padding:10px 14px;background:#292929;color:#fff;border:1px solid #999;border-radius:7px;font:bold 13px Arial;cursor:pointer;';
         launcher.onclick = showFullPanel;
         document.body.appendChild(launcher);
+        makeLauncherMovable(launcher);
 
         // Compact capture controls remain available while the panel is hidden.
         const bar = document.createElement('div');
