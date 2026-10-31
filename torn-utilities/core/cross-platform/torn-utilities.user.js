@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.14-who-dev
-// @description  Movable TU launcher and module catalog for Torn PDA
+// @version      0.5.42.15-who-dev
+// @description  Navbar-docked TU launcher for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -1083,32 +1083,23 @@
   const visibilityObserver=new MutationObserver(syncLauncher);
   visibilityObserver.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['style','hidden','class']});
   syncLauncher();
-  const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
-  const setPos = (x, y) => {
-    launcher.style.left = clamp(x, 0, Math.max(0, innerWidth - launcher.offsetWidth)) + 'px';
-    launcher.style.top = clamp(y, 0, Math.max(0, innerHeight - launcher.offsetHeight)) + 'px';
+  // Fixed navigation dock: keep the existing launcher and its click behavior.
+  const dockLauncher=()=>{
+    const nav=document.querySelector('#top-page-links-list, .header-navigation, [class*="header-navigation"], [class*="topLinks"]');
+    const search=document.querySelector('a[href*="search.php"], a[href*="/search"], [aria-label="Search"]');
+    const menu=document.querySelector('[aria-label="Menu"], [title="Menu"], .menu-icon');
+    const target=nav||(search&&search.parentElement)||(menu&&menu.parentElement);
+    if(!target)return;
+    if(launcher.parentElement!==target){
+      if(search&&search.parentElement===target)target.insertBefore(launcher,search);
+      else if(menu&&menu.parentElement===target)menu.after(launcher);
+      else target.prepend(launcher);
+    }
+    launcher.style.cssText='position:relative!important;inset:auto!important;left:auto!important;top:auto!important;transform:none!important;width:clamp(32px,5vw,44px);height:clamp(32px,5vw,44px);min-width:32px;min-height:32px;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;flex-shrink:0;touch-action:manipulation;cursor:pointer;z-index:2';
   };
-  if (Number.isFinite(saved.x) && Number.isFinite(saved.y)) setPos(saved.x, saved.y);
-  let gesture = null;
-  launcher.addEventListener('pointerdown', e => {
-    if (e.button !== 0 && e.pointerType === 'mouse') return;
-    gesture = {id:e.pointerId, sx:e.clientX, sy:e.clientY, x:launcher.offsetLeft, y:launcher.offsetTop, moved:false};
-    launcher.setPointerCapture(e.pointerId);
-  });
-  launcher.addEventListener('pointermove', e => {
-    if (!gesture || gesture.id !== e.pointerId) return;
-    const dx=e.clientX-gesture.sx, dy=e.clientY-gesture.sy;
-    if (Math.hypot(dx,dy)>6) gesture.moved=true;
-    if (gesture.moved) setPos(gesture.x+dx,gesture.y+dy);
-  });
-  launcher.addEventListener('pointerup', e => {
-    if (!gesture || gesture.id !== e.pointerId) return;
-    const moved=gesture.moved; gesture=null;
-    if (moved) { saved.x=launcher.offsetLeft; saved.y=launcher.offsetTop; persist(); }
-    else { togglePanel(); }
-  });
-  launcher.addEventListener('pointercancel', () => { gesture=null; });
-  window.addEventListener('resize', () => {
-    if (saved.x !== undefined) setPos(launcher.offsetLeft, launcher.offsetTop);
-  });
+  launcher.setAttribute('aria-label','Open Torn Utilities');
+  launcher.addEventListener('click',togglePanel);
+  const navDockObserver=new MutationObserver(()=>{if(!launcher.isConnected||launcher.parentElement===document.body)dockLauncher();});
+  navDockObserver.observe(document.body,{childList:true,subtree:true});
+  dockLauncher();
 })();
