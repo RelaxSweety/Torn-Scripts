@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.18-who-dev
-// @description  Navbar-docked TU launcher for PDA and Tampermonkey
+// @version      0.5.42.19-who-dev
+// @description  Compact draggable TU launcher for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -1083,39 +1083,38 @@
   const visibilityObserver=new MutationObserver(syncLauncher);
   visibilityObserver.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['style','hidden','class']});
   syncLauncher();
-  // Non-invasive launcher placement. Never change Torn navigation DOM.
-  const dockLauncher=()=>{
-    if(launcher.parentElement!==document.body)document.body.appendChild(launcher);
-    const menu=document.querySelector('[aria-label="Menu"], [title="Menu"], .menu-icon');
-    const search=document.querySelector('a[href*="search.php"], a[href*="/search"], [aria-label="Search"], [title="Search"]');
-    const m=menu?.getBoundingClientRect(),q=search?.getBoundingClientRect();
-    let x,y,size=40;
-    if(m&&q&&q.left-m.right>=size+12&&Math.abs(m.top-q.top)<20){
-      x=m.right+(q.left-m.right-size)/2;y=m.top+(m.height-size)/2;
-    }else{
-      // Torn PDA uses an unlabeled menu/search row. Anchor to the actual
-      // Torn logo rather than guessing positions from unrelated page controls.
-      const logo=[...document.querySelectorAll('img')].find(el=>/torn/i.test((el.alt||'')+' '+(el.getAttribute('src')||''))&&el.getBoundingClientRect().width>65&&el.getBoundingClientRect().width<300);
-      const lr=logo?.getBoundingClientRect();
-      if(lr&&lr.top>=0&&lr.top<250){
-        size=Math.min(40,Math.max(30,lr.height*.72));
-        x=lr.right+Math.min(120,Math.max(70,innerWidth*.16));
-        y=lr.top+(lr.height-size)/2;
-      }else{
-        // Guaranteed visible recovery position if Torn changes its header.
-        x=12;y=Math.max(80,innerHeight*.38);
-      }
-    }
-    x=Math.max(0,Math.min(innerWidth-size,x));
-    launcher.style.cssText='position:fixed!important;left:'+Math.round(x)+'px!important;top:'+Math.round(y)+'px!important;right:auto!important;bottom:auto!important;transform:none!important;width:'+size+'px!important;height:'+size+'px!important;min-width:0!important;min-height:0!important;display:flex!important;align-items:center;justify-content:center;touch-action:manipulation;cursor:pointer;z-index:2147483645';
+  // Restore the original draggable launcher with compact dimensions.
+  launcher.setAttribute('aria-label','Open Torn Utilities; drag to reposition');
+  launcher.style.width='34px';
+  launcher.style.height='34px';
+  launcher.style.minWidth='34px';
+  launcher.style.minHeight='34px';
+  const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+  const setPos = (x, y) => {
+    launcher.style.left = clamp(x, 0, Math.max(0, innerWidth - launcher.offsetWidth)) + 'px';
+    launcher.style.top = clamp(y, 0, Math.max(0, innerHeight - launcher.offsetHeight)) + 'px';
   };
-  launcher.setAttribute('aria-label','Open Torn Utilities');
-  launcher.addEventListener('click',togglePanel);
-  let dockQueued=false;
-  const scheduleDock=()=>{if(dockQueued)return;dockQueued=true;requestAnimationFrame(()=>{dockQueued=false;dockLauncher();});};
-  const navDockObserver=new MutationObserver(scheduleDock);
-  navDockObserver.observe(document.body,{childList:true,subtree:true});
-  window.addEventListener('resize',scheduleDock);
-  window.addEventListener('scroll',scheduleDock,{passive:true});
-  dockLauncher();
+  if (Number.isFinite(saved.x) && Number.isFinite(saved.y)) setPos(saved.x, saved.y);
+  let gesture = null;
+  launcher.addEventListener('pointerdown', e => {
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    gesture = {id:e.pointerId, sx:e.clientX, sy:e.clientY, x:launcher.offsetLeft, y:launcher.offsetTop, moved:false};
+    launcher.setPointerCapture(e.pointerId);
+  });
+  launcher.addEventListener('pointermove', e => {
+    if (!gesture || gesture.id !== e.pointerId) return;
+    const dx=e.clientX-gesture.sx, dy=e.clientY-gesture.sy;
+    if (Math.hypot(dx,dy)>6) gesture.moved=true;
+    if (gesture.moved) setPos(gesture.x+dx,gesture.y+dy);
+  });
+  launcher.addEventListener('pointerup', e => {
+    if (!gesture || gesture.id !== e.pointerId) return;
+    const moved=gesture.moved; gesture=null;
+    if (moved) { saved.x=launcher.offsetLeft; saved.y=launcher.offsetTop; persist(); }
+    else { togglePanel(); }
+  });
+  launcher.addEventListener('pointercancel', () => { gesture=null; });
+  window.addEventListener('resize', () => {
+    if (saved.x !== undefined) setPos(launcher.offsetLeft, launcher.offsetTop);
+  });
 })();
