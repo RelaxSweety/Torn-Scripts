@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.16-who-dev
+// @version      0.5.42.17-who-dev
 // @description  Navbar-docked TU launcher for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -1083,19 +1083,21 @@
   const visibilityObserver=new MutationObserver(syncLauncher);
   visibilityObserver.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['style','hidden','class']});
   syncLauncher();
-  // Overlay-only navbar docking: never insert a node into Torn's flex/grid header.
-  // This prevents the navigation and status bars from reflowing.
+  // Dock only in verified free space between the menu and search icons.
+  // Never modify Torn's header DOM or overlap its controls.
   const dockLauncher=()=>{
     if(launcher.parentElement!==document.body)document.body.appendChild(launcher);
     const menu=document.querySelector('[aria-label="Menu"], [title="Menu"], .menu-icon');
-    const header=menu?.closest('header, nav')||document.querySelector('#top-page-links-list, .header-navigation, [class*="header-navigation"]');
-    if(!header){launcher.style.display='none';return;}
-    const r=header.getBoundingClientRect();
-    const mr=menu?.getBoundingClientRect();
-    const size=Math.max(30,Math.min(44,r.height||44));
-    const x=mr?mr.right+Math.max(4,(size/5)):r.left+Math.min(180,r.width*.30);
-    const y=r.top+(r.height-size)/2;
-    launcher.style.cssText='position:fixed!important;left:'+Math.round(x)+'px!important;top:'+Math.round(y)+'px!important;right:auto!important;bottom:auto!important;transform:none!important;width:'+size+'px;height:'+size+'px;min-width:0;min-height:0;display:flex;align-items:center;justify-content:center;touch-action:manipulation;cursor:pointer;z-index:2147483645';
+    const search=document.querySelector('a[href*="search.php"], a[href*="/search"], [aria-label="Search"], [title="Search"]');
+    if(!menu||!search){launcher.style.setProperty('display','none','important');return;}
+    const m=menu.getBoundingClientRect(),q=search.getBoundingClientRect();
+    const gap=q.left-m.right;
+    const size=Math.min(40,Math.max(0,gap-12),Math.max(0,m.height));
+    if(size<28||Math.abs((m.top+m.height/2)-(q.top+q.height/2))>20){
+      launcher.style.setProperty('display','none','important');return;
+    }
+    const x=m.right+(gap-size)/2,y=m.top+(m.height-size)/2;
+    launcher.style.cssText='position:fixed!important;left:'+Math.round(x)+'px!important;top:'+Math.round(y)+'px!important;right:auto!important;bottom:auto!important;transform:none!important;width:'+size+'px!important;height:'+size+'px!important;min-width:0!important;min-height:0!important;display:flex!important;align-items:center;justify-content:center;touch-action:manipulation;cursor:pointer;z-index:2147483645';
   };
   launcher.setAttribute('aria-label','Open Torn Utilities');
   launcher.addEventListener('click',togglePanel);
