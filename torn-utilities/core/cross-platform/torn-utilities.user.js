@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.15-who-dev
+// @version      0.5.42.16-who-dev
 // @description  Navbar-docked TU launcher for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -1083,23 +1083,27 @@
   const visibilityObserver=new MutationObserver(syncLauncher);
   visibilityObserver.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['style','hidden','class']});
   syncLauncher();
-  // Fixed navigation dock: keep the existing launcher and its click behavior.
+  // Overlay-only navbar docking: never insert a node into Torn's flex/grid header.
+  // This prevents the navigation and status bars from reflowing.
   const dockLauncher=()=>{
-    const nav=document.querySelector('#top-page-links-list, .header-navigation, [class*="header-navigation"], [class*="topLinks"]');
-    const search=document.querySelector('a[href*="search.php"], a[href*="/search"], [aria-label="Search"]');
+    if(launcher.parentElement!==document.body)document.body.appendChild(launcher);
     const menu=document.querySelector('[aria-label="Menu"], [title="Menu"], .menu-icon');
-    const target=nav||(search&&search.parentElement)||(menu&&menu.parentElement);
-    if(!target)return;
-    if(launcher.parentElement!==target){
-      if(search&&search.parentElement===target)target.insertBefore(launcher,search);
-      else if(menu&&menu.parentElement===target)menu.after(launcher);
-      else target.prepend(launcher);
-    }
-    launcher.style.cssText='position:relative!important;inset:auto!important;left:auto!important;top:auto!important;transform:none!important;width:clamp(32px,5vw,44px);height:clamp(32px,5vw,44px);min-width:32px;min-height:32px;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;flex-shrink:0;touch-action:manipulation;cursor:pointer;z-index:2';
+    const header=menu?.closest('header, nav')||document.querySelector('#top-page-links-list, .header-navigation, [class*="header-navigation"]');
+    if(!header){launcher.style.display='none';return;}
+    const r=header.getBoundingClientRect();
+    const mr=menu?.getBoundingClientRect();
+    const size=Math.max(30,Math.min(44,r.height||44));
+    const x=mr?mr.right+Math.max(4,(size/5)):r.left+Math.min(180,r.width*.30);
+    const y=r.top+(r.height-size)/2;
+    launcher.style.cssText='position:fixed!important;left:'+Math.round(x)+'px!important;top:'+Math.round(y)+'px!important;right:auto!important;bottom:auto!important;transform:none!important;width:'+size+'px;height:'+size+'px;min-width:0;min-height:0;display:flex;align-items:center;justify-content:center;touch-action:manipulation;cursor:pointer;z-index:2147483645';
   };
   launcher.setAttribute('aria-label','Open Torn Utilities');
   launcher.addEventListener('click',togglePanel);
-  const navDockObserver=new MutationObserver(()=>{if(!launcher.isConnected||launcher.parentElement===document.body)dockLauncher();});
+  let dockQueued=false;
+  const scheduleDock=()=>{if(dockQueued)return;dockQueued=true;requestAnimationFrame(()=>{dockQueued=false;dockLauncher();});};
+  const navDockObserver=new MutationObserver(scheduleDock);
   navDockObserver.observe(document.body,{childList:true,subtree:true});
+  window.addEventListener('resize',scheduleDock);
+  window.addEventListener('scroll',scheduleDock,{passive:true});
   dockLauncher();
 })();
