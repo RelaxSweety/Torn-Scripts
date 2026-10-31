@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.17-who-dev
+// @version      0.5.42.18-who-dev
 // @description  Navbar-docked TU launcher for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -1083,20 +1083,30 @@
   const visibilityObserver=new MutationObserver(syncLauncher);
   visibilityObserver.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['style','hidden','class']});
   syncLauncher();
-  // Dock only in verified free space between the menu and search icons.
-  // Never modify Torn's header DOM or overlap its controls.
+  // Non-invasive launcher placement. Never change Torn navigation DOM.
   const dockLauncher=()=>{
     if(launcher.parentElement!==document.body)document.body.appendChild(launcher);
     const menu=document.querySelector('[aria-label="Menu"], [title="Menu"], .menu-icon');
     const search=document.querySelector('a[href*="search.php"], a[href*="/search"], [aria-label="Search"], [title="Search"]');
-    if(!menu||!search){launcher.style.setProperty('display','none','important');return;}
-    const m=menu.getBoundingClientRect(),q=search.getBoundingClientRect();
-    const gap=q.left-m.right;
-    const size=Math.min(40,Math.max(0,gap-12),Math.max(0,m.height));
-    if(size<28||Math.abs((m.top+m.height/2)-(q.top+q.height/2))>20){
-      launcher.style.setProperty('display','none','important');return;
+    const m=menu?.getBoundingClientRect(),q=search?.getBoundingClientRect();
+    let x,y,size=40;
+    if(m&&q&&q.left-m.right>=size+12&&Math.abs(m.top-q.top)<20){
+      x=m.right+(q.left-m.right-size)/2;y=m.top+(m.height-size)/2;
+    }else{
+      // Torn PDA uses an unlabeled menu/search row. Anchor to the actual
+      // Torn logo rather than guessing positions from unrelated page controls.
+      const logo=[...document.querySelectorAll('img')].find(el=>/torn/i.test((el.alt||'')+' '+(el.getAttribute('src')||''))&&el.getBoundingClientRect().width>65&&el.getBoundingClientRect().width<300);
+      const lr=logo?.getBoundingClientRect();
+      if(lr&&lr.top>=0&&lr.top<250){
+        size=Math.min(40,Math.max(30,lr.height*.72));
+        x=lr.right+Math.min(120,Math.max(70,innerWidth*.16));
+        y=lr.top+(lr.height-size)/2;
+      }else{
+        // Guaranteed visible recovery position if Torn changes its header.
+        x=12;y=Math.max(80,innerHeight*.38);
+      }
     }
-    const x=m.right+(gap-size)/2,y=m.top+(m.height-size)/2;
+    x=Math.max(0,Math.min(innerWidth-size,x));
     launcher.style.cssText='position:fixed!important;left:'+Math.round(x)+'px!important;top:'+Math.round(y)+'px!important;right:auto!important;bottom:auto!important;transform:none!important;width:'+size+'px!important;height:'+size+'px!important;min-width:0!important;min-height:0!important;display:flex!important;align-items:center;justify-content:center;touch-action:manipulation;cursor:pointer;z-index:2147483645';
   };
   launcher.setAttribute('aria-label','Open Torn Utilities');
