@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Testing and Diagnostics DEV
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.1.7-dev
+// @version      0.1.8-dev
 // @description  Independent guided cross-platform TU test checklist and sanitized export
 // @match        https://www.torn.com/*
 // @grant        none
@@ -22,12 +22,12 @@
     ['core.position','Launcher movement and position persist after reload'],
     ['auth.agreement','Agreement confirmation and session restoration work'],
     ['auth.api','Saved API level is verified and labeled correctly'],
-    ['auth.public','Public Only key registration and acceptance of agreement 1.2 work'],
-    ['auth.limited','Limited Access key registration and acceptance of agreement 1.2 work'],
-    ['auth.reaccept','Agreement 1.1 acceptance does not grant access to 1.2 without re-acceptance'],
-    ['auth.persist','After reload, current agreement 1.2 and session restore without prompting'],
+    ['auth.public','Public Only key registration and current agreement acceptance work'],
+    ['auth.limited','Limited Access key registration and current agreement acceptance work'],
+    ['auth.reaccept','Prior agreement acceptance does not grant access to newly published version'],
+    ['auth.persist','After reload, current agreement and session restore without prompting'],
     ['auth.rejection','Full Access or invalid API key registration is rejected'],
-    ['auth.health','DEV worker health and published agreement 1.2 metadata check'],
+    ['auth.health','DEV worker publishes a valid current agreement from its registry'],
     ['core.registry','Expected modules appear in Manager'],
     ['module.travel','Travel Assistant opens and controls respond'],
     ['module.item','Item Monitor selection and Cancel work'],
@@ -149,10 +149,10 @@
       if(!response.ok)throw Error('HTTP '+response.status);
       const data=await response.json();
       const agreement=data?.agreement;
-      const ok=agreement?.agreement_version==='1.2'&&agreement?.agreement_number===3&&agreement?.agreement_date==='2026-11-04'&&/Public Only or Limited Access/.test(data?.content||'');
+      const ok=typeof agreement?.agreement_version==='string'&&Number.isSafeInteger(agreement?.agreement_number)&&/^\\d{4}-\\d{2}-\\d{2}$/.test(agreement?.agreement_date||'')&&typeof data?.content==='string'&&data.content.includes('Version: '+agreement.agreement_version)&&data.content.includes('Agreement number: '+agreement.agreement_number);
       const index=tests.findIndex(([id])=>id==='auth.health');
-      state.results[index]={id:'auth.health',status:ok?'pass':'fail',at:new Date().toISOString(),note:ok?'Published agreement 1.2 metadata and API language confirmed':'Unexpected DEV agreement metadata or text'};
-      serverResult.textContent=ok?'PASS: DEV publishes agreement 1.2 (number 3, 2026-11-04)':'FAIL: DEV agreement version or text does not match expected 1.2';save();render();
+      state.results[index]={id:'auth.health',status:ok?'pass':'fail',at:new Date().toISOString(),note:ok?'Published agreement '+agreement.agreement_version+' (#'+agreement.agreement_number+')':'Invalid published DEV agreement metadata or text'};
+      serverResult.textContent=ok?'PASS: DEV publishes agreement '+agreement.agreement_version+' (#'+agreement.agreement_number+', '+agreement.agreement_date+')':'FAIL: DEV agreement registry metadata or text is invalid';save();render();
     }catch(error){serverResult.textContent='CHECK FAILED: '+redact(error?.message||error);const index=tests.findIndex(([id])=>id==='auth.health');state.results[index]={id:'auth.health',status:'fail',at:new Date().toISOString(),note:'Request failed; check network/CORS and DEV deployment'};save();render();}
   }
   const btn=(label,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=fn;b.style.cssText='font:600 12px/1.35 '+font+';color:#f4f7fa;background:#344d60;border:1px solid #7892a2;border-radius:5px;padding:7px 10px;min-height:32px;cursor:pointer;appearance:none;text-shadow:none';return b};
