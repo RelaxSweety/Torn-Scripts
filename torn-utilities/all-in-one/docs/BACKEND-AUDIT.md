@@ -9,14 +9,17 @@
 - `src/access/agreements.js` validates identity using Torn v1 user basic, but does not independently verify a key's Public/Limited permission classification.
 - The source of the DEV auth worker has **not** been identified; do not assume this multiplayer repository is the same deployed service.
 
+## Decision: retain existing registration
+Reuse the deployed DEV Cloudflare registration endpoint, session token handling, renewal, and agreement verification. Extend the existing /api/auth/register handler to verify and return actual Public/Limited access level. A separate /api/auth/verify-key endpoint is optional, not required. Existing agreement test records need not be migrated. The deployed worker source still needs to be located before modifying backend code.
+
 ## Blocker
-The proposed `POST /api/auth/verify-key` endpoint in `src/core/server-verifier.js` is a **contract proposal**, not a deployed route. The actual DEV auth worker must be located and audited before client integration.
+The proposed `POST /api/auth/verify-key` endpoint in `src/core/server-verifier.js` is **not required** and is not deployed. Prefer extending existing `POST /api/auth/register` to return server-verified `accessLevel` and `playerId` alongside the existing token. The actual DEV auth worker must be located and audited before client integration.
 
 ## Required backend behavior
 1. Accept key and requested Public/Limited access; never trust requested access as actual access.
 2. Query Torn's authoritative key metadata (confirm endpoint and schema against Torn API documentation) and identity, and reject revoked/invalid, Full or unrecognized access.
 3. Return `{verified:true,accessLevel:'public'|'limited',playerId:<positive integer>}` only after verification.
-4. Existing user agreement records are testing-only and need not be migrated. Implement a clean versioned agreement and session lifecycle for All-in-One; do not delete or overwrite old data until the replacement is validated.
+4. Existing user agreement records are testing-only and need not be migrated. Reuse the existing registration, session, and agreement lifecycle. Old agreement test records need not be migrated; do not delete or overwrite old data until the replacement is validated.
 5. Do not log/store raw API keys unless explicitly required by a reviewed security design.
 6. Add automated tests for Public, Limited, Full, invalid, revoked, mismatched and Torn API failures.
 7. Deploy to isolated DEV and manually validate PDA and Tampermonkey before switching Manager login.
