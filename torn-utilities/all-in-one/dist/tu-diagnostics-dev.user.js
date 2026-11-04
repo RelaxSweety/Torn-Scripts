@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Testing and Diagnostics DEV
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.1.4-dev
+// @version      0.1.5-dev
 // @description  Independent guided cross-platform TU test checklist and sanitized export
 // @match        https://www.torn.com/*
 // @grant        none
@@ -13,6 +13,7 @@
   window.__TU_DIAGNOSTICS_DEV__=true;
   const key='tu:aio:diagnostics:v1';
   const positionKey='tu:aio:diagnostics:launcher-position:v1';
+  const panelLayoutKey='tu:aio:diagnostics:panel-layout:v1';
   const tests=[
     ['core.launcher','TU launcher appears and opens'],
     ['core.window','Manager Back, Minimize, Restore and Exit work'],
@@ -78,13 +79,31 @@
   launcher.addEventListener('pointerup',finishDrag);
   launcher.addEventListener('pointercancel',finishDrag);
   const panel=document.createElement('section');
-  panel.style.cssText='position:fixed;right:12px;bottom:60px;width:min(410px,calc(100vw - 24px));max-height:75vh;overflow:auto;z-index:2147483646;background:#18242d;color:white;padding:14px;border:1px solid #89a;border-radius:10px;font:400 14px/1.5 Arial,Helvetica,sans-serif;box-sizing:border-box;display:none';
+  panel.style.cssText='position:fixed;right:12px;bottom:60px;width:min(410px,calc(100vw - 24px));height:min(530px,calc(100dvh - 36px));min-width:260px;min-height:230px;max-width:100vw;max-height:100dvh;overflow:hidden;display:none;flex-direction:column;z-index:2147483646;background:#18242d;color:white;padding:14px;border:1px solid #89a;border-radius:10px;font:400 14px/1.5 Arial,Helvetica,sans-serif;box-sizing:border-box;resize:both';
+  let savedPanelLayout=null;
+  try{savedPanelLayout=JSON.parse(localStorage.getItem(panelLayoutKey)||'null')}catch{}
+  const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
+  if(savedPanelLayout&&['x','y','w','h'].every(k=>Number.isFinite(savedPanelLayout[k]))){
+    panel.style.width=clamp(savedPanelLayout.w,260,Math.max(260,innerWidth))+'px';
+    panel.style.height=clamp(savedPanelLayout.h,230,Math.max(230,innerHeight))+'px';
+    panel.style.left=clamp(savedPanelLayout.x,0,Math.max(0,innerWidth-60))+'px';
+    panel.style.top=clamp(savedPanelLayout.y,0,Math.max(0,innerHeight-50))+'px';
+    panel.style.right='auto';panel.style.bottom='auto';
+  }
+  const savePanelLayout=()=>{const rect=panel.getBoundingClientRect();try{localStorage.setItem(panelLayoutKey,JSON.stringify({x:rect.left,y:rect.top,w:rect.width,h:rect.height}))}catch{}};
+  if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>{if(panel.style.display!=='none')savePanelLayout()}).observe(panel);
   // Torn page styles can override native buttons and inputs; scope explicit typography.
   const font='Arial,Helvetica,sans-serif';
-  const heading=document.createElement('div');heading.style.cssText='display:flex;justify-content:space-between;align-items:center';
+  const heading=document.createElement('div');heading.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:move;touch-action:none;flex-shrink:0;user-select:none;padding-bottom:8px';
   const title=document.createElement('strong');title.textContent='TU Testing & Diagnostics';title.style.cssText='font:700 15px/1.4 '+font+';color:#f4f7fa';
   const close=document.createElement('button');close.textContent='Close';close.style.cssText='font:600 12px/1.35 Arial,Helvetica,sans-serif;color:#fff;background:#344d60;border:1px solid #7892a2;border-radius:5px;padding:6px 10px;cursor:pointer';close.onclick=()=>panel.style.display='none';heading.append(title,close);panel.append(heading);
-  const meta=document.createElement('p');meta.textContent='Platform: '+platformInfo.label+(platformInfo.confidence==='detected'?' (detected)':' (not identifiable automatically)');panel.append(meta);
+  let panelDrag=null;
+  heading.addEventListener('pointerdown',event=>{if(event.button!==0||event.target===close)return;const rect=panel.getBoundingClientRect();panelDrag={id:event.pointerId,x:event.clientX,y:event.clientY,left:rect.left,top:rect.top};heading.setPointerCapture?.(event.pointerId);event.preventDefault()});
+  heading.addEventListener('pointermove',event=>{if(!panelDrag||event.pointerId!==panelDrag.id)return;panel.style.left=clamp(panelDrag.left+event.clientX-panelDrag.x,0,Math.max(0,innerWidth-60))+'px';panel.style.top=clamp(panelDrag.top+event.clientY-panelDrag.y,0,Math.max(0,innerHeight-50))+'px';panel.style.right='auto';panel.style.bottom='auto'});
+  const stopPanelDrag=event=>{if(!panelDrag||event.pointerId!==panelDrag.id)return;panelDrag=null;savePanelLayout()};
+  heading.addEventListener('pointerup',stopPanelDrag);heading.addEventListener('pointercancel',stopPanelDrag);
+  const content=document.createElement('div');content.style.cssText='flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding-right:4px';panel.append(content);
+  const meta=document.createElement('p');meta.textContent='Platform: '+platformInfo.label+(platformInfo.confidence==='detected'?' (detected)':' (not identifiable automatically)');content.append(meta);
   const filterBar=document.createElement('div');filterBar.style.cssText='margin:8px 0 12px;position:relative';
   const sections=[['core','Manager core'],['auth','Authentication & API'],['module.travel','Travel Assistant'],['module.item','Item Monitor'],['module.war','War Organizer'],['incomplete','Not passed'],['failed','Failed only']];
   const selectedSections=new Set(); // Empty selection means all sections.
@@ -101,10 +120,10 @@
   });
   const clearFilters=document.createElement('button');clearFilters.type='button';clearFilters.textContent='Show all sections';clearFilters.style.cssText='font:600 12px Arial,Helvetica,sans-serif;padding:7px;color:#fff;background:#344d60;border:1px solid #7892a2;border-radius:5px;cursor:pointer';
   clearFilters.onclick=()=>{selectedSections.clear();filterMenu.querySelectorAll('input[type=checkbox]').forEach(c=>c.checked=false);updateFilterLabel();render()};
-  filterMenu.append(clearFilters);filterBar.append(filterToggle,filterMenu);panel.append(filterBar);updateFilterLabel();
-  const status=document.createElement('p');panel.append(status);
-  const list=document.createElement('div');panel.append(list);
-  const actions=document.createElement('div');actions.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:12px';panel.append(actions);
+  filterMenu.append(clearFilters);filterBar.append(filterToggle,filterMenu);content.append(filterBar);updateFilterLabel();
+  const status=document.createElement('p');content.append(status);
+  const list=document.createElement('div');content.append(list);
+  const actions=document.createElement('div');actions.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:12px';content.append(actions);
   const btn=(label,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=fn;b.style.cssText='font:600 12px/1.35 '+font+';color:#f4f7fa;background:#344d60;border:1px solid #7892a2;border-radius:5px;padding:7px 10px;min-height:32px;cursor:pointer;appearance:none;text-shadow:none';return b};
   function render(){
     list.replaceChildren();
@@ -131,6 +150,6 @@
     const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'});
     const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='tu-diagnostics-'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }),btn('Reset checklist',()=>{if(confirm('Clear this diagnostic session?')){state={results:[],started:new Date().toISOString()};save();render()}}));
-  launcher.onclick=()=>{if(suppressClick){suppressClick=false;return;}panel.style.display=panel.style.display==='none'?'block':'none';render()};
+  launcher.onclick=()=>{if(suppressClick){suppressClick=false;return;}panel.style.display=panel.style.display==='none'?'flex':'none';render()};
   document.body.append(launcher,panel);render();
 })();
