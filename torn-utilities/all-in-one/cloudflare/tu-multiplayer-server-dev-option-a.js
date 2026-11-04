@@ -76,7 +76,26 @@ async function publishedAgreement(env) {
   // trailing blank lines. Ignore only those transport/formatting differences;
   // never silently overwrite an existing published agreement's wording.
   const canonicalText = value => String(value).replace(/\\r\\n?/g, "\\n").replace(/[\\t ]+$/gm, "").trimEnd();
-  if (row && (row.agreement_version !== a.agreement_version || row.agreement_date !== a.agreement_date || canonicalText(row.content) !== canonicalText(published.content))) throw Error("Published agreement number conflicts with immutable D1 history (metadata or substantive content differs)");
+  if (row && (row.agreement_version !== a.agreement_version || row.agreement_date !== a.agreement_date || canonicalText(row.content) !== canonicalText(published.content))) {
+    const stored = canonicalText(row.content), incoming = canonicalText(published.content);
+    let firstDifference = 0;
+    while (firstDifference < stored.length && firstDifference < incoming.length && stored[firstDifference] === incoming[firstDifference]) firstDifference++;
+    // Both documents are public terms. Only show short excerpts around the mismatch.
+    const detail = {
+      error: "Published agreement number conflicts with immutable D1 history",
+      agreement_number: a.agreement_number,
+      stored_version: row.agreement_version,
+      github_version: a.agreement_version,
+      stored_date: row.agreement_date,
+      github_date: a.agreement_date,
+      stored_length: stored.length,
+      github_length: incoming.length,
+      first_difference: firstDifference,
+      stored_excerpt: stored.slice(Math.max(0, firstDifference - 45), firstDifference + 65),
+      github_excerpt: incoming.slice(Math.max(0, firstDifference - 45), firstDifference + 65)
+    };
+    throw Error("AGREEMENT_DIAGNOSTIC:" + JSON.stringify(detail));
+  }
   const current = await db.prepare("SELECT agreement_number FROM tu_agreement_registry WHERE is_current=1 LIMIT 1").first();
   if (current && current.agreement_number > a.agreement_number) throw Error("Agreement rollback refused");
   if (!row || !row.is_current) {
@@ -111,7 +130,9 @@ async function handleAuth(req, env, url) {
     try {
       return respond(await publishedAgreement(env));
     } catch (error) {
-      return respond({ error: "Published agreement unavailable", detail: String(error?.message || error).slice(0, 200) }, 503);
+      const message = String(error?.message || error);
+      if (message.startsWith("AGREEMENT_DIAGNOSTIC:")) return respond(JSON.parse(message.slice("AGREEMENT_DIAGNOSTIC:".length)), 409);
+      return respond({ error: "Published agreement unavailable", detail: message.slice(0, 200) }, 503);
     }
   }
   const db = env.TU_USERS_DB;
