@@ -1,13 +1,14 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.10.27-dev
+// @version      1.10.28-dev
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
+// @grant        unsafeWindow
 // @connect      tu-multiplayer-server.tuserver.workers.dev
-// @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/item-monitor.user.js
-// @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/item-monitor.user.js
+// @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/stable-05424-who/torn-utilities/modules/item-monitor.user.js
+// @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/stable-05424-who/torn-utilities/modules/item-monitor.user.js
 // @run-at       document-idle
 // ==/UserScript==
 // TU Manager authorization gate (development): no module initialization before verified consent.
@@ -29,7 +30,7 @@
 
 (()=>{
   'use strict';const TU_MODULE_VERSION=(typeof GM_info!=='undefined'&&GM_info?.script?.version)||'1.10.23';
-if(window.__TU_ITEM_MONITOR__)return;window.__TU_ITEM_MONITOR__=true;
+if(host.__TU_ITEM_MONITOR__)return;window.__TU_ITEM_MONITOR__=true;
 const ID='item-monitor',KEY='tu-item-monitor-v1',OLD='tuac-watches';
 const load=(k,f)=>{try{return JSON.parse(localStorage.getItem(k)||'null')??f}catch{return f}};
 const state={items:load(KEY,[]),cfg:load('tuac-settings',{}),panel:null,context:null,picking:false,selected:null,observer:null,alarmTimers:[],audio:null,muted:false,catalog:null,catalogWindow:null};
@@ -163,7 +164,7 @@ async function getCatalog(){
  const cached=load(catalogCacheKey,null);
  if(cached?.items?.length&&Date.now()-cached.time<86400000){state.catalog=cached.items;return state.catalog}
  const pdaKey='###PDA-APIKEY###';
- const apiKey=!pdaKey.includes('PDA-APIKEY')?pdaKey:(window.TornUtilities?.apiKey||window.TornUtilities?.getApiKey?.()||'');
+ const apiKey=!pdaKey.includes('PDA-APIKEY')?pdaKey:(host.TornUtilities?.apiKey||host.TornUtilities?.getApiKey?.()||'');
  if(!apiKey)throw Error('PDA API key unavailable. Configure your key in Torn PDA, then reload the script.');
  const url='https://api.torn.com/v2/torn/items?key='+encodeURIComponent(apiKey);
  let payload=null;
@@ -763,7 +764,7 @@ function travelUI(){
   info.textContent='Retrieving current stock and prices...';
   const base='https://tu-multiplayer-server.tuserver.workers.dev/api/foreign/',query='?country='+travel.country+'&item_id='+id;
   const pdaKey='###PDA-APIKEY###';
-  const key=!pdaKey.includes('PDA-APIKEY')?pdaKey:(window.TornUtilities?.apiKey||window.TornUtilities?.getApiKey?.()||'');
+  const key=!pdaKey.includes('PDA-APIKEY')?pdaKey:(host.TornUtilities?.apiKey||host.TornUtilities?.getApiKey?.()||'');
   const flightPromise=travelCurrentFlight(key);
   const jobs=[travelGet(base+'history'+query+'&limit=200'),travelGet(base+'prediction'+query+'&lead_seconds='+Math.ceil((minutes+travelNum(travel.buffer))*60+60)),key?travelGet('https://api.torn.com/v2/market/'+id+'/itemmarket?key='+encodeURIComponent(key)):Promise.reject(Error('Torn API key unavailable'))];
   const settled=await Promise.allSettled(jobs);if(seq!==serial||!w.isConnected)return;
@@ -791,7 +792,7 @@ function migrate(){if(localStorage.getItem('tuim-migrated'))return;const old=loa
 function activate(ctx){state.context=ctx;style();if(!state.panel){state.panel=E('section',document.body);state.panel.id='tuim-panel'}state.panel.hidden=false;state.panel.style.height=state.panel.style.height||'min(62dvh,540px)';render();tuModuleOpen('tuim-panel');scan()}
 function deactivate(){travelClose();state.catalogWindow?.remove();state.catalogWindow=null;stopPick();if(state.panel)state.panel.hidden=true;state.context=null}
 migrate();style();let pending=false;const obs=new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;scan()},400)});obs.observe(document.documentElement,{childList:true,subtree:true,characterData:true});window.addEventListener('pageshow',scan);window.addEventListener('popstate',()=>setTimeout(scan,300));setInterval(()=>{if(state.items.length)scan()},2000);scan();
-const definition={id:ID,version:TU_MODULE_VERSION,activate,deactivate};const register=()=>window.TornUtilities?.register?.(definition);window.addEventListener('torn-utilities-ready',register);register();
+const definition={id:ID,version:TU_MODULE_VERSION,activate,deactivate};const register=()=>host.TornUtilities?.register?.(definition);host.addEventListener('torn-utilities-ready',register);register();
 })();
   }
   run();
