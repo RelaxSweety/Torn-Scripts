@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Testing and Diagnostics DEV
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.1.1-dev
+// @version      0.1.2-dev
 // @description  Independent guided cross-platform TU test checklist and sanitized export
 // @match        https://www.torn.com/*
 // @grant        none
@@ -32,7 +32,7 @@
   if(!state||!Array.isArray(state.results))state={results:[],started:new Date().toISOString()};
   const save=()=>{try{localStorage.setItem(key,JSON.stringify(state))}catch{}};
   const launcher=document.createElement('button');launcher.textContent='TU Test';launcher.title='Open independent TU diagnostics';
-  launcher.style.cssText='position:fixed;bottom:18px;right:18px;z-index:2147483645;background:#233f53;color:white;border:1px solid #9ac;padding:9px 12px;border-radius:8px;font:13px sans-serif;cursor:pointer';
+  launcher.style.cssText='position:fixed;bottom:18px;right:18px;z-index:2147483645;background:#233f53;color:white;border:1px solid #9ac;padding:9px 12px;border-radius:8px;font:600 13px/1.3 Arial,Helvetica,sans-serif;cursor:pointer';
   // Drag with pointer or touch; a short tap still opens the checklist.
   let position=null;
   try{position=JSON.parse(localStorage.getItem(positionKey)||'null')}catch{}
@@ -69,29 +69,31 @@
   launcher.addEventListener('pointerup',finishDrag);
   launcher.addEventListener('pointercancel',finishDrag);
   const panel=document.createElement('section');
-  panel.style.cssText='position:fixed;right:12px;bottom:60px;width:min(410px,calc(100vw - 24px));max-height:75vh;overflow:auto;z-index:2147483646;background:#18242d;color:white;padding:14px;border:1px solid #89a;border-radius:10px;font:13px/1.45 sans-serif;box-sizing:border-box;display:none';
+  panel.style.cssText='position:fixed;right:12px;bottom:60px;width:min(410px,calc(100vw - 24px));max-height:75vh;overflow:auto;z-index:2147483646;background:#18242d;color:white;padding:14px;border:1px solid #89a;border-radius:10px;font:400 14px/1.5 Arial,Helvetica,sans-serif;box-sizing:border-box;display:none';
+  // Torn page styles can override native buttons and inputs; scope explicit typography.
+  const font='Arial,Helvetica,sans-serif';
   const heading=document.createElement('div');heading.style.cssText='display:flex;justify-content:space-between;align-items:center';
-  const title=document.createElement('strong');title.textContent='TU Testing & Diagnostics';
-  const close=document.createElement('button');close.textContent='Close';close.onclick=()=>panel.style.display='none';heading.append(title,close);panel.append(heading);
+  const title=document.createElement('strong');title.textContent='TU Testing & Diagnostics';title.style.cssText='font:700 15px/1.4 '+font+';color:#f4f7fa';
+  const close=document.createElement('button');close.textContent='Close';close.style.cssText='font:600 12px/1.35 Arial,Helvetica,sans-serif;color:#fff;background:#344d60;border:1px solid #7892a2;border-radius:5px;padding:6px 10px;cursor:pointer';close.onclick=()=>panel.style.display='none';heading.append(title,close);panel.append(heading);
   const meta=document.createElement('p');meta.textContent='Platform: '+platform+' (confirm manually)';panel.append(meta);
   const status=document.createElement('p');panel.append(status);
   const list=document.createElement('div');panel.append(list);
   const actions=document.createElement('div');actions.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:12px';panel.append(actions);
-  const btn=(label,fn)=>{const b=document.createElement('button');b.textContent=label;b.onclick=fn;b.style.cssText='padding:6px 9px;cursor:pointer';return b};
+  const btn=(label,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=fn;b.style.cssText='font:600 12px/1.35 '+font+';color:#f4f7fa;background:#344d60;border:1px solid #7892a2;border-radius:5px;padding:7px 10px;min-height:32px;cursor:pointer;appearance:none;text-shadow:none';return b};
   function render(){
     list.replaceChildren();
     const completed=state.results.filter(x=>x&&x.status).length;
     status.textContent=completed+'/'+tests.length+' checks recorded';
     tests.forEach(([id,label],i)=>{
-      const wrap=document.createElement('div');wrap.style.cssText='border-top:1px solid #566;padding:8px 0';
-      const name=document.createElement('div');name.textContent=(i+1)+'. '+label;wrap.append(name);
+      const wrap=document.createElement('div');wrap.style.cssText='border-top:1px solid #566;padding:10px 0';
+      const name=document.createElement('div');name.textContent=(i+1)+'. '+label;name.style.cssText='font:600 13px/1.45 '+font+';color:#f4f7fa';wrap.append(name);
       const row=document.createElement('div');row.style.cssText='display:flex;gap:5px;margin-top:5px';
       ['pass','fail','skip'].forEach(result=>{
         const b=btn(result.toUpperCase(),()=>{state.results[i]={id,status:result,at:new Date().toISOString(),note:redact(note.value)};save();render()});
-        if(state.results[i]?.status===result)b.style.background='#89b9ad';
+        if(state.results[i]?.status===result){b.style.background='#89b9ad';b.style.color='#10262a';}
         row.append(b);
       });wrap.append(row);
-      const note=document.createElement('input');note.placeholder='Optional notes';note.value=state.results[i]?.note||'';note.style.cssText='width:100%;box-sizing:border-box;margin-top:5px';
+      const note=document.createElement('input');note.placeholder='Optional notes';note.value=state.results[i]?.note||'';note.style.cssText='width:100%;box-sizing:border-box;margin-top:7px;padding:7px 9px;min-height:34px;font:400 13px/1.4 '+font+';color:#18242d;background:#fff;border:1px solid #a8b5bf;border-radius:4px';
       note.onchange=()=>{const prev=state.results[i]||{id,status:null};state.results[i]={...prev,note:redact(note.value)};save()};
       wrap.append(note);list.append(wrap);
     });
