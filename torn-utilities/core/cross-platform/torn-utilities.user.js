@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.20-who-dev
+// @version      0.5.42.21-who-dev
 // @description  Compact draggable TU launcher for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -616,15 +616,25 @@
     alert(instructions);
   };
   function appendTerms(target){
-    const version=document.createElement('small');version.textContent='Agreement version '+TU_TERMS_VERSION;target.append(version);
-    for(const [title,body] of TU_TERMS){const h=document.createElement('h3');h.textContent=title;const p=document.createElement('p');p.textContent=body;target.append(h,p);}
+    const version=document.createElement('small');version.textContent='Agreement version '+TU_TERMS_VERSION;
+    version.style.cssText='display:block;margin:0 0 20px;color:#c5d0d8;font:500 12px/1.5 system-ui';
+    target.append(version);
+    for(const [title,body] of TU_TERMS){
+      const section=document.createElement('section');
+      section.style.cssText='display:block;margin:0 0 22px;padding:0;border:0;background:transparent';
+      const h=document.createElement('h3');h.textContent=title;
+      h.style.cssText='display:block;position:static;margin:0 0 10px;padding:0;color:#f3f6f8;background:transparent;font:700 17px/1.35 system-ui;letter-spacing:normal';
+      const p=document.createElement('p');p.textContent=body;
+      p.style.cssText='display:block;position:static;margin:0;padding:0;color:#e3e8ec;background:transparent;font:400 14px/1.6 system-ui;white-space:normal;overflow-wrap:break-word';
+      section.append(h,p);target.append(section);
+    }
   }
   function showAgreement(){
     panel.hidden=false;render('about');
     const existing=document.getElementById('tu-agreement-overlay');if(existing){existing.hidden=false;existing.style.display='flex';tuNav.minimized=false;tuNav.exited=false;launcher.hidden=true;return;}
     const overlay=document.createElement('div');overlay.id='tu-agreement-overlay';overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#000d;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;overflow:hidden';
     const dialog=document.createElement('section');dialog.style.cssText='background:#182026;color:#eee;border:2px solid #cba953;border-radius:12px;width:min(96vw,580px);max-height:calc(100dvh - 110px);height:min(780px,calc(100dvh - 110px));display:flex;flex-direction:column;overflow:hidden;padding:0;font:14px/1.5 system-ui;box-sizing:border-box;min-height:0';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');
-    const h=document.createElement('h2');h.textContent='TU Terms and Information Use Agreement';dialog.append(h);appendTerms(dialog);
+    const h=document.createElement('h2');h.textContent='TU Terms and Information Use Agreement';h.style.cssText='display:block;position:static;margin:0 0 18px;padding:0;color:#f3f6f8;font:700 21px/1.35 system-ui';dialog.append(h);appendTerms(dialog);
     const keyInfo=document.createElement('p');keyInfo.textContent='Torn Public Only or Limited Access API key: enter your key below to verify identity and accept agreement 1.2. Never enter a Full Access key.';dialog.append(keyInfo);
     const key=document.createElement('input');key.type='password';key.autocomplete='off';key.maxLength=16;key.placeholder=readSavedKey()?'API key already saved':'16-character Public Only or Limited Access key';key.style.cssText='width:100%;box-sizing:border-box;padding:10px';dialog.append(key);
     const checkLabel=document.createElement('label');checkLabel.style.cssText='display:flex;gap:10px;margin:15px 0';const check=document.createElement('input');check.type='checkbox';checkLabel.append(check,document.createTextNode('I have reviewed and agree to the Terms of Use and Information Use Agreement.'));dialog.append(checkLabel);
