@@ -48,12 +48,42 @@ async function audit(db, type, actor, target) {
   await db.prepare("INSERT INTO tu_audit_events(actor_torn_id,target_torn_id,event_type,created_at) VALUES(?,?,?,?)").bind(actor, target, type, now()).run();
 }
 __name(audit, "audit");
+const TU_AGREEMENT_GITHUB_URL = "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/agreements/dev/current.json";
 async function publishedAgreement(env) {
   const db = env?.TU_USERS_DB;
   if (!db) throw Error("Agreement registry database unavailable");
-  const row = await db.prepare("SELECT agreement_version,agreement_number,agreement_date,content FROM tu_agreement_registry WHERE is_current=1 LIMIT 1").first();
-  if (!row || !row.content || !row.agreement_version || !Number.isSafeInteger(Number(row.agreement_number)) || !/^\d{4}-\d{2}-\d{2}$/.test(row.agreement_date || "")) throw Error("No valid published agreement");
-  return {agreement:{agreement_version:String(row.agreement_version),agreement_number:Number(row.agreement_number),agreement_date:row.agreement_date},content:row.content};
+  // GitHub is the publication authority; D1 is an immutable audit/cache copy.
+  // Fail closed on GitHub errors, invalid metadata or conflicting version content.
+  const response = await fetch(TU_AGREEMENT_GITHUB_URL, {
+    headers: { "accept": "application/json" },
+    cf: { cacheTtl: 60, cacheEverything: true }
+  });
+  if (!response.ok) throw Error("Agreement publication unavailable: " + response.status);
+  const raw = await response.text();
+  if (raw.length > 65536) throw Error("Agreement publication too large");
+  let published;
+  try { published = JSON.parse(raw); } catch { throw Error("Invalid agreement publication JSON"); }
+  const a = published?.agreement;
+  if (!a || typeof a.agreement_version !== "string" || !/^\\d+\\.\\d+(?:\\.\\d+)?$/.test(a.agreement_version)
+      || !Number.isSafeInteger(a.agreement_number) || a.agreement_number < 1
+      || typeof a.agreement_date !== "string" || !/^\\d{4}-\\d{2}-\\d{2}$/.test(a.agreement_date)
+      || typeof published.content !== "string" || !published.content.trim()
+      || !published.content.includes("Version: " + a.agreement_version)
+      || !published.content.includes("Agreement number: " + a.agreement_number)
+      || !published.content.includes("Effective date: " + a.agreement_date)) throw Error("Invalid agreement publication");
+  const row = await db.prepare("SELECT agreement_version,agreement_number,agreement_date,content,is_current FROM tu_agreement_registry WHERE agreement_number=?").bind(a.agreement_number).first();
+  if (row && (row.agreement_version !== a.agreement_version || row.agreement_date !== a.agreement_date || row.content !== published.content)) throw Error("Published agreement number conflicts with immutable D1 history");
+  const current = await db.prepare("SELECT agreement_number FROM tu_agreement_registry WHERE is_current=1 LIMIT 1").first();
+  if (current && current.agreement_number > a.agreement_number) throw Error("Agreement rollback refused");
+  if (!row || !row.is_current) {
+    // D1 batch executes transactionally, preserving previously published rows.
+    const statements = [];
+    if (!row) statements.push(db.prepare("INSERT INTO tu_agreement_registry(agreement_number,agreement_version,agreement_date,content,is_current) VALUES(?,?,?,?,0)").bind(a.agreement_number,a.agreement_version,a.agreement_date,published.content));
+    statements.push(db.prepare("UPDATE tu_agreement_registry SET is_current=0 WHERE is_current=1"));
+    statements.push(db.prepare("UPDATE tu_agreement_registry SET is_current=1 WHERE agreement_number=?").bind(a.agreement_number));
+    await db.batch(statements);
+  }
+  return {agreement:{agreement_version:a.agreement_version,agreement_number:a.agreement_number,agreement_date:a.agreement_date},content:published.content};
 }
 __name(publishedAgreement, "publishedAgreement");
 async function latestAgreement(db, playerId) {
