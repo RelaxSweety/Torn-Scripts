@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "id": "core.launcher",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ],
+      "instructions": "Confirm launcher visible and Manager opens"
+    },
+    {
+      "id": "core.registry",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ],
+      "instructions": "Confirm bundled modules are registered"
+    },
+    {
+      "id": "auth.public",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ],
+      "instructions": "Verify a Public key via server and confirm Public label"
+    },
+    {
+      "id": "auth.limited",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ],
+      "instructions": "Verify a Limited key via server and confirm Limited label"
+    },
+    {
+      "id": "module.item-monitor.selection",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ],
+      "instructions": "Select item and verify cancellation works"
+    }
+  ]
+}
