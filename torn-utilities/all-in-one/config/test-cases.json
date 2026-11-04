@@ -45,6 +45,33 @@
         "pda"
       ],
       "instructions": "Select item and verify cancellation works"
+    },
+    {
+      "id": "auth.rejected",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ],
+      "instructions": "Confirm server-rejected API keys are not saved and a clear error is shown"
+    },
+    {
+      "id": "auth.mismatch",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ],
+      "instructions": "Confirm a Public key selected as Limited is rejected without storing it"
+    },
+    {
+      "id": "auth.privacy",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ],
+      "instructions": "Confirm diagnostic exports never contain API keys or authorization tokens"
     }
   ]
 }
