@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {createCredentialController} from '../src/core/api-credentials.js';
+import {createModuleRegistry} from '../src/core/module-registry.js';
+import {createTestSession} from '../src/diagnostics/test-session.js';
+const data=new Map(),storage={get:async k=>data.get(k),set:async(k,v)=>data.set(k,v),remove:async k=>data.delete(k)};
+const api=createCredentialController({storage,verifyWithServer:async({requestedAccess})=>({verified:true,accessLevel:requestedAccess,playerId:4539436})});
+await api.confirm('1234567890abcdef','limited');
+assert.equal((await api.getStatus()).accessLevel,'limited');
+assert.equal((await api.getStatus()).apiKey,undefined);
+const modules=createModuleRegistry();modules.register({id:'broken',activate(){throw Error('failure')}});modules.register({id:'working',activate(){return ()=>{}}});
+assert.equal(await modules.activate('broken'),false);assert.equal(await modules.activate('working'),true);
+const s=createTestSession({buildId:'test',platform:'pda',tests:[{id:'critical',critical:true}]});s.record('critical','pass','key 1234567890abcdef');assert.equal(s.export().releaseReady,true);assert.ok(!JSON.stringify(s.export()).includes('1234567890abcdef'));
+console.log('TU core smoke tests passed');
