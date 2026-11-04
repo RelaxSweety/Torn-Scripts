@@ -48,8 +48,12 @@ async function audit(db, type, actor, target) {
   await db.prepare("INSERT INTO tu_audit_events(actor_torn_id,target_torn_id,event_type,created_at) VALUES(?,?,?,?)").bind(actor, target, type, now()).run();
 }
 __name(audit, "audit");
-async function publishedAgreement() {
-  return bundledAgreement;
+async function publishedAgreement(env) {
+  const db = env?.TU_USERS_DB;
+  if (!db) throw Error("Agreement registry database unavailable");
+  const row = await db.prepare("SELECT agreement_version,agreement_number,agreement_date,content FROM tu_agreement_registry WHERE is_current=1 LIMIT 1").first();
+  if (!row || !row.content || !row.agreement_version || !Number.isSafeInteger(Number(row.agreement_number)) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(row.agreement_date || "")) throw Error("No valid published agreement");
+  return {agreement:{agreement_version:String(row.agreement_version),agreement_number:Number(row.agreement_number),agreement_date:row.agreement_date},content:row.content};
 }
 __name(publishedAgreement, "publishedAgreement");
 async function latestAgreement(db, playerId) {
@@ -71,7 +75,7 @@ async function handleAuth(req, env, url) {
   const path = url.pathname;
   if (path === "/api/auth/agreement/current" && req.method === "GET") {
     try {
-      return respond(await publishedAgreement());
+      return respond(await publishedAgreement(env));
     } catch (error) {
       return respond({ error: "Published agreement unavailable", detail: String(error?.message || error).slice(0, 200) }, 503);
     }
@@ -117,7 +121,7 @@ async function handleAuth(req, env, url) {
       if (!ledger) return respond({ error: "Agreement database is not configured" }, 503);
       let published;
       try {
-        published = await publishedAgreement();
+        published = await publishedAgreement(env);
       } catch {
         return respond({ error: "Published agreement unavailable" }, 503);
       }
@@ -210,7 +214,7 @@ async function handleAuth(req, env, url) {
       if (!moduleId || !/^[a-zA-Z0-9._-]{1,80}$/.test(moduleId)) return respond({ error: "Invalid module ID" }, 400);
       if (session.account_status !== "active") return respond({ allowed: false, reason: "Account not active" }, 403);
       if (!env.FOREIGN_DB) return respond({ allowed: false, reason: "Agreement database unavailable" }, 503);
-      if (!currentAgreement(await latestAgreement(env.FOREIGN_DB, session.torn_id), (await publishedAgreement()).agreement)) return respond({ allowed: false, reason: "Current agreement not accepted" }, 403);
+      if (!currentAgreement(await latestAgreement(env.FOREIGN_DB, session.torn_id), (await publishedAgreement(env)).agreement)) return respond({ allowed: false, reason: "Current agreement not accepted" }, 403);
       const permission = await db.prepare("SELECT allowed FROM tu_module_permissions WHERE torn_id=? AND module_id=?").bind(session.torn_id, moduleId).first();
       const allowed = session.role === "admin" || permission?.allowed === 1;
       return respond({ allowed, module_id: moduleId, reason: allowed ? "Authorized" : "Module permission not granted" }, allowed ? 200 : 403);
