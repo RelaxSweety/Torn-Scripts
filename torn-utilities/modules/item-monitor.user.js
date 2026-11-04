@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.10.28-dev
+// @version      1.10.29-dev
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -130,32 +130,58 @@ function scan(){
 }
 function clearHighlights(){document.querySelectorAll('.tuim-watch,.tuim-wait,.tuim-trigger').forEach(el=>el.classList.remove('tuim-watch','tuim-wait','tuim-trigger'))}
 function draggable(el,handle,clickAllowed=false){let moved=false,start=null;handle.style.touchAction='none';handle.addEventListener('pointerdown',e=>{if(e.button!==0||e.target.closest('button')&&handle!==el)return;start={x:e.clientX,y:e.clientY,left:el.getBoundingClientRect().left,top:el.getBoundingClientRect().top};moved=false;handle.setPointerCapture?.(e.pointerId)});handle.addEventListener('pointermove',e=>{if(!start)return;const dx=e.clientX-start.x,dy=e.clientY-start.y;if(Math.abs(dx)+Math.abs(dy)>7)moved=true;if(!moved)return;el.style.left=Math.max(0,Math.min(window.innerWidth-el.offsetWidth,start.left+dx))+'px';el.style.top=Math.max(0,Math.min(window.innerHeight-el.offsetHeight,start.top+dy))+'px';el.style.right='auto'});const finish=()=>{start=null};handle.addEventListener('pointerup',finish);handle.addEventListener('pointercancel',finish);if(clickAllowed)handle.addEventListener('click',e=>{if(moved){e.preventDefault();e.stopImmediatePropagation();moved=false}},true)}
-function stopPick(){if(!state.picking)return;state.picking=false;for(const event of ['pointerdown','touchstart','mousedown','click'])document.removeEventListener(event,intercept,true);document.getElementById('tuim-tip')?.remove()}
-function intercept(e){if(e.target.closest('#tuim-tip,#tuim-panel,#tu-pda-panel'))return;const row=e.target.closest(candidates);if(!row&&category()!=='Item Market')return;e.preventDefault();e.stopImmediatePropagation();if(e.type==='click'){state.selected=category()==='Item Market'?{category:'Item Market',...pageItem()}: {category:category(),name:nameOf(row),key:keyOf(row),row};stopPick();state.panel.hidden=false;render()}else if(e.type==='pointerdown'||e.type==='touchstart'){state.selected={category:category(),name:nameOf(row),key:keyOf(row),row};setTimeout(()=>{if(state.picking){stopPick();state.panel.hidden=false;render()}},500)}}
+function stopPick(){
+ state.picking=false;
+ for(const event of ['pointerdown','touchstart','mousedown','click'])document.removeEventListener(event,intercept,true);
+ document.removeEventListener('keydown',cancelPickOnEscape,true);
+ document.getElementById('tuim-tip')?.remove();
+}
+function cancelPick(){
+ stopPick();
+ if(state.panel){state.panel.hidden=false;render();}
+}
+function cancelPickOnEscape(e){if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cancelPick();}}
+function intercept(e){
+ if(e.target.closest('#tuim-tip,#tuim-panel,#tu-pda-panel'))return;
+ const row=e.target.closest(candidates);
+ if(!row&&category()!=='Item Market')return;
+ e.preventDefault();e.stopImmediatePropagation();
+ if(e.type==='click'){
+   const item=category()==='Item Market'?pageItem():null;
+   if(category()==='Item Market'&&!item)return;
+   state.selected=item?{category:'Item Market',...item}:{category:category(),name:nameOf(row),key:keyOf(row),row};
+   cancelPick();
+ }else if((e.type==='pointerdown'||e.type==='touchstart')&&row&&category()!=='Item Market'){
+   state.selected={category:category(),name:nameOf(row),key:keyOf(row),row};
+   setTimeout(()=>{if(state.picking)cancelPick()},500);
+ }
+}
 function pick(){
  stopPick();
- if(category()==='Item Market'){
-   state.picking=true;
-   state.panel.hidden=true;
-   const tip=E('button',document.body,'Select displayed market item');
-   tip.id='tuim-tip';
-   tip.type='button';
-   tip.style.cssText='position:fixed;z-index:2147483646;top:18%;right:12px;max-width:220px;padding:10px 14px;background:#d6b65c;color:#111;border:2px solid #fff;border-radius:9px;font:600 14px system-ui;box-shadow:0 3px 12px #000';
-   draggable(tip,tip,true);
-   tip.onclick=()=>{
-     const item=pageItem();
-     if(!item){alert('Could not identify the displayed market item. Open an item listing and try again.');return}
-     state.selected={category:'Item Market',...item};
-     stopPick();state.panel.hidden=false;render();
-   };
-   return;
- }
- state.picking=true;state.panel.hidden=true;
- const tip=E('div',document.body,'Tap an item to monitor. Tap here to cancel.');
+ state.picking=true;
+ state.panel.hidden=true;
+ document.addEventListener('keydown',cancelPickOnEscape,true);
+ const tip=E('div',document.body);
  tip.id='tuim-tip';
- tip.style.cssText='position:fixed;z-index:2147483646;top:10px;left:5%;width:90%;padding:12px;background:#3a2c16;color:white;border:2px solid gold';
- draggable(tip,tip,true);tip.onclick=()=>{stopPick();state.panel.hidden=false};
- for(const event of ['pointerdown','touchstart','mousedown','click'])document.addEventListener(event,intercept,{capture:true,passive:false});
+ tip.style.cssText='position:fixed;z-index:2147483646;top:10%;right:12px;max-width:260px;padding:12px;background:#3a2c16;color:white;border:2px solid #d6b65c;border-radius:9px;font:14px system-ui;box-shadow:0 3px 12px #000';
+ const instructions=E('div',tip,category()==='Item Market'?'Open an individual item listing, then select the item.':'Tap an item to monitor.');
+ instructions.style.marginBottom='8px';
+ if(category()==='Item Market'){
+   const choose=E('button',tip,'Select displayed market item');
+   choose.type='button';
+   choose.style.cssText='display:block;margin:6px 0;padding:8px;background:#d6b65c;color:#111;border:0;border-radius:5px;cursor:pointer';
+   choose.onclick=()=>{
+     const item=pageItem();
+     if(!item){instructions.textContent='Item not identified. Open an individual item listing, or cancel to return.';return;}
+     state.selected={category:'Item Market',...item};cancelPick();
+   };
+ }else{
+   for(const event of ['pointerdown','touchstart','mousedown','click'])document.addEventListener(event,intercept,{capture:true,passive:false});
+ }
+ const cancel=E('button',tip,'Cancel selection');
+ cancel.type='button';
+ cancel.style.cssText='display:block;margin-top:8px;padding:8px 12px;background:#444;color:white;border:1px solid #aaa;border-radius:5px;cursor:pointer';
+ cancel.onclick=cancelPick;
 }
 
 const catalogCacheKey='tuim-catalog-v2';
