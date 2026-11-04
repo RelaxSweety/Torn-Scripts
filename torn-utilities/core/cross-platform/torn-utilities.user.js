@@ -228,7 +228,7 @@
   const saveKey=key=>{let stored=false;try{localStorage.setItem(VAULT,key);stored=true}catch(_){}try{if(typeof GM_setValue==='function'){GM_setValue(VAULT,key);stored=true}}catch(_){}if(!stored)throw Error('No persistent key storage available')};
   const removeSavedKey=()=>{try{localStorage.removeItem(VAULT)}catch(_){}try{if(typeof GM_deleteValue==='function')GM_deleteValue(VAULT)}catch(_){}};
   // Explicit user-provided Public Only key; never persisted or broadcast.
-  let playerInfo=null,identityStatus='Enter your Public Only API key',identityBusy=null,authGeneration=0;
+  let playerInfo=null,identityStatus='Enter your Public Only or Limited Access API key',identityBusy=null,authGeneration=0;
   const getPlayer=()=>playerInfo?Object.freeze({...playerInfo}):null;
   let automaticIdentityAttempted=false;
   const openProfileHelp=()=>{panel.hidden=false;render('settings');syncLauncher();};
@@ -261,7 +261,7 @@
         if(!/^[a-zA-Z0-9]{16}$/.test(key))throw Error('Invalid 16-character key');
         const data=await requestIdentity(key);
         if(data?.error)throw Error('Torn rejected key');
-        if((data?.info?.access?.type??data?.info?.access)!=='Public Only')throw Error('Public Only key required');
+        if(!['Public Only','Limited Access'].includes(data?.info?.access?.type??data?.info?.access))throw Error('Public Only or Limited Access key required');
         const id=Number(data?.info?.user?.id),faction=Number(data?.info?.user?.faction_id||0);
         if(!Number.isSafeInteger(id)||id<=0)throw Error('Key owner not returned');
         if(generation!==authGeneration)return false;
@@ -277,7 +277,7 @@
     automaticIdentityAttempted=true;
     const key=readSavedKey();
     if(!key)return;
-    identityStatus='Verifying saved Public Only API key…';
+    identityStatus='Verifying saved Torn API key…';
     const ok=await updatePlayer(key);
     if(!ok)console.warn('[TU] Saved key verification failed:',identityStatus);
     refreshIdentity();
@@ -331,11 +331,11 @@
   });
   Object.defineProperty(pageWindow, 'TornUtilities', {value:api, configurable:false, writable:false});
   pageWindow.dispatchEvent(new Event('torn-utilities-ready'));
-  const TU_TERMS_VERSION='1.1';
+  const TU_TERMS_VERSION='1.2';
 
   // DEVELOPMENT BUILD ONLY. This code is not deployed from main.
   const DEV_BASE='https://tu-multiplayer-server-dev.tuserver.workers.dev';
-  const DEV_AGREEMENT={agreement_version:'1.1',agreement_number:2,agreement_date:'2026-10-23'};
+  const DEV_AGREEMENT={agreement_version:'1.2',agreement_number:3,agreement_date:'2026-11-04'};
   const DEV_SESSION_KEY='tu:dev:auth:session:v1';
   const devToken=()=>sessionStorage.getItem(DEV_SESSION_KEY)||'';
   let devAuthIssue='',devRenewalBlocked=false;
@@ -405,7 +405,7 @@
     if(devRenewal)return devRenewal;
     if(devRenewalBlocked)throw Error(devAuthIssue||'Session renewal paused');
     const key=readSavedKey();
-    if(!/^[A-Za-z0-9]{16}$/.test(key||''))throw Error('Saved Public Only API key required to renew session');
+    if(!/^[A-Za-z0-9]{16}$/.test(key||''))throw Error('Saved Public Only or Limited Access API key required to renew session');
     devRenewal=(async()=>{
       const registration=await devRequest('/api/auth/register','POST',{api_key:key,platform:'tampermonkey'},'');
       if(!registration.token)throw Error('Session renewal returned no token');
@@ -471,7 +471,7 @@
   const TU_TERMS=[
     ['Terms of Use','Torn Utilities is an independent optional collection of Torn City userscripts, not endorsed by Torn City. Use is at your own risk and subject to Torn rules. Features, predictions and availability are not guaranteed.'],
     ['Information Use','TU may read your player name and ID, publicly accessible Torn information, shop inventory, item prices, gameplay and settings. Optional foreign shop reporting transmits observed item IDs, quantities, prices, country and timestamps to TU-hosted Cloudflare services for stock analysis. Multiplayer modules exchange gameplay/session information with TU services.'],
-    ['API Key and Storage','Use only a Public Only or appropriately scoped Torn API key. Your key is sent to Torn for verification; an optionally saved key is stored locally without encryption and excluded from TU backups. Other scripts running on Torn pages may be able to read local browser storage. Do not share API keys in diagnostic reports.'],
+    ['API Key and Storage','Use a Public Only or Limited Access Torn API key for TU registration; use the least access required. Limited Access keys may permit additional gameplay data access. Full Access keys are not accepted for registration. Your key is sent to Torn for verification; an optionally saved key is stored locally without encryption and excluded from TU backups. Other scripts running on Torn pages may be able to read local browser storage. Do not share API keys in diagnostic reports.'],
     ['Services and Retention','TU uses Torn API, GitHub, and TU-hosted services including Cloudflare. Server-side observations and game records may be retained for functionality and analysis. A complete retention and deletion schedule is not yet published. Network metadata may be handled by service providers.'],
     ['Consent and Choice','Declining restricts Manager functionality to the Info page. You can stop using TU, uninstall scripts and clear local data. Acceptance is stored locally and may be requested again after terms updates. Contact the maintainer using the links below with questions.']
   ];
@@ -625,16 +625,16 @@
     const overlay=document.createElement('div');overlay.id='tu-agreement-overlay';overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#000d;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;overflow:hidden';
     const dialog=document.createElement('section');dialog.style.cssText='background:#182026;color:#eee;border:2px solid #cba953;border-radius:12px;width:min(96vw,580px);max-height:calc(100dvh - 110px);height:min(780px,calc(100dvh - 110px));display:flex;flex-direction:column;overflow:hidden;padding:0;font:14px/1.5 system-ui;box-sizing:border-box;min-height:0';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');
     const h=document.createElement('h2');h.textContent='TU Terms and Information Use Agreement';dialog.append(h);appendTerms(dialog);
-    const keyInfo=document.createElement('p');keyInfo.textContent='Public Only Torn API key: enter an optional key below to verify your identity. Never use a full-access key.';dialog.append(keyInfo);
-    const key=document.createElement('input');key.type='password';key.autocomplete='off';key.maxLength=16;key.placeholder=readSavedKey()?'Public Only key already saved':'16-character Public Only API key';key.style.cssText='width:100%;box-sizing:border-box;padding:10px';dialog.append(key);
+    const keyInfo=document.createElement('p');keyInfo.textContent='Torn Public Only or Limited Access API key: enter your key below to verify identity and accept agreement 1.2. Never enter a Full Access key.';dialog.append(keyInfo);
+    const key=document.createElement('input');key.type='password';key.autocomplete='off';key.maxLength=16;key.placeholder=readSavedKey()?'API key already saved':'16-character Public Only or Limited Access key';key.style.cssText='width:100%;box-sizing:border-box;padding:10px';dialog.append(key);
     const checkLabel=document.createElement('label');checkLabel.style.cssText='display:flex;gap:10px;margin:15px 0';const check=document.createElement('input');check.type='checkbox';checkLabel.append(check,document.createTextNode('I have reviewed and agree to the Terms of Use and Information Use Agreement.'));dialog.append(checkLabel);
     const status=document.createElement('p');status.setAttribute('role','status');dialog.append(status);
     const buttons=document.createElement('div');buttons.style.cssText='display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap';
     const decline=makeButton('Decline / Info only',()=>{overlay.remove();render('about')});
     const accept=makeButton('I Agree — Continue',async()=>{
       if(!check.checked)return;
-      const supplied=key.value.trim();if(supplied&&!/^[a-zA-Z0-9]{16}$/.test(supplied)){status.textContent='Enter a valid 16-character Public Only key';return;}
-      const selected=supplied||readSavedKey();if(!/^[A-Za-z0-9]{16}$/.test(selected)){status.textContent='A 16-character Public Only key is required';return;}accept.disabled=true;try{status.textContent='Registering and recording development agreement…';await devAccept(selected,'tampermonkey');if(supplied)saveKey(supplied);await updatePlayer(selected);}catch(error){status.textContent='Development agreement failed: '+error.message;accept.disabled=false;return;}
+      const supplied=key.value.trim();if(supplied&&!/^[a-zA-Z0-9]{16}$/.test(supplied)){status.textContent='Enter a valid 16-character Public Only or Limited Access key';return;}
+      const selected=supplied||readSavedKey();if(!/^[A-Za-z0-9]{16}$/.test(selected)){status.textContent='A 16-character Public Only or Limited Access key is required';return;}accept.disabled=true;try{status.textContent='Registering and recording development agreement…';await devAccept(selected,'tampermonkey');if(supplied)saveKey(supplied);await updatePlayer(selected);}catch(error){status.textContent='Development agreement failed: '+error.message;accept.disabled=false;return;}
       localStorage.setItem(TU_TERMS_KEY,TU_TERMS_VERSION);publishAuthorization(true);overlay.remove();render('modules');
     });
     buttons.append(decline,accept);dialog.append(buttons);overlay.append(dialog);document.body.append(overlay);
@@ -786,7 +786,7 @@
         const EXTRA_KEYS='tu:api:additional-keys:v1';
         const readExtras=()=>{try{const list=JSON.parse(localStorage.getItem(EXTRA_KEYS)||'[]');return Array.isArray(list)?list.filter(x=>x&&typeof x.key==='string'&&typeof x.level==='string'):[]}catch{return []}};
         const note=document.createElement('p');
-        note.textContent='Enter any Torn API key below. TU identifies its access level before saving. Public Only remains the required login key. Higher-access keys are optional and stored locally without encryption; other scripts on Torn pages may be able to read them. Do not enter a Full Access key unless necessary.';
+        note.textContent='Enter any Torn API key below. TU identifies its access level before saving. Public Only and Limited Access are supported login key levels. Higher-access keys are optional and stored locally without encryption; other scripts on Torn pages may be able to read them. Do not enter a Full Access key unless necessary.';
         content.append(note);
         const form=document.createElement('form');form.autocomplete='off';
         const input=document.createElement('input');input.type='password';input.maxLength=16;input.autocomplete='off';input.placeholder='16-character Torn API key';input.style.cssText='width:100%;box-sizing:border-box;padding:9px';
