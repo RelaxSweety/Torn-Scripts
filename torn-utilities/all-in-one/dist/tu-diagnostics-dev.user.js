@@ -5,6 +5,8 @@
 // @description  Independent guided cross-platform TU test checklist and sanitized export
 // @match        https://www.torn.com/*
 // @grant        none
+// @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/all-in-one/dist/tu-diagnostics-dev.user.js
+// @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/all-in-one/dist/tu-diagnostics-dev.user.js
 // @run-at       document-idle
 // ==/UserScript==
 (() => {
