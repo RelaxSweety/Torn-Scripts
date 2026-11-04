@@ -64,9 +64,9 @@ async function publishedAgreement(env) {
   let published;
   try { published = JSON.parse(raw); } catch { throw Error("Invalid agreement publication JSON"); }
   const a = published?.agreement;
-  if (!a || typeof a.agreement_version !== "string" || !/^\\d+\\.\\d+(?:\\.\\d+)?$/.test(a.agreement_version)
+  if (!a || typeof a.agreement_version !== "string" || !/^\d+\.\d+(?:\.\d+)?$/.test(a.agreement_version)
       || !Number.isSafeInteger(a.agreement_number) || a.agreement_number < 1
-      || typeof a.agreement_date !== "string" || !/^\\d{4}-\\d{2}-\\d{2}$/.test(a.agreement_date)
+      || typeof a.agreement_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(a.agreement_date)
       || typeof published.content !== "string" || !published.content.trim()
       || !published.content.includes("Version: " + a.agreement_version)
       || !published.content.includes("Agreement number: " + a.agreement_number)
