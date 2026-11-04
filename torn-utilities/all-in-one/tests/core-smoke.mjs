@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {createCredentialController} from '../src/core/api-credentials.js';
+import {createServerVerifier} from '../src/core/server-verifier.js';
 import {createModuleRegistry} from '../src/core/module-registry.js';
 import {createTestSession} from '../src/diagnostics/test-session.js';
 const data=new Map(),storage={get:async k=>data.get(k),set:async(k,v)=>data.set(k,v),remove:async k=>data.delete(k)};
@@ -41,4 +42,18 @@ const sampleKey='abcdef0123456789';
   assert.ok(!JSON.stringify(await controller.getStatus()).includes(sampleKey));
   await controller.clear();
   assert.equal(await controller.getStatus(),null);
+}
+
+{
+  const verifier=createServerVerifier({request:async(path,options)=>{
+    assert.equal(path,'/api/auth/verify-key');
+    assert.equal(options.body.requested_access,'limited');
+    return {verified:true,accessLevel:'limited',playerId:4539436};
+  }});
+  const result=await verifier({apiKey:sampleKey,requestedAccess:'limited'});
+  assert.equal(result.playerId,'4539436');
+}
+{
+  const verifier=createServerVerifier({request:async()=>({verified:true,accessLevel:'limited',playerId:null})});
+  await assert.rejects(verifier({apiKey:sampleKey,requestedAccess:'limited'}),/player identity/);
 }
