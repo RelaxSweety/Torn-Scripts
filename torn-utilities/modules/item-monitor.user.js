@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.10.29-dev
+// @version      1.10.30-dev
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -70,6 +70,22 @@ const pageItem=()=>{
    if(el)name=exact(el);
  }
  return name?{key:'name:'+norm(name),name}:null;
+};
+// Item Market tile fallback: identify the item explicitly clicked by its visible label.
+const marketTileItem=target=>{
+ const visible=e=>!!e&&e.getClientRects().length>0;
+ const clean=x=>String(x||'').trim().replace(/\\s+/g,' ');
+ const invalid=/^(item market|drugs|most popular|search for an item|buy|qty|owner|cost|equipment|medical)$/i;
+ let node=target;
+ for(let depth=0;node&&depth<6;node=node.parentElement,depth++){
+   if(!visible(node)||node.closest('#tuim-tip,#tuim-panel,#tu-pda-panel'))return null;
+   const raw=(node.innerText||'').trim();
+   if(raw.length>180||!node.querySelector('img'))continue;
+   const lines=raw.split('\\n').map(clean).filter(Boolean);
+   const name=lines.find(x=>x.length>=2&&x.length<=65&&!invalid.test(x)&&!/^\\$|^[\\d,() ]+$/.test(x)&&!/available|listing|seller/i.test(x));
+   if(name&&lines.some(x=>/\\$[\\d,]+/.test(x)))return {name,key:'name:'+norm(name)};
+ }
+ return null;
 };
 const listingSelector='[data-listing-id],[data-seller-id],tr,[role=row],[class*=sellerRow],[class*=SellerRow],[class*=listingRow],[class*=ListingRow],[class*=marketRow],[class*=MarketRow]';
 const listings=()=>[...document.querySelectorAll(listingSelector)].filter(e=>!e.closest('#tuim-panel,#tu-pda-panel')&&Number.isFinite(listingPrice(e))&&(!e.parentElement?.closest(listingSelector)));
@@ -147,7 +163,7 @@ function intercept(e){
  if(!row&&category()!=='Item Market')return;
  e.preventDefault();e.stopImmediatePropagation();
  if(e.type==='click'){
-   const item=category()==='Item Market'?pageItem():null;
+   const item=category()==='Item Market'?(marketTileItem(e.target)||pageItem()):null;
    if(category()==='Item Market'&&!item)return;
    state.selected=item?{category:'Item Market',...item}:{category:category(),name:nameOf(row),key:keyOf(row),row};
    cancelPick();
@@ -167,12 +183,14 @@ function pick(){
  const instructions=E('div',tip,category()==='Item Market'?'Open an individual item listing, then select the item.':'Tap an item to monitor.');
  instructions.style.marginBottom='8px';
  if(category()==='Item Market'){
+   instructions.textContent='Click the item tile (image/name/price) you want to monitor, or use the button below.';
+   document.addEventListener('click',intercept,{capture:true,passive:false});
    const choose=E('button',tip,'Select displayed market item');
    choose.type='button';
    choose.style.cssText='display:block;margin:6px 0;padding:8px;background:#d6b65c;color:#111;border:0;border-radius:5px;cursor:pointer';
    choose.onclick=()=>{
      const item=pageItem();
-     if(!item){instructions.textContent='Item not identified. Open an individual item listing, or cancel to return.';return;}
+     if(!item){instructions.textContent='No active item identified. Click its item tile (image/name/price), or cancel.';return;}
      state.selected={category:'Item Market',...item};cancelPick();
    };
  }else{
