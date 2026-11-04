@@ -117,9 +117,9 @@
       "id": "item-monitor",
       "name": "Travel Assistant and Item Monitor",
       "category": "business",
-      "version": "1.10.17",
+      "version": "1.10.28-dev",
       "description": "Item Monitor and Travel Assistant with D1 stock reporting, source diagnostics and stock estimation",
-      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/item-monitor.user.js"
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/stable-05424-who/torn-utilities/modules/item-monitor.user.js"
     },
     {
       "id": "war-status-diagnostic",
