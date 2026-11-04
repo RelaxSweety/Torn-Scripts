@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Testing and Diagnostics DEV
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.1.2-dev
+// @version      0.1.3-dev
 // @description  Independent guided cross-platform TU test checklist and sanitized export
 // @match        https://www.torn.com/*
 // @grant        none
@@ -26,7 +26,16 @@
     ['core.recovery','Manager recovers after reload without duplicate windows']
   ];
   const redact=s=>String(s||'').replace(/\b[A-Za-z0-9]{16}\b/g,'[REDACTED]').slice(0,1500);
-  const platform=/android|iphone|ipad/i.test(navigator.userAgent)?'mobile/PDA candidate':'desktop/Tampermonkey candidate';
+  const detectPlatform=()=>{
+    const ua=navigator.userAgent||'';
+    const pdaSignals=[/torn[ -]?pda/i.test(ua),typeof window.PDA_httpGet==='function',typeof window.PDA_httpPost==='function',typeof window.tornPDA!=='undefined'];
+    if(pdaSignals.some(Boolean))return {id:'pda',label:'Torn PDA',confidence:'detected'};
+    const tmSignals=[/tampermonkey/i.test(ua),typeof GM_info!=='undefined'&&/tampermonkey/i.test(GM_info?.scriptHandler||'')];
+    if(tmSignals.some(Boolean))return {id:'tampermonkey',label:'Tampermonkey',confidence:'detected'};
+    return {id:'unknown',label:'Unknown script host',confidence:'unconfirmed'};
+  };
+  const platformInfo=detectPlatform();
+  const platform=platformInfo.id;
   let state;
   try{state=JSON.parse(localStorage.getItem(key)||'null')}catch{}
   if(!state||!Array.isArray(state.results))state={results:[],started:new Date().toISOString()};
@@ -75,7 +84,13 @@
   const heading=document.createElement('div');heading.style.cssText='display:flex;justify-content:space-between;align-items:center';
   const title=document.createElement('strong');title.textContent='TU Testing & Diagnostics';title.style.cssText='font:700 15px/1.4 '+font+';color:#f4f7fa';
   const close=document.createElement('button');close.textContent='Close';close.style.cssText='font:600 12px/1.35 Arial,Helvetica,sans-serif;color:#fff;background:#344d60;border:1px solid #7892a2;border-radius:5px;padding:6px 10px;cursor:pointer';close.onclick=()=>panel.style.display='none';heading.append(title,close);panel.append(heading);
-  const meta=document.createElement('p');meta.textContent='Platform: '+platform+' (confirm manually)';panel.append(meta);
+  const meta=document.createElement('p');meta.textContent='Platform: '+platformInfo.label+(platformInfo.confidence==='detected'?' (detected)':' (not identifiable automatically)');panel.append(meta);
+  const filterBar=document.createElement('div');filterBar.style.cssText='display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0 12px';
+  const filterLabel=document.createElement('label');filterLabel.textContent='Section: ';filterLabel.style.cssText='font:600 13px Arial,Helvetica,sans-serif';
+  const filter=document.createElement('select');filter.style.cssText='font:400 13px Arial,Helvetica,sans-serif;color:#14222d;background:#fff;border:1px solid #a8b5bf;padding:6px;border-radius:4px';
+  const sections=[['all','All sections'],['core','Manager core'],['auth','Authentication & API'],['module','Modules'],['module.travel','Travel Assistant'],['module.item','Item Monitor'],['module.war','War Organizer'],['incomplete','Not passed'],['failed','Failed only']];
+  sections.forEach(([value,label])=>{const option=document.createElement('option');option.value=value;option.textContent=label;filter.append(option)});
+  filter.value='all';filter.onchange=()=>render();filterLabel.append(filter);filterBar.append(filterLabel);panel.append(filterBar);
   const status=document.createElement('p');panel.append(status);
   const list=document.createElement('div');panel.append(list);
   const actions=document.createElement('div');actions.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:12px';panel.append(actions);
@@ -83,8 +98,10 @@
   function render(){
     list.replaceChildren();
     const completed=state.results.filter(x=>x&&x.status).length;
-    status.textContent=completed+'/'+tests.length+' checks recorded';
+    const visible=tests.filter(([id],i)=>filter.value==='all'||(filter.value==='incomplete'&&state.results[i]?.status!=='pass')||(filter.value==='failed'&&state.results[i]?.status==='fail')||id===filter.value||id.startsWith(filter.value+'.'));
+    status.textContent=completed+'/'+tests.length+' checks recorded · '+visible.length+' shown';
     tests.forEach(([id,label],i)=>{
+      if(!visible.some(t=>t[0]===id))return;
       const wrap=document.createElement('div');wrap.style.cssText='border-top:1px solid #566;padding:10px 0';
       const name=document.createElement('div');name.textContent=(i+1)+'. '+label;name.style.cssText='font:600 13px/1.45 '+font+';color:#f4f7fa';wrap.append(name);
       const row=document.createElement('div');row.style.cssText='display:flex;gap:5px;margin-top:5px';
@@ -99,7 +116,7 @@
     });
   }
   actions.append(btn('Export JSON',()=>{
-    const report={schemaVersion:1,platform,userAgent:navigator.userAgent,started:state.started,exported:new Date().toISOString(),results:state.results.map(x=>x?{...x,note:redact(x.note)}:null)};
+    const report={schemaVersion:1,platform,platformDetection:platformInfo.confidence,userAgent:navigator.userAgent,started:state.started,exported:new Date().toISOString(),results:state.results.map(x=>x?{...x,note:redact(x.note)}:null)};
     const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'});
     const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='tu-diagnostics-'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }),btn('Reset checklist',()=>{if(confirm('Clear this diagnostic session?')){state={results:[],started:new Date().toISOString()};save();render()}}));
