@@ -1,0 +1,9 @@
+{
+  "name": "tu-all-in-one-dev",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/core-smoke.mjs"
+  },
+  "description": "TU all-in-one development core; not yet installable"
+}
