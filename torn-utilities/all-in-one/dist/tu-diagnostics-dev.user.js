@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Testing and Diagnostics DEV
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.1.5-dev
+// @version      0.1.6-dev
 // @description  Independent guided cross-platform TU test checklist and sanitized export
 // @match        https://www.torn.com/*
 // @grant        none
@@ -106,29 +106,37 @@
   const meta=document.createElement('p');meta.textContent='Platform: '+platformInfo.label+(platformInfo.confidence==='detected'?' (detected)':' (not identifiable automatically)');content.append(meta);
   const filterBar=document.createElement('div');filterBar.style.cssText='margin:8px 0 12px;position:relative';
   const sections=[['core','Manager core'],['auth','Authentication & API'],['module.travel','Travel Assistant'],['module.item','Item Monitor'],['module.war','War Organizer'],['incomplete','Not passed'],['failed','Failed only']];
-  const selectedSections=new Set(); // Empty selection means all sections.
+  const selectedSections=new Set(sections.map(([id])=>id)); // All selected by default.
   const filterToggle=document.createElement('button');filterToggle.type='button';
   filterToggle.style.cssText='width:100%;text-align:left;font:600 13px/1.4 Arial,Helvetica,sans-serif;color:#f4f7fa;background:#344d60;border:1px solid #7892a2;border-radius:5px;padding:9px 10px;cursor:pointer';
   const filterMenu=document.createElement('div');filterMenu.style.cssText='display:none;position:absolute;left:0;right:0;top:100%;z-index:10;background:#233541;border:1px solid #7892a2;border-radius:5px;max-height:260px;overflow:auto;padding:8px;box-shadow:0 5px 15px #0008';
-  const updateFilterLabel=()=>{filterToggle.textContent=selectedSections.size?('Sections ('+selectedSections.size+' selected) ▾'):'All sections ▾'};
+  const updateFilterLabel=()=>{filterToggle.textContent='Sections ('+selectedSections.size+'/'+sections.length+' selected) ▾'};
   filterToggle.onclick=()=>{filterMenu.style.display=filterMenu.style.display==='none'?'block':'none'};
   sections.forEach(([value,label])=>{
     const line=document.createElement('label');line.style.cssText='display:flex;align-items:center;gap:8px;padding:6px;font:400 13px Arial,Helvetica,sans-serif;color:#fff;cursor:pointer';
-    const check=document.createElement('input');check.type='checkbox';check.value=value;check.style.cssText='width:16px;height:16px;accent-color:#89b9ad';
+    const check=document.createElement('input');check.type='checkbox';check.value=value;check.checked=true;check.style.cssText='width:16px;height:16px;accent-color:#89b9ad';
     check.onchange=()=>{if(check.checked)selectedSections.add(value);else selectedSections.delete(value);updateFilterLabel();render()};
     line.append(check,document.createTextNode(label));filterMenu.append(line);
   });
-  const clearFilters=document.createElement('button');clearFilters.type='button';clearFilters.textContent='Show all sections';clearFilters.style.cssText='font:600 12px Arial,Helvetica,sans-serif;padding:7px;color:#fff;background:#344d60;border:1px solid #7892a2;border-radius:5px;cursor:pointer';
-  clearFilters.onclick=()=>{selectedSections.clear();filterMenu.querySelectorAll('input[type=checkbox]').forEach(c=>c.checked=false);updateFilterLabel();render()};
-  filterMenu.append(clearFilters);filterBar.append(filterToggle,filterMenu);content.append(filterBar);updateFilterLabel();
+  const filterActions=document.createElement('div');filterActions.style.cssText='display:flex;gap:6px;margin-top:8px;flex-wrap:wrap';
+  const setAllFilters=select=>{selectedSections.clear();filterMenu.querySelectorAll('input[type=checkbox]').forEach(c=>{c.checked=select;if(select)selectedSections.add(c.value)});updateFilterLabel();render()};
+  for(const [label,select] of [['Select all',true],['Clear all',false]]){
+    const b=document.createElement('button');b.type='button';b.textContent=label;b.style.cssText='font:600 12px Arial,Helvetica,sans-serif;padding:7px;color:#fff;background:#344d60;border:1px solid #7892a2;border-radius:5px;cursor:pointer';b.onclick=()=>setAllFilters(select);filterActions.append(b);
+  }
+  filterMenu.append(filterActions);filterBar.append(filterToggle,filterMenu);content.append(filterBar);updateFilterLabel();
   const status=document.createElement('p');content.append(status);
   const list=document.createElement('div');content.append(list);
+  const feedback=document.createElement('div');feedback.style.cssText='border-top:1px solid #566;margin-top:14px;padding-top:12px';
+  const feedbackTitle=document.createElement('strong');feedbackTitle.textContent='User feedback';feedbackTitle.style.cssText='font:700 14px Arial,Helvetica,sans-serif;color:#fff';feedback.append(feedbackTitle);
+  const feedbackHint=document.createElement('p');feedbackHint.textContent='General feedback, suggestions, or issues not covered by the checklist. Included in JSON export.';feedbackHint.style.cssText='font:400 12px/1.5 Arial,Helvetica,sans-serif;color:#d4e1e9;margin:6px 0';feedback.append(feedbackHint);
+  const feedbackInput=document.createElement('textarea');feedbackInput.placeholder='Enter your feedback here';feedbackInput.value=state.feedback||'';feedbackInput.style.cssText='display:block;width:100%;min-height:90px;box-sizing:border-box;resize:vertical;padding:8px;font:400 13px/1.4 Arial,Helvetica,sans-serif;color:#18242d;background:#fff;border:1px solid #a8b5bf;border-radius:4px';
+  feedbackInput.addEventListener('input',()=>{state.feedback=redact(feedbackInput.value);save()});feedback.append(feedbackInput);content.append(feedback);
   const actions=document.createElement('div');actions.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:12px';content.append(actions);
   const btn=(label,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=fn;b.style.cssText='font:600 12px/1.35 '+font+';color:#f4f7fa;background:#344d60;border:1px solid #7892a2;border-radius:5px;padding:7px 10px;min-height:32px;cursor:pointer;appearance:none;text-shadow:none';return b};
   function render(){
     list.replaceChildren();
     const completed=state.results.filter(x=>x&&x.status).length;
-    const visible=tests.filter(([id],i)=>!selectedSections.size||[...selectedSections].some(section=>(section==='incomplete'&&state.results[i]?.status!=='pass')||(section==='failed'&&state.results[i]?.status==='fail')||id===section||id.startsWith(section+'.')));
+    const visible=tests.filter(([id],i)=>[...selectedSections].some(section=>(section==='incomplete'&&state.results[i]?.status!=='pass')||(section==='failed'&&state.results[i]?.status==='fail')||id===section||id.startsWith(section+'.')));
     status.textContent=completed+'/'+tests.length+' checks recorded · '+visible.length+' shown';
     tests.forEach(([id,label],i)=>{
       if(!visible.some(t=>t[0]===id))return;
@@ -146,10 +154,10 @@
     });
   }
   actions.append(btn('Export JSON',()=>{
-    const report={schemaVersion:1,platform,platformDetection:platformInfo.confidence,userAgent:navigator.userAgent,started:state.started,exported:new Date().toISOString(),results:state.results.map(x=>x?{...x,note:redact(x.note)}:null)};
+    const report={schemaVersion:1,platform,platformDetection:platformInfo.confidence,userAgent:navigator.userAgent,started:state.started,exported:new Date().toISOString(),feedback:redact(state.feedback),results:state.results.map(x=>x?{...x,note:redact(x.note)}:null)};
     const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'});
     const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='tu-diagnostics-'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-  }),btn('Reset checklist',()=>{if(confirm('Clear this diagnostic session?')){state={results:[],started:new Date().toISOString()};save();render()}}));
+  }),btn('Reset checklist',()=>{if(confirm('Clear this diagnostic session?')){state={results:[],feedback:'',started:new Date().toISOString()};feedbackInput.value='';save();render()}}));
   launcher.onclick=()=>{if(suppressClick){suppressClick=false;return;}panel.style.display=panel.style.display==='none'?'flex':'none';render()};
   document.body.append(launcher,panel);render();
 })();
