@@ -72,7 +72,11 @@ async function publishedAgreement(env) {
       || !published.content.includes("Agreement number: " + a.agreement_number)
       || !published.content.includes("Effective date: " + a.agreement_date)) throw Error("Invalid agreement publication");
   const row = await db.prepare("SELECT agreement_version,agreement_number,agreement_date,content,is_current FROM tu_agreement_registry WHERE agreement_number=?").bind(a.agreement_number).first();
-  if (row && (row.agreement_version !== a.agreement_version || row.agreement_date !== a.agreement_date || row.content !== published.content)) throw Error("Published agreement number conflicts with immutable D1 history");
+  // Earlier D1 migrations may store equivalent Markdown with different CRLF or
+  // trailing blank lines. Ignore only those transport/formatting differences;
+  // never silently overwrite an existing published agreement's wording.
+  const canonicalText = value => String(value).replace(/\\r\\n?/g, "\\n").replace(/[\\t ]+$/gm, "").trimEnd();
+  if (row && (row.agreement_version !== a.agreement_version || row.agreement_date !== a.agreement_date || canonicalText(row.content) !== canonicalText(published.content))) throw Error("Published agreement number conflicts with immutable D1 history (metadata or substantive content differs)");
   const current = await db.prepare("SELECT agreement_number FROM tu_agreement_registry WHERE is_current=1 LIMIT 1").first();
   if (current && current.agreement_number > a.agreement_number) throw Error("Agreement rollback refused");
   if (!row || !row.is_current) {
