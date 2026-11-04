@@ -11,3 +11,34 @@ const modules=createModuleRegistry();modules.register({id:'broken',activate(){th
 assert.equal(await modules.activate('broken'),false);assert.equal(await modules.activate('working'),true);
 const s=createTestSession({buildId:'test',platform:'pda',tests:[{id:'critical',critical:true}]});s.record('critical','pass','key 1234567890abcdef');assert.equal(s.export().releaseReady,true);assert.ok(!JSON.stringify(s.export()).includes('1234567890abcdef'));
 console.log('TU core smoke tests passed');
+
+const freshStorage=()=>{const entries=new Map();return {entries,get:async k=>entries.get(k),set:async(k,v)=>{entries.set(k,v)},remove:async k=>{entries.delete(k)}}};
+const sampleKey='abcdef0123456789';
+{
+  const storage=freshStorage();
+  const controller=createCredentialController({storage,verifyWithServer:async()=>({verified:false,accessLevel:'limited',playerId:42})});
+  await assert.rejects(controller.confirm(sampleKey,'limited'),/verification/i);
+  assert.equal(await controller.getStatus(),null,'Rejected keys must not persist');
+}
+{
+  const storage=freshStorage();
+  const controller=createCredentialController({storage,verifyWithServer:async()=>({verified:true,accessLevel:'public',playerId:42})});
+  await assert.rejects(controller.confirm(sampleKey,'limited'),/not verified as Limited/);
+  assert.equal(storage.entries.size,0,'Mismatched requested access must not persist');
+}
+{
+  const storage=freshStorage();
+  const controller=createCredentialController({storage,verifyWithServer:async()=>({verified:true,accessLevel:'full',playerId:42})});
+  await assert.rejects(controller.confirm(sampleKey,'public'),/unsupported API access level/);
+  assert.equal(storage.entries.size,0,'Unsupported access must not persist');
+}
+{
+  const storage=freshStorage();
+  const controller=createCredentialController({storage,verifyWithServer:async()=>({verified:true,accessLevel:'limited',playerId:42})});
+  const confirmed=await controller.confirm(sampleKey,'limited');
+  assert.equal(confirmed.accessLevel,'limited');
+  assert.equal(await controller.getKeyForAuthorizedRequest(),sampleKey);
+  assert.ok(!JSON.stringify(await controller.getStatus()).includes(sampleKey));
+  await controller.clear();
+  assert.equal(await controller.getStatus(),null);
+}
