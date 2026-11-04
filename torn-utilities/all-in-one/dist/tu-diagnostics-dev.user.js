@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Testing and Diagnostics DEV
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.1.0-dev
+// @version      0.1.1-dev
 // @description  Independent guided cross-platform TU test checklist and sanitized export
 // @match        https://www.torn.com/*
 // @grant        none
@@ -12,6 +12,7 @@
   if(window.__TU_DIAGNOSTICS_DEV__)return;
   window.__TU_DIAGNOSTICS_DEV__=true;
   const key='tu:aio:diagnostics:v1';
+  const positionKey='tu:aio:diagnostics:launcher-position:v1';
   const tests=[
     ['core.launcher','TU launcher appears and opens'],
     ['core.window','Manager Back, Minimize, Restore and Exit work'],
@@ -32,6 +33,41 @@
   const save=()=>{try{localStorage.setItem(key,JSON.stringify(state))}catch{}};
   const launcher=document.createElement('button');launcher.textContent='TU Test';launcher.title='Open independent TU diagnostics';
   launcher.style.cssText='position:fixed;bottom:18px;right:18px;z-index:2147483645;background:#233f53;color:white;border:1px solid #9ac;padding:9px 12px;border-radius:8px;font:13px sans-serif;cursor:pointer';
+  // Drag with pointer or touch; a short tap still opens the checklist.
+  let position=null;
+  try{position=JSON.parse(localStorage.getItem(positionKey)||'null')}catch{}
+  if(position&&Number.isFinite(position.x)&&Number.isFinite(position.y)){
+    launcher.style.left=Math.max(0,Math.min(window.innerWidth-70,position.x))+'px';
+    launcher.style.top=Math.max(0,Math.min(window.innerHeight-35,position.y))+'px';
+    launcher.style.right='auto';launcher.style.bottom='auto';
+  }
+  launcher.style.touchAction='none';
+  let drag=null,suppressClick=false;
+  launcher.addEventListener('pointerdown',event=>{
+    if(event.button!==0)return;
+    const rect=launcher.getBoundingClientRect();
+    drag={id:event.pointerId,startX:event.clientX,startY:event.clientY,x:rect.left,y:rect.top,moved:false};
+    launcher.setPointerCapture?.(event.pointerId);
+  });
+  launcher.addEventListener('pointermove',event=>{
+    if(!drag||drag.id!==event.pointerId)return;
+    const dx=event.clientX-drag.startX,dy=event.clientY-drag.startY;
+    if(!drag.moved&&Math.hypot(dx,dy)<6)return;
+    drag.moved=true;
+    const x=Math.max(0,Math.min(window.innerWidth-launcher.offsetWidth,drag.x+dx));
+    const y=Math.max(0,Math.min(window.innerHeight-launcher.offsetHeight,drag.y+dy));
+    launcher.style.left=x+'px';launcher.style.top=y+'px';launcher.style.right='auto';launcher.style.bottom='auto';
+  });
+  const finishDrag=event=>{
+    if(!drag||drag.id!==event.pointerId)return;
+    if(drag.moved){
+      suppressClick=true;
+      try{localStorage.setItem(positionKey,JSON.stringify({x:parseFloat(launcher.style.left),y:parseFloat(launcher.style.top)}))}catch{}
+    }
+    drag=null;
+  };
+  launcher.addEventListener('pointerup',finishDrag);
+  launcher.addEventListener('pointercancel',finishDrag);
   const panel=document.createElement('section');
   panel.style.cssText='position:fixed;right:12px;bottom:60px;width:min(410px,calc(100vw - 24px));max-height:75vh;overflow:auto;z-index:2147483646;background:#18242d;color:white;padding:14px;border:1px solid #89a;border-radius:10px;font:13px/1.45 sans-serif;box-sizing:border-box;display:none';
   const heading=document.createElement('div');heading.style.cssText='display:flex;justify-content:space-between;align-items:center';
@@ -65,6 +101,6 @@
     const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'});
     const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='tu-diagnostics-'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }),btn('Reset checklist',()=>{if(confirm('Clear this diagnostic session?')){state={results:[],started:new Date().toISOString()};save();render()}}));
-  launcher.onclick=()=>{panel.style.display=panel.style.display==='none'?'block':'none';render()};
+  launcher.onclick=()=>{if(suppressClick){suppressClick=false;return;}panel.style.display=panel.style.display==='none'?'block':'none';render()};
   document.body.append(launcher,panel);render();
 })();
