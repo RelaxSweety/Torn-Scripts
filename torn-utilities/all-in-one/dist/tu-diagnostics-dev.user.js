@@ -149,7 +149,7 @@
       if(!response.ok)throw Error('HTTP '+response.status);
       const data=await response.json();
       const agreement=data?.agreement;
-      const ok=typeof agreement?.agreement_version==='string'&&Number.isSafeInteger(agreement?.agreement_number)&&/^\\d{4}-\\d{2}-\\d{2}$/.test(agreement?.agreement_date||'')&&typeof data?.content==='string'&&data.content.includes('Version: '+agreement.agreement_version)&&data.content.includes('Agreement number: '+agreement.agreement_number);
+      const ok=typeof agreement?.agreement_version==='string'&&Number.isSafeInteger(agreement?.agreement_number)&&/^\d{4}-\d{2}-\d{2}$/.test(agreement?.agreement_date||'')&&typeof data?.content==='string'&&data.content.includes('Version: '+agreement.agreement_version)&&data.content.includes('Agreement number: '+agreement.agreement_number);
       const index=tests.findIndex(([id])=>id==='auth.health');
       state.results[index]={id:'auth.health',status:ok?'pass':'fail',at:new Date().toISOString(),note:ok?'Published agreement '+agreement.agreement_version+' (#'+agreement.agreement_number+')':'Invalid published DEV agreement metadata or text'};
       serverResult.textContent=ok?'PASS: DEV publishes agreement '+agreement.agreement_version+' (#'+agreement.agreement_number+', '+agreement.agreement_date+')':'FAIL: DEV agreement registry metadata or text is invalid';save();render();
