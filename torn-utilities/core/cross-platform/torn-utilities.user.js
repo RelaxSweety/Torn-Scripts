@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.21-who-dev
+// @version      0.5.42.22-who-dev
 // @description  Compact draggable TU launcher for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -331,11 +331,21 @@
   });
   Object.defineProperty(pageWindow, 'TornUtilities', {value:api, configurable:false, writable:false});
   pageWindow.dispatchEvent(new Event('torn-utilities-ready'));
-  const TU_TERMS_VERSION='1.2';
+  let TU_TERMS_VERSION=null;
+  let currentDevAgreement=null;
+  let currentDevAgreementContent='';
 
   // DEVELOPMENT BUILD ONLY. This code is not deployed from main.
   const DEV_BASE='https://tu-multiplayer-server-dev.tuserver.workers.dev';
-  const DEV_AGREEMENT={agreement_version:'1.2',agreement_number:3,agreement_date:'2026-11-04'};
+  async function loadDevAgreement(){
+    const published=await devRequest('/api/auth/agreement/current','GET',null,'');
+    const a=published?.agreement;
+    if(!a||typeof a.agreement_version!=='string'||!Number.isSafeInteger(a.agreement_number)||typeof a.agreement_date!=='string'||typeof published.content!=='string'||!published.content.trim())throw Error('Current DEV agreement unavailable');
+    currentDevAgreement={agreement_version:a.agreement_version,agreement_number:a.agreement_number,agreement_date:a.agreement_date};
+    currentDevAgreementContent=published.content;
+    TU_TERMS_VERSION=a.agreement_version;
+    return currentDevAgreement;
+  }
   const DEV_SESSION_KEY='tu:dev:auth:session:v1';
   const devToken=()=>sessionStorage.getItem(DEV_SESSION_KEY)||'';
   let devAuthIssue='',devRenewalBlocked=false;
@@ -423,6 +433,7 @@
   }
   async function restoreDevSession(){
     try{
+      await loadDevAgreement();
       if(!readSavedKey()||localStorage.getItem(TU_TERMS_KEY)!==TU_TERMS_VERSION)return;
       const token=devToken();
       if(token){
@@ -453,7 +464,8 @@
     const registration=await devRequest('/api/auth/register','POST',{api_key:key,platform},'');
     if(!registration.token)throw Error('Registration returned no session');
     const token=registration.token;
-    await devRequest('/api/auth/agreement','POST',{action:'accepted',request_id:crypto.randomUUID(),...DEV_AGREEMENT},token);
+    const agreement=await loadDevAgreement();
+    await devRequest('/api/auth/agreement','POST',{action:'accepted',request_id:crypto.randomUUID(),...agreement},token);
     const status=await devRequest('/api/auth/agreement','GET',null,token);
     if(!status.accepted)throw Error('Development agreement was not confirmed');
     sessionStorage.setItem(DEV_SESSION_KEY,token);
@@ -475,7 +487,7 @@
     ['Services and Retention','TU uses Torn API, GitHub, and TU-hosted services including Cloudflare. Server-side observations and game records may be retained for functionality and analysis. A complete retention and deletion schedule is not yet published. Network metadata may be handled by service providers.'],
     ['Consent and Choice','Declining restricts Manager functionality to the Info page. You can stop using TU, uninstall scripts and clear local data. Acceptance is stored locally and may be requested again after terms updates. Contact the maintainer using the links below with questions.']
   ];
-  const hasAgreement=()=>!!devToken()&&localStorage.getItem(TU_TERMS_KEY)===TU_TERMS_VERSION;
+  const hasAgreement=()=>!!devToken()&&!!TU_TERMS_VERSION&&localStorage.getItem(TU_TERMS_KEY)===TU_TERMS_VERSION;
   let currentTab='modules',settingsPage=null,diagnosticModule=null;
   // PDA Scripts installs modules independently; TU only manages registered modules.
   function stopModule() {
@@ -616,18 +628,19 @@
     alert(instructions);
   };
   function appendTerms(target){
-    const version=document.createElement('small');version.textContent='Agreement version '+TU_TERMS_VERSION;
+    const version=document.createElement('small');
     version.style.cssText='display:block;margin:0 0 20px;color:#c5d0d8;font:500 12px/1.5 system-ui';
-    target.append(version);
-    for(const [title,body] of TU_TERMS){
-      const section=document.createElement('section');
-      section.style.cssText='display:block;margin:0 0 22px;padding:0;border:0;background:transparent';
-      const h=document.createElement('h3');h.textContent=title;
-      h.style.cssText='display:block;position:static;margin:0 0 10px;padding:0;color:#f3f6f8;background:transparent;font:700 17px/1.35 system-ui;letter-spacing:normal';
-      const p=document.createElement('p');p.textContent=body;
-      p.style.cssText='display:block;position:static;margin:0;padding:0;color:#e3e8ec;background:transparent;font:400 14px/1.6 system-ui;white-space:normal;overflow-wrap:break-word';
-      section.append(h,p);target.append(section);
-    }
+    version.textContent='Loading current agreement…';target.append(version);
+    const body=document.createElement('div');target.append(body);
+    const renderPublished=()=>{
+      body.replaceChildren();
+      version.textContent='Agreement version '+TU_TERMS_VERSION+' · Number '+currentDevAgreement.agreement_number+' · '+currentDevAgreement.agreement_date;
+      // Display the exact server-published text; never interpret agreement text as HTML.
+      const text=document.createElement('div');text.textContent=currentDevAgreementContent;
+      text.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere;font:400 14px/1.65 system-ui;color:#e3e8ec';
+      body.append(text);
+    };
+    loadDevAgreement().then(renderPublished).catch(error=>{version.textContent='Agreement unavailable';body.textContent='Unable to load current terms: '+error.message+'. Retry by reopening the agreement.';});
   }
   function showAgreement(){
     panel.hidden=false;render('about');
@@ -635,7 +648,7 @@
     const overlay=document.createElement('div');overlay.id='tu-agreement-overlay';overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#000d;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;overflow:hidden';
     const dialog=document.createElement('section');dialog.style.cssText='background:#182026;color:#eee;border:2px solid #cba953;border-radius:12px;width:min(96vw,580px);max-height:calc(100dvh - 110px);height:min(780px,calc(100dvh - 110px));display:flex;flex-direction:column;overflow:hidden;padding:0;font:14px/1.5 system-ui;box-sizing:border-box;min-height:0';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');
     const h=document.createElement('h2');h.textContent='TU Terms and Information Use Agreement';h.style.cssText='display:block;position:static;margin:0 0 18px;padding:0;color:#f3f6f8;font:700 21px/1.35 system-ui';dialog.append(h);appendTerms(dialog);
-    const keyInfo=document.createElement('p');keyInfo.textContent='Torn Public Only or Limited Access API key: enter your key below to verify identity and accept agreement 1.2. Never enter a Full Access key.';dialog.append(keyInfo);
+    const keyInfo=document.createElement('p');keyInfo.textContent='Torn Public Only or Limited Access API key: enter your key below to verify identity and accept the current published agreement. Never enter a Full Access key.';dialog.append(keyInfo);
     const key=document.createElement('input');key.type='password';key.autocomplete='off';key.maxLength=16;key.placeholder=readSavedKey()?'API key already saved':'16-character Public Only or Limited Access key';key.style.cssText='width:100%;box-sizing:border-box;padding:10px';dialog.append(key);
     const checkLabel=document.createElement('label');checkLabel.style.cssText='display:flex;gap:10px;margin:15px 0';const check=document.createElement('input');check.type='checkbox';checkLabel.append(check,document.createTextNode('I have reviewed and agree to the Terms of Use and Information Use Agreement.'));dialog.append(checkLabel);
     const status=document.createElement('p');status.setAttribute('role','status');dialog.append(status);
@@ -643,6 +656,7 @@
     const decline=makeButton('Decline / Info only',()=>{overlay.remove();render('about')});
     const accept=makeButton('I Agree — Continue',async()=>{
       if(!check.checked)return;
+      if(!currentDevAgreement){status.textContent='Current agreement has not loaded. Please wait or reopen the agreement.';return;}
       const supplied=key.value.trim();if(supplied&&!/^[a-zA-Z0-9]{16}$/.test(supplied)){status.textContent='Enter a valid 16-character Public Only or Limited Access key';return;}
       const selected=supplied||readSavedKey();if(!/^[A-Za-z0-9]{16}$/.test(selected)){status.textContent='A 16-character Public Only or Limited Access key is required';return;}accept.disabled=true;try{status.textContent='Registering and recording development agreement…';await devAccept(selected,'tampermonkey');if(supplied)saveKey(supplied);await updatePlayer(selected);}catch(error){status.textContent='Development agreement failed: '+error.message;accept.disabled=false;return;}
       localStorage.setItem(TU_TERMS_KEY,TU_TERMS_VERSION);publishAuthorization(true);overlay.remove();render('modules');
