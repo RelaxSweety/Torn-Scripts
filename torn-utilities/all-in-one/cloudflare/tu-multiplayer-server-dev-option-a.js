@@ -52,7 +52,7 @@ async function publishedAgreement(env) {
   const db = env?.TU_USERS_DB;
   if (!db) throw Error("Agreement registry database unavailable");
   const row = await db.prepare("SELECT agreement_version,agreement_number,agreement_date,content FROM tu_agreement_registry WHERE is_current=1 LIMIT 1").first();
-  if (!row || !row.content || !row.agreement_version || !Number.isSafeInteger(Number(row.agreement_number)) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(row.agreement_date || "")) throw Error("No valid published agreement");
+  if (!row || !row.content || !row.agreement_version || !Number.isSafeInteger(Number(row.agreement_number)) || !/^\d{4}-\d{2}-\d{2}$/.test(row.agreement_date || "")) throw Error("No valid published agreement");
   return {agreement:{agreement_version:String(row.agreement_version),agreement_number:Number(row.agreement_number),agreement_date:row.agreement_date},content:row.content};
 }
 __name(publishedAgreement, "publishedAgreement");
