@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.22-who-dev
+// @version      0.5.42.23-who-dev
 // @description  Compact draggable TU launcher for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -635,10 +635,21 @@
     const renderPublished=()=>{
       body.replaceChildren();
       version.textContent='Agreement version '+TU_TERMS_VERSION+' · Number '+currentDevAgreement.agreement_number+' · '+currentDevAgreement.agreement_date;
-      // Display the exact server-published text; never interpret agreement text as HTML.
-      const text=document.createElement('div');text.textContent=currentDevAgreementContent;
-      text.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere;font:400 14px/1.65 system-ui;color:#e3e8ec';
-      body.append(text);
+      // Render only recognized Markdown headings and paragraphs using safe text nodes.
+      // Never assign published agreement content to innerHTML.
+      const sections=currentDevAgreementContent.replace(/\\r\\n?/g,'\\n').split(/\\n\\s*\\n/);
+      for(const block of sections){
+        const lines=block.split('\\n');
+        for(const line of lines){
+          const heading=/^(#{1,3})\\s+(.+)$/.exec(line);
+          const element=document.createElement(heading?(heading[1].length===1?'h2':'h3'):'p');
+          element.textContent=heading?heading[2]:line;
+          element.style.cssText=heading
+            ?'display:block!important;position:static!important;margin:18px 0 10px!important;padding:0!important;font:700 '+(heading[1].length===1?'19':'16')+'px/1.45 system-ui!important;color:#f3f6f8!important;white-space:normal!important;'
+            :'display:block!important;position:static!important;margin:0 0 12px!important;padding:0!important;font:400 14px/1.65 system-ui!important;color:#e3e8ec!important;white-space:normal!important;overflow-wrap:anywhere!important;';
+          body.append(element);
+        }
+      }
     };
     loadDevAgreement().then(renderPublished).catch(error=>{version.textContent='Agreement unavailable';body.textContent='Unable to load current terms: '+error.message+'. Retry by reopening the agreement.';});
   }
