@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Testing and Diagnostics DEV
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.1.6-dev
+// @version      0.1.7-dev
 // @description  Independent guided cross-platform TU test checklist and sanitized export
 // @match        https://www.torn.com/*
 // @grant        none
@@ -20,6 +20,12 @@
     ['core.position','Launcher movement and position persist after reload'],
     ['auth.agreement','Agreement confirmation and session restoration work'],
     ['auth.api','Saved API level is verified and labeled correctly'],
+    ['auth.public','Public Only key registration and acceptance of agreement 1.2 work'],
+    ['auth.limited','Limited Access key registration and acceptance of agreement 1.2 work'],
+    ['auth.reaccept','Agreement 1.1 acceptance does not grant access to 1.2 without re-acceptance'],
+    ['auth.persist','After reload, current agreement 1.2 and session restore without prompting'],
+    ['auth.rejection','Full Access or invalid API key registration is rejected'],
+    ['auth.health','DEV worker health and published agreement 1.2 metadata check'],
     ['core.registry','Expected modules appear in Manager'],
     ['module.travel','Travel Assistant opens and controls respond'],
     ['module.item','Item Monitor selection and Cancel work'],
@@ -132,6 +138,21 @@
   const feedbackInput=document.createElement('textarea');feedbackInput.placeholder='Enter your feedback here';feedbackInput.value=state.feedback||'';feedbackInput.style.cssText='display:block;width:100%;min-height:90px;box-sizing:border-box;resize:vertical;padding:8px;font:400 13px/1.4 Arial,Helvetica,sans-serif;color:#18242d;background:#fff;border:1px solid #a8b5bf;border-radius:4px';
   feedbackInput.addEventListener('input',()=>{state.feedback=redact(feedbackInput.value);save()});feedback.append(feedbackInput);content.append(feedback);
   const actions=document.createElement('div');actions.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:12px';content.append(actions);
+  const serverResult=document.createElement('p');serverResult.style.cssText='font:12px/1.4 Arial,Helvetica,sans-serif;color:#d4e1e9';content.append(serverResult);
+  async function checkDevServer(){
+    const base='https://tu-multiplayer-server-dev.tuserver.workers.dev';
+    serverResult.textContent='Checking DEV published agreement (no API key transmitted)…';
+    try{
+      const response=await fetch(base+'/api/auth/agreement/current',{method:'GET',cache:'no-store',credentials:'omit'});
+      if(!response.ok)throw Error('HTTP '+response.status);
+      const data=await response.json();
+      const agreement=data?.agreement;
+      const ok=agreement?.agreement_version==='1.2'&&agreement?.agreement_number===3&&agreement?.agreement_date==='2026-11-04'&&/Public Only or Limited Access/.test(data?.content||'');
+      const index=tests.findIndex(([id])=>id==='auth.health');
+      state.results[index]={id:'auth.health',status:ok?'pass':'fail',at:new Date().toISOString(),note:ok?'Published agreement 1.2 metadata and API language confirmed':'Unexpected DEV agreement metadata or text'};
+      serverResult.textContent=ok?'PASS: DEV publishes agreement 1.2 (number 3, 2026-11-04)':'FAIL: DEV agreement version or text does not match expected 1.2';save();render();
+    }catch(error){serverResult.textContent='CHECK FAILED: '+redact(error?.message||error);const index=tests.findIndex(([id])=>id==='auth.health');state.results[index]={id:'auth.health',status:'fail',at:new Date().toISOString(),note:'Request failed; check network/CORS and DEV deployment'};save();render();}
+  }
   const btn=(label,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=fn;b.style.cssText='font:600 12px/1.35 '+font+';color:#f4f7fa;background:#344d60;border:1px solid #7892a2;border-radius:5px;padding:7px 10px;min-height:32px;cursor:pointer;appearance:none;text-shadow:none';return b};
   function render(){
     list.replaceChildren();
@@ -153,7 +174,7 @@
       wrap.append(note);list.append(wrap);
     });
   }
-  actions.append(btn('Export JSON',()=>{
+  actions.append(btn('Check DEV agreement',checkDevServer),btn('Export JSON',()=>{
     const report={schemaVersion:1,platform,platformDetection:platformInfo.confidence,userAgent:navigator.userAgent,started:state.started,exported:new Date().toISOString(),feedback:redact(state.feedback),results:state.results.map(x=>x?{...x,note:redact(x.note)}:null)};
     const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'});
     const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='tu-diagnostics-'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
