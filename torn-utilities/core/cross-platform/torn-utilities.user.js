@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.19-who-dev
+// @version      0.5.42.20-who-dev
 // @description  Compact draggable TU launcher for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -15,8 +15,8 @@
 // @connect      api.github.com
 // @connect      tu-multiplayer-server-dev.tuserver.workers.dev
 // @run-at       document-idle
-// @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/stable-05424-who/torn-utilities/core/cross-platform/torn-utilities.user.js
-// @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/stable-05424-who/torn-utilities/core/cross-platform/torn-utilities.user.js
+// @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/core/cross-platform/torn-utilities.user.js
+// @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/core/cross-platform/torn-utilities.user.js
 // ==/UserScript==
 (() => {
   'use strict';
