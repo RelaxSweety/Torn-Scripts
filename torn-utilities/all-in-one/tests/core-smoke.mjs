@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {createCredentialController} from '../src/core/api-credentials.js';
 import {createServerVerifier} from '../src/core/server-verifier.js';
+import {verifyRegistrationKey} from '../src/backend/verify-registration-key.js';
 import {createModuleRegistry} from '../src/core/module-registry.js';
 import {createTestSession} from '../src/diagnostics/test-session.js';
 const data=new Map(),storage={get:async k=>data.get(k),set:async(k,v)=>data.set(k,v),remove:async k=>data.delete(k)};
@@ -67,3 +68,17 @@ const sampleKey='abcdef0123456789';
   const verifier=createServerVerifier({request:async()=>({verified:true,accessLevel:'public',playerId:4539436})});
   await assert.rejects(verifier({apiKey:sampleKey,requestedAccess:'limited'}),/does not match/);
 }
+
+{
+  const fetchImpl=async(url,options)=>{
+    assert.equal(url,'https://api.torn.com/v2/key/info');
+    assert.equal(options.headers.Authorization,'ApiKey '+sampleKey);
+    return {ok:true,json:async()=>({info:{access:{type:'Limited Access'},user:{id:4539436}}})};
+  };
+  assert.deepEqual({...await verifyRegistrationKey(sampleKey,{fetchImpl})},{verified:true,accessLevel:'limited',playerId:4539436});
+}
+for(const type of ['Full Access','Custom','']) {
+  await assert.rejects(verifyRegistrationKey(sampleKey,{fetchImpl:async()=>({ok:true,json:async()=>({info:{access:{type},user:{id:42}}})})}),/Unsupported API access level/);
+}
+await assert.rejects(verifyRegistrationKey(sampleKey,{fetchImpl:async()=>({ok:false})}),/verification failed/);
+await assert.rejects(verifyRegistrationKey(sampleKey,{fetchImpl:async()=>({ok:true,json:async()=>({info:{access:{type:'Public Only'},user:{id:null}}})})}),/owner not verified/);
