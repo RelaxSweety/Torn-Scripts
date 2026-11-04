@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "modules": [
+    {
+      "id": "travel-assistant",
+      "source": "src/modules/travel-assistant/index.js",
+      "enabledByDefault": false
+    },
+    {
+      "id": "item-monitor",
+      "source": "src/modules/item-monitor/index.js",
+      "enabledByDefault": false
+    },
+    {
+      "id": "war-organizer",
+      "source": "src/modules/war-organizer/index.js",
+      "enabledByDefault": false
+    }
+  ],
+  "note": "Initial migration targets; extend with existing modules after inventory. Source files are not yet implemented."
+}
