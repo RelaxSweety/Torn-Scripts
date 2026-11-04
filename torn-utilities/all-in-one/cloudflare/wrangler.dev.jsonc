@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json.schemastore.org/wrangler.json",
+  "name": "tu-multiplayer-server-dev",
+  "main": "./tu-multiplayer-server-dev-option-a.js",
+  "compatibility_date": "2026-11-04",
+  "workers_dev": true,
+  "d1_databases": [
+    {
+      "binding": "TU_USERS_DB",
+      "database_name": "tu-users-dev",
+      "database_id": "378c3c6b-e681-4605-81ea-ae01a2e751e8"
+    },
+    {
+      "binding": "FOREIGN_DB",
+      "database_name": "tu-foreign-stock-dev",
+      "database_id": "61dcfcc3-504f-4069-b668-208054b82c54"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "GAME",
+        "class_name": "GameRoom"
+      },
+      {
+        "name": "ARCADE",
+        "class_name": "ArcadeRoom"
+      },
+      {
+        "name": "MARBLES",
+        "class_name": "MarbleRoom"
+      }
+    ]
+  },
+  "triggers": {
+    "crons": [
+      "* * * * *"
+    ]
+  }
+}
