@@ -46,7 +46,8 @@ const sampleKey='abcdef0123456789';
 
 {
   const verifier=createServerVerifier({request:async(path,options)=>{
-    assert.equal(path,'/api/auth/verify-key');
+    assert.equal(path,'/api/auth/register');
+    assert.equal(options.body.platform,'tampermonkey');
     assert.equal(options.body.requested_access,'limited');
     return {verified:true,accessLevel:'limited',playerId:4539436};
   }});
@@ -56,4 +57,13 @@ const sampleKey='abcdef0123456789';
 {
   const verifier=createServerVerifier({request:async()=>({verified:true,accessLevel:'limited',playerId:null})});
   await assert.rejects(verifier({apiKey:sampleKey,requestedAccess:'limited'}),/player identity/);
+}
+
+{
+  const verifier=createServerVerifier({request:async()=>({token:'legacy-session',playerId:4539436})});
+  await assert.rejects(verifier({apiKey:sampleKey,requestedAccess:'limited'}),/did not confirm key verification/);
+}
+{
+  const verifier=createServerVerifier({request:async()=>({verified:true,accessLevel:'public',playerId:4539436})});
+  await assert.rejects(verifier({apiKey:sampleKey,requestedAccess:'limited'}),/does not match/);
 }
