@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.23-who-dev
+// @version      0.5.42.24-who-dev
 // @description  Compact draggable TU launcher for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -359,7 +359,7 @@
   function resetDevAuthFailure(){devAuthIssue='';devRenewalBlocked=false;}
   async function devRequest(path,method='GET',body,token=devToken()){
     const url=DEV_BASE+path;
-    const headers={'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{})};
+    const headers={...(method!=='GET'?{'content-type':'application/json'}:{}),...(token?{authorization:'Bearer '+token}:{})};
     const payload=body?JSON.stringify(body):undefined;
     const parse=raw=>{
       if(raw==null)throw Error('Empty authentication response');
@@ -396,7 +396,7 @@
         return {status:200,data};
       }
       // Standard fetch is a last resort on platforms with CORS support.
-      const response=await fetch(url,{method,headers,...(payload?{body:payload}:{}),cache:'no-store'});
+      let response;try{response=await fetch(url,{method,headers,...(payload?{body:payload}:{}),cache:'no-store'});}catch(error){throw Error('Unable to reach DEV Worker (network/CORS). Check '+DEV_BASE+'/api/auth/agreement/current in a browser. '+(error?.message||''));}
       return {status:response.status,data:await response.json().catch(()=>({}))};
     };
     const response=await transport();
