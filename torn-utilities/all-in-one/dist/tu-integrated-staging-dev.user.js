@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.30-integration-dev
+// @version      0.5.42.31-integration-dev
 // @description  Integrated TU development bundle for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -26,7 +26,7 @@
   if (pageWindow.__RELAX_TORN_UTILITIES_PDA__) return;
   pageWindow.__RELAX_TORN_UTILITIES_PDA__ = true;
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.5.42.30-integration-dev';
+  const TU_VERSION='0.5.42.31-integration-dev';
   // Bundled tool directory: no external catalog, cache, or refresh requests.
   const registry={schemaVersion:1,categories:[{"id":"business","name":"Business Tools","icon":"▥","order":10},{"id":"games","name":"Games","icon":"♜","order":20},{"id":"single-player","name":"Single Player","icon":"▣","order":21,"parent":"games"},{"id":"multiplayer","name":"Multiplayer","icon":"♟","order":22,"parent":"games"},{"id":"chat","name":"Chat Tools","icon":"◉","order":30},{"id":"other","name":"War Tools","icon":"⚙","order":40}],modules:[{"id":"alerts-calculations","name":"Stock and Calculations","category":"business","version":"0.4.6","description":"Stock cash-target transaction calculator and basic percentage calculator"},{"id":"flight-game","name":"Flight Game","category":"single-player","version":"0.12.6","description":"Standalone Flight Game arcade module, playable anytime"},{"id":"stick-fighter","name":"Stick Fighter","category":"single-player","version":"0.2.5","description":"Standalone Stick Fighter arcade module, playable anytime"},{"id":"chat-archiver","name":"Chat Archiver","category":"chat","version":"0.1.8","description":"Archive Torn chat conversations"},{"id":"tic-tac-toe","name":"Tic-Tac-Toe","category":"multiplayer","version":"0.6.4","description":"Two-player Tic-Tac-Toe with named winners, green winning line, rematches and head-to-head history"},{"id":"torn-four","name":"Torn Four","category":"multiplayer","version":"0.2.4","description":"Connect Four: two-player multiplayer with private room codes"},{"id":"torn-fleet","name":"Torn Fleet","category":"multiplayer","version":"0.2.4","description":"Battleship: fleet placement and turn-based naval combat"},{"id":"torn-snake","name":"Slithering Streets","category":"single-player","version":"0.2.13","description":"Single-player Snake with touch controls and local high scores"},{"id":"chaos-marbles","name":"Chaos Marbles","category":"multiplayer","version":"0.2.4","description":"Online 2–4 player marble race with private player sessions, Waiting for Chaos staging, and game history"},{"id":"item-monitor","name":"Travel Assistant and Item Monitor","category":"business","version":"1.10.30-dev","description":"Item Monitor and Travel Assistant with D1 stock reporting, source diagnostics and stock estimation"},{"id":"war-hit-organizer","name":"War Organizer","category":"other","version":"0.3.17-dev","description":"Compact war target board, reservation controls, timer and local development settings"}]};
   const registryStatus='Integrated tools',registryRefreshing=false,registryUpdatedAt=0;
@@ -208,7 +208,10 @@
     isActive(id) { return active === id; }
   });
   Object.defineProperty(pageWindow, 'TornUtilities', {value:api, configurable:false, writable:false});
+  // Share the integrated tool API with both the page and userscript sandbox.
+  if(window!==pageWindow)try{Object.defineProperty(window,'TornUtilities',{value:api,configurable:true});}catch(error){console.warn('[TU] Sandbox API bridge unavailable',error);}
   pageWindow.dispatchEvent(new Event('torn-utilities-ready'));
+  if(window!==pageWindow)window.dispatchEvent(new Event('torn-utilities-ready'));
   let TU_TERMS_VERSION=null;
   let currentDevAgreement=null;
   let currentDevAgreementContent='';
@@ -464,7 +467,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.30-integration-dev</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.31-integration-dev</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const headerBrand=panel.querySelector('.tu-logo');if(headerBrand){headerBrand.textContent='';headerBrand.classList.add('tu-brand-emblem');headerBrand.setAttribute('role','img');headerBrand.setAttribute('aria-label','Torn Utilities');}
   const identityLine=document.createElement('p');
@@ -568,7 +571,7 @@
   }
   // Script update check is informational: PDA manages installed script replacement.
   const tuScriptPath='torn-utilities/core/cross-platform/torn-utilities.user.js';
-  const tuScriptUrl='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/'+tuScriptPath;
+  const tuScriptUrl='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/all-in-one/dist/tu-integrated-staging-dev.user.js';
   let tuUpdateStatus='Not checked';
   const tuCheckUpdates=async()=>{
     tuUpdateStatus='Checking GitHub…';render('settings');
@@ -612,25 +615,14 @@
         content.append(status);
         if(loaded&&reg.version&&versionCompare(reg.version,m.version)<0){const u=document.createElement('p');u.textContent='Update available';content.append(u);}
         if(loaded){
-          content.append(makeButton(disabled?'Enable module':'Disable module',()=>{
+          content.append(makeButton(disabled?'Enable tool':'Disable tool',()=>{
             saved.disabled ||= {};saved.disabled[m.id]=!disabled;
             if(!disabled&&active===m.id)stopModule();
             persist();render('modules');
           }));
         }
-        content.append(makeButton('Copy Script URL',()=>{
-          if(navigator.clipboard?.writeText)navigator.clipboard.writeText(m.scriptUrl).then(()=>alert('Script URL copied')).catch(()=>prompt('Copy script URL',m.scriptUrl));
-          else prompt('Copy script URL',m.scriptUrl);
-        }));
-        content.append(makeButton('Install in Tampermonkey',()=>{
-          // Opening a raw .user.js URL in a new tab triggers Tampermonkey's installation page.
-          // If popups are blocked, show the URL for manual installation from Dashboard > Utilities.
-          const tab=window.open(m.scriptUrl,'_blank','noopener');
-          if(!tab)prompt('Open this URL in a new tab or paste it into Tampermonkey > Utilities > Install from URL:',m.scriptUrl);
-        }));
-        content.append(makeButton('Module diagnostics',()=>{diagnosticModule=m.id;settingsPage='diagnostics';render('settings')}));
-        content.append(makeButton('PDA installation instructions',showInstallationInstructions));
-        const help=document.createElement('p');help.textContent='PDA: Copy Script URL and install through PDA Scripts. Tampermonkey: Select Install in Tampermonkey and confirm the installation, or use Dashboard > Utilities > Install from URL. Refresh Torn after installing.';content.append(help);
+        content.append(makeButton('Tool diagnostics',()=>{diagnosticModule=m.id;settingsPage='diagnostics';render('settings')}));
+        // Tool is bundled: no separate installation required.
       }else if(viewCategory){
         const category=registry.categories.find(x=>x.id===viewCategory);
         if(!category){viewCategory=null;return render('modules');}
@@ -647,7 +639,7 @@
           card.append(symbol,body,makeButton('Open →',go));content.append(card);
         }
         const modules=registry.modules.filter(m=>m.category===viewCategory);
-        if(!modules.length&&!subcategories.length){const p=document.createElement('p');p.textContent='No published modules yet';content.append(p);}
+        if(!modules.length&&!subcategories.length){const p=document.createElement('p');p.textContent='No tools in this category';content.append(p);}
         for(const m of modules){
           const card=document.createElement('div');card.className='tu-card';
           const body=document.createElement('div');body.style.flex='1;min-width:0';
@@ -857,7 +849,7 @@
     }else{
       const p=document.createElement('p');p.textContent='Torn Utilities integration development build by RelaxSweety [4539436]. Drag TU to reposition.';content.append(p);
       if(devAuthIssue){const issue=document.createElement('p');issue.setAttribute('role','status');issue.textContent=devAuthIssue;content.append(issue,makeButton('Retry saved API key',()=>{resetDevAuthFailure();void restoreDevSession();}));}
-      const agreementButton=makeButton('User Agreement',()=>{content.replaceChildren();const back=makeButton('← About',()=>render('about'));content.append(back);appendTerms(content);if(!hasAgreement())content.append(makeButton('Review and Accept Terms',showAgreement));});agreementButton.style.margin='8px 8px 8px 0';content.append(agreementButton);const notesButton=makeButton('Version Notes',()=>{content.replaceChildren();content.append(makeButton('← About',()=>render('about')));const heading=document.createElement('h3');heading.textContent='Version Notes';const notes=document.createElement('p');notes.textContent='0.5.42.30-integration-dev — Integrated tool source staging, removed external catalog fetching, removed War Status Diagnostic, renamed War Tools, added About pages for User Agreement and Version Notes. Compatibility testing pending.';content.append(heading,notes);});notesButton.style.margin='8px 0';content.append(notesButton);
+      const agreementButton=makeButton('User Agreement',()=>{content.replaceChildren();const back=makeButton('← About',()=>render('about'));content.append(back);appendTerms(content);if(!hasAgreement())content.append(makeButton('Review and Accept Terms',showAgreement));});agreementButton.style.margin='8px 8px 8px 0';content.append(agreementButton);const notesButton=makeButton('Version Notes',()=>{content.replaceChildren();content.append(makeButton('← About',()=>render('about')));const heading=document.createElement('h3');heading.textContent='Version Notes';const notes=document.createElement('p');notes.textContent='0.5.42.31-integration-dev — Integrated tool source staging, removed external catalog fetching, removed War Status Diagnostic, renamed War Tools, added About pages for User Agreement and Version Notes. Compatibility testing pending.';content.append(heading,notes);});notesButton.style.margin='8px 0';content.append(notesButton);
       const guideLink=document.createElement('a');guideLink.href='https://github.com/RelaxSweety/Torn-Scripts/blob/main/torn-utilities/INSTALLATION.md';guideLink.target='_blank';guideLink.rel='noopener noreferrer';guideLink.textContent='TU Installation & Module Setup Guide ↗';guideLink.style.cssText='display:block;margin:12px 0;padding:12px;border:1px solid #806a3e;border-radius:8px;color:#e4c779;text-decoration:underline;font-weight:600';content.append(guideLink);
       // Official-style vector marks; no remote image dependencies.
       addSocialIcon('RelaxSweety on Discord','https://discord.com/users/relaxsweety','M20.317 4.369a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.211.375-.445.865-.608 1.25a18.27 18.27 0 0 0-5.49 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037 19.736 19.736 0 0 0-4.885 1.515.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.1 18.057a.083.083 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.077.077 0 0 0 .084-.028c.462-.63.873-1.295 1.226-1.994a.075.075 0 0 0-.041-.104 13.1 13.1 0 0 1-1.872-.89.076.076 0 0 1-.008-.127c.126-.095.252-.193.372-.292a.074.074 0 0 1 .077-.01c3.929 1.793 8.185 1.793 12.068 0a.074.074 0 0 1 .078.01c.12.099.246.197.373.292a.076.076 0 0 1-.007.127c-.598.35-1.224.65-1.873.89a.076.076 0 0 0-.04.105c.36.698.77 1.363 1.225 1.993a.076.076 0 0 0 .084.028 19.83 19.83 0 0 0 6.003-3.03.077.077 0 0 0 .031-.056c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028ZM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.42 0-1.334.955-2.42 2.157-2.42 1.211 0 2.176 1.095 2.157 2.42 0 1.335-.955 2.42-2.157 2.42Zm7.96 0c-1.183 0-2.157-1.085-2.157-2.42 0-1.334.955-2.42 2.157-2.42 1.211 0 2.176 1.095 2.157 2.42 0 1.335-.946 2.42-2.157 2.42Z');
