@@ -1,3 +1,7 @@
+## Tool removal: 0.5.42.34-dev
+
+Stock and Calculations is excluded from the integrated build, navigation and registration. Ten tools remain. Historical standalone source, releases and stored settings are retained. Native device testing remains manual.
+
 ## Logo update: 0.5.42.33-dev
 
 Selected sample #1 Integrated Gold replaces the DEV launcher, shared header and War Organizer logos. Core smoke tests and all 191 integration assertions pass; committed-output checks pass. The previous 0.5.42.32-dev file is preserved. Native device logo rendering remains a manual acceptance check.
@@ -27,7 +31,6 @@ Record device/browser, OS, userscript host version, results and errors. Never in
 - [ ] Open, minimize, restore, Back, Exit, disable, re-enable and reopen every tool. Check mobile sizing, overflow, stacking, persistent positions, touch resize, no duplicate windows and no late requests/timers after exit.
 - [ ] Play Flight Game, Stick Fighter and Slithering Streets, checking controls, canvas rendering, audio, scoring, saves and restoration.
 - [ ] With two DEV accounts, create/join/play/finish/rematch Tic-Tac-Toe, Torn Four, Torn Fleet and Chaos Marbles. Verify reconnects, room tokens and histories; do not use production rooms.
-- [ ] Check Stock calculations and manual quantity entry without automatic trade submission.
 - [ ] Check Travel monitoring, reports, alarms, predictions and reopening after cleanup on representative Torn pages.
 - [ ] Check War Organizer roster/reservation/timer behavior with a Limited key, including faction API errors.
 - [ ] Check Chat Archiver capture, pause/stop, scroll stability, stored records and CSV/JSON exports.

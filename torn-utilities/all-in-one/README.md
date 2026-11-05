@@ -1,10 +1,10 @@
 # Torn Utilities — single-script DEV
 
-Version **0.5.42.33-dev**, branch `dev/tu-all-in-one`. Install one complete userscript for desktop Tampermonkey or Torn PDA. This is a DEV release for manual acceptance; no production deployment is included.
+Version **0.5.42.34-dev**, branch `dev/tu-all-in-one`. Install one complete userscript for desktop Tampermonkey or Torn PDA. This is a DEV release for manual acceptance; no production deployment is included.
 
 [Install DEV](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/releases/dev/torn-utilities-dev.user.js) · [Installation and rollback](../INSTALLATION.md) · [Acceptance checklist](docs/DEV-ACCEPTANCE.md)
 
-The 11 retained tools are Stock and Calculations, Flight Game, Stick Fighter, Tic-Tac-Toe, Torn Four, Torn Fleet, Slithering Streets, Chaos Marbles, Travel Assistant and Item Monitor, War Organizer, and Chat Archiver. Navigation is Tools / Settings / About, with War Organizer under War Tools. User Agreement loads the published DEV agreement; Version Notes are embedded.
+The 10 retained tools are Flight Game, Stick Fighter, Tic-Tac-Toe, Torn Four, Torn Fleet, Slithering Streets, Chaos Marbles, Travel Assistant and Item Monitor, War Organizer, and Chat Archiver. Navigation is Tools / Settings / About, with War Organizer under War Tools. User Agreement loads the published DEV agreement; Version Notes are embedded.
 
 ## Build and tests
 
@@ -22,7 +22,7 @@ Tests use jsdom, mocked HTTP/account responses and a mocked canvas. They validat
 
 ## Architecture and migration
 
-The internal Manager registers 11 lazy factories. Each retained source initializes on its first activation, captures its definition through a private Window facade, and receives its own version through `GM_info`. Native Window methods retain their receiver. Closing a tool calls its cleanup; reopening uses the retained factory. The build removes obsolete authorization bootstrap wrappers; the Manager controls access and revocation. Flight/Stick listeners use abortable scopes; Travel polling and observers stop on deactivation and resume on reopening. Minimizing preserves the active tool.
+The internal Manager registers 10 lazy factories. Each retained source initializes on its first activation, captures its definition through a private Window facade, and receives its own version through `GM_info`. Native Window methods retain their receiver. Closing a tool calls its cleanup; reopening uses the retained factory. The build removes obsolete authorization bootstrap wrappers; the Manager controls access and revocation. Flight/Stick listeners use abortable scopes; Travel polling and observers stop on deactivation and resume on reopening. Minimizing preserves the active tool.
 
 All bundled service endpoints target the DEV Worker. Multiplayer requests carry account authorization plus a separate room token. DEV room session keys are separate from production; saved game history, settings, and other storage namespaces remain in place. Existing room sessions are not copied between servers. Backups preserve the existing TU-managed namespace format; large archives and legacy tool storage are outside that backup format and must be exported using their own tools.
 

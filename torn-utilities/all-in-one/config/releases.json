@@ -1,5 +1,20 @@
 [
   {
+    "version": "0.5.42.34-dev",
+    "date": "2026-11-05",
+    "changes": {
+      "Removed": [
+        "Stock and Calculations removed from the integrated application"
+      ],
+      "Features": [
+        "10 retained integrated tools"
+      ],
+      "Migration": [
+        "Existing saved data and historical releases retained"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.33-dev",
     "date": "2026-11-05",
     "changes": {

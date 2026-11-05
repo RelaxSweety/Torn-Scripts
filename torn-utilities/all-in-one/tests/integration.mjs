@@ -41,12 +41,12 @@ for(const sandbox of [false,true]){
  assert.equal(api?.isAuthorized(),true);checks++;
  for(const t of tools)assert.equal(api.isRegistered(t.id),true,t.id);checks++;
  w.eval(code);assert.equal(w.document.querySelectorAll('#tu-pda-launcher').length,1);checks++;
- assert.equal(w.document.querySelector('#tuac-panel'),null,'Startup must not initialize Stock tool');
+ assert.equal(api.isRegistered('alerts-calculations'),false,'Removed tool must not register');
  assert.equal(w.document.querySelector('#tuim-panel'),null,'Startup must not initialize Travel tool');checks++;
  assert.ok(!requests.some(u=>u.includes('modules.json')));checks++;
  w.document.querySelector('[data-tab="about"]').click();
  const button=text=>[...w.document.querySelectorAll('button')].find(b=>b.textContent===text);
- button('Version Notes').click();assert.ok(w.document.body.textContent.includes('0.5.42.33-dev'));checks++;
+ button('Version Notes').click();assert.ok(w.document.body.textContent.includes('0.5.42.34-dev'));checks++;
  button('← About').click();button('User Agreement').click();await tick();assert.ok(w.document.body.textContent.includes('Complete fixture agreement.'));checks++;
  for(const tool of tools){
   api.closeActiveModule();

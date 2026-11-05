@@ -39,9 +39,9 @@ for(const tool of tools){
 output=output.replace(/[\t ]+$/gm,'');
 new vm.Script(output,{filename:'torn-utilities-dev.user.js'});
 if((output.match(/^\/\/ ==UserScript==$/gm)||[]).length!==1)throw Error('Duplicate metadata');
-for(const marker of ['tu-multiplayer-server.tuserver.workers.dev','modules.json','War Status Diagnostic','war-status-diagnostic','--- Current Version','+++ New Version'])if(output.includes(marker))throw Error('Forbidden distribution marker: '+marker);
+for(const marker of ['tu-multiplayer-server.tuserver.workers.dev','alerts-calculations','modules.json','War Status Diagnostic','war-status-diagnostic','--- Current Version','+++ New Version'])if(output.includes(marker))throw Error('Forbidden distribution marker: '+marker);
 if(!output.startsWith('// ==UserScript==')||!output.includes('// @version      '+version))throw Error('Release metadata mismatch');
-if(tools.length!==11||new Set(tools.map(t=>t.id)).size!==11)throw Error('Expected exactly 11 tools');
+if(tools.length!==10||new Set(tools.map(t=>t.id)).size!==10)throw Error('Expected exactly 10 tools');
 fs.mkdirSync(path.join(root,'torn-utilities/releases/dev'),{recursive:true});
 for(const p of ['dist/tu-integrated-staging-dev.user.js',`../releases/dev/torn-utilities-${version}.user.js`,'../releases/dev/torn-utilities-dev.user.js']){const target=path.join(base,p);if(process.argv.includes('--check')){if(fs.readFileSync(target,'utf8')!==output)throw Error('Stale generated release: '+p);}else fs.writeFileSync(target,output);}
 console.log(`Built ${version}: ${tools.length} tools; ${Buffer.byteLength(output)} bytes`);
