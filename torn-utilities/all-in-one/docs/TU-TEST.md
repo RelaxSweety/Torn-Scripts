@@ -1,6 +1,6 @@
 # Independent TU Testing and Diagnostics DEV
 
-This updates **TU Testing and Diagnostics DEV**, previously v0.1.9-dev, to **v0.2.0-dev**. It is the independent guided checklist at `dist/tu-diagnostics-dev.user.js`. The separate `torn-utilities/diagnostics/torn-pda-diagnostic.user.js` is unchanged.
+This updates **TU Testing and Diagnostics DEV**, previously v0.1.9-dev, to **v0.2.1-dev**. It is the independent guided checklist at `dist/tu-diagnostics-dev.user.js`. The separate `torn-utilities/diagnostics/torn-pda-diagnostic.user.js` is unchanged.
 
 [Install/update TU Test](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/all-in-one/dist/tu-diagnostics-dev.user.js)
 
@@ -8,7 +8,7 @@ Install alongside the integrated TU DEV userscript. The current checklist target
 
 ## Using it
 
-1. Open **TU Test**, select the actual host (Tampermonkey or Torn PDA), and enter the device/OS/browser and host version. Platform detection is a hint, not proof of compatibility.
+1. Open **TU Test**, select the actual host (Tampermonkey or Torn PDA), and review the auto-filled device/OS/browser and host version. Correct or complete any editable values. Platform detection is a hint, not proof of compatibility.
 2. Run **Run read-only checks**. Seven automatic checks inspect the installed version label, shared tool registrations, temporary local storage, the version-specific integrated DEV artifact and agreement publications. A registration/source check does not establish functional correctness. Blocked networking remains BLOCKED.
 3. For the remaining 43 manual checks, follow the displayed steps in the actual selected host. Record observed behavior or a reproduction/blocking reason before marking PASS, FAIL, BLOCKED or SKIP. Use NOT TESTED to clear a result. Manual recording requires the target integrated TU build's version label to be present.
 4. Exercise real DEV authentication and backend agreement acceptance/cancellation yourself. The test tool never accepts terms, registers keys, creates rooms, submits gameplay, or deploys backend changes. Controlled agreement-version-change tests need an authorized DEV setup; leave BLOCKED when unavailable.
@@ -43,3 +43,11 @@ npm test
 ```
 
 Automated regressions cover catalog/tool coverage, evidence requirements, redaction, build/host isolation, unknown hosts, skipped/incomplete results, filters, resets, exports, duplicate launchers and blocked networks. They run in jsdom with mocked service responses. Actual Torn PDA/Tampermonkey execution and live DEV acceptance are still manual; no real-account outcomes were established by these regression tests.
+
+## Automatic environment details (v0.2.1)
+
+TU Test fills device type/family or exposed model, OS/platform version, browser/version and actual script host/version from available browser metadata. It prefers richer User-Agent Client Hints when supported and permitted, falling back to the reported user agent. It makes no network requests to detect device details. Manual corrections and saved values are retained, including when Client Hints arrive later.
+
+Tampermonkey uses `GM_info.version`, never `GM_info.script.version` (the test script's own version). Torn PDA version is read only from an explicit TornPDA app/version token in the user agent. A PDA bridge identifies the host but does not reveal its app version; when that version is not exposed, enter it from PDA's About screen. The tool does not invent app versions or read credentials/settings to find them.
+
+Browsers may reduce/spoof user agents, hide exact hardware models, report desktop-style iPad user agents or expose an OS platform code instead of a marketing version. Windows NT 10.0 is labeled Windows 10/11 without guessing which. Client Hints OS values are labeled platform versions. iPhone/iPad family identification is not an exact hardware model. Detection sources are included in the report's structured `detectedEnvironment`; manual profile fields remain authoritative evidence context. Auto-detection never marks functional checks as passed.

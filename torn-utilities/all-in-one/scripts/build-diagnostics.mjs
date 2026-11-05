@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import {fileURLToPath} from 'node:url';
+import {detectTestEnvironment} from '../src/diagnostics/environment.js';
 import {createAcceptanceSession} from '../src/diagnostics/acceptance-session.js';
 const base=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const read=p=>fs.readFileSync(path.join(base,p),'utf8');
@@ -9,7 +10,7 @@ const catalog=JSON.parse(read('config/test-cases.json')),tools=JSON.parse(read('
 if(new Set(catalog.tests.map(t=>t.id)).size!==catalog.tests.length)throw Error('Duplicate check IDs');
 for(const tool of tools)for(const suffix of ['function','lifecycle'])if(!catalog.tests.some(t=>t.id==='tool.'+tool.id+'.'+suffix))throw Error('Missing tool coverage: '+tool.id);
 for(const check of catalog.tests)if(check.section.startsWith('tool.')&&!tools.some(t=>check.section==='tool.'+t.id))throw Error('Obsolete tool check: '+check.id);
-let output=read('src/diagnostics/tu-test.user.js').replace('__TU_ACCEPTANCE_ENGINE__',()=>createAcceptanceSession.toString()).replace('__TU_TEST_CATALOG__',()=>JSON.stringify(catalog)).replace('__TU_TEST_TOOLS__',()=>JSON.stringify(tools.map(({id,name})=>({id,name})))).replaceAll('__TU_TEST_TARGET__',target);
+let output=read('src/diagnostics/tu-test.user.js').replace('__TU_ENVIRONMENT_DETECTOR__',()=>detectTestEnvironment.toString()).replace('__TU_ACCEPTANCE_ENGINE__',()=>createAcceptanceSession.toString()).replace('__TU_TEST_CATALOG__',()=>JSON.stringify(catalog)).replace('__TU_TEST_TOOLS__',()=>JSON.stringify(tools.map(({id,name})=>({id,name})))).replaceAll('__TU_TEST_TARGET__',target);
 new vm.Script(output,{filename:'tu-diagnostics-dev.user.js'});
 const dest=path.join(base,'dist/tu-diagnostics-dev.user.js');
 if(process.argv.includes('--check')){if(read('dist/tu-diagnostics-dev.user.js')!==output)throw Error('Stale TU Test build');}else fs.writeFileSync(dest,output);

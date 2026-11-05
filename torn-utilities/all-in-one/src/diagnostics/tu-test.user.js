@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Testing and Diagnostics DEV
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.2.0-dev
+// @version      0.2.1-dev
 // @description  Guided DEV acceptance for ten tools, separate PDA/Tampermonkey evidence and sanitized reports
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -22,11 +22,11 @@
  const key='tu:test:acceptance:'+targetBuild+':'+catalog.checklistVersion;
  const positionKey='tu:aio:diagnostics:launcher-position:v1',panelLayoutKey='tu:aio:diagnostics:panel-layout:v1';
  const host=typeof unsafeWindow!=='undefined'?unsafeWindow:window;
- const detected=(()=>{
-  if(/torn[ -]?pda/i.test(navigator.userAgent)||typeof host.PDA_httpGet==='function'||typeof host.PDA_httpPost==='function'||typeof window.PDA_httpGet==='function'||typeof window.PDA_httpPost==='function')return 'pda';
-  if(typeof GM_info!=='undefined'&&/tampermonkey/i.test(GM_info.scriptHandler||''))return 'tampermonkey';
-  return 'unknown';
- })();
+ const detectEnvironment=__TU_ENVIRONMENT_DETECTOR__;
+ const baseEnvironment={userAgent:navigator.userAgent,platform:navigator.platform,maxTouchPoints:navigator.maxTouchPoints,gmInfo:typeof GM_info!=='undefined'?GM_info:null,pdaBridge:typeof host.PDA_httpGet==='function'||typeof host.PDA_httpPost==='function'||typeof window.PDA_httpGet==='function'||typeof window.PDA_httpPost==='function'};
+ let environment=detectEnvironment({...baseEnvironment,uaData:navigator.userAgentData});
+ const detected=environment.host.id;
+
  let saved={};try{saved=JSON.parse(localStorage.getItem(key)||'{}')||{}}catch{}
  const profiles=saved.profiles&&typeof saved.profiles==='object'?saved.profiles:{};
  let platform=detected,session;
@@ -96,7 +96,7 @@
   const content=document.createElement('div');content.style.cssText='flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding-right:4px';panel.append(content);
  const button=(label,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=fn;b.style.cssText='font:600 12px Arial;color:#fff;background:#344d60;border:1px solid #7892a2;border-radius:5px;padding:8px;margin:3px;cursor:pointer';return b;};
  const text=(tag,value,parent=content)=>{const e=document.createElement(tag);e.textContent=value;parent.append(e);return e;};
- const notice=text('p','Target '+targetBuild+' · TU Test 0.2.0-dev. Record results only for the actual selected host. Automatic checks are read-only and do not prove gameplay or native bridge compatibility.');
+ const notice=text('p','Target '+targetBuild+' · TU Test 0.2.1-dev. Record results only for the actual selected host. Automatic checks are read-only and do not prove gameplay or native bridge compatibility.');
  text('p','Do not paste API keys, session tokens or room secrets into notes. This tool never registers keys, accepts/cancels agreements, creates rooms or modifies backend records.');
  const hostLabel=text('label','Actual test host: ');
  const hostSelect=document.createElement('select');hostSelect.id='tu-test-host';
@@ -105,6 +105,7 @@
  const hostVersion=text('input','');hostVersion.placeholder='Actual PDA / Tampermonkey version';hostVersion.id='tu-test-host-version';
  for(const e of [device,hostVersion]){e.style.cssText='display:block;width:100%;box-sizing:border-box;padding:8px;margin:6px 0';e.oninput=()=>{session.setMeta({device:device.value,hostVersion:hostVersion.value});save();updateSummary();};}
  const contextWarning=text('p','');
+ const detectedDetails=text('p','');detectedDetails.id='tu-test-detected-environment';
  const section=document.createElement('select');section.id='tu-test-section';
  const sections=[['all','All sections'],['automatic','Read-only automatic checks'],['auth','Authentication & agreement'],['core','Manager, data & release'],...tools.map(t=>['tool.'+t.id,t.name])];
  for(const [id,label] of sections){const o=document.createElement('option');o.value=id;o.textContent=label;section.append(o);}content.append(section);
@@ -115,7 +116,14 @@
  const list=document.createElement('div');list.id='tu-test-checklist';content.append(list);
  const feedback=text('textarea','');feedback.placeholder='General feedback (no credentials)';feedback.id='tu-test-feedback';feedback.style.cssText='width:100%;box-sizing:border-box;min-height:70px';
  feedback.oninput=()=>{session.setMeta({feedback:feedback.value});save();};
- const refreshFields=()=>{const m=session.snapshot().meta;device.value=m.device;hostVersion.value=m.hostVersion;feedback.value=m.feedback;};
+ const describeEnvironment=()=>[environment.device.model||environment.device.type,environment.os.name+(environment.os.version?(environment.os.source==='client-hints platform version'?' (platform '+environment.os.version+')':' '+environment.os.version):''),environment.browser.name+(environment.browser.version?' '+environment.browser.version:'')].filter(v=>v&&v!=='unknown').join(' / ');
+ const applyDetection=()=>{
+  const m=session.snapshot().meta,values={};
+  if(!m.device.trim())values.device=describeEnvironment();
+  if(!m.hostVersion.trim()&&platform===environment.host.id&&environment.host.version)values.hostVersion=environment.host.version;
+  session.setMeta(values);
+ };
+ const refreshFields=()=>{applyDetection();const m=session.snapshot().meta;device.value=m.device;hostVersion.value=m.hostVersion;feedback.value=m.feedback;detectedDetails.textContent='Auto-detected: '+describeEnvironment()+' · '+environment.host.name+' '+(environment.host.version||'(version not exposed)')+'. Reported browser information may be reduced; exact device models and app versions may be unavailable. Edit the fields to correct or complete them.';};
  const statusLabel=s=>s.toUpperCase().replace('-',' ');
  function updateSummary(){
   const r=session.report();
@@ -195,7 +203,7 @@
  const runButton=button('Run read-only checks',runChecks);actions.append(runButton);
  function exportReport(){
   save();const reports={};for(const id of ['tampermonkey','pda'])reports[id]=createSession({targetBuild,checklistVersion:catalog.checklistVersion,tests,platform:id,initial:profiles[id]}).report();
-  const report={schemaVersion:2,toolVersion:'0.2.0-dev',targetBuild,checklistVersion:catalog.checklistVersion,detectedHost:detected,userAgent:session.scrub(navigator.userAgent),platforms:reports,acceptanceComplete:Object.values(reports).every(r=>r.platformReady),productionAuthorized:false};
+  const report={schemaVersion:2,toolVersion:'0.2.1-dev',targetBuild,checklistVersion:catalog.checklistVersion,detectedHost:detected,detectedEnvironment:Object.fromEntries(Object.entries(environment).map(([k,fields])=>[k,Object.fromEntries(Object.entries(fields).map(([name,value])=>[name,typeof value==='string'?session.scrub(value):value]))])),userAgent:session.scrub(navigator.userAgent),platforms:reports,acceptanceComplete:Object.values(reports).every(r=>r.platformReady),productionAuthorized:false};
   const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='tu-dev-acceptance-'+targetBuild+'-'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
  }
  actions.append(button('Export both host reports',exportReport),button('Reset selected host',()=>{
@@ -204,4 +212,12 @@
  }));
  launcher.onclick=()=>{if(suppressClick){suppressClick=false;return;}panel.style.display=panel.style.display==='none'?'flex':'none';render();};
  document.body.append(launcher,panel);refreshFields();render();
+ if(typeof navigator.userAgentData?.getHighEntropyValues==='function'){
+  Promise.resolve().then(()=>navigator.userAgentData.getHighEntropyValues(['model','platformVersion','fullVersionList'])).then(hints=>{
+   const previous=describeEnvironment();environment=detectEnvironment({...baseEnvironment,uaData:{platform:navigator.userAgentData.platform,brands:navigator.userAgentData.brands,...hints}});
+   if(session.snapshot().meta.device===previous)session.setMeta({device:describeEnvironment()});
+   refreshFields();save();updateSummary();
+  }).catch(()=>{ /* Keep reported UA values and editable fields when hints are unavailable. */ });
+ }
+
 })();

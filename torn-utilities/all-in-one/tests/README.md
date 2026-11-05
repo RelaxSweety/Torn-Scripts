@@ -5,3 +5,5 @@ Run `npm run validate` from `torn-utilities/all-in-one` with Node 24. `core-smok
 Canvas, networking and browser bridge responses are mocked. These tests do not establish native PDA/Tampermonkey or live server compatibility. See `../docs/DEV-ACCEPTANCE.md` for remaining checks. `node scripts/build-dev.mjs --check` verifies committed release files exactly match the reproducible build.
 
 `diagnostics.mjs` validates the independent TU Test checklist/session engine and generated UI, including evidence gates, credential redaction, build/host isolation, complete exports and blocked networking. These are mocked jsdom tests, not native host acceptance. Run `node scripts/build-diagnostics.mjs --check` to reject a stale TU Test build. See `../docs/TU-TEST.md` for usage.
+
+`environment.mjs` covers device/browser/host parsing, reduced user agents, PDA version availability, correct Tampermonkey version selection, Client Hints success/denial and preservation of manual metadata corrections. These fixtures do not constitute real-device acceptance.
