@@ -637,11 +637,11 @@
       version.textContent='Agreement version '+TU_TERMS_VERSION+' · Number '+currentDevAgreement.agreement_number+' · '+currentDevAgreement.agreement_date;
       // Render only recognized Markdown headings and paragraphs using safe text nodes.
       // Never assign published agreement content to innerHTML.
-      const sections=currentDevAgreementContent.replace(/\\r\\n?/g,'\\n').split(/\\n\\s*\\n/);
+      const sections=currentDevAgreementContent.replace(/\r\n?/g,'\n').split(/\n\s*\n/);
       for(const block of sections){
-        const lines=block.split('\\n');
+        const lines=block.split('\n');
         for(const line of lines){
-          const heading=/^(#{1,3})\\s+(.+)$/.exec(line);
+          const heading=/^(#{1,3})\s+(.+)$/.exec(line);
           const element=document.createElement(heading?(heading[1].length===1?'h2':'h3'):'p');
           element.textContent=heading?heading[2]:line;
           element.style.cssText=heading
