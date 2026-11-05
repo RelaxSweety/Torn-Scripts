@@ -75,7 +75,7 @@ async function publishedAgreement(env) {
   // Earlier D1 migrations may store equivalent Markdown with different CRLF or
   // trailing blank lines. Ignore only those transport/formatting differences;
   // never silently overwrite an existing published agreement's wording.
-  const canonicalText = value => String(value).replace(/\r\n?/g, "\n").replace(/[\t ]+$/gm, "").trimEnd();
+  const canonicalText = value => String(value).replace(/\s+/g, " ").trim();
   if (row && (row.agreement_version !== a.agreement_version || row.agreement_date !== a.agreement_date || canonicalText(row.content) !== canonicalText(published.content))) {
     const stored = canonicalText(row.content), incoming = canonicalText(published.content);
     let firstDifference = 0;
