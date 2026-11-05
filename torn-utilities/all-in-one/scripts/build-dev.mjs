@@ -9,7 +9,8 @@ const read=p=>fs.readFileSync(path.join(base,p),'utf8');
 const tools=JSON.parse(read('config/tools.json'));
 const releases=JSON.parse(read('config/releases.json'));
 const version=releases[0].version;
-let manager=read('src/manager/manager.user.js');
+const logoData='data:image/png;base64,'+fs.readFileSync(path.join(root,'torn-utilities/assets/tu-logo-integrated-gold.png')).toString('base64');
+let manager=read('src/manager/manager.user.js').replaceAll('__TU_LOGO_DATA_URL__',logoData);
 const registry=/const registry=\{schemaVersion:1,categories:(\[.*?\]),modules:\[.*?\]\};/;
 if(!registry.test(manager))throw Error('Manager tool directory missing');
 manager=manager.replace(registry,(_,categories)=>`const registry={schemaVersion:1,categories:${categories},modules:${JSON.stringify(tools.map(({source,...t})=>t))}};\nconst TU_RELEASES=${JSON.stringify(releases)};`);
@@ -28,7 +29,7 @@ for(const tool of tools){
   if(end<start)throw Error('Authorization wrapper changed: '+tool.source);
   source=source.slice(start,end);
  }
- if(tool.id==='war-hit-organizer')source=source.replace(/data:image\/webp;base64,[A-Za-z0-9+/=]+/g,'data:image/svg+xml;base64,'+fs.readFileSync(path.join(root,'torn-utilities/assets/tu-logo-standard.svg')).toString('base64'));
+ if(tool.id==='war-hit-organizer')source=source.replace(/"data:image\/webp;base64,[A-Za-z0-9+/=]+"/g,'manager.getLogo()');
 
  // Each retained source runs only on first use. A private Window facade captures
  // its legacy registration internally and binds native Window methods correctly.

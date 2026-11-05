@@ -1,6 +1,6 @@
 # Torn Utilities — single-script DEV
 
-Version **0.5.42.32-dev**, branch `dev/tu-all-in-one`. Install one complete userscript for desktop Tampermonkey or Torn PDA. This is a DEV release for manual acceptance; no production deployment is included.
+Version **0.5.42.33-dev**, branch `dev/tu-all-in-one`. Install one complete userscript for desktop Tampermonkey or Torn PDA. This is a DEV release for manual acceptance; no production deployment is included.
 
 [Install DEV](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/releases/dev/torn-utilities-dev.user.js) · [Installation and rollback](../INSTALLATION.md) · [Acceptance checklist](docs/DEV-ACCEPTANCE.md)
 
@@ -26,6 +26,6 @@ The internal Manager registers 11 lazy factories. Each retained source initializ
 
 All bundled service endpoints target the DEV Worker. Multiplayer requests carry account authorization plus a separate room token. DEV room session keys are separate from production; saved game history, settings, and other storage namespaces remain in place. Existing room sessions are not copied between servers. Backups preserve the existing TU-managed namespace format; large archives and legacy tool storage are outside that backup format and must be exported using their own tools.
 
-The existing vector master `../assets/tu-logo-standard.svg` is embedded at native resolution, including the compact 34px launcher and War Organizer logo. No replacement bitmap or new artwork was created. Device rendering remains an acceptance check.
+The selected sample #1 Integrated Gold logo is embedded from `../assets/tu-logo-integrated-gold.png`, including the compact 34px launcher, shared headers and War Organizer logo. The previous SVG master remains available for historical releases. Device rendering remains an acceptance check.
 
 Historical independent sources, `modules.json`, legacy catalog Managers, and production guard workflows remain for rollback and existing supported installations. They are not inputs to the DEV integrated build. Never run the production candidate builder as part of DEV release setup, and never deploy Workers or databases for this workflow.

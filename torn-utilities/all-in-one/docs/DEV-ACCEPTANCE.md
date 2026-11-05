@@ -1,3 +1,7 @@
+## Logo update: 0.5.42.33-dev
+
+Selected sample #1 Integrated Gold replaces the DEV launcher, shared header and War Organizer logos. Core smoke tests and all 191 integration assertions pass; committed-output checks pass. The previous 0.5.42.32-dev file is preserved. Native device logo rendering remains a manual acceptance check.
+
 # DEV 0.5.42.32 acceptance report
 
 Release date: 2026-11-05. Branch: `dev/tu-all-in-one`. This is a DEV userscript for user review, with 11 retained tools. The working pre-integration Manager and all Worker/database files are unchanged.
