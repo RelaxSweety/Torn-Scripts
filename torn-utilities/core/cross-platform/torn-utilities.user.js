@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities Cross-Platform
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.26-who-dev
+// @version      0.5.42.27-who-dev
 // @description  Compact draggable TU launcher for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -223,10 +223,12 @@
   }
   // Public Only key stored locally on this device; no passphrase or GM grants.
   const VAULT='tu:identity:public-only-key:v1';
+  const LOGIN_ACCESS_KEY='tu:identity:login-access-level:v1';
+  const loginAccessLabel=()=>localStorage.getItem(LOGIN_ACCESS_KEY)==='limited'?'Limited Access':localStorage.getItem(LOGIN_ACCESS_KEY)==='public'?'Public Only':'Access level unverified';
   const normalizeKey=v=>{if(typeof v!=='string')return '';let x=v.trim();for(let i=0;i<3;i++){if(x.startsWith('GMV2_')){x=x.slice(5);continue;}if(x.startsWith('"')&&x.endsWith('"')){try{const y=JSON.parse(x);if(typeof y==='string'){x=y.trim();continue}}catch{}}break;}return /^[A-Za-z0-9]{16}$/.test(x)?x:'';};
   const readSavedKey=()=>{let v='';try{v=localStorage.getItem(VAULT)||''}catch{}let key=normalizeKey(v);if(key){if(key!==v)try{localStorage.setItem(VAULT,key)}catch{}return key;}try{key=normalizeKey(typeof GM_getValue==='function'?GM_getValue(VAULT,''):'');if(key){try{localStorage.setItem(VAULT,key)}catch{}return key}}catch{}return ''};
   const saveKey=key=>{let stored=false;try{localStorage.setItem(VAULT,key);stored=true}catch(_){}try{if(typeof GM_setValue==='function'){GM_setValue(VAULT,key);stored=true}}catch(_){}if(!stored)throw Error('No persistent key storage available')};
-  const removeSavedKey=()=>{try{localStorage.removeItem(VAULT)}catch(_){}try{if(typeof GM_deleteValue==='function')GM_deleteValue(VAULT)}catch(_){}};
+  const removeSavedKey=()=>{try{localStorage.removeItem(LOGIN_ACCESS_KEY)}catch(_){}try{localStorage.removeItem(VAULT)}catch(_){}try{if(typeof GM_deleteValue==='function')GM_deleteValue(VAULT)}catch(_){}};
   // Explicit user-provided Public Only key; never persisted or broadcast.
   let playerInfo=null,identityStatus='Enter your Public Only or Limited Access API key',identityBusy=null,authGeneration=0;
   const getPlayer=()=>playerInfo?Object.freeze({...playerInfo}):null;
@@ -464,11 +466,14 @@
     const registration=await devRequest('/api/auth/register','POST',{api_key:key,platform},'');
     if(!registration.token)throw Error('Registration returned no session');
     const token=registration.token;
+    const accessLevel=registration.accessLevel;
+    if(!['public','limited'].includes(accessLevel))throw Error('Torn did not confirm a Public Only or Limited Access key');
     const agreement=await loadDevAgreement();
     await devRequest('/api/auth/agreement','POST',{action:'accepted',request_id:crypto.randomUUID(),...agreement},token);
     const status=await devRequest('/api/auth/agreement','GET',null,token);
     if(!status.accepted)throw Error('Development agreement was not confirmed');
     sessionStorage.setItem(DEV_SESSION_KEY,token);
+    localStorage.setItem(LOGIN_ACCESS_KEY,accessLevel);
     resetDevAuthFailure();
     return status;
   }
@@ -669,7 +674,7 @@
       if(!check.checked)return;
       if(!currentDevAgreement){status.textContent='Current agreement has not loaded. Please wait or reopen the agreement.';return;}
       const supplied=key.value.trim();if(supplied&&!/^[a-zA-Z0-9]{16}$/.test(supplied)){status.textContent='Enter a valid 16-character Public Only or Limited Access key';return;}
-      const selected=supplied||readSavedKey();if(!/^[A-Za-z0-9]{16}$/.test(selected)){status.textContent='A 16-character Public Only or Limited Access key is required';return;}accept.disabled=true;try{status.textContent='Registering and recording development agreement…';await devAccept(selected,'tampermonkey');if(supplied)saveKey(supplied);await updatePlayer(selected);}catch(error){status.textContent='Development agreement failed: '+error.message;accept.disabled=false;return;}
+      const selected=supplied||readSavedKey();if(!/^[A-Za-z0-9]{16}$/.test(selected)){status.textContent='A 16-character Public Only or Limited Access key is required';return;}accept.disabled=true;try{status.textContent='Registering and recording development agreement…';await devAccept(selected,'tampermonkey');if(supplied)saveKey(supplied);await updatePlayer(selected);}catch(error){status.textContent='Development agreement failed: '+(error.message==='Torn verification failed'?'Torn could not verify this key. Registration requires a valid Public Only or Limited Access key; Full Access and invalid keys are not supported.':error.message);accept.disabled=false;return;}
       localStorage.setItem(TU_TERMS_KEY,TU_TERMS_VERSION);publishAuthorization(true);overlay.remove();render('modules');
     });
     buttons.append(decline,accept);dialog.append(buttons);overlay.append(dialog);document.body.append(overlay);
@@ -834,7 +839,7 @@
         const renderSaved=()=>{
           saved.replaceChildren();
           const keys=[];
-          const publicKey=readSavedKey();if(publicKey)keys.push({key:publicKey,level:'Public Only',source:'public'});
+          const publicKey=readSavedKey();if(publicKey)keys.push({key:publicKey,level:loginAccessLabel(),source:'public'});
           const who=localStorage.getItem(WHO_KEY);if(who&&who!==publicKey)keys.push({key:who,level:'Limited Access',source:'who'});
           for(const x of readExtras())if(!keys.some(y=>y.key===x.key))keys.push({...x,source:'extra'});
           const summary=document.createElement('p');summary.textContent=keys.length+' saved API key(s)';saved.append(summary);
