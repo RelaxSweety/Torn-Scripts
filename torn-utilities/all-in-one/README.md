@@ -1,6 +1,6 @@
 # Torn Utilities — single-script DEV
 
-Version **0.5.42.35-dev**, branch `dev/tu-all-in-one`. Install one complete userscript for desktop Tampermonkey or Torn PDA. This is a DEV release for manual acceptance; no production deployment is included.
+Version **0.5.42.36-dev**, branch `dev/tu-all-in-one`. Install one complete userscript for desktop Tampermonkey or Torn PDA. This is a DEV release for manual acceptance; no production deployment is included.
 
 [Install DEV](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/releases/dev/torn-utilities-dev.user.js) · [Installation and rollback](../INSTALLATION.md) · [Acceptance checklist](docs/DEV-ACCEPTANCE.md)
 
@@ -32,4 +32,8 @@ Historical independent sources, `modules.json`, legacy catalog Managers, and pro
 
 ## Independent TU Test
 
-Use [TU Testing and Diagnostics DEV](docs/TU-TEST.md) v0.2.1-dev for the 50-check acceptance plan, separate PDA/Tampermonkey evidence, and sanitized exports. This checklist targets the current integrated DEV build; actual host tests remain manual. `npm run build` also regenerates this independent test tool; `npm run build:diagnostics` updates only TU Test.
+Use [TU Testing and Diagnostics DEV](docs/TU-TEST.md) v0.2.2-dev for the 52-check acceptance plan, separate PDA/Tampermonkey evidence, and sanitized exports. This checklist targets the current integrated DEV build; actual host tests remain manual. `npm run build` also regenerates this independent test tool; `npm run build:diagnostics` updates only TU Test.
+
+## Saved API keys
+
+Settings → API Keys keeps each Torn-verified Public Only/Limited key in a separate record with its own access level and player ID. Saving adds or updates that key without replacing the login. Use the explicit TU login or War Organizer buttons to select a role. Legacy login/WHO/additional stores are merged without discarding keys; legacy labels stay unverified until rechecked. Removing a key clears matching legacy/role copies and preserves other keys. Active-key removal still requires confirmed DEV cancellation. Keys already overwritten before this fix cannot be recovered if no stored copy remains; re-add those keys. Key records are excluded from TU-managed backups and diagnostic reports.

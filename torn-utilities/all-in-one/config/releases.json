@@ -1,5 +1,19 @@
 [
   {
+    "version": "0.5.42.36-dev",
+    "date": "2026-11-05",
+    "changes": {
+      "Fixes": [
+        "Retain each validated API key independently with its own verified access level and owner",
+        "Adding keys preserves the active login; explicit saved-key login and War Organizer selection",
+        "Remove selected keys from legacy role stores as well as the saved-key list; prevent cleared login resurrection"
+      ],
+      "Migration": [
+        "Legacy saved keys are recovered and shown individually; recheck legacy access levels in Settings"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.35-dev",
     "date": "2026-11-05",
     "changes": {

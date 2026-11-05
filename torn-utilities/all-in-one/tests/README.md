@@ -7,3 +7,5 @@ Canvas, networking and browser bridge responses are mocked. These tests do not e
 `diagnostics.mjs` validates the independent TU Test checklist/session engine and generated UI, including evidence gates, credential redaction, build/host isolation, complete exports and blocked networking. These are mocked jsdom tests, not native host acceptance. Run `node scripts/build-diagnostics.mjs --check` to reject a stale TU Test build. See `../docs/TU-TEST.md` for usage.
 
 `environment.mjs` covers device/browser/host parsing, reduced user agents, PDA version availability, correct Tampermonkey version selection, Client Hints success/denial and preservation of manual metadata corrections. These fixtures do not constitute real-device acceptance.
+
+`saved-keys.mjs` runs the generated Manager with mock Torn/DEV services to verify per-key access levels, multiple-key retention/deduplication, legacy recovery, explicit login/War selection, cross-player rejection, reload, failed operations, deletion of all selected-key copies and prevention of stale GM login recovery. Live device/account retesting is still required.

@@ -1,3 +1,7 @@
+## Saved-key update: 0.5.42.36-dev
+
+Settings now retains multiple validated keys independently, labels each from its own verified metadata, preserves the login when adding a key, offers explicit login/War Organizer selection, and removes matching copies of only the selected key. Legacy keys can be rechecked; incompatible-account War key roles are cleared without deleting the saved key. Dedicated saved-key regressions cover the reported failure, persistence, account isolation, deletion, failed requests and GM fallback. Re-run the updated TU Test v0.2.2 (52 checks) against this build; actual PDA/Tampermonkey retesting and authorized backend event evidence remain required. Previous build test evidence is preserved separately.
+
 ## Tool removal: 0.5.42.34-dev
 
 Stock and Calculations is excluded from the integrated build, navigation and registration. Ten tools remain. Historical standalone source, releases and stored settings are retained. Native device testing remains manual.

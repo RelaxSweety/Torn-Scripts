@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "checklistVersion": "dev-acceptance-2026-11-05-v2",
+  "checklistVersion": "dev-acceptance-2026-11-05-v3",
   "tests": [
     {
       "id": "runtime.build",
@@ -123,6 +123,30 @@
       ]
     },
     {
+      "id": "auth.keyinventory",
+      "section": "auth",
+      "label": "Saved keys and verified per-key labels",
+      "instructions": "Save at least two Public Only and two Limited Access keys. Verify each is listed once with its own Torn-verified access level and owner, even after reload. Adding a key must leave the current login unchanged. Recheck legacy keys; explicitly switch the login and War Organizer key, and verify other keys remain saved.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "auth.keyremoval",
+      "section": "auth",
+      "label": "Remove one key without losing others",
+      "instructions": "Remove an inactive key and verify every copy is removed while other keys and the login remain. Remove the active login in a dedicated DEV session: cancellation must be confirmed before deletion, other saved keys must remain, and the deleted key must not return after reload through GM or legacy storage. Cancellation/network failure must retain the active key.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
       "id": "auth.visibility",
       "section": "auth",
       "label": "Show / Hide API key",
@@ -186,7 +210,7 @@
       "id": "agreement.accept",
       "section": "auth",
       "label": "Agreement acceptance record",
-      "instructions": "Explicitly accept in DEV and verify the authorized backend confirms the corresponding acceptance event. This tool never submits acceptance.",
+      "instructions": "After explicitly accepting in DEV, inspect an authorized backend response or event record confirming the acceptance event for the current agreement. Record the event type, agreement version and confirmation timestamp without credentials. Successful UI access alone does not pass this check; mark BLOCKED if backend evidence is unavailable. This tool never submits acceptance.",
       "kind": "manual",
       "critical": true,
       "platforms": [

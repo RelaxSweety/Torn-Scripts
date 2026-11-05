@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities DEV (All-in-One)
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.35-dev
+// @version      0.5.42.36-dev
 // @description  Integrated TU development bundle for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -26,7 +26,7 @@
   if (pageWindow.__RELAX_TORN_UTILITIES_PDA__) return;
   pageWindow.__RELAX_TORN_UTILITIES_PDA__ = true;
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.5.42.35-dev';
+  const TU_VERSION='0.5.42.36-dev';
   const TU_LOGO='__TU_LOGO_DATA_URL__';
   // Bundled tool directory: no external catalog, cache, or refresh requests.
   const registry={schemaVersion:1,categories:[{"id":"business","name":"Business Tools","icon":"▥","order":10},{"id":"games","name":"Games","icon":"♜","order":20},{"id":"single-player","name":"Single Player","icon":"▣","order":21,"parent":"games"},{"id":"multiplayer","name":"Multiplayer","icon":"♟","order":22,"parent":"games"},{"id":"chat","name":"Chat Tools","icon":"◉","order":30},{"id":"other","name":"War Tools","icon":"⚙","order":40}],modules:[{"id":"flight-game","name":"Flight Game","category":"single-player","version":"0.12.8","description":"Standalone Flight Game arcade module, playable anytime"},{"id":"stick-fighter","name":"Stick Fighter","category":"single-player","version":"0.2.7","description":"Standalone Stick Fighter arcade module, playable anytime"},{"id":"chat-archiver","name":"Chat Archiver","category":"chat","version":"0.1.8","description":"Archive Torn chat conversations"},{"id":"tic-tac-toe","name":"Tic-Tac-Toe","category":"multiplayer","version":"0.6.5","description":"Two-player Tic-Tac-Toe with named winners, green winning line, rematches and head-to-head history"},{"id":"torn-four","name":"Torn Four","category":"multiplayer","version":"0.2.5","description":"Connect Four: two-player multiplayer with private room codes"},{"id":"torn-fleet","name":"Torn Fleet","category":"multiplayer","version":"0.2.5","description":"Battleship: fleet placement and turn-based naval combat"},{"id":"torn-snake","name":"Slithering Streets","category":"single-player","version":"0.2.14","description":"Single-player Snake with touch controls and local high scores"},{"id":"chaos-marbles","name":"Chaos Marbles","category":"multiplayer","version":"0.2.5","description":"Online 2\u20134 player marble race with private player sessions, Waiting for Chaos staging, and game history"},{"id":"item-monitor","name":"Travel Assistant and Item Monitor","category":"business","version":"1.10.31-dev","description":"Item Monitor and Travel Assistant with D1 stock reporting, source diagnostics and stock estimation"},{"id":"war-hit-organizer","name":"War Organizer","category":"other","version":"0.3.17-dev","description":"Compact war target board, reservation controls, timer and local development settings"}]};
@@ -97,13 +97,46 @@
     return pending.length;
   }
   // Public Only key stored locally on this device; no passphrase or GM grants.
-  const VAULT='tu:identity:public-only-key:v1';
+  const VAULT='tu:identity:public-only-key:v1',VAULT_CLEARED='tu:identity:login-cleared:v1';
   const LOGIN_ACCESS_KEY='tu:identity:login-access-level:v1';
-  const loginAccessLabel=()=>localStorage.getItem(LOGIN_ACCESS_KEY)==='limited'?'Limited Access':localStorage.getItem(LOGIN_ACCESS_KEY)==='public'?'Public Only':'Access level unverified';
+  const loginAccessLabel=()=>readStoredKeys().find(entry=>entry.key===readSavedKey())?.level||'Access level unverified';
   const normalizeKey=v=>{if(typeof v!=='string')return '';let x=v.trim();for(let i=0;i<3;i++){if(x.startsWith('GMV2_')){x=x.slice(5);continue;}if(x.startsWith('"')&&x.endsWith('"')){try{const y=JSON.parse(x);if(typeof y==='string'){x=y.trim();continue}}catch{}}break;}return /^[A-Za-z0-9]{16}$/.test(x)?x:'';};
-  const readSavedKey=()=>{let v='';try{v=localStorage.getItem(VAULT)||''}catch{}let key=normalizeKey(v);if(key){if(key!==v)try{localStorage.setItem(VAULT,key)}catch{}return key;}try{key=normalizeKey(typeof GM_getValue==='function'?GM_getValue(VAULT,''):'');if(key){try{localStorage.setItem(VAULT,key)}catch{}return key}}catch{}return ''};
-  const saveKey=key=>{let stored=false;try{localStorage.setItem(VAULT,key);stored=true}catch(_){}try{if(typeof GM_setValue==='function'){GM_setValue(VAULT,key);stored=true}}catch(_){}if(!stored)throw Error('No persistent key storage available')};
-  const removeSavedKey=()=>{try{localStorage.removeItem(LOGIN_ACCESS_KEY)}catch(_){}try{localStorage.removeItem(VAULT)}catch(_){}try{if(typeof GM_deleteValue==='function')GM_deleteValue(VAULT)}catch(_){}};
+  const readSavedKey=()=>{let v='';try{v=localStorage.getItem(VAULT)||''}catch{}let key=normalizeKey(v);if(key){if(key!==v)try{localStorage.setItem(VAULT,key)}catch{}return key;}if(localStorage.getItem(VAULT_CLEARED)==='1')return '';try{key=normalizeKey(typeof GM_getValue==='function'?GM_getValue(VAULT,''):'');if(key){try{localStorage.setItem(VAULT,key)}catch{}return key}}catch{}return ''};
+  const saveKey=key=>{localStorage.setItem(SAVED_KEYS,JSON.stringify(readStoredKeys()));let stored=false;try{localStorage.setItem(VAULT,key);stored=true}catch(_){}try{if(typeof GM_setValue==='function'){GM_setValue(VAULT,key);stored=true}}catch(_){}if(!stored)throw Error('No persistent key storage available');localStorage.removeItem(VAULT_CLEARED)};
+  const removeSavedKey=()=>{localStorage.setItem(VAULT_CLEARED,'1');try{localStorage.removeItem(LOGIN_ACCESS_KEY)}catch(_){}try{localStorage.removeItem(VAULT)}catch(_){}try{if(typeof GM_deleteValue==='function')GM_deleteValue(VAULT);else if(typeof GM_setValue==='function')GM_setValue(VAULT,'')}catch(_){}};
+  const SAVED_KEYS='tu:identity:saved-keys:v1',WHO_KEY='tu:who:limited-api-key:v1',EXTRA_KEYS='tu:api:additional-keys:v1';
+  const readExtras=()=>{try{const list=JSON.parse(localStorage.getItem(EXTRA_KEYS)||'[]');return Array.isArray(list)?list.filter(x=>normalizeKey(x?.key)):[]}catch{return []}};
+  function readStoredKeys(){
+    let records=[];try{const data=JSON.parse(localStorage.getItem(SAVED_KEYS)||'[]');if(Array.isArray(data))records=data}catch{}
+    const keys=new Map();
+    for(const entry of records){const key=normalizeKey(entry?.key);if(key&&!keys.has(key))keys.set(key,{key,level:['Public Only','Limited Access'].includes(entry.level)?entry.level:null,playerId:/^[1-9][0-9]*$/.test(String(entry.playerId||''))?String(entry.playerId):null,verifiedAt:typeof entry.verifiedAt==='string'?entry.verifiedAt:null});}
+    // Recover every legacy key without treating stale role labels as verified access.
+    for(const value of [readSavedKey(),localStorage.getItem(WHO_KEY),...readExtras().map(e=>e.key)]){const key=normalizeKey(value);if(key&&!keys.has(key))keys.set(key,{key,level:null,playerId:null,verifiedAt:null});}
+    return [...keys.values()];
+  }
+  function rememberVerifiedKey(key,level,playerId){
+    if(!normalizeKey(key)||!['Public Only','Limited Access'].includes(level))throw Error('Unsupported verified key');
+    const entries=readStoredKeys(),entry=entries.find(e=>e.key===key)||{key};
+    const previous=entries.findIndex(e=>e.key===key);
+    Object.assign(entry,{level,playerId:/^[1-9][0-9]*$/.test(String(playerId||''))?String(playerId):entry.playerId||null,verifiedAt:new Date().toISOString()});
+    if(previous<0)entries.push(entry);else entries[previous]=entry;
+    localStorage.setItem(SAVED_KEYS,JSON.stringify(entries));
+    return entry;
+  }
+  function forgetStoredKey(key){
+    const remaining=readStoredKeys().filter(e=>e.key!==key);
+    if(readSavedKey()===key)removeSavedKey();
+    if(normalizeKey(localStorage.getItem(WHO_KEY))===key)localStorage.removeItem(WHO_KEY);
+    localStorage.setItem(EXTRA_KEYS,JSON.stringify(readExtras().filter(e=>normalizeKey(e.key)!==key)));
+    localStorage.setItem(SAVED_KEYS,JSON.stringify(remaining));
+  }
+  function checkedKeyInfo(data){
+    if(data?.error)throw Error('Torn rejected key');
+    const level=String(data?.info?.access?.type??data?.info?.access??'').trim(),playerId=Number(data?.info?.user?.id);
+    if(!['Public Only','Limited Access'].includes(level))throw Error('Only Public Only or Limited Access keys are supported');
+    if(!Number.isSafeInteger(playerId)||playerId<=0)throw Error('Torn did not return a valid key owner');
+    return {level,playerId:String(playerId)};
+  }
   // Explicit user-provided Public Only key; never persisted or broadcast.
   let playerInfo=null,identityStatus='Enter your Public Only or Limited Access API key',identityBusy=null,authGeneration=0;
   const getPlayer=()=>playerInfo?Object.freeze({...playerInfo}):null;
@@ -129,20 +162,23 @@
     playerInfo={...playerInfo,name:u?.name||u?.player?.name||playerInfo.name||null,factionName:fa?.name||fa?.faction?.name||factionFromUser||playerInfo.factionName||null,updatedAt:Date.now()};
     pageWindow.dispatchEvent(new CustomEvent('tu-player-updated',{detail:{...playerInfo}}));
   }
-  async function updatePlayer(key){
+  async function updatePlayer(key,verifiedData=null){
     if(typeof key!=='string')return !!playerInfo;
     if(identityBusy)return identityBusy;
     const generation=++authGeneration;
     identityBusy=(async()=>{
       try{
         if(!/^[a-zA-Z0-9]{16}$/.test(key))throw Error('Invalid 16-character key');
-        const data=await requestIdentity(key);
+        const data=verifiedData||await requestIdentity(key);
         if(data?.error)throw Error('Torn rejected key');
         if(!['Public Only','Limited Access'].includes(data?.info?.access?.type??data?.info?.access))throw Error('Public Only or Limited Access key required');
         const id=Number(data?.info?.user?.id),faction=Number(data?.info?.user?.faction_id||0);
         if(!Number.isSafeInteger(id)||id<=0)throw Error('Key owner not returned');
         if(generation!==authGeneration)return false;
+        const checked=checkedKeyInfo(data);rememberVerifiedKey(key,checked.level,checked.playerId);
+        if(key===readSavedKey())localStorage.setItem(LOGIN_ACCESS_KEY,checked.level==='Limited Access'?'limited':'public');
         playerInfo={id:String(id),name:null,factionId:Number.isSafeInteger(faction)&&faction>0?faction:null,factionName:null,profileUrl:'https://www.torn.com/profiles.php?XID='+id,updatedAt:Date.now()};
+        const warKey=readStoredKeys().find(entry=>entry.key===normalizeKey(localStorage.getItem(WHO_KEY)));if(warKey?.playerId&&warKey.playerId!==String(id))localStorage.removeItem(WHO_KEY);
         identityStatus='Verified by Torn API';pageWindow.dispatchEvent(new CustomEvent('tu-player-updated',{detail:{...playerInfo}}));void enrichIdentity(key,generation);return true;
       }catch(e){if(generation===authGeneration){playerInfo=null;identityStatus='Verification failed: '+e.message;}return false;}
       finally{identityBusy=null;}
@@ -183,7 +219,8 @@
       if(!authorized())throw Error('TU Manager authentication required');
       if(typeof path!=='string'||!(/^(?:\/v2\/faction(?:\/|\?|$)|\/v2\/user\/[0-9]+\/profile(?:\?|$))/.test(path)))throw Error('Unsupported WHO API path');
       const key=normalizeKey(localStorage.getItem('tu:who:limited-api-key:v1')||'')||(localStorage.getItem(LOGIN_ACCESS_KEY)==='limited'?readSavedKey():'');
-      if(!key)throw Error('Save a Limited Access key under TU Manager > Settings > API Keys');
+      const keyEntry=readStoredKeys().find(entry=>entry.key===key);
+      if(!key||keyEntry?.level!=='Limited Access'||!playerInfo?.id||keyEntry.playerId!==playerInfo.id)throw Error('Recheck and select a Limited Access key for the current TU player in Settings > API Keys');
       const url='https://api.torn.com'+path;
       const data=await new Promise((resolve,reject)=>{
         if(typeof GM_xmlhttpRequest==='function')GM_xmlhttpRequest({method:'GET',url,timeout:20000,headers:{Authorization:'ApiKey '+key,Accept:'application/json'},onload:r=>{try{if(r.status<200||r.status>=300)throw Error('HTTP '+r.status);resolve(JSON.parse(r.responseText))}catch(e){reject(e)}},onerror:()=>reject(Error('Network error')),ontimeout:()=>reject(Error('Timeout'))});
@@ -352,6 +389,7 @@
     const status=await devRequest('/api/auth/agreement','GET',null,token);
     if(!status.accepted)throw Error('Development agreement was not confirmed');
     sessionStorage.setItem(DEV_SESSION_KEY,token);
+    rememberVerifiedKey(key,accessLevel==='limited'?'Limited Access':'Public Only',registration.playerId);
     localStorage.setItem(LOGIN_ACCESS_KEY,accessLevel);
     resetDevAuthFailure();
     return status;
@@ -468,7 +506,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.35-dev</span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.36-dev</span></footer>';
   document.body.appendChild(panel);
   const headerBrand=panel.querySelector('.tu-logo');if(headerBrand){headerBrand.textContent='';headerBrand.classList.add('tu-brand-emblem');headerBrand.setAttribute('role','img');headerBrand.setAttribute('aria-label','Torn Utilities');}
   const identityLine=document.createElement('p');
@@ -534,14 +572,14 @@
     };
     loadDevAgreement().then(renderPublished).catch(error=>{version.textContent='Agreement unavailable';body.textContent='Unable to load current terms: '+error.message+'. Retry by reopening the agreement.';});
   }
-  function showAgreement(){
+  function showAgreement(selectedKey=null){
     panel.hidden=false;render('about');
-    const existing=document.getElementById('tu-agreement-overlay');if(existing){existing.hidden=false;existing.style.display='flex';tuNav.minimized=false;tuNav.exited=false;launcher.hidden=true;return;}
+    const existing=document.getElementById('tu-agreement-overlay');if(existing){if(typeof selectedKey==='string'){const field=existing.querySelector('input[type=password],input[type=text]');if(field)field.value=selectedKey;}existing.hidden=false;existing.style.display='flex';tuNav.minimized=false;tuNav.exited=false;launcher.hidden=true;return;}
     const overlay=document.createElement('div');overlay.id='tu-agreement-overlay';overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#000d;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;overflow:hidden';
     const dialog=document.createElement('section');dialog.style.cssText='background:#182026;color:#eee;border:2px solid #cba953;border-radius:12px;width:min(96vw,580px);max-height:calc(100dvh - 110px);height:min(780px,calc(100dvh - 110px));display:flex;flex-direction:column;overflow:hidden;padding:0;font:14px/1.5 system-ui;box-sizing:border-box;min-height:0';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');
     const h=document.createElement('h2');h.textContent='TU Terms and Information Use Agreement';h.style.cssText='display:block;position:static;margin:0 0 18px;padding:0;color:#f3f6f8;font:700 21px/1.35 system-ui';dialog.append(h);appendTerms(dialog);
     const keyInfo=document.createElement('p');keyInfo.textContent='Torn Public Only or Limited Access API key: enter your key below to verify identity and accept the current published agreement. Never enter a Full Access key.';dialog.append(keyInfo);
-    const key=document.createElement('input');key.type='password';key.autocomplete='off';key.maxLength=16;key.placeholder=readSavedKey()?'API key already saved':'16-character Public Only or Limited Access key';key.style.cssText='flex:1;min-width:0;box-sizing:border-box;padding:10px';const keyRow=document.createElement('div');keyRow.style.cssText='display:flex;align-items:center;gap:8px;width:100%';const revealKey=makeButton('Show',()=>{const visible=key.type==='text';key.type=visible?'password':'text';revealKey.textContent=visible?'Show':'Hide';revealKey.setAttribute('aria-pressed',String(!visible));});revealKey.type='button';revealKey.setAttribute('aria-label','Show or hide agreement API key');revealKey.setAttribute('aria-pressed','false');keyRow.append(key,revealKey);dialog.append(keyRow);
+    const key=document.createElement('input');key.type='password';key.autocomplete='off';key.maxLength=16;if(typeof selectedKey==='string')key.value=selectedKey;key.placeholder=readSavedKey()?'API key already saved':'16-character Public Only or Limited Access key';key.style.cssText='flex:1;min-width:0;box-sizing:border-box;padding:10px';const keyRow=document.createElement('div');keyRow.style.cssText='display:flex;align-items:center;gap:8px;width:100%';const revealKey=makeButton('Show',()=>{const visible=key.type==='text';key.type=visible?'password':'text';revealKey.textContent=visible?'Show':'Hide';revealKey.setAttribute('aria-pressed',String(!visible));});revealKey.type='button';revealKey.setAttribute('aria-label','Show or hide agreement API key');revealKey.setAttribute('aria-pressed','false');keyRow.append(key,revealKey);dialog.append(keyRow);
     const checkLabel=document.createElement('label');checkLabel.style.cssText='display:flex;gap:10px;margin:15px 0';const check=document.createElement('input');check.type='checkbox';checkLabel.append(check,document.createTextNode('I have reviewed and agree to the Terms of Use and Information Use Agreement.'));dialog.append(checkLabel);
     const status=document.createElement('p');status.setAttribute('role','status');dialog.append(status);
     const buttons=document.createElement('div');buttons.style.cssText='display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap';
@@ -684,84 +722,63 @@
       return;
       }
       if(settingsPage==='api'){
-        const WHO_KEY='tu:who:limited-api-key:v1';
-        const EXTRA_KEYS='tu:api:additional-keys:v1';
-        const readExtras=()=>{try{const list=JSON.parse(localStorage.getItem(EXTRA_KEYS)||'[]');return Array.isArray(list)?list.filter(x=>x&&typeof x.key==='string'&&typeof x.level==='string'):[]}catch{return []}};
-        const note=document.createElement('p');
-        note.textContent='Enter any Torn API key below. TU identifies its access level before saving. Public Only and Limited Access are supported login key levels. Higher-access keys are optional and stored locally without encryption; other scripts on Torn pages may be able to read them. Do not enter a Full Access key unless necessary.';
-        content.append(note);
+        const note=document.createElement('p');note.textContent='Save Public Only or Limited Access keys individually. Adding a key preserves the current TU login. Use a saved key explicitly to switch login or select the Limited key for War Organizer. Keys are stored locally without encryption; keep them private.';content.append(note);
         const form=document.createElement('form');form.autocomplete='off';
         const input=document.createElement('input');input.type='password';input.maxLength=16;input.autocomplete='off';input.placeholder='16-character Torn API key';input.style.cssText='width:100%;box-sizing:border-box;padding:9px';
         const status=document.createElement('p');status.setAttribute('role','status');status.textContent=identityStatus;
         const submit=makeButton('Confirm & Save');submit.type='submit';
-        form.append(input,makeButton('Show / Hide',()=>{input.type=input.type==='password'?'text':'password'}),submit);
-        content.append(form,status);
-        const saved=document.createElement('div');saved.style.cssText='margin:10px 0';
-        let viewing=false;
-        const renderSaved=()=>{
-          saved.replaceChildren();
-          const keys=[];
-          const publicKey=readSavedKey();if(publicKey)keys.push({key:publicKey,level:loginAccessLabel(),source:'public'});
-          const who=localStorage.getItem(WHO_KEY);if(who&&who!==publicKey)keys.push({key:who,level:'Limited Access',source:'who'});
-          for(const x of readExtras())if(!keys.some(y=>y.key===x.key))keys.push({...x,source:'extra'});
-          const summary=document.createElement('p');summary.textContent=keys.length+' saved API key(s)';saved.append(summary);
-          if(!viewing)return;
-          if(!keys.length){const empty=document.createElement('p');empty.textContent='No saved keys';saved.append(empty);return;}
-          for(const entry of keys){
-            const row=document.createElement('div');row.style.cssText='padding:9px 0;border-top:1px solid #555';
-            const label=document.createElement('strong');label.textContent=entry.level+(entry.source==='public'?' (TU login)':entry.source==='who'?' (WHO)':'');row.append(label);
+        form.append(input,makeButton('Show / Hide',()=>{input.type=input.type==='password'?'text':'password'}),submit);content.append(form,status);
+        const savedKeys=document.createElement('div');savedKeys.style.cssText='margin:10px 0';let viewing=true,keyOperation=false;
+        const guarded=action=>async()=>{if(keyOperation)return;keyOperation=true;try{await action()}finally{keyOperation=false;}};
+        const reportError=()=>{status.textContent='Operation failed. Check the key, network connection and DEV session, then retry.'};
+        async function verifyEntry(key){const data=await requestIdentity(key),info=checkedKeyInfo(data);rememberVerifiedKey(key,info.level,info.playerId);if(key===readSavedKey())localStorage.setItem(LOGIN_ACCESS_KEY,info.level==='Limited Access'?'limited':'public');return {data,...info};}
+        async function useForLogin(key){
+          try{
+            const checked=await verifyEntry(key);
+            const registration=await devRequest('/api/auth/register','POST',{api_key:key,platform:typeof pageWindow.PDA_httpGet==='function'?'pda':'tampermonkey'},'');
+            const expected=checked.level==='Limited Access'?'limited':'public';
+            if(!registration.token||registration.accessLevel!==expected||(registration.playerId!=null&&String(registration.playerId)!==checked.playerId))throw Error('DEV registration verification mismatch');
+            const agreement=await loadDevAgreement();
+            const current=await devRequest('/api/auth/agreement','GET',null,registration.token);
+            if(!current.accepted){showAgreement(key);return;}
+            stopModule();clearPlayer();saveKey(key);localStorage.setItem(LOGIN_ACCESS_KEY,expected);sessionStorage.setItem(DEV_SESSION_KEY,registration.token);localStorage.setItem(TU_TERMS_KEY,agreement.agreement_version);
+            if(!await updatePlayer(key,checked.data))throw Error('Identity update failed');
+            resetDevAuthFailure();publishAuthorization(true);status.textContent='Saved key selected for TU login';renderSaved();
+          }catch{reportError();}
+        }
+        function renderSaved(){
+          savedKeys.replaceChildren();const keys=readStoredKeys();
+          const summary=document.createElement('p');summary.textContent=keys.length+' saved API key(s)';savedKeys.append(summary);if(!viewing)return;
+          for(const [index,entry] of keys.entries()){
+            const row=document.createElement('div');row.dataset.tuKeyEntry=String(index);row.style.cssText='padding:9px 0;border-top:1px solid #555';
+            const roles=[entry.key===readSavedKey()?'TU login':null,entry.key===normalizeKey(localStorage.getItem(WHO_KEY))?'War Organizer':null].filter(Boolean);
+            const label=document.createElement('strong');label.textContent=(entry.level||'Access level unverified')+(roles.length?' ('+roles.join(', ')+')':'');row.append(label);
+            const owner=document.createElement('small');owner.textContent=entry.playerId?' · Player '+entry.playerId:' · Recheck legacy key to verify its access level';row.append(owner);
             const field=document.createElement('input');field.type='password';field.readOnly=true;field.value=entry.key;field.style.cssText='display:block;width:100%;box-sizing:border-box;padding:8px;margin:6px 0';row.append(field);
             row.append(makeButton('Show / Hide',()=>{field.type=field.type==='password'?'text':'password'}));
-            row.append(makeButton('Remove',async()=>{
-              if(!confirm('Remove this '+entry.level+' API key?'))return;
-              if(entry.source==='public'){
-                try{await devCancel()}catch(error){status.textContent='Cancellation not confirmed; key retained: '+error.message;return;}
-                removeSavedKey();resetDevAuthFailure();localStorage.removeItem(TU_TERMS_KEY);sessionStorage.removeItem(DEV_SESSION_KEY);clearPlayer();publishAuthorization(false);
-                showAgreement();syncLauncher();
-              }else if(entry.source==='who'){localStorage.removeItem(WHO_KEY)}
-              else localStorage.setItem(EXTRA_KEYS,JSON.stringify(readExtras().filter(x=>x.key!==entry.key)));
-              renderSaved();
-            }));
-            saved.append(row);
+            row.append(makeButton('Recheck access level',guarded(async()=>{try{await verifyEntry(entry.key);status.textContent='Saved key access level verified by Torn';renderSaved();}catch{status.textContent='Key could not be verified. It remains saved until you remove it.'}})));
+            if(entry.key!==readSavedKey())row.append(makeButton('Use for TU login',guarded(()=>useForLogin(entry.key))));
+            if(entry.level==='Limited Access'&&entry.key!==normalizeKey(localStorage.getItem(WHO_KEY)))row.append(makeButton('Use for War Organizer',guarded(async()=>{try{const checked=await verifyEntry(entry.key);if(checked.level!=='Limited Access'||checked.playerId!==getPlayer()?.id)throw Error('Use a Limited key belonging to the current TU player');localStorage.setItem(WHO_KEY,entry.key);status.textContent='Limited key selected for War Organizer';renderSaved();}catch{status.textContent='Select a valid Limited key belonging to the current TU player.'}})));
+            row.append(makeButton('Remove',guarded(async()=>{
+              if(!confirm('Remove only this saved API key? Other saved keys will be retained.'))return;
+              const activeKey=entry.key===readSavedKey();
+              if(activeKey){try{await devCancel()}catch{status.textContent='Cancellation not confirmed; key retained. Check the DEV connection and retry.';return;}}
+              forgetStoredKey(entry.key);
+              if(activeKey){resetDevAuthFailure();localStorage.removeItem(TU_TERMS_KEY);sessionStorage.removeItem(DEV_SESSION_KEY);clearPlayer();publishAuthorization(false);showAgreement();syncLauncher();}
+              else{status.textContent='Selected key removed; other saved keys retained';renderSaved();}
+            })));savedKeys.append(row);
           }
-        };
-        content.append(makeButton('View Saved Keys',()=>{viewing=!viewing;renderSaved()}),saved);
+        }
+        const toggleSaved=makeButton('Hide Saved Keys',()=>{viewing=!viewing;toggleSaved.textContent=viewing?'Hide Saved Keys':'View Saved Keys';renderSaved();});content.append(toggleSaved,savedKeys);
         content.append(makeButton('Clear session',()=>{clearPlayer();status.textContent=identityStatus;refreshIdentity()}));
         form.addEventListener('submit',async event=>{
-          event.preventDefault();const key=input.value.trim();input.value='';
-          if(!/^[A-Za-z0-9]{16}$/.test(key)){status.textContent='Enter a valid 16-character API key';return;}
+          event.preventDefault();if(keyOperation)return;keyOperation=true;const key=normalizeKey(input.value);input.value='';
+          if(!key){keyOperation=false;status.textContent='Enter a valid 16-character API key';return;}
           submit.disabled=true;status.textContent='Verifying key with Torn…';
-          try{
-            const data=await requestIdentity(key);
-            if(data?.error)throw Error(data.error.error||'Torn rejected key');
-            const level=String(data?.info?.access?.type??data?.info?.access??'').trim();
-            const owner=Number(data?.info?.user?.id);
-            if(!level||!Number.isSafeInteger(owner)||owner<=0)throw Error('Torn did not return a valid access level and key owner');
-            status.textContent='Torn confirmed: '+level;
-            if(!['Public Only','Limited Access'].includes(level))throw Error('Registration supports Public Only or Limited Access keys');
-            if(level!=='Public Only'){
-              const approved=confirm('WARNING: '+level+' keys can expose more Torn account information or actions than Public Only. TU will store this key locally without encryption. Other scripts running on Torn pages may be able to read it. Continue saving this '+level+' key?');
-              if(!approved){status.textContent='Verified '+level+' key; not saved (warning declined)';return;}
-            }
-            if(level==='Public Only'){
-              const verified=await updatePlayer(key);
-              if(!verified)throw Error(identityStatus);
-              saveKey(key);resetDevAuthFailure();
-            }else if(level==='Limited Access'){
-              localStorage.setItem(WHO_KEY,key);
-              localStorage.setItem(EXTRA_KEYS,JSON.stringify(readExtras().filter(x=>x.key!==key)));
-            }else{
-              const extras=readExtras().filter(x=>x.key!==key);
-              extras.push({key,level});
-              localStorage.setItem(EXTRA_KEYS,JSON.stringify(extras));
-            }
-            status.textContent=level+' key verified and saved';
-            renderSaved();refreshIdentity();
-          }catch(error){status.textContent='Not saved: '+error.message}
-          finally{submit.disabled=false}
-        });
-        renderSaved();
-        return;
+          try{const checked=await verifyEntry(key);status.textContent=checked.level+' key verified and saved individually; TU login unchanged';renderSaved();}
+          catch{status.textContent='Not saved: Torn must verify a valid Public Only or Limited Access key and its owner';}
+          finally{keyOperation=false;submit.disabled=false;}
+        });renderSaved();return;
       }
       if(settingsPage==='diagnostics'){
       if(diagnosticModule){const h=document.createElement('h4');h.textContent='Tool: '+(registry.modules.find(m=>m.id===diagnosticModule)?.name||diagnosticModule);content.append(h)}
