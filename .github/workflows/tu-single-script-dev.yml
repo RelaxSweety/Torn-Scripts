@@ -23,4 +23,5 @@ jobs:
           cache-dependency-path: torn-utilities/all-in-one/package-lock.json
       - run: npm ci --no-audit --no-fund
       - run: node scripts/build-dev.mjs --check
+      - run: node scripts/build-diagnostics.mjs --check
       - run: npm test

@@ -29,3 +29,7 @@ All bundled service endpoints target the DEV Worker. Multiplayer requests carry 
 The selected sample #1 Integrated Gold logo is embedded from `../assets/tu-logo-integrated-gold.png`, including the compact 34px launcher, shared headers and War Organizer logo. The previous SVG master remains available for historical releases. Device rendering remains an acceptance check.
 
 Historical independent sources, `modules.json`, legacy catalog Managers, and production guard workflows remain for rollback and existing supported installations. They are not inputs to the DEV integrated build. Never run the production candidate builder as part of DEV release setup, and never deploy Workers or databases for this workflow.
+
+## Independent TU Test
+
+Use [TU Testing and Diagnostics DEV](docs/TU-TEST.md) v0.2.0-dev for the 50-check acceptance plan, separate PDA/Tampermonkey evidence, and sanitized exports. This checklist targets the current integrated DEV build; actual host tests remain manual. `npm run build` also regenerates this independent test tool; `npm run build:diagnostics` updates only TU Test.

@@ -1,77 +1,606 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
+  "checklistVersion": "dev-acceptance-2026-11-05-v2",
   "tests": [
     {
-      "id": "core.launcher",
+      "id": "runtime.build",
+      "section": "automatic",
+      "label": "Installed DEV build",
+      "instructions": "Confirm the installed TU version matches the target release. This checks only the visible version label.",
+      "kind": "automatic",
       "critical": true,
       "platforms": [
         "tampermonkey",
         "pda"
-      ],
-      "instructions": "Confirm launcher visible and Manager opens"
+      ]
     },
     {
-      "id": "core.registry",
+      "id": "runtime.registry",
+      "section": "automatic",
+      "label": "Ten integrated tools registered",
+      "instructions": "Read the shared TU API and confirm all ten expected tools are registered; Stock and Calculations must be absent. Registration does not prove a tool works.",
+      "kind": "automatic",
       "critical": true,
       "platforms": [
         "tampermonkey",
         "pda"
-      ],
-      "instructions": "Confirm bundled modules are registered"
+      ]
+    },
+    {
+      "id": "runtime.storage",
+      "section": "automatic",
+      "label": "Temporary storage roundtrip",
+      "instructions": "Write, read and remove only a temporary TU Test key; do not touch tool data.",
+      "kind": "automatic",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "source.bundle",
+      "section": "automatic",
+      "label": "Published single-script DEV artifact",
+      "instructions": "Check release metadata, ten bundled factory markers, removed tool exclusion and DEV-only backend URLs. This is a source check, not runtime validation.",
+      "kind": "automatic",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "agreement.github",
+      "section": "automatic",
+      "label": "GitHub published agreement",
+      "instructions": "Read the published DEV agreement metadata and complete text.",
+      "kind": "automatic",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "agreement.worker",
+      "section": "automatic",
+      "label": "DEV Worker published agreement",
+      "instructions": "Read the public DEV agreement endpoint. No key or session token is transmitted.",
+      "kind": "automatic",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "agreement.match",
+      "section": "automatic",
+      "label": "Agreement publication consistency",
+      "instructions": "Compare published version, number, effective date and wording between GitHub and DEV Worker.",
+      "kind": "automatic",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
     },
     {
       "id": "auth.public",
+      "section": "auth",
+      "label": "Public Only registration",
+      "instructions": "In DEV, register using a Public Only key. Verify the server-confirmed access label and accepted current agreement. Record outcome only; never paste the key.",
+      "kind": "manual",
       "critical": true,
       "platforms": [
         "tampermonkey",
         "pda"
-      ],
-      "instructions": "Verify a Public key via server and confirm Public label"
+      ]
     },
     {
       "id": "auth.limited",
+      "section": "auth",
+      "label": "Limited Access registration",
+      "instructions": "Repeat with a Limited Access key in DEV; verify its label and access to the features requiring that level.",
+      "kind": "manual",
       "critical": true,
       "platforms": [
         "tampermonkey",
         "pda"
-      ],
-      "instructions": "Verify a Limited key via server and confirm Limited label"
+      ]
     },
     {
-      "id": "module.item-monitor.selection",
+      "id": "auth.reject",
+      "section": "auth",
+      "label": "Reject unsupported or invalid keys",
+      "instructions": "Verify Full Access, unsupported levels and invalid keys are rejected with actionable errors and are not persisted.",
+      "kind": "manual",
       "critical": true,
       "platforms": [
         "tampermonkey",
         "pda"
-      ],
-      "instructions": "Select item and verify cancellation works"
+      ]
     },
     {
-      "id": "auth.rejected",
+      "id": "auth.visibility",
+      "section": "auth",
+      "label": "Show / Hide API key",
+      "instructions": "Check registration and Settings fields toggle between masked and visible values without exposing values in reports.",
+      "kind": "manual",
       "critical": true,
       "platforms": [
         "tampermonkey",
         "pda"
-      ],
-      "instructions": "Confirm server-rejected API keys are not saved and a clear error is shown"
+      ]
     },
     {
-      "id": "auth.mismatch",
+      "id": "auth.persist",
+      "section": "auth",
+      "label": "Session and agreement persistence",
+      "instructions": "Accept the current agreement, navigate and reload Torn; authorization restores without another acceptance prompt. Close/reopen the host too.",
+      "kind": "manual",
       "critical": true,
       "platforms": [
         "tampermonkey",
         "pda"
-      ],
-      "instructions": "Confirm a Public key selected as Limited is rejected without storing it"
+      ]
+    },
+    {
+      "id": "auth.renew",
+      "section": "auth",
+      "label": "Expired session renewal",
+      "instructions": "Using a controlled DEV session, verify expiry/renewal respects backend validity and does not accept terms automatically.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "auth.failures",
+      "section": "auth",
+      "label": "Authentication failure recovery",
+      "instructions": "Verify rejected/revoked keys, rate limits and network failures produce clear recovery steps without repeated requests or prompts.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "agreement.display",
+      "section": "auth",
+      "label": "Complete published agreement",
+      "instructions": "Compare all displayed content plus version, number and effective date with the published DEV agreement.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "agreement.accept",
+      "section": "auth",
+      "label": "Agreement acceptance record",
+      "instructions": "Explicitly accept in DEV and verify the authorized backend confirms the corresponding acceptance event. This tool never submits acceptance.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "agreement.cancel",
+      "section": "auth",
+      "label": "Cancellation and revocation",
+      "instructions": "In a dedicated DEV session, cancel acceptance and confirm backend event/revocation, tool access removal and a subsequent valid recovery.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "agreement.reaccept",
+      "section": "auth",
+      "label": "Version-change reacceptance",
+      "instructions": "With an approved controlled DEV agreement update, verify old acceptance no longer grants access. Do not modify production or publish terms just to complete this checklist.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
     },
     {
       "id": "auth.privacy",
+      "section": "auth",
+      "label": "Credentials stay private",
+      "instructions": "Inspect diagnostics, exported backups/reports and console output. Confirm no API keys, bearer tokens or room secrets appear; record no secret values.",
+      "kind": "manual",
       "critical": true,
       "platforms": [
         "tampermonkey",
         "pda"
-      ],
-      "instructions": "Confirm diagnostic exports never contain API keys or authorization tokens"
+      ]
+    },
+    {
+      "id": "core.navigation",
+      "section": "core",
+      "label": "Tools / Settings / About",
+      "instructions": "Open each tab, Business Tools, Games single/multiplayer, Chat Tools and War Tools. War Organizer belongs under War Tools. No module installation/catalog controls or removed tools.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "core.branding",
+      "section": "core",
+      "label": "Approved gold logo",
+      "instructions": "Check the approved no-flare Integrated Gold master in launcher, headers and War Organizer on standard/high-density displays. Check sharpness, proportions, transparent exterior and compact launcher size.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "core.launcher",
+      "section": "core",
+      "label": "Launcher visibility and dragging",
+      "instructions": "Drag with mouse and touch as applicable; reload to verify position persistence, keep launcher on-screen after rotation/resize.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "core.windows",
+      "section": "core",
+      "label": "Window navigation and layout",
+      "instructions": "Check Back, Minimize, Restore and Exit, drag/resize, saved positions, viewport bounds, stacking, scrolling and overflow.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "core.lazy",
+      "section": "core",
+      "label": "Lazy startup and cleanup",
+      "instructions": "Opening one tool should initialize only that tool. Repeat open/close and switch tools; inspect for duplicate windows, listeners, timers and requests. Minimize should preserve the active tool.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "core.recovery",
+      "section": "core",
+      "label": "Reload and duplicate injection",
+      "instructions": "Reload and test normal Torn SPA navigation; verify one launcher and one instance per tool with no startup exceptions.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "platform.bridges",
+      "section": "core",
+      "label": "Native host / request bridges",
+      "instructions": "In the selected actual host, exercise its real GM legacy/modern or PDA/fetch bridge and isolated/shared page context. A mocked or desktop-browser result cannot prove PDA compatibility.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "data.settings",
+      "section": "core",
+      "label": "Settings persistence",
+      "instructions": "Change time display and tool settings; reload and verify saved values and unaffected historical data.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "data.backup",
+      "section": "core",
+      "label": "Backup and restoration",
+      "instructions": "Export TU-managed data and restore in a controlled DEV profile; verify additive restoration and key exclusion. Separately export/import large archives and legacy data using each tool.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "release.update",
+      "section": "core",
+      "label": "Single-script update",
+      "instructions": "Install/update via rolling DEV URL; confirm version, all ten tools, settings/history, approved logo, and no separate tool installation.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "release.rollback",
+      "section": "core",
+      "label": "Rollback procedure",
+      "instructions": "In a controlled DEV profile, disable the integrated script and restore the previous Manager/tools without clearing storage. Confirm recovery; then return to the target DEV build.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.flight-game.function",
+      "section": "tool.flight-game",
+      "label": "Flight Game \u2014 functional test",
+      "instructions": "Play with mouse/keyboard and touch as applicable; check graphics, audio, scoring, pause/end, condition transitions, saved game and restore.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.flight-game.lifecycle",
+      "section": "tool.flight-game",
+      "label": "Flight Game \u2014 lifecycle and saved data",
+      "instructions": "Open, minimize, restore, Back, Exit, switch away and reopen this tool repeatedly. Check viewport/scroll/touch behavior, one instance, saved data and cessation of polling/listeners after Exit. Verify no late errors or duplicate requests.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.stick-fighter.function",
+      "section": "tool.stick-fighter",
+      "label": "Stick Fighter \u2014 functional test",
+      "instructions": "Play, move/attack, pause/end, score and save/restore. Check touch/multitouch and audio on the selected host.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.stick-fighter.lifecycle",
+      "section": "tool.stick-fighter",
+      "label": "Stick Fighter \u2014 lifecycle and saved data",
+      "instructions": "Open, minimize, restore, Back, Exit, switch away and reopen this tool repeatedly. Check viewport/scroll/touch behavior, one instance, saved data and cessation of polling/listeners after Exit. Verify no late errors or duplicate requests.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.chat-archiver.function",
+      "section": "tool.chat-archiver",
+      "label": "Chat Archiver \u2014 functional test",
+      "instructions": "Capture live/history chats, select channels, pause/resume/stop, scroll without jumping, preserve records, and verify complete CSV/JSON exports.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.chat-archiver.lifecycle",
+      "section": "tool.chat-archiver",
+      "label": "Chat Archiver \u2014 lifecycle and saved data",
+      "instructions": "Open, minimize, restore, Back, Exit, switch away and reopen this tool repeatedly. Check viewport/scroll/touch behavior, one instance, saved data and cessation of polling/listeners after Exit. Verify no late errors or duplicate requests.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.tic-tac-toe.function",
+      "section": "tool.tic-tac-toe",
+      "label": "Tic-Tac-Toe \u2014 functional test",
+      "instructions": "Use two separate DEV accounts (up to four for Chaos Marbles). Create/join a fresh DEV room; play a complete game, check rules, turns, scoring/winner, history, reconnect and rematch. Verify account authorization and room tokens; never use production rooms.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.tic-tac-toe.lifecycle",
+      "section": "tool.tic-tac-toe",
+      "label": "Tic-Tac-Toe \u2014 lifecycle and saved data",
+      "instructions": "Open, minimize, restore, Back, Exit, switch away and reopen this tool repeatedly. Check viewport/scroll/touch behavior, one instance, saved data and cessation of polling/listeners after Exit. Verify no late errors or duplicate requests.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.torn-four.function",
+      "section": "tool.torn-four",
+      "label": "Torn Four \u2014 functional test",
+      "instructions": "Use two separate DEV accounts (up to four for Chaos Marbles). Create/join a fresh DEV room; play a complete game, check rules, turns, scoring/winner, history, reconnect and rematch. Verify account authorization and room tokens; never use production rooms.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.torn-four.lifecycle",
+      "section": "tool.torn-four",
+      "label": "Torn Four \u2014 lifecycle and saved data",
+      "instructions": "Open, minimize, restore, Back, Exit, switch away and reopen this tool repeatedly. Check viewport/scroll/touch behavior, one instance, saved data and cessation of polling/listeners after Exit. Verify no late errors or duplicate requests.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.torn-fleet.function",
+      "section": "tool.torn-fleet",
+      "label": "Torn Fleet \u2014 functional test",
+      "instructions": "Use two separate DEV accounts (up to four for Chaos Marbles). Create/join a fresh DEV room; play a complete game, check rules, turns, scoring/winner, history, reconnect and rematch. Verify account authorization and room tokens; never use production rooms.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.torn-fleet.lifecycle",
+      "section": "tool.torn-fleet",
+      "label": "Torn Fleet \u2014 lifecycle and saved data",
+      "instructions": "Open, minimize, restore, Back, Exit, switch away and reopen this tool repeatedly. Check viewport/scroll/touch behavior, one instance, saved data and cessation of polling/listeners after Exit. Verify no late errors or duplicate requests.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.torn-snake.function",
+      "section": "tool.torn-snake",
+      "label": "Slithering Streets \u2014 functional test",
+      "instructions": "Play with desktop and touch controls as applicable; check scoring, game-over, restart and persisted high scores.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.torn-snake.lifecycle",
+      "section": "tool.torn-snake",
+      "label": "Slithering Streets \u2014 lifecycle and saved data",
+      "instructions": "Open, minimize, restore, Back, Exit, switch away and reopen this tool repeatedly. Check viewport/scroll/touch behavior, one instance, saved data and cessation of polling/listeners after Exit. Verify no late errors or duplicate requests.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.chaos-marbles.function",
+      "section": "tool.chaos-marbles",
+      "label": "Chaos Marbles \u2014 functional test",
+      "instructions": "Use two separate DEV accounts (up to four for Chaos Marbles). Create/join a fresh DEV room; play a complete game, check rules, turns, scoring/winner, history, reconnect and rematch. Verify account authorization and room tokens; never use production rooms.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.chaos-marbles.lifecycle",
+      "section": "tool.chaos-marbles",
+      "label": "Chaos Marbles \u2014 lifecycle and saved data",
+      "instructions": "Open, minimize, restore, Back, Exit, switch away and reopen this tool repeatedly. Check viewport/scroll/touch behavior, one instance, saved data and cessation of polling/listeners after Exit. Verify no late errors or duplicate requests.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.item-monitor.function",
+      "section": "tool.item-monitor",
+      "label": "Travel Assistant and Item Monitor \u2014 functional test",
+      "instructions": "Select/cancel items, manage watches, trigger quantity/price alerts, verify alarms and persistence. Exercise Travel planning, live DEV reporting, predictions and failure recovery on representative Torn pages.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.item-monitor.lifecycle",
+      "section": "tool.item-monitor",
+      "label": "Travel Assistant and Item Monitor \u2014 lifecycle and saved data",
+      "instructions": "Open, minimize, restore, Back, Exit, switch away and reopen this tool repeatedly. Check viewport/scroll/touch behavior, one instance, saved data and cessation of polling/listeners after Exit. Verify no late errors or duplicate requests.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.war-hit-organizer.function",
+      "section": "tool.war-hit-organizer",
+      "label": "War Organizer \u2014 functional test",
+      "instructions": "Use a Limited key to exercise faction roster, target/reservation controls, countdowns, refresh, historical data and API errors without automating attacks.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.war-hit-organizer.lifecycle",
+      "section": "tool.war-hit-organizer",
+      "label": "War Organizer \u2014 lifecycle and saved data",
+      "instructions": "Open, minimize, restore, Back, Exit, switch away and reopen this tool repeatedly. Check viewport/scroll/touch behavior, one instance, saved data and cessation of polling/listeners after Exit. Verify no late errors or duplicate requests.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
     }
   ]
 }

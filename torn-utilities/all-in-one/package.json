@@ -3,9 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node scripts/build-dev.mjs",
-    "test": "node tests/core-smoke.mjs && node tests/integration.mjs",
-    "validate": "npm run build && npm test"
+    "build": "node scripts/build-dev.mjs && node scripts/build-diagnostics.mjs",
+    "test": "node tests/core-smoke.mjs && node tests/integration.mjs && node tests/diagnostics.mjs",
+    "validate": "npm run build && npm test",
+    "build:diagnostics": "node scripts/build-diagnostics.mjs"
   },
   "description": "Single-script Torn Utilities DEV build and validation",
   "devDependencies": {
