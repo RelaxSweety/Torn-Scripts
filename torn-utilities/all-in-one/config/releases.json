@@ -1,5 +1,17 @@
 [
   {
+    "version": "0.5.42.35-dev",
+    "date": "2026-11-05",
+    "changes": {
+      "Fixes": [
+        "Removed flare highlights from the Integrated Gold logo"
+      ],
+      "Compatibility": [
+        "Existing launcher sizing and embedded image delivery retained"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.34-dev",
     "date": "2026-11-05",
     "changes": {
