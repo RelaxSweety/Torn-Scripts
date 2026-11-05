@@ -1,0 +1,4 @@
+[
+  {"version":"0.5.42.32-dev","date":"2026-11-05","changes":{"Features":["One DEV userscript with 11 tools and lazy tool factories","Embedded structured Version Notes"],"Fixes":["Internal registration across userscript and page contexts","Updated retained tool sources","Activation failure clears active state"],"Removed":["External module installation and catalog diagnostics","Obsolete war diagnostic excluded"],"Compatibility":["Desktop Tampermonkey and Torn PDA adapters retained; device acceptance required"],"Migration":["Existing storage namespaces retained","Previous DEV Manager preserved"]}},
+  {"version":"0.5.42.31-integration-dev","date":"2026-11-05","changes":{"Features":["Initial integration staging at b5ba89c"],"Migration":["Not a validated single-script release"]}}
+]

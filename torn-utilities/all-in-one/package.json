@@ -3,7 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/core-smoke.mjs"
+    "build": "node scripts/build-dev.mjs",
+    "test": "node tests/core-smoke.mjs && node tests/integration.mjs",
+    "validate": "npm run build && npm test"
   },
-  "description": "TU all-in-one development core; not yet installable"
+  "description": "Single-script Torn Utilities DEV build and validation",
+  "devDependencies": {
+    "jsdom": "26.1.0"
+  }
 }

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Flight Game
 // @namespace    https://www.torn.com/
-// @version      0.12.7
+// @version      0.12.8
 // @description  Standalone TU Flight Game module, playable anytime
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -456,7 +456,9 @@
         }
     }
 
+    let uiAbort=null;
     function wireUI() {
+        uiAbort?.abort();uiAbort=new AbortController();
         canvas = document.getElementById('tpfg-canvas');
         ctx = canvas.getContext('2d');
                 document.getElementById('tpfg-min').addEventListener('click', requestLeave);
@@ -471,13 +473,13 @@
         bindStick(document.getElementById('tpfg-stick'));
         const vol=document.getElementById('tpfg-volume'),mute=document.getElementById('tpfg-mute');vol.value=Math.round(audioPrefs.volume*100);mute.textContent=audioPrefs.muted?'OFF':'ON';vol.addEventListener('input',()=>{audioPrefs.volume=Number(vol.value)/100;saveAudio();});mute.addEventListener('click',()=>{audioPrefs.muted=!audioPrefs.muted;mute.textContent=audioPrefs.muted?'OFF':'ON';saveAudio();if(audioPrefs.muted)updateEngineSound(false);else ensureAudio();});
 
-        window.addEventListener('resize', resize);
+        window.addEventListener('resize', resize,{signal:uiAbort.signal});
         window.addEventListener('keydown', e => {
             if (!state.running) return;
             if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','w','a','s','d','W','A','S','D'].includes(e.key)) e.preventDefault();
             keyFromEvent(e, true);
-        }, {passive:false});
-        window.addEventListener('keyup', e => keyFromEvent(e, false));
+        }, {passive:false,signal:uiAbort.signal});
+        window.addEventListener('keyup', e => keyFromEvent(e, false),{signal:uiAbort.signal});
     }
 
     function bindStick(stick) {
@@ -527,7 +529,7 @@
         stick.addEventListener('pointerup',endPointer);
         stick.addEventListener('pointercancel',endPointer);
         stick.addEventListener('lostpointercapture',endPointer);
-        window.addEventListener('blur',reset);
+        window.addEventListener('blur',reset,{signal:uiAbort.signal});
     }
 
     function chatInputs(){return [...new Set([...document.querySelectorAll('textarea,[contenteditable="true"][role="textbox"],[contenteditable="true"][data-placeholder*="message" i],[contenteditable="true"][aria-label*="message" i]')])].filter(el=>!el.closest('#tpfg-root')&&!el.closest('#tpfg-chatpick')&&el.getBoundingClientRect().width>0);}
@@ -833,9 +835,10 @@
     async function activateStick(){await ensureInitialized();launchGame(Arcade.games.get('stick-figure-fighter'));}
     function deactivateFromTU(){
       ++activationEpoch;
+      uiAbort?.abort();uiAbort=null;
       StickFighter.stop();closeActiveGame();
-      for(const id of ['tpfg-manager','tpfg-prompt','tpfg-game-settings','tpfg-root'])document.getElementById(id)?.remove();
-      initialized=false;
+      for(const id of ['tpfg-manager','tpfg-prompt','tpfg-game-settings','tpfg-root','tpfg-chatpick'])document.getElementById(id)?.remove();
+      canvas=null;ctx=null;initialized=false;
     }
     const definitions=[{id:'flight-game',version:TU_MODULE_VERSION,activate:activateFlight,deactivate:deactivateFromTU}];
     function registerTU(){if((typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities?.register)for(const definition of definitions)(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities.register(definition);}
