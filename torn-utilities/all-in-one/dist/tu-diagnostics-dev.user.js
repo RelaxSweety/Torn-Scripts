@@ -1,10 +1,12 @@
 // ==UserScript==
 // @name         TU Testing and Diagnostics DEV
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.1.8-dev
+// @version      0.1.9-dev
 // @description  Independent guided cross-platform TU test checklist and sanitized export
 // @match        https://www.torn.com/*
-// @grant        none
+// @grant        GM_xmlhttpRequest
+// @connect      raw.githubusercontent.com
+// @connect      tu-multiplayer-server-dev.tuserver.workers.dev
 // @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/all-in-one/dist/tu-diagnostics-dev.user.js
 // @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/all-in-one/dist/tu-diagnostics-dev.user.js
 // @run-at       document-idle
@@ -32,7 +34,11 @@
     ['module.travel','Travel Assistant opens and controls respond'],
     ['module.item','Item Monitor selection and Cancel work'],
     ['module.war','War Organizer opens and displays players'],
-    ['core.recovery','Manager recovers after reload without duplicate windows']
+    ['core.recovery','Manager recovers after reload without duplicate windows'],
+    ['auth.github','DEV GitHub agreement manifest is valid'],
+    ['auth.consistency','DEV Worker and GitHub agreement metadata and wording match'],
+    ['core.source','DEV Manager source and agreement formatting parser are current'],
+    ['auth.event','After acceptance, authorized backend confirms a D1 acceptance event']
   ];
   const redact=s=>String(s||'').replace(/\b[A-Za-z0-9]{16}\b/g,'[REDACTED]').slice(0,1500);
   const detectPlatform=()=>{
@@ -141,19 +147,56 @@
   feedbackInput.addEventListener('input',()=>{state.feedback=redact(feedbackInput.value);save()});feedback.append(feedbackInput);content.append(feedback);
   const actions=document.createElement('div');actions.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:12px';content.append(actions);
   const serverResult=document.createElement('p');serverResult.style.cssText='font:12px/1.4 Arial,Helvetica,sans-serif;color:#d4e1e9';content.append(serverResult);
+  const githubAgreement='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/agreements/dev/current.json';
+  const managerSource='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/core/cross-platform/torn-utilities.user.js';
+  const devAgreement='https://tu-multiplayer-server-dev.tuserver.workers.dev/api/auth/agreement/current';
+  const canonical=value=>String(value??'').replace(/\s+/g,' ').trim();
+  const recordAuto=(id,ok,note)=>{
+    const index=tests.findIndex(([testId])=>testId===id);
+    if(index<0)return;
+    state.results[index]={id,status:ok?'pass':'fail',at:new Date().toISOString(),note:redact(note)};
+    save();render();
+  };
+  function getText(url){
+    return new Promise((resolve,reject)=>{
+      let settled=false;
+      const finish=(error,value)=>{if(settled)return;settled=true;clearTimeout(timer);error?reject(error):resolve(value)};
+      const timer=setTimeout(()=>finish(new Error('Network timeout')),12000);
+      if(typeof GM_xmlhttpRequest==='function'){
+        try{GM_xmlhttpRequest({method:'GET',url,timeout:11000,onload:r=>r.status===200?finish(null,r.responseText):finish(new Error('HTTP '+r.status)),onerror:()=>finish(new Error('GM network error')),ontimeout:()=>finish(new Error('GM timeout'))})}catch(error){finish(error)}
+      }else{
+        fetch(url,{cache:'no-store',credentials:'omit'}).then(async r=>{if(!r.ok)throw Error('HTTP '+r.status);finish(null,await r.text())}).catch(error=>finish(error))
+      }
+    });
+  }
   async function checkDevServer(){
-    const base='https://tu-multiplayer-server-dev.tuserver.workers.dev';
-    serverResult.textContent='Checking DEV published agreement (no API key transmitted)…';
+    serverResult.textContent='Checking DEV Manager, GitHub agreement and Worker (no API key transmitted)…';
+    let github=null,worker=null;
     try{
-      const response=await fetch(base+'/api/auth/agreement/current',{method:'GET',cache:'no-store',credentials:'omit'});
-      if(!response.ok)throw Error('HTTP '+response.status);
-      const data=await response.json();
-      const agreement=data?.agreement;
-      const ok=typeof agreement?.agreement_version==='string'&&Number.isSafeInteger(agreement?.agreement_number)&&/^\d{4}-\d{2}-\d{2}$/.test(agreement?.agreement_date||'')&&typeof data?.content==='string'&&data.content.includes('Version: '+agreement.agreement_version)&&data.content.includes('Agreement number: '+agreement.agreement_number);
-      const index=tests.findIndex(([id])=>id==='auth.health');
-      state.results[index]={id:'auth.health',status:ok?'pass':'fail',at:new Date().toISOString(),note:ok?'Published agreement '+agreement.agreement_version+' (#'+agreement.agreement_number+')':'Invalid published DEV agreement metadata or text'};
-      serverResult.textContent=ok?'PASS: DEV publishes agreement '+agreement.agreement_version+' (#'+agreement.agreement_number+', '+agreement.agreement_date+')':'FAIL: DEV agreement registry metadata or text is invalid';save();render();
-    }catch(error){serverResult.textContent='CHECK FAILED: '+redact(error?.message||error);const index=tests.findIndex(([id])=>id==='auth.health');state.results[index]={id:'auth.health',status:'fail',at:new Date().toISOString(),note:'Request failed; check network/CORS and DEV deployment'};save();render();}
+      github=JSON.parse(await getText(githubAgreement));
+      const a=github?.agreement;
+      const valid=typeof a?.agreement_version==='string'&&Number.isSafeInteger(a?.agreement_number)&&typeof github?.content==='string'&&github.content.length>0;
+      recordAuto('auth.github',valid,valid?'GitHub agreement '+a.agreement_version+' (#'+a.agreement_number+')':'Invalid GitHub manifest');
+    }catch(error){recordAuto('auth.github',false,'GitHub request: '+error.message)}
+    try{
+      worker=JSON.parse(await getText(devAgreement));
+      const a=worker?.agreement;
+      const valid=typeof a?.agreement_version==='string'&&Number.isSafeInteger(a?.agreement_number)&&/^\d{4}-\d{2}-\d{2}$/.test(a?.agreement_date||'')&&typeof worker?.content==='string'&&worker.content.includes('Version: '+a.agreement_version)&&worker.content.includes('Agreement number: '+a.agreement_number);
+      recordAuto('auth.health',valid,valid?'Worker agreement '+a.agreement_version+' (#'+a.agreement_number+')':'Invalid Worker agreement metadata or wording');
+    }catch(error){recordAuto('auth.health',false,'Worker request: '+error.message)}
+    if(github&&worker){
+      const fields=['agreement_number','agreement_version','agreement_date'];
+      const sameMeta=fields.every(k=>github.agreement?.[k]===worker.agreement?.[k]);
+      const sameWords=canonical(github.content)===canonical(worker.content);
+      recordAuto('auth.consistency',sameMeta&&sameWords,'Metadata '+(sameMeta?'matches':'differs')+'; wording '+(sameWords?'matches':'differs'));
+    }else recordAuto('auth.consistency',false,'Cannot compare until both sources are reachable');
+    try{
+      const source=await getText(managerSource);
+      const version=source.match(/^\/\/ @version\s+(.+)$/m)?.[1]||'unknown';
+      const parser=source.includes("split(/\\n\\s*\\n/)")&&source.includes("block.split('\\n')");
+      recordAuto('core.source',source.startsWith('// ==UserScript==')&&parser,'Manager '+version+'; Markdown parser '+(parser?'present':'not detected'));
+    }catch(error){recordAuto('core.source',false,'Manager source: '+error.message)}
+    serverResult.textContent='DEV checks completed. Review individual PASS/FAIL results. Agreement acceptance and D1 event verification remain manual.';
   }
   const btn=(label,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=fn;b.style.cssText='font:600 12px/1.35 '+font+';color:#f4f7fa;background:#344d60;border:1px solid #7892a2;border-radius:5px;padding:7px 10px;min-height:32px;cursor:pointer;appearance:none;text-shadow:none';return b};
   function render(){
