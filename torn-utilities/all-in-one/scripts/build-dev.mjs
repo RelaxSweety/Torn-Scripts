@@ -42,5 +42,5 @@ for(const marker of ['tu-multiplayer-server.tuserver.workers.dev','modules.json'
 if(!output.startsWith('// ==UserScript==')||!output.includes('// @version      '+version))throw Error('Release metadata mismatch');
 if(tools.length!==11||new Set(tools.map(t=>t.id)).size!==11)throw Error('Expected exactly 11 tools');
 fs.mkdirSync(path.join(root,'torn-utilities/releases/dev'),{recursive:true});
-for(const p of ['dist/tu-integrated-staging-dev.user.js',`../releases/dev/torn-utilities-${version}.user.js`,'../releases/dev/torn-utilities-dev.user.js'])fs.writeFileSync(path.join(base,p),output);
+for(const p of ['dist/tu-integrated-staging-dev.user.js',`../releases/dev/torn-utilities-${version}.user.js`,'../releases/dev/torn-utilities-dev.user.js']){const target=path.join(base,p);if(process.argv.includes('--check')){if(fs.readFileSync(target,'utf8')!==output)throw Error('Stale generated release: '+p);}else fs.writeFileSync(target,output);}
 console.log(`Built ${version}: ${tools.length} tools; ${Buffer.byteLength(output)} bytes`);

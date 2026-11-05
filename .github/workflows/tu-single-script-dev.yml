@@ -1,0 +1,26 @@
+name: TU single-script DEV
+on:
+  push:
+    branches: [dev/tu-all-in-one]
+  pull_request:
+    paths:
+      - torn-utilities/all-in-one/**
+      - torn-utilities/modules/**
+      - torn-utilities/releases/dev/**
+      - chat-archiver/pda/src/**
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: torn-utilities/all-in-one
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: torn-utilities/all-in-one/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: node scripts/build-dev.mjs --check
+      - run: npm test
