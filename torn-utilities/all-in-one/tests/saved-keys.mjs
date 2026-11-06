@@ -23,7 +23,7 @@ async function boot({local=null,gmInitial=A,deleteGM=true,clearGM=true}={}){
   else if(o.url.endsWith('/api/auth/register')){const key=JSON.parse(o.data).api_key;if(control.registrationFailure){status=403;data={error:'Rejected fixture registration'}}else data={token:'new-fixture-session',accessLevel:fixtures.get(key)?.level==='Limited Access'?'limited':'public',playerId:fixtures.get(key)?.id};}
   else if(o.url.endsWith('/api/auth/agreement')){
    if(o.method==='POST'&&JSON.parse(o.data).action==='cancelled'){control.cancellations++;if(control.cancelFailure){status=503;data={error:'Cancellation unavailable'}}else{control.accepted=false;data={ok:true}}}
-   else data={accepted:control.accepted};
+   else data={accepted:control.accepted,agreement:{agreement_version:'fixture-v1',agreement_number:1,agreement_date:'2026-11-05'}};
   }else if(o.url.includes('/key/info')){const key=o.headers.Authorization.replace('ApiKey ',''),fixture=fixtures.get(key);data=fixture?{info:{access:{type:fixture.level},user:{id:fixture.id}}}:{error:{error:'Rejected fixture key'}};}
   else if(o.url.includes('/user/'))data={name:'Fixture player'};
   o.onload?.({status,responseText:JSON.stringify(data)});

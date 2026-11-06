@@ -11,3 +11,5 @@ Canvas, networking and browser bridge responses are mocked. These tests do not e
 `saved-keys.mjs` runs the generated Manager with mock Torn/DEV services to verify per-key access levels, multiple-key retention/deduplication, legacy recovery, explicit login/War selection, cross-player rejection, reload, failed operations, deletion of all selected-key copies and prevention of stale GM login recovery. Live device/account retesting is still required.
 
 `performance.mjs` measures Manager root lookups/style reads and Item Monitor candidate queries under unrelated Torn updates, with zero or configured monitors. It checks header recreation, window visibility and hidden-page behavior. These work-count regressions are not a mobile frame-rate benchmark; see `../docs/PDA-PERFORMANCE.md`.
+
+`session-lifecycle.mjs` validates warm navigation without HTTP, metadata-only rechecks, identity/profile reuse, full-text cache behavior, changed versions, read-only diagnostics, expired/revoked sessions, cross-tab logout and observer disconnection while the Manager/tools are idle.

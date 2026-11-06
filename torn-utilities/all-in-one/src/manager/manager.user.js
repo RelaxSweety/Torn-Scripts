@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities DEV (All-in-One)
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.37-dev
+// @version      0.5.42.38-dev
 // @description  Integrated TU development bundle for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -26,14 +26,14 @@
   if (pageWindow.__RELAX_TORN_UTILITIES_PDA__) return;
   pageWindow.__RELAX_TORN_UTILITIES_PDA__ = true;
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.5.42.37-dev';
+  const TU_VERSION='0.5.42.38-dev';
   const TU_LOGO='__TU_LOGO_DATA_URL__';
   // Bundled tool directory: no external catalog, cache, or refresh requests.
   const registry={schemaVersion:1,categories:[{"id":"business","name":"Business Tools","icon":"▥","order":10},{"id":"games","name":"Games","icon":"♜","order":20},{"id":"single-player","name":"Single Player","icon":"▣","order":21,"parent":"games"},{"id":"multiplayer","name":"Multiplayer","icon":"♟","order":22,"parent":"games"},{"id":"chat","name":"Chat Tools","icon":"◉","order":30},{"id":"other","name":"War Tools","icon":"⚙","order":40}],modules:[{"id":"flight-game","name":"Flight Game","category":"single-player","version":"0.12.8","description":"Standalone Flight Game arcade module, playable anytime"},{"id":"stick-fighter","name":"Stick Fighter","category":"single-player","version":"0.2.7","description":"Standalone Stick Fighter arcade module, playable anytime"},{"id":"chat-archiver","name":"Chat Archiver","category":"chat","version":"0.1.8","description":"Archive Torn chat conversations"},{"id":"tic-tac-toe","name":"Tic-Tac-Toe","category":"multiplayer","version":"0.6.5","description":"Two-player Tic-Tac-Toe with named winners, green winning line, rematches and head-to-head history"},{"id":"torn-four","name":"Torn Four","category":"multiplayer","version":"0.2.5","description":"Connect Four: two-player multiplayer with private room codes"},{"id":"torn-fleet","name":"Torn Fleet","category":"multiplayer","version":"0.2.5","description":"Battleship: fleet placement and turn-based naval combat"},{"id":"torn-snake","name":"Slithering Streets","category":"single-player","version":"0.2.14","description":"Single-player Snake with touch controls and local high scores"},{"id":"chaos-marbles","name":"Chaos Marbles","category":"multiplayer","version":"0.2.5","description":"Online 2\u20134 player marble race with private player sessions, Waiting for Chaos staging, and game history"},{"id":"item-monitor","name":"Travel Assistant and Item Monitor","category":"business","version":"1.10.31-dev","description":"Item Monitor and Travel Assistant with D1 stock reporting, source diagnostics and stock estimation"},{"id":"war-hit-organizer","name":"War Organizer","category":"other","version":"0.3.17-dev","description":"Compact war target board, reservation controls, timer and local development settings"}]};
   const versionCompare=(a,b)=>{const aa=String(a||'0').split('.').map(v=>parseInt(v,10)||0),bb=String(b||'0').split('.').map(v=>parseInt(v,10)||0);for(let i=0;i<3;i++)if(aa[i]!==bb[i])return (aa[i]||0)-(bb[i]||0);return 0;};
   // Lifecycle API: modules register inert factories; only this manager calls activate().
   const registered = new Map();
-  let active = null;
+  let active = null,observationReady=false;
   const moduleHost = document.createElement('div');
   moduleHost.id = 'tu-pda-module-host';
   moduleHost.hidden = true;
@@ -99,11 +99,17 @@
   // Public Only key stored locally on this device; no passphrase or GM grants.
   const VAULT='tu:identity:public-only-key:v1',VAULT_CLEARED='tu:identity:login-cleared:v1';
   const LOGIN_ACCESS_KEY='tu:identity:login-access-level:v1';
+  const AUTH_CACHE='tu:dev:authorization-cache:v1',IDENTITY_CACHE='tu:dev:identity-cache:v1',AGREEMENT_CACHE='tu:dev:agreement-content:v1';
+  const AUTH_TTL=5*60*1000,IDENTITY_TTL=30*60*1000,AGREEMENT_TTL=24*60*60*1000;
+  const readCache=key=>{try{return JSON.parse(sessionStorage.getItem(key)||'null')}catch{return null}};
+  const fresh=(entry,ttl)=>entry&&Number.isFinite(entry.checkedAt)&&entry.checkedAt<=Date.now()&&Date.now()-entry.checkedAt<ttl;
+  const clearAuthorizationCache=()=>{sessionStorage.removeItem(AUTH_CACHE);};
+
   const loginAccessLabel=()=>readStoredKeys().find(entry=>entry.key===readSavedKey())?.level||'Access level unverified';
   const normalizeKey=v=>{if(typeof v!=='string')return '';let x=v.trim();for(let i=0;i<3;i++){if(x.startsWith('GMV2_')){x=x.slice(5);continue;}if(x.startsWith('"')&&x.endsWith('"')){try{const y=JSON.parse(x);if(typeof y==='string'){x=y.trim();continue}}catch{}}break;}return /^[A-Za-z0-9]{16}$/.test(x)?x:'';};
   const readSavedKey=()=>{let v='';try{v=localStorage.getItem(VAULT)||''}catch{}let key=normalizeKey(v);if(key){if(key!==v)try{localStorage.setItem(VAULT,key)}catch{}return key;}if(localStorage.getItem(VAULT_CLEARED)==='1')return '';try{key=normalizeKey(typeof GM_getValue==='function'?GM_getValue(VAULT,''):'');if(key){try{localStorage.setItem(VAULT,key)}catch{}return key}}catch{}return ''};
-  const saveKey=key=>{localStorage.setItem(SAVED_KEYS,JSON.stringify(readStoredKeys()));let stored=false;try{localStorage.setItem(VAULT,key);stored=true}catch(_){}try{if(typeof GM_setValue==='function'){GM_setValue(VAULT,key);stored=true}}catch(_){}if(!stored)throw Error('No persistent key storage available');localStorage.removeItem(VAULT_CLEARED)};
-  const removeSavedKey=()=>{localStorage.setItem(VAULT_CLEARED,'1');try{localStorage.removeItem(LOGIN_ACCESS_KEY)}catch(_){}try{localStorage.removeItem(VAULT)}catch(_){}try{if(typeof GM_deleteValue==='function')GM_deleteValue(VAULT);else if(typeof GM_setValue==='function')GM_setValue(VAULT,'')}catch(_){}};
+  const saveKey=key=>{clearAuthorizationCache();sessionStorage.removeItem(IDENTITY_CACHE);localStorage.setItem(SAVED_KEYS,JSON.stringify(readStoredKeys()));let stored=false;try{localStorage.setItem(VAULT,key);stored=true}catch(_){}try{if(typeof GM_setValue==='function'){GM_setValue(VAULT,key);stored=true}}catch(_){}if(!stored)throw Error('No persistent key storage available');localStorage.removeItem(VAULT_CLEARED)};
+  const removeSavedKey=()=>{clearAuthorizationCache();sessionStorage.removeItem(IDENTITY_CACHE);localStorage.setItem(VAULT_CLEARED,'1');try{localStorage.removeItem(LOGIN_ACCESS_KEY)}catch(_){}try{localStorage.removeItem(VAULT)}catch(_){}try{if(typeof GM_deleteValue==='function')GM_deleteValue(VAULT);else if(typeof GM_setValue==='function')GM_setValue(VAULT,'')}catch(_){}};
   const SAVED_KEYS='tu:identity:saved-keys:v1',WHO_KEY='tu:who:limited-api-key:v1',EXTRA_KEYS='tu:api:additional-keys:v1';
   const readExtras=()=>{try{const list=JSON.parse(localStorage.getItem(EXTRA_KEYS)||'[]');return Array.isArray(list)?list.filter(x=>normalizeKey(x?.key)):[]}catch{return []}};
   function readStoredKeys(){
@@ -160,7 +166,7 @@
     const u=user.status==='fulfilled'?user.value:null,fa=faction.status==='fulfilled'?faction.value:null;
     const factionFromUser=u?.faction?.faction_name||u?.faction?.name;
     playerInfo={...playerInfo,name:u?.name||u?.player?.name||playerInfo.name||null,factionName:fa?.name||fa?.faction?.name||factionFromUser||playerInfo.factionName||null,updatedAt:Date.now()};
-    pageWindow.dispatchEvent(new CustomEvent('tu-player-updated',{detail:{...playerInfo}}));
+    cacheIdentity();pageWindow.dispatchEvent(new CustomEvent('tu-player-updated',{detail:{...playerInfo}}));
   }
   async function updatePlayer(key,verifiedData=null){
     if(typeof key!=='string')return !!playerInfo;
@@ -179,32 +185,54 @@
         if(key===readSavedKey())localStorage.setItem(LOGIN_ACCESS_KEY,checked.level==='Limited Access'?'limited':'public');
         playerInfo={id:String(id),name:null,factionId:Number.isSafeInteger(faction)&&faction>0?faction:null,factionName:null,profileUrl:'https://www.torn.com/profiles.php?XID='+id,updatedAt:Date.now()};
         const warKey=readStoredKeys().find(entry=>entry.key===normalizeKey(localStorage.getItem(WHO_KEY)));if(warKey?.playerId&&warKey.playerId!==String(id))localStorage.removeItem(WHO_KEY);
-        identityStatus='Verified by Torn API';pageWindow.dispatchEvent(new CustomEvent('tu-player-updated',{detail:{...playerInfo}}));void enrichIdentity(key,generation);return true;
+        cacheIdentity();identityStatus='Verified by Torn API';pageWindow.dispatchEvent(new CustomEvent('tu-player-updated',{detail:{...playerInfo}}));void enrichIdentity(key,generation);return true;
       }catch(e){if(generation===authGeneration){playerInfo=null;identityStatus='Verification failed: '+e.message;}return false;}
       finally{identityBusy=null;}
     })();return identityBusy;
   }
   // Restore identity once per page load. Never send the stored key to modules.
+  function cacheIdentity(){
+    if(playerInfo&&devToken())sessionStorage.setItem(IDENTITY_CACHE,JSON.stringify({token:devToken(),checkedAt:Date.now(),player:playerInfo}));
+  }
   async function restoreSavedIdentity(){
     if(automaticIdentityAttempted)return;
     automaticIdentityAttempted=true;
-    const key=readSavedKey();
-    if(!key)return;
+    const key=readSavedKey();if(!key)return;
+    const cached=readCache(IDENTITY_CACHE),entry=readStoredKeys().find(e=>e.key===key);
+    if(cached?.token===devToken()&&cached.player?.id&&entry?.playerId===String(cached.player.id)&&entry.level){
+      playerInfo={...cached.player};identityStatus='Verified session identity restored';refreshIdentity();if(!fresh(cached,IDENTITY_TTL))void enrichIdentity(key,authGeneration);return;
+    }
     identityStatus='Verifying saved Torn API key…';
     const ok=await updatePlayer(key);
-    if(!ok)console.warn('[TU] Saved key verification failed:',identityStatus);
+    if(!ok)console.warn('[TU] Saved key verification unavailable');
     refreshIdentity();
-    if(typeof render==='function'&&currentTab==='settings')render('settings');
+    if(currentTab==='settings'&&!panel.hidden)render('settings');
   }
   let authorizationVerified=false,authRestorePending=true,authOpenRequested=false;
   const authorized=()=>authorizationVerified&&!!devToken()&&!!readSavedKey()&&!!TU_TERMS_VERSION&&localStorage.getItem(TU_TERMS_KEY)===TU_TERMS_VERSION;
   const publishAuthorization=ok=>{authorizationVerified=!!ok;pageWindow.dispatchEvent(new CustomEvent('tu-authorization-change',{detail:{authorized:authorized()}}));if(!authorized())stopModule();};
   const api = Object.freeze({
     isAuthorized:()=>authorized(),
+    async getAgreementVersion({refresh=false}={}){
+      if(!devToken()||!readSavedKey())throw Error('An authenticated DEV session is required');
+      if(refresh){
+        // Independent TU Test gets a read-only status check, never registration
+        // or automatic agreement acceptance through this bridge.
+        try{
+          const status=await devRequest('/api/auth/agreement','GET');applyAgreementMetadata(status.agreement);
+          if(!status.accepted){clearAuthorizationCache();localStorage.removeItem(TU_TERMS_KEY);publishAuthorization(false);return {agreement_version:TU_TERMS_VERSION,accepted:false,checkedAt:Date.now()};}
+          rememberAuthorization(status);publishAuthorization(true);
+        }catch{clearAuthorizationCache();publishAuthorization(false);throw Error('DEV agreement verification unavailable; reopen TU to restore the session');}
+      }else await restoreDevSession();
+      if(!authorized()||!currentDevAgreement)throw Error('DEV agreement verification unavailable');
+      return {agreement_version:TU_TERMS_VERSION,accepted:true,checkedAt:readCache(AUTH_CACHE)?.checkedAt||null};
+    },
+    handleBackendAuthorizationFailure:()=>{clearAuthorizationCache();publishAuthorization(false);void restoreDevSession({force:true});},
     storage,
     getLogo:()=>TU_LOGO,
     getPlayer,
     async requestTorn(path,{format='json'}={}){
+      if(!await ensureAuthorization())throw Error('TU Manager authentication required');
       if(typeof path!=='string'||!/^\/v2\/faction(?:\/|\?|$)/.test(path))throw Error('Unsupported Torn API path');
       const key=readSavedKey();if(!key)throw Error('Set Public Only API key in TU Manager Settings');
       const url='https://api.torn.com'+path;
@@ -216,7 +244,7 @@
       const data=JSON.parse(raw);if(data?.error)throw Error(data.error.error||'Torn API error');return data;
     },
     async requestWhoTorn(path){
-      if(!authorized())throw Error('TU Manager authentication required');
+      if(!await ensureAuthorization())throw Error('TU Manager authentication required');
       if(typeof path!=='string'||!(/^(?:\/v2\/faction(?:\/|\?|$)|\/v2\/user\/[0-9]+\/profile(?:\?|$))/.test(path)))throw Error('Unsupported WHO API path');
       const key=normalizeKey(localStorage.getItem('tu:who:limited-api-key:v1')||'')||(localStorage.getItem(LOGIN_ACCESS_KEY)==='limited'?readSavedKey():'');
       const keyEntry=readStoredKeys().find(entry=>entry.key===key);
@@ -238,7 +266,7 @@
           typeof def.activate !== 'function' || typeof def.deactivate !== 'function' ||
           registered.has(def.id)||!registry.modules.some(t=>t.id===def.id)) return false;
       registered.set(def.id, Object.freeze({id:def.id, version:typeof def.version==='string'?def.version:null, activate:def.activate, deactivate:def.deactivate}));
-      if (typeof render === 'function') render(currentTab);
+      if (typeof render === 'function'&&!panel.hidden) render(currentTab);
       return true;
     },
     isRegistered(id) { return registered.has(id); },
@@ -255,23 +283,48 @@
 
   // DEVELOPMENT BUILD ONLY. This code is not deployed from main.
   const DEV_BASE='https://tu-multiplayer-server-dev.tuserver.workers.dev';
-  async function loadDevAgreement(){
-    const published=await devRequest('/api/auth/agreement/current','GET',null,'');
-    const a=published?.agreement;
-    if(!a||typeof a.agreement_version!=='string'||!Number.isSafeInteger(a.agreement_number)||typeof a.agreement_date!=='string'||typeof published.content!=='string'||!published.content.trim())throw Error('Current DEV agreement unavailable');
-    currentDevAgreement={agreement_version:a.agreement_version,agreement_number:a.agreement_number,agreement_date:a.agreement_date};
-    currentDevAgreementContent=published.content;
+  function applyAgreementMetadata(a){
+    if(!a||typeof a.agreement_version!=='string'||!a.agreement_version.trim())throw Error('Current DEV agreement version unavailable');
+    if(TU_TERMS_VERSION!==a.agreement_version)currentDevAgreementContent='';
+    currentDevAgreement={agreement_version:a.agreement_version,agreement_number:a.agreement_number??null,agreement_date:a.agreement_date??null};
     TU_TERMS_VERSION=a.agreement_version;
     return currentDevAgreement;
   }
+  function rememberAuthorization(status,token=devToken()){
+    applyAgreementMetadata(status.agreement);
+    if(status.accepted!==true)throw Error('Current agreement requires acceptance');
+    localStorage.setItem(TU_TERMS_KEY,TU_TERMS_VERSION);
+    sessionStorage.setItem(AUTH_CACHE,JSON.stringify({token,checkedAt:Date.now(),agreement:currentDevAgreement,accepted:true}));
+  }
+  function freshAuthorization(){
+    const cached=readCache(AUTH_CACHE);
+    return fresh(cached,AUTH_TTL)&&cached.token===devToken()&&cached.accepted===true&&cached.agreement?.agreement_version===localStorage.getItem(TU_TERMS_KEY)?cached:null;
+  }
+  let agreementLoad=null;
+  async function loadDevAgreement({force=false}={}){
+    const cached=readCache(AGREEMENT_CACHE);
+    if(!force&&fresh(cached,AGREEMENT_TTL)&&cached.content&&(!TU_TERMS_VERSION||cached.agreement?.agreement_version===TU_TERMS_VERSION)){
+      applyAgreementMetadata(cached.agreement);currentDevAgreementContent=cached.content;return currentDevAgreement;
+    }
+    if(agreementLoad)return agreementLoad;
+    agreementLoad=(async()=>{
+      const published=await devRequest('/api/auth/agreement/current','GET',null,'');
+      if(!Number.isSafeInteger(published?.agreement?.agreement_number)||typeof published?.agreement?.agreement_date!=='string'||typeof published.content!=='string'||!published.content.trim())throw Error('Current DEV agreement unavailable');
+      applyAgreementMetadata(published.agreement);currentDevAgreementContent=published.content;
+      sessionStorage.setItem(AGREEMENT_CACHE,JSON.stringify({checkedAt:Date.now(),agreement:currentDevAgreement,content:currentDevAgreementContent}));
+      return currentDevAgreement;
+    })().finally(()=>{agreementLoad=null;});
+    return agreementLoad;
+  }
   const DEV_SESSION_KEY='tu:dev:auth:session:v1';
   const devToken=()=>sessionStorage.getItem(DEV_SESSION_KEY)||'';
+  const scriptPlatform=()=>/torn[ -]?pda/i.test(navigator.userAgent)||typeof pageWindow.PDA_httpGet==='function'||typeof window.PDA_httpGet==='function'||typeof pageWindow.PDA_httpPost==='function'||typeof window.PDA_httpPost==='function'?'pda':'tampermonkey';
   let devAuthIssue='',devRenewalBlocked=false;
   function devAuthFailure(error){
     const status=error?.status;
     devAuthIssue=status===401||status===403?'Saved API key rejected. Replace it in TU Settings.':status===429?'Authentication rate-limited. Retry later.':status>=500||!status?'Authentication service unavailable. Retry later.':error?.message||'Session renewal failed.';
     devRenewalBlocked=true;
-    sessionStorage.removeItem(DEV_SESSION_KEY);
+    clearAuthorizationCache();sessionStorage.removeItem(DEV_SESSION_KEY);
     if(!panel.hidden)render('about');
   }
   function resetDevAuthFailure(){devAuthIssue='';devRenewalBlocked=false;}
@@ -324,7 +377,7 @@
       const renewed=await renewDevSession();
       return devRequest(path,method,body,renewed);
     }
-    if(!response.ok){const error=Error(result.error||('Development server HTTP '+response.status));error.status=response.status;throw error;}
+    if(!response.ok){if([401,403].includes(response.status)&&token&&token===devToken()){clearAuthorizationCache();publishAuthorization(false);}const error=Error(result.error||('Development server HTTP '+response.status));error.status=response.status;throw error;}
     return result;
   }
   // Renew expired sessions using the user's saved Public Only key. Never accept terms automatically.
@@ -335,48 +388,54 @@
     const key=readSavedKey();
     if(!/^[A-Za-z0-9]{16}$/.test(key||''))throw Error('Saved Public Only or Limited Access API key required to renew session');
     devRenewal=(async()=>{
-      const registration=await devRequest('/api/auth/register','POST',{api_key:key,platform:'tampermonkey'},'');
-      if(!registration.token)throw Error('Session renewal returned no token');
+      const registration=await devRequest('/api/auth/register','POST',{api_key:key,platform:scriptPlatform()},'');
+      if(!registration.token||!['public','limited'].includes(registration.accessLevel))throw Error('Session renewal returned no verified session');
       const status=await devRequest('/api/auth/agreement','GET',null,registration.token);
+      applyAgreementMetadata(status.agreement);
       if(!status.accepted){
-        sessionStorage.removeItem(DEV_SESSION_KEY);
+        clearAuthorizationCache();sessionStorage.removeItem(DEV_SESSION_KEY);
         localStorage.removeItem(TU_TERMS_KEY);
         throw Error('Current agreement requires acceptance');
       }
+      const identity=readCache(IDENTITY_CACHE),savedEntry=readStoredKeys().find(entry=>entry.key===key);
+      if(identity?.player?.id&&String(registration.playerId)===String(identity.player.id)&&savedEntry?.playerId===String(identity.player.id))sessionStorage.setItem(IDENTITY_CACHE,JSON.stringify({...identity,token:registration.token}));
       sessionStorage.setItem(DEV_SESSION_KEY,registration.token);
-      localStorage.setItem(TU_TERMS_KEY,TU_TERMS_VERSION);
+      rememberAuthorization(status,registration.token);
       return registration.token;
     })().catch(error=>{devAuthFailure(error);throw error;}).finally(()=>{devRenewal=null});
     return devRenewal;
   }
-  async function restoreDevSession(){
-    try{
-      await loadDevAgreement();
-      if(!readSavedKey()||localStorage.getItem(TU_TERMS_KEY)!==TU_TERMS_VERSION)return;
-      const token=devToken();
-      if(token){
-        try{
-          const status=await devRequest('/api/auth/agreement','GET',null,token);
-          if(status.accepted){publishAuthorization(true);resetDevAuthFailure();render('modules');return;}
-          localStorage.removeItem(TU_TERMS_KEY);
-          sessionStorage.removeItem(DEV_SESSION_KEY);
-          return;
-        }catch(error){
-          if(error.status!==401)throw error;
+  let authRestorePromise=null;
+  async function restoreDevSession({force=false}={}){
+    if(authRestorePromise)return authRestorePromise;
+    authRestorePromise=(async()=>{
+      try{
+        if(!readSavedKey()){clearAuthorizationCache();publishAuthorization(false);return;}
+        const cached=!force&&freshAuthorization();
+        if(cached){applyAgreementMetadata(cached.agreement);publishAuthorization(true);await restoreSavedIdentity();return;}
+        const token=devToken();
+        if(token){
+          try{
+            const status=await devRequest('/api/auth/agreement','GET',null,token);
+            applyAgreementMetadata(status.agreement);
+            if(status.accepted){rememberAuthorization(status);publishAuthorization(true);resetDevAuthFailure();await restoreSavedIdentity();if(!panel.hidden)render('modules');return;}
+            clearAuthorizationCache();localStorage.removeItem(TU_TERMS_KEY);sessionStorage.removeItem(DEV_SESSION_KEY);publishAuthorization(false);return;
+          }catch(error){if(error.status!==401)throw error;}
         }
+        if(!localStorage.getItem(TU_TERMS_KEY)){publishAuthorization(false);return;}
+        await renewDevSession();publishAuthorization(true);resetDevAuthFailure();await restoreSavedIdentity();if(!panel.hidden)render('modules');
+      }catch(error){
+        clearAuthorizationCache();publishAuthorization(false);console.warn('[TU] Session restore unavailable');if(!panel.hidden)render('about');
+      }finally{
+        authRestorePending=false;
+        if(authOpenRequested){authOpenRequested=false;tuRestore();syncLauncher();}
       }
-      await renewDevSession();
-      publishAuthorization(true);
-      resetDevAuthFailure();
-      render('modules');
-    }catch(error){
-      publishAuthorization(false);
-      console.warn('[TU] Session restore unavailable:',error.message);
-      render('about');
-    }finally{
-      authRestorePending=false;
-      if(authOpenRequested){authOpenRequested=false;tuRestore();syncLauncher();}
-    }
+    })().finally(()=>{authRestorePromise=null;});
+    return authRestorePromise;
+  }
+  async function ensureAuthorization(){
+    if(!freshAuthorization())await restoreDevSession({force:true});
+    return authorized();
   }
   async function devAccept(key,platform){
     const registration=await devRequest('/api/auth/register','POST',{api_key:key,platform},'');
@@ -385,10 +444,13 @@
     const accessLevel=registration.accessLevel;
     if(!['public','limited'].includes(accessLevel))throw Error('Torn did not confirm a Public Only or Limited Access key');
     const agreement=await loadDevAgreement();
+    const before=await devRequest('/api/auth/agreement','GET',null,token);
+    if(before.agreement?.agreement_version!==agreement.agreement_version){applyAgreementMetadata(before.agreement);await loadDevAgreement({force:true});document.getElementById('tu-agreement-overlay')?.remove();showAgreement(key);throw Error('Agreement version changed. Review the updated agreement and confirm again.');}
     await devRequest('/api/auth/agreement','POST',{action:'accepted',request_id:crypto.randomUUID(),...agreement},token);
     const status=await devRequest('/api/auth/agreement','GET',null,token);
-    if(!status.accepted)throw Error('Development agreement was not confirmed');
+    if(!status.accepted||status.agreement?.agreement_version!==agreement.agreement_version)throw Error('Development agreement was not confirmed');
     sessionStorage.setItem(DEV_SESSION_KEY,token);
+    rememberAuthorization(status,token);
     rememberVerifiedKey(key,accessLevel==='limited'?'Limited Access':'Public Only',registration.playerId);
     localStorage.setItem(LOGIN_ACCESS_KEY,accessLevel);
     resetDevAuthFailure();
@@ -398,7 +460,7 @@
     const token=devToken();
     if(!token)throw Error('No development session available; cannot confirm cancellation');
     await devRequest('/api/auth/agreement','POST',{action:'cancelled',request_id:crypto.randomUUID()},token);
-    sessionStorage.removeItem(DEV_SESSION_KEY);
+    clearAuthorizationCache();sessionStorage.removeItem(IDENTITY_CACHE);sessionStorage.removeItem(DEV_SESSION_KEY);
     publishAuthorization(false);
   }
   const TU_TERMS_KEY='tu:agreement:accepted';
@@ -414,26 +476,26 @@
   // Internal tool factories load on first activation.
   function stopModule() {
     if (!active) return;
-    const id=active; active=null;
+    const id=active; active=null;observeTUWindows();
     try { registered.get(id)?.deactivate(); } catch(e) { console.error('[TU] tool cleanup failed',id); }
     moduleHost.replaceChildren(); moduleHost.hidden=true;
   }
   async function openModule(id) {
-    if(!authorized()){showAgreement();return false;}
+    if(!await ensureAuthorization()){showAgreement();return false;}
     const mod=registered.get(id);
     if (!mod || saved.disabled?.[id]) return false;
     if(active===id)return true;
     stopModule();
     moduleHost.hidden=false;
     try {
-      active=id;
+      active=id;observeTUWindows();
       tuNav.history.push('tu-pda-panel');tuNav.current=id;tuNav.minimized=false;tuNav.exited=false;
       await mod.activate(Object.freeze({mount:moduleHost, close:()=>{stopModule();panel.hidden=false;viewModule=null;render('modules');syncLauncher();},minimize:()=>{tuMinimize();syncLauncher();}}));
-      return true;
+      if(observationReady)scheduleWindowUpdate(true);return true;
     } catch(e) {
       console.error('[TU] tool activation failed',id);
       try { mod.deactivate(); } catch {}
-      active=null;moduleHost.replaceChildren(); moduleHost.hidden=true;
+      active=null;observeTUWindows();moduleHost.replaceChildren(); moduleHost.hidden=true;
       return false;
     }
   }
@@ -445,7 +507,7 @@
   const tuRoots=['tu-pda-panel','tuim-panel','tuim-catalog','tuim-travel-window','tuim-data-window','tca-panel','tca-playbar','tpfg-root','tpfg-manager','tpfg-prompt','sff-root','tu-diagnostics-window'];
   const tuRoot=id=>document.getElementById(id);
   const tuHideAll=()=>tuRoots.forEach(id=>{const el=tuRoot(id);if(el){el.hidden=true;if(id==='tpfg-root')el.style.display='none';}});
-  const tuShow=id=>{const el=tuRoot(id);if(!el)return false;tuHideAll();el.hidden=false;if(id==='tpfg-root')el.style.display='block';tuNav.current=id;tuNav.minimized=false;tuNav.exited=false;return true;};
+  const tuShow=id=>{const el=tuRoot(id);if(!el)return false;tuHideAll();el.hidden=false;if(id==='tpfg-root')el.style.display='block';tuNav.current=id;tuNav.minimized=false;tuNav.exited=false;observeTUWindows();if(observationReady)syncLauncher();return true;};
   const tuOpen=id=>{if(!tuRoot(id))return false;if(tuNav.current!==id&&tuRoot(tuNav.current))tuNav.history.push(tuNav.current);return tuShow(id);};
   const tuBack=(source)=>{const parents={'tuim-travel-window':'tuim-panel','tuim-data-window':'tuim-travel-window','tuim-catalog':'tuim-panel'};const parent=parents[source];if(parent&&tuRoot(parent)){if(tuNav.history[tuNav.history.length-1]===parent)tuNav.history.pop();return tuShow(parent);}if(source&&tuRoot(source))tuNav.current=source;while(tuNav.history.length){const id=tuNav.history.pop();if(tuRoot(id))return tuShow(id);}return tuShow('tu-pda-panel');};
   const tuMinimize=(source)=>{if(source&&tuRoot(source))tuNav.current=source;
@@ -453,7 +515,7 @@
     const visible=tuRoots.filter(id=>{const el=tuRoot(id);return el&&!el.hidden&&getComputedStyle(el).display!=='none';});
     const top=(source&&tuRoot(source)?source:null)||visible.find(id=>id===tuNav.current)||visible.find(id=>id!=='tu-pda-panel')||visible[0];
     if(top)tuNav.current=top;
-    tuNav.minimized=true;tuNav.exited=false;tuHideAll();launcher.hidden=false;
+    tuNav.minimized=true;tuNav.exited=false;tuHideAll();launcher.hidden=false;observeTUWindows();
   };
   const tuExit=(source)=>{tuNav.history.length=0;tuNav.current='tu-pda-panel';tuMinimize();tuNav.exited=true;stopModule();};
   const tuRestore=()=>{
@@ -506,7 +568,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.37-dev</span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.38-dev</span></footer>';
   document.body.appendChild(panel);
   const headerBrand=panel.querySelector('.tu-logo');if(headerBrand){headerBrand.textContent='';headerBrand.classList.add('tu-brand-emblem');headerBrand.setAttribute('role','img');headerBrand.setAttribute('aria-label','Torn Utilities');}
   const identityLine=document.createElement('p');
@@ -588,12 +650,12 @@
       if(!check.checked)return;
       if(!currentDevAgreement){status.textContent='Current agreement has not loaded. Please wait or reopen the agreement.';return;}
       const supplied=key.value.trim();if(supplied&&!/^[a-zA-Z0-9]{16}$/.test(supplied)){status.textContent='Enter a valid 16-character Public Only or Limited Access key';return;}
-      const selected=supplied||readSavedKey();if(!/^[A-Za-z0-9]{16}$/.test(selected)){status.textContent='A 16-character Public Only or Limited Access key is required';return;}accept.disabled=true;try{status.textContent='Registering and recording development agreement…';await devAccept(selected,'tampermonkey');if(supplied)saveKey(supplied);await updatePlayer(selected);}catch(error){status.textContent='Development agreement failed: '+(error.message==='Torn verification failed'?'Torn could not verify this key. Registration requires a valid Public Only or Limited Access key; Full Access and invalid keys are not supported.':error.message);accept.disabled=false;return;}
+      const selected=supplied||readSavedKey();if(!/^[A-Za-z0-9]{16}$/.test(selected)){status.textContent='A 16-character Public Only or Limited Access key is required';return;}accept.disabled=true;try{status.textContent='Registering and recording development agreement…';const accepted=await devAccept(selected,scriptPlatform());if(supplied)saveKey(supplied);rememberAuthorization(accepted);await updatePlayer(selected);}catch(error){status.textContent='Development agreement failed: '+(error.message==='Torn verification failed'?'Torn could not verify this key. Registration requires a valid Public Only or Limited Access key; Full Access and invalid keys are not supported.':error.message);accept.disabled=false;return;}
       localStorage.setItem(TU_TERMS_KEY,TU_TERMS_VERSION);publishAuthorization(true);overlay.remove();render('modules');
     });
-    buttons.append(decline,accept);dialog.append(buttons);overlay.append(dialog);document.body.append(overlay);
+    buttons.append(decline,accept);dialog.append(buttons);overlay.append(dialog);document.body.append(overlay);observeTUWindows();
     // Minimize the consent dialog without accepting; the user may visit Torn to retrieve an API key.
-    const minimizeAgreement=()=>{overlay.hidden=true;overlay.style.display='none';tuNav.minimized=true;tuNav.exited=false;panel.hidden=true;launcher.hidden=false;};
+    const minimizeAgreement=()=>{overlay.hidden=true;overlay.style.display='none';tuNav.minimized=true;tuNav.exited=false;panel.hidden=true;launcher.hidden=false;observeTUWindows();};
     const agreementBar=document.createElement('div');agreementBar.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;background:#172026;z-index:2;padding:6px 0';
     const agreementTitle=document.createElement('strong');agreementTitle.textContent='TU Agreement';
     const minimizeButton=makeButton('− Minimize',minimizeAgreement);minimizeButton.setAttribute('aria-label','Minimize agreement to retrieve Torn API key');
@@ -631,6 +693,7 @@
     box.append(buttons);content.append(box);
   };
   function render(tab) {
+    observeTUWindows();
     if(!authorized()&&tab!=='about')tab='about';
     if(tab!=='settings')settingsPage=null;
     currentTab=tab;
@@ -735,13 +798,12 @@
         async function useForLogin(key){
           try{
             const checked=await verifyEntry(key);
-            const registration=await devRequest('/api/auth/register','POST',{api_key:key,platform:typeof pageWindow.PDA_httpGet==='function'?'pda':'tampermonkey'},'');
+            const registration=await devRequest('/api/auth/register','POST',{api_key:key,platform:scriptPlatform()},'');
             const expected=checked.level==='Limited Access'?'limited':'public';
             if(!registration.token||registration.accessLevel!==expected||(registration.playerId!=null&&String(registration.playerId)!==checked.playerId))throw Error('DEV registration verification mismatch');
-            const agreement=await loadDevAgreement();
             const current=await devRequest('/api/auth/agreement','GET',null,registration.token);
-            if(!current.accepted){showAgreement(key);return;}
-            stopModule();clearPlayer();saveKey(key);localStorage.setItem(LOGIN_ACCESS_KEY,expected);sessionStorage.setItem(DEV_SESSION_KEY,registration.token);localStorage.setItem(TU_TERMS_KEY,agreement.agreement_version);
+            applyAgreementMetadata(current.agreement);if(!current.accepted){showAgreement(key);return;}
+            stopModule();clearPlayer();saveKey(key);localStorage.setItem(LOGIN_ACCESS_KEY,expected);sessionStorage.setItem(DEV_SESSION_KEY,registration.token);localStorage.setItem(TU_TERMS_KEY,current.agreement.agreement_version);rememberAuthorization(current,registration.token);
             if(!await updatePlayer(key,checked.data))throw Error('Identity update failed');
             resetDevAuthFailure();publishAuthorization(true);status.textContent='Saved key selected for TU login';renderSaved();
           }catch{reportError();}
@@ -856,9 +918,17 @@
     }
   }
   render(hasAgreement()?'modules':'about');
-  restoreSavedIdentity();
   void restoreDevSession();
-  setInterval(()=>{if(authorizationVerified&&!authorized())publishAuthorization(false);},1000);
+  const resumeAuthorization=()=>{if(!document.hidden&&devToken()&&!freshAuthorization())void restoreDevSession({force:true});};
+  document.addEventListener('visibilitychange',resumeAuthorization);
+  window.addEventListener('pageshow',resumeAuthorization);
+  window.addEventListener('storage',event=>{
+    if(![VAULT,TU_TERMS_KEY,VAULT_CLEARED].includes(event.key))return;
+    clearAuthorizationCache();
+    if(event.key===VAULT||event.key===VAULT_CLEARED){sessionStorage.removeItem(IDENTITY_CACHE);sessionStorage.removeItem(DEV_SESSION_KEY);automaticIdentityAttempted=false;}
+    if(!readSavedKey()||!localStorage.getItem(TU_TERMS_KEY))publishAuthorization(false);
+    else void restoreDevSession({force:true});
+  });
   // Do not interrupt first-run API requests with an immediate alert.
   window.addEventListener('torn-utilities-ready',()=>render(currentTab));
   // Tool factories remain inert until Open is pressed.
@@ -890,7 +960,7 @@
   // Shared floating-window support for TU module panels.
   // Persist each TU window's user-selected size and position independently.
   const floatIds=['tu-diagnostics-window','tuim-panel','tuim-catalog','tca-panel','tu-pda-panel','sff-root','tpfg-manager','tpfg-root','tpfg-prompt'];
-  const floatingSetup=new WeakSet();
+  const floatingSetup=new WeakSet(),floatingResizeObservers=new Map();
   const FLOAT_KEY='tu:window-layout:v1:';
   const getLayout=id=>{try{return JSON.parse(localStorage.getItem(FLOAT_KEY+id)||'null')}catch(_){return null}};
   const putLayout=(id,layout)=>{try{localStorage.setItem(FLOAT_KEY+id,JSON.stringify(layout))}catch(_){}};
@@ -927,7 +997,7 @@
         if(first){first=false;return;}
         remember();
       });
-      resizeObserver.observe(el);
+      floatingResizeObservers.set(el,{observer:resizeObserver,observing:false});
     }
     const bar=el.querySelector('header,.tu-header,.tuim-header,.tuac-header')||el.firstElementChild;
     if(!bar)return;
@@ -995,7 +1065,7 @@
     uiFrame=requestAnimationFrame(()=>{
       uiFrame=null;if(document.hidden)return;
       if(enhancementPending){enhancementPending=false;enhanceFloating();tuEnhanceHeaders();}
-      syncLauncher();
+      observeTUWindows();syncLauncher();
     });
   };
   const windowObserver=new MutationObserver(records=>{
@@ -1013,8 +1083,26 @@
     }
     if(visibilityChanged||headersChanged)scheduleWindowUpdate(headersChanged);
   });
-  windowObserver.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['style','hidden','class']});
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleWindowUpdate(true);});
+  const windowDiscovery=new MutationObserver(records=>{
+    if(records.some(record=>[...record.addedNodes,...record.removedNodes].some(n=>n.nodeType===1&&(windowIds.has(n.id)||n.querySelector(windowSelector)))))scheduleWindowUpdate(true);
+  });
+  function observeTUWindows(){
+    if(!observationReady)return;
+    windowObserver.disconnect();windowDiscovery.disconnect();
+    for(const [el,entry] of floatingResizeObservers){
+      const needed=!document.hidden&&el.isConnected&&!el.hidden&&el.style.display!=='none'&&(el===panel||!!active||!panel.hidden);
+      if(needed&&!entry.observing){entry.observer.observe(el);entry.observing=true;}
+      else if(!needed&&entry.observing){entry.observer.disconnect();entry.observing=false;}
+      if(!el.isConnected){entry.observer.disconnect();floatingResizeObservers.delete(el);}
+    }
+    if(document.hidden)return;
+    const options={subtree:true,childList:true,attributes:true,attributeFilter:['style','hidden','class']};
+    if(!panel.hidden)windowObserver.observe(panel,options);
+    const overlay=document.getElementById('tu-agreement-overlay');if(overlay&&!overlay.hidden)windowObserver.observe(overlay,options);
+    if(active){windowObserver.observe(moduleHost,options);for(const id of windowIds){const el=tuRoot(id);if(el&&el!==moduleHost&&el!==panel)windowObserver.observe(el,options);}windowDiscovery.observe(document.body,{childList:true});}
+  }
+  observationReady=true;observeTUWindows();
+  document.addEventListener('visibilitychange',()=>{observeTUWindows();if(!document.hidden&&(active||!panel.hidden))scheduleWindowUpdate(true);});
   syncLauncher();
   // Restore the original draggable launcher with compact dimensions.
   launcher.setAttribute('aria-label','Open Torn Utilities; drag to reposition');

@@ -1,3 +1,7 @@
+## Session/observation update: 0.5.42.38-dev
+
+[Session reuse and observer lifecycle](SESSION-AND-OBSERVERS.md) removes the idle one-second authorization timer and connected Manager observers, reuses verified identity/session state, and replaces diagnostic agreement-wording comparisons with version metadata. Use TU Test v0.2.4 (52 checks, checklist v4) against this build. Automated lifecycle checks pass; actual PDA and live-account acceptance still require retesting.
+
 ## PDA performance update: 0.5.42.37-dev
 
 The Manager filters/batches window mutation work and Item Monitor skips empty/hidden scans. [Investigation and repeatable measurements](PDA-PERFORMANCE.md) document the reproduced excess DOM work and regression coverage. Actual PDA lag/frame-rate resolution remains unverified until device retesting; use TU Test v0.2.3 against this build. The approved logo and existing saved-key behavior are preserved.

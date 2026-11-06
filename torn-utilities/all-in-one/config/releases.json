@@ -1,5 +1,17 @@
 [
   {
+    "version": "0.5.42.38-dev",
+    "date": "2026-11-05",
+    "changes": {
+      "Fixes": [
+        "Reuse short-lived session verification and cached identity across page navigation",
+        "Agreement verification uses version metadata; full text is fetched only for review/acceptance",
+        "Remove one-second authorization polling; recheck on relevant activity, resume and backend denial",
+        "Observe TU windows only while in use; no global subtree observer in the idle Manager"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.37-dev",
     "date": "2026-11-05",
     "changes": {

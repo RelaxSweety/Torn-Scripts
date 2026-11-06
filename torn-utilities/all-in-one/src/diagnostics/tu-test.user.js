@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Testing and Diagnostics DEV
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.2.3-dev
+// @version      0.2.4-dev
 // @description  Guided DEV acceptance for ten tools, separate PDA/Tampermonkey evidence and sanitized reports
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -82,12 +82,12 @@
     panel.style.right='auto';panel.style.bottom='auto';
   }
   const savePanelLayout=()=>{const rect=panel.getBoundingClientRect();try{localStorage.setItem(panelLayoutKey,JSON.stringify({x:rect.left,y:rect.top,w:rect.width,h:rect.height}))}catch{}};
-  if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>{if(panel.style.display!=='none')savePanelLayout()}).observe(panel);
+  const panelResizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(()=>{if(panel.style.display!=='none')savePanelLayout()}):null;
   // Torn page styles can override native buttons and inputs; scope explicit typography.
   const font='Arial,Helvetica,sans-serif';
   const heading=document.createElement('div');heading.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:move;touch-action:none;flex-shrink:0;user-select:none;padding-bottom:8px';
   const title=document.createElement('strong');title.textContent='TU Test · DEV acceptance';title.style.cssText='font:700 15px/1.4 '+font+';color:#f4f7fa';
-  const close=document.createElement('button');close.textContent='Close';close.style.cssText='font:600 12px/1.35 Arial,Helvetica,sans-serif;color:#fff;background:#344d60;border:1px solid #7892a2;border-radius:5px;padding:6px 10px;cursor:pointer';close.onclick=()=>panel.style.display='none';heading.append(title,close);panel.append(heading);
+  const close=document.createElement('button');close.textContent='Close';close.style.cssText='font:600 12px/1.35 Arial,Helvetica,sans-serif;color:#fff;background:#344d60;border:1px solid #7892a2;border-radius:5px;padding:6px 10px;cursor:pointer';close.onclick=()=>{panel.style.display='none';panelResizeObserver?.disconnect();};heading.append(title,close);panel.append(heading);
   let panelDrag=null;
   heading.addEventListener('pointerdown',event=>{if(event.button!==0||event.target===close)return;const rect=panel.getBoundingClientRect();panelDrag={id:event.pointerId,x:event.clientX,y:event.clientY,left:rect.left,top:rect.top};heading.setPointerCapture?.(event.pointerId);event.preventDefault()});
   heading.addEventListener('pointermove',event=>{if(!panelDrag||event.pointerId!==panelDrag.id)return;panel.style.left=clamp(panelDrag.left+event.clientX-panelDrag.x,0,Math.max(0,innerWidth-60))+'px';panel.style.top=clamp(panelDrag.top+event.clientY-panelDrag.y,0,Math.max(0,innerHeight-50))+'px';panel.style.right='auto';panel.style.bottom='auto'});
@@ -96,7 +96,7 @@
   const content=document.createElement('div');content.style.cssText='flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding-right:4px';panel.append(content);
  const button=(label,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=fn;b.style.cssText='font:600 12px Arial;color:#fff;background:#344d60;border:1px solid #7892a2;border-radius:5px;padding:8px;margin:3px;cursor:pointer';return b;};
  const text=(tag,value,parent=content)=>{const e=document.createElement(tag);e.textContent=value;parent.append(e);return e;};
- const notice=text('p','Target '+targetBuild+' · TU Test 0.2.3-dev. Record results only for the actual selected host. Automatic checks are read-only and do not prove gameplay or native bridge compatibility.');
+ const notice=text('p','Target '+targetBuild+' · TU Test 0.2.4-dev. Record results only for the actual selected host. Automatic checks are read-only and do not prove gameplay or native bridge compatibility.');
  text('p','Do not paste API keys, session tokens or room secrets into notes. This tool never registers keys, accepts/cancels agreements, creates rooms or modifies backend records.');
  const hostLabel=text('label','Actual test host: ');
  const hostSelect=document.createElement('select');hostSelect.id='tu-test-host';
@@ -158,8 +158,7 @@
  }
  section.onchange=render;filter.onchange=render;
  hostSelect.onchange=()=>{save();platform=hostSelect.value;loadSession();refreshFields();render();};
- const githubAgreement='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/agreements/dev/current.json';
- const workerAgreement='https://tu-multiplayer-server-dev.tuserver.workers.dev/api/auth/agreement/current';
+ const githubAgreement='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/agreements/dev/version.json';
  const artifact='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/releases/dev/torn-utilities-'+targetBuild+'.user.js';
  async function getText(url){
   return new Promise((resolve,reject)=>{
@@ -173,7 +172,7 @@
   });
  }
  const setAuto=(id,status,note)=>{session.record(id,status,note,'automatic');save();render();};
- const validAgreement=d=>typeof d?.agreement?.agreement_version==='string'&&d.agreement.agreement_version.trim()&&Number.isSafeInteger(d.agreement.agreement_number)&&d.agreement.agreement_number>0&&/^\d{4}-\d{2}-\d{2}$/.test(d.agreement.agreement_date||'')&&typeof d.content==='string'&&d.content.trim().length>0;
+ const validAgreement=d=>typeof d?.agreement_version==='string'&&!!d.agreement_version.trim();
  let running=false;
  async function runChecks(){
   if(running)return;if(platform==='unknown'){alert('Select your actual test host first.');return;}
@@ -190,27 +189,28 @@
     const ok=source.startsWith('// ==UserScript==')&&version===targetBuild&&markers&&(source.match(/\/\* Integrated tool:/g)||[]).length===10&&!source.includes('/* Integrated tool: alerts-calculations')&&!source.includes('war-status-diagnostic')&&!source.includes('modules.json')&&!source.includes('https://tu-multiplayer-server.tuserver.workers.dev');
     setAuto('source.bundle',ok?'pass':'fail','Published '+(version||'unknown')+'; single-script metadata, ten tool markers, exclusions and DEV endpoints '+(ok?'match':'do not match')+'. This does not execute the source.');
    }catch(e){setAuto('source.bundle',e.blocked?'blocked':'fail',e.message);}
-   const documents=[];
-   for(const [id,url] of [['agreement.github',githubAgreement],['agreement.worker',workerAgreement]]){
-    try{const d=JSON.parse(await getText(url));const valid=!!validAgreement(d);documents.push(valid?d:null);setAuto(id,valid?'pass':'fail',valid?'Published '+d.agreement.agreement_version+' #'+d.agreement.agreement_number+' effective '+d.agreement.agreement_date:'Invalid agreement metadata or empty content');}
-    catch(e){documents.push(null);setAuto(id,e.blocked?'blocked':'fail',e.blocked?e.message:'Invalid agreement response');}
-   }
-   const [github,worker]=documents;
-   if(!github||!worker)setAuto('agreement.match','blocked','Both valid agreement publications are needed for comparison');
-   else{const same=['agreement_version','agreement_number','agreement_date'].every(k=>github.agreement[k]===worker.agreement[k])&&github.content.replace(/\s+/g,' ').trim()===worker.content.replace(/\s+/g,' ').trim();setAuto('agreement.match',same?'pass':'fail',same?'Metadata and full wording match after whitespace normalization':'Published DEV metadata or wording differs');}
+   let github=null,worker=null;
+   try{github=JSON.parse(await getText(githubAgreement));if(!validAgreement(github))throw Error('Invalid published version');setAuto('agreement.github','pass','Published DEV agreement version '+github.agreement_version+'; metadata only');}
+   catch(e){github=null;setAuto('agreement.github',e.blocked?'blocked':'fail',e.blocked?e.message:'Invalid public version metadata');}
+   if(typeof api?.getAgreementVersion!=='function')setAuto('agreement.worker','blocked','Updated authenticated TU Manager is required for version-only backend verification');
+   else try{worker=await api.getAgreementVersion({refresh:true});if(!validAgreement(worker))throw Error('Missing backend version');setAuto('agreement.worker','pass','DEV backend agreement version '+worker.agreement_version+' confirmed via Manager; full text not downloaded');}
+   catch{worker=null;setAuto('agreement.worker','blocked','DEV session/version verification unavailable; authenticate in TU and retry');}
+   if(!github||!worker)setAuto('agreement.match','blocked','Both published version numbers are needed');
+   else{const same=github.agreement_version===worker.agreement_version;setAuto('agreement.match',same?'pass':'fail',same?'Published agreement versions match; wording is not compared':'Published agreement version numbers differ');}
+
   }finally{running=false;runButton.disabled=false;hostSelect.disabled=false;render();}
  }
  const runButton=button('Run read-only checks',runChecks);actions.append(runButton);
  function exportReport(){
   save();const reports={};for(const id of ['tampermonkey','pda'])reports[id]=createSession({targetBuild,checklistVersion:catalog.checklistVersion,tests,platform:id,initial:profiles[id]}).report();
-  const report={schemaVersion:2,toolVersion:'0.2.3-dev',targetBuild,checklistVersion:catalog.checklistVersion,detectedHost:detected,detectedEnvironment:Object.fromEntries(Object.entries(environment).map(([k,fields])=>[k,Object.fromEntries(Object.entries(fields).map(([name,value])=>[name,typeof value==='string'?session.scrub(value):value]))])),userAgent:session.scrub(navigator.userAgent),platforms:reports,acceptanceComplete:Object.values(reports).every(r=>r.platformReady),productionAuthorized:false};
+  const report={schemaVersion:2,toolVersion:'0.2.4-dev',targetBuild,checklistVersion:catalog.checklistVersion,detectedHost:detected,detectedEnvironment:Object.fromEntries(Object.entries(environment).map(([k,fields])=>[k,Object.fromEntries(Object.entries(fields).map(([name,value])=>[name,typeof value==='string'?session.scrub(value):value]))])),userAgent:session.scrub(navigator.userAgent),platforms:reports,acceptanceComplete:Object.values(reports).every(r=>r.platformReady),productionAuthorized:false};
   const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='tu-dev-acceptance-'+targetBuild+'-'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
  }
  actions.append(button('Export both host reports',exportReport),button('Reset selected host',()=>{
   if(!confirm('Clear results for this build and selected host? Export first to retain evidence.'))return;
   delete profiles[platform];loadSession();refreshFields();save();render();
  }));
- launcher.onclick=()=>{if(suppressClick){suppressClick=false;return;}panel.style.display=panel.style.display==='none'?'flex':'none';render();};
+ launcher.onclick=()=>{if(suppressClick){suppressClick=false;return;}panel.style.display=panel.style.display==='none'?'flex':'none';if(panel.style.display==='none')panelResizeObserver?.disconnect();else panelResizeObserver?.observe(panel);render();};
  document.body.append(launcher,panel);refreshFields();render();
  if(typeof navigator.userAgentData?.getHighEntropyValues==='function'){
   Promise.resolve().then(()=>navigator.userAgentData.getHighEntropyValues(['model','platformVersion','fullVersionList'])).then(hints=>{

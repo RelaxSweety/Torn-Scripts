@@ -27,12 +27,12 @@ function boot({offline=false,isolated=false,wrongBuild=false}={}){
  w.addEventListener('error',e=>{errors.push(e.error);e.preventDefault()});w.alert=m=>alerts.push(m);w.confirm=()=>true;
  w.GM_info={scriptHandler:'Tampermonkey'};w.HTMLElement.prototype.setPointerCapture=()=>{};
  w.localStorage.setItem('tu:aio:diagnostics:v1',JSON.stringify({results:[{id:'auth.public',status:'pass'}]}));
- w.TornUtilities={isRegistered:id=>tools.some(t=>t.id===id)};
+ w.TornUtilities={isRegistered:id=>tools.some(t=>t.id===id),getAgreementVersion:async()=>{if(offline)throw Error('Network unavailable');return {agreement_version:'fixture-v1',accepted:true}}};
  if(isolated){w.unsafeWindow={TornUtilities:w.TornUtilities};delete w.TornUtilities;}
  w.GM_xmlhttpRequest=o=>{requests.push(o);queueMicrotask(()=>{
   if(offline){o.onerror();return;}
   const agreement={agreement:{agreement_version:'fixture-v1',agreement_number:1,agreement_date:'2026-11-05'},content:'Complete published fixture agreement.'};
-  o.onload({status:200,responseText:o.url.endsWith('.user.js')?bundle:JSON.stringify(agreement)});
+  o.onload({status:200,responseText:o.url.endsWith('.user.js')?bundle:JSON.stringify({agreement_version:'fixture-v1'})});
  });};
  w.Blob=class{constructor(parts){report=JSON.parse(parts.join(''))}};w.URL.createObjectURL=()=> 'blob:test';w.URL.revokeObjectURL=()=>{};w.HTMLAnchorElement.prototype.click=()=>{};
  w.eval(source);
@@ -45,7 +45,7 @@ for(const isolated of [false,true]){
   button('Export both host reports').click();assert.equal(b.report().platforms.tampermonkey.counts.pass,0,'Legacy results are not imported');assert.equal(b.report().platforms.pda.results.length,52);
   button('Run read-only checks').click();await tick();await tick();
   button('Export both host reports').click();assert.equal(b.report().platforms.tampermonkey.counts.pass,7);assert.equal(b.report().platforms.pda.counts.pass,0);assert.equal(b.report().acceptanceComplete,false);
-  assert.equal(requests.length,3);for(const r of requests){assert.equal(r.method,'GET');assert.ok(!('data' in r));assert.ok(!Object.keys(r.headers).some(k=>k.toLowerCase()==='authorization'));}
+  assert.equal(requests.length,2);assert.ok(requests.some(r=>r.url.endsWith('/agreements/dev/version.json')));assert.ok(!requests.some(r=>r.url.includes('/agreement/current')||r.url.endsWith('/agreements/dev/current.json')),'Do not download full agreements for version comparison');for(const r of requests){assert.equal(r.method,'GET');assert.ok(!('data' in r));assert.ok(!Object.keys(r.headers).some(k=>k.toLowerCase()==='authorization'));}
   const auth=w.document.querySelector('[data-test-id="auth.public"]');auth.querySelector('button').click();assert.ok(alerts.pop().includes('evidence'));
   auth.querySelector('textarea').value='Registered a DEV Public Only test account; verified label';auth.querySelector('button').click();
   button('Export both host reports').click();assert.equal(b.report().platforms.tampermonkey.counts.pass,8);

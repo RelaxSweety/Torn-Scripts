@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "checklistVersion": "dev-acceptance-2026-11-05-v3",
+  "checklistVersion": "dev-acceptance-2026-11-05-v4",
   "tests": [
     {
       "id": "runtime.build",
@@ -54,7 +54,7 @@
       "id": "agreement.github",
       "section": "automatic",
       "label": "GitHub published agreement",
-      "instructions": "Read the published DEV agreement metadata and complete text.",
+      "instructions": "Read the small published DEV agreement version.json metadata file. Full agreement text is not fetched by this automatic check.",
       "kind": "automatic",
       "critical": true,
       "platforms": [
@@ -66,7 +66,7 @@
       "id": "agreement.worker",
       "section": "automatic",
       "label": "DEV Worker published agreement",
-      "instructions": "Read the public DEV agreement endpoint. No key or session token is transmitted.",
+      "instructions": "Ask the authenticated TU Manager for a read-only DEV agreement-status check. Confirm its published version; the tool does not receive keys/tokens or download full text. If authentication is unavailable, mark BLOCKED.",
       "kind": "automatic",
       "critical": true,
       "platforms": [
@@ -77,8 +77,8 @@
     {
       "id": "agreement.match",
       "section": "automatic",
-      "label": "Agreement publication consistency",
-      "instructions": "Compare published version, number, effective date and wording between GitHub and DEV Worker.",
+      "label": "Agreement version consistency",
+      "instructions": "Compare the published agreement_version values only. Wording, number and effective-date fields are not compared for this verification. Full agreement remains available for user review in TU.",
       "kind": "automatic",
       "critical": true,
       "platforms": [
@@ -162,7 +162,7 @@
       "id": "auth.persist",
       "section": "auth",
       "label": "Session and agreement persistence",
-      "instructions": "Accept the current agreement, navigate and reload Torn; authorization restores without another acceptance prompt. Close/reopen the host too.",
+      "instructions": "Accept the current agreement, navigate and reload Torn; authorization restores without another acceptance prompt. With a fresh session cache, verify no repeated key/profile or full agreement downloads. After the five-minute verification cache expires, confirm a metadata status check on activity/resume. Closing the host may require normal session restoration.",
       "kind": "manual",
       "critical": true,
       "platforms": [
@@ -174,7 +174,7 @@
       "id": "auth.renew",
       "section": "auth",
       "label": "Expired session renewal",
-      "instructions": "Using a controlled DEV session, verify expiry/renewal respects backend validity and does not accept terms automatically.",
+      "instructions": "Use a controlled DEV session to verify expired tokens renew once through the Manager, backend revocation stops access, cross-tab logout clears cached access, and changed agreement versions require explicit acceptance. TU Test read-only version checking must never register or accept automatically.",
       "kind": "manual",
       "critical": true,
       "platforms": [
@@ -306,7 +306,7 @@
       "id": "core.lazy",
       "section": "core",
       "label": "Lazy startup and cleanup",
-      "instructions": "Opening one tool should initialize only that tool. Repeat open/close and switch tools; inspect for duplicate windows, listeners, timers and requests. Minimize should preserve the active tool.",
+      "instructions": "With Manager and tools closed, verify no authorization polling interval, connected Manager DOM observers or background tool initialization. Opening a tool should initialize only that tool; Torn page-content observers should exist only for activated tools that need them. Repeat close/Exit/switch and verify observers/timers stop. Minimizing an active monitor may preserve its intended monitoring.",
       "kind": "manual",
       "critical": true,
       "platforms": [

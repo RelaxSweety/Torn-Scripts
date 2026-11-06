@@ -21,7 +21,7 @@ async function boot({sandbox=false,authorized=true,accepted=true,access='public'
  requests.push(url);
  if(url.endsWith('/api/auth/agreement/current'))return {agreement:{agreement_version:'test-v1',agreement_number:1,agreement_date:'2026-11-05'},content:'# Published agreement\n\nComplete fixture agreement.'};
  if(url.endsWith('/api/auth/register'))return {token:'mock-session',accessLevel:access,playerId:4539436};
- if(url.endsWith('/api/auth/agreement'))return {accepted};
+ if(url.endsWith('/api/auth/agreement'))return {accepted,agreement:{agreement_version:'test-v1',agreement_number:1,agreement_date:'2026-11-05'}};
  if(url.includes('/key/info'))return {info:{access:{type:'Public Only'},user:{id:4539436}}};
  if(url.includes('/user/'))return {name:'Fixture Player',player_id:4539436};
  return {};
@@ -46,7 +46,7 @@ for(const sandbox of [false,true]){
  assert.ok(!requests.some(u=>u.includes('modules.json')));checks++;
  w.document.querySelector('[data-tab="about"]').click();
  const button=text=>[...w.document.querySelectorAll('button')].find(b=>b.textContent===text);
- button('Version Notes').click();assert.ok(w.document.body.textContent.includes('0.5.42.37-dev'));checks++;
+ button('Version Notes').click();assert.ok(w.document.body.textContent.includes('0.5.42.38-dev'));checks++;
  button('← About').click();button('User Agreement').click();await tick();assert.ok(w.document.body.textContent.includes('Complete fixture agreement.'));checks++;
  for(const tool of tools){
   api.closeActiveModule();

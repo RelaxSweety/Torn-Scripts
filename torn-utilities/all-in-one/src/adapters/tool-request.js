@@ -12,3 +12,9 @@ export function authorizeToolRequest(url, options={}, {authorized,token}={}) {
  headers.Authorization='Bearer '+token;
  return {...options,headers};
 }
+
+// A room-token failure is not evidence that the TU account session expired.
+export function isAccountAuthorizationFailure(url,status,data) {
+ const target=new URL(String(url),'https://www.torn.com');
+ return target.origin==='https://tu-multiplayer-server-dev.tuserver.workers.dev'&&/^\/api\/(rooms|connect|battleship|marbles)(\/|$)/.test(target.pathname)&&[401,403].includes(status)&&[401,403].includes(data?.authorization_status);
+}
