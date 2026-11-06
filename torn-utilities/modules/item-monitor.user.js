@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.10.31-dev
+// @version      1.10.32-dev
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -108,8 +108,9 @@ function travelStyle(){if(document.getElementById('tuim-travel-style'))return;co
 function sound(){for(const t of state.alarmTimers)clearTimeout(t);state.alarmTimers=[];const duration=Math.max(.5,Math.min(30,Number(state.cfg.alarmDuration)||3)),vol=Math.max(0,Math.min(100,Number(state.cfg.alarmVolume??60)))/100;try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;const a=state.audio||(state.audio=new C());a.resume?.();for(let ms=0;ms<duration*1000;ms+=280)state.alarmTimers.push(setTimeout(()=>{const o=a.createOscillator(),g=a.createGain(),now=a.currentTime;o.type=state.cfg.alarmSound==='siren'?'sawtooth':state.cfg.alarmSound==='chime'?'sine':'square';o.frequency.value=state.cfg.alarmSound==='chime'?1046:850;g.gain.setValueAtTime(vol*.13,now);g.gain.exponentialRampToValueAtTime(.0001,now+.18);o.connect(g);g.connect(a.destination);o.start();o.stop(now+.2)},ms))}catch(e){console.warn('[Item Monitor] Audio unavailable',e)}}
 function alertItem(w,reason){if(!state.panel){sound();return}state.panel.hidden=false;render();const p=state.panel.querySelector('#tuim-status');if(p)p.textContent='ALERT: '+w.name+' — '+reason;sound()}
 function scan(){
+  if(document.hidden||!state.items.length)return;
   style();
-  const cat=category(),rows=[...document.querySelectorAll(candidates)].filter(e=>!e.closest('#tuim-panel,#tu-pda-panel'));
+  const cat=category(),rows=state.items.some(w=>w.category===cat)?[...document.querySelectorAll(candidates)].filter(e=>!e.closest('#tuim-panel,#tu-pda-panel')):[];
   for(const w of state.items){
     const previous=w.row;
     if(w.category!==cat){previous?.classList.remove('tuim-watch','tuim-trigger','tuim-wait');w.row=null;w.status='Waiting for '+w.category;w.fired=false;continue}
@@ -842,7 +843,7 @@ function startRuntime(){
  if(runtimeAbort)return;
  migrate();style();runtimeAbort=new AbortController();
  for(const task of runtimeTasks)task.timer=setInterval(task.fn,task.delay);
- runtimeObserver=new MutationObserver(()=>{if(scanTimer!==null)return;scanTimer=setTimeout(()=>{scanTimer=null;if(runtimeAbort)scan()},400)});
+ runtimeObserver=new MutationObserver(records=>{if(document.hidden||!state.items.length||scanTimer!==null)return;if(records.every(record=>(record.target.nodeType===1?record.target:record.target.parentElement)?.closest('#tuim-panel,#tuim-catalog,#tuim-travel-window,#tuim-data-window,#tu-pda-panel,#tu-test-dev-panel')))return;scanTimer=setTimeout(()=>{scanTimer=null;if(runtimeAbort)scan()},400)});
  runtimeObserver.observe(document.documentElement,{childList:true,subtree:true,characterData:true});
  window.addEventListener('pageshow',scan,{signal:runtimeAbort.signal});
  window.addEventListener('popstate',scan,{signal:runtimeAbort.signal});

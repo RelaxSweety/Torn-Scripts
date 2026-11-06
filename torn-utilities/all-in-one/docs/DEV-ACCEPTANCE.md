@@ -1,3 +1,7 @@
+## PDA performance update: 0.5.42.37-dev
+
+The Manager filters/batches window mutation work and Item Monitor skips empty/hidden scans. [Investigation and repeatable measurements](PDA-PERFORMANCE.md) document the reproduced excess DOM work and regression coverage. Actual PDA lag/frame-rate resolution remains unverified until device retesting; use TU Test v0.2.3 against this build. The approved logo and existing saved-key behavior are preserved.
+
 ## Saved-key update: 0.5.42.36-dev
 
 Settings now retains multiple validated keys independently, labels each from its own verified metadata, preserves the login when adding a key, offers explicit login/War Organizer selection, and removes matching copies of only the selected key. Legacy keys can be rechecked; incompatible-account War key roles are cleared without deleting the saved key. Dedicated saved-key regressions cover the reported failure, persistence, account isolation, deletion, failed requests and GM fallback. Re-run the updated TU Test v0.2.2 (52 checks) against this build; actual PDA/Tampermonkey retesting and authorized backend event evidence remain required. Previous build test evidence is preserved separately.

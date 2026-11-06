@@ -1,5 +1,19 @@
 [
   {
+    "version": "0.5.42.37-dev",
+    "date": "2026-11-05",
+    "changes": {
+      "Fixes": [
+        "Ignore unrelated Torn DOM changes in Manager visibility/layout observers",
+        "Batch TU window updates per animation frame; stop rewriting initialized headers",
+        "Skip Item Monitor page scans without monitors or while the page is hidden"
+      ],
+      "Compatibility": [
+        "PDA performance mitigation; actual device retesting required"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.36-dev",
     "date": "2026-11-05",
     "changes": {
