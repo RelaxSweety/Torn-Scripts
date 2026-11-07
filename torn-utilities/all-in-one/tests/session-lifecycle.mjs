@@ -5,7 +5,7 @@ import {isAccountAuthorizationFailure} from '../src/adapters/tool-request.js';
 const code=fs.readFileSync(new URL('../dist/tu-integrated-staging-dev.user.js',import.meta.url),'utf8');
 const KEY='abcdef0123456789',VAULT='tu:identity:public-only-key:v1',TOKEN='tu:dev:auth:session:v1',AUTH='tu:dev:authorization-cache:v1',IDENTITY='tu:dev:identity-cache:v1';
 const tick=()=>new Promise(r=>setTimeout(r,35));
-async function boot(snapshot=null,{noKey=false}={}){
+async function boot(snapshot=null,{noKey=false,native=false,modern=false}={}){
  const dom=new JSDOM('<body><main id="torn-content">Torn</main></body>',{url:'https://www.torn.com',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window;
  const watchers=[],intervals=[],requests=[],errors=[],renders={count:0};let shift=0;
  const now=w.Date.now.bind(w.Date);w.Date.now=()=>now()+shift;
@@ -29,6 +29,14 @@ async function boot(snapshot=null,{noKey=false}={}){
   o.onload?.({status,responseText:JSON.stringify(data)});
  });};
  w.HTMLElement.prototype.setPointerCapture=()=>{};
+ const mockRequest=w.GM_xmlhttpRequest;
+ if(native){w.flutter_inappwebview={callHandler:(handler,url,headers,body)=>{
+  assert.ok(['PDA_httpGet','PDA_httpPost'].includes(handler));assert.equal(typeof headers,'object');
+  if(handler==='PDA_httpPost'){assert.equal(typeof body,'string');assert.ok(headers['content-type']);}
+  if(url.endsWith('/api/auth/agreement')&&handler==='PDA_httpGet')assert.ok(headers.authorization?.startsWith('Bearer '),'Authenticated GET headers must reach native bridge');
+  return new Promise(resolve=>mockRequest({method:handler==='PDA_httpGet'?'GET':'POST',url,headers,data:body,onload:resolve}));
+ }};delete w.GM_xmlhttpRequest;}
+ if(modern){w.GM={xmlHttpRequest(details){assert.equal(this,w.GM,'Modern GM method must retain its receiver');return mockRequest(details)}};delete w.GM_xmlhttpRequest;}
  w.fetch=async()=>{throw Error('Unexpected fetch')};
  w.__renders=renders;w.eval(code.replace('function render(tab) {','function render(tab) {window.__renders.count++;'));
  await tick();await tick();
@@ -90,5 +98,8 @@ let saved;
 }
 {
  const b=await boot(saved);try{const before=b.requests.length;b.w.localStorage.removeItem('tu:agreement:accepted');b.w.dispatchEvent(new b.w.StorageEvent('storage',{key:'tu:agreement:accepted',newValue:null}));await tick();assert.equal(b.api.isAuthorized(),false);assert.equal(b.requests.length,before,'Cross-tab logout is event-driven, not a new polling request');assert.equal(b.w.sessionStorage.getItem(AUTH),null);}finally{b.close()}
+}
+for(const mode of [{native:true},{modern:true}]){
+ const b=await boot(null,mode);try{assert.equal(b.api.isAuthorized(),true);assert.deepEqual(b.errors,[]);if(mode.native){b.advance(6*60*1000);b.control.status=401;b.w.document.dispatchEvent(new b.w.Event('visibilitychange'));await tick();await tick();assert.equal(b.control.registers,1);assert.equal(b.api.isAuthorized(),true);assert.equal(b.requests.filter(r=>r.path.includes('/current')).length,0);}}finally{b.close()}
 }
 console.log('Session lifecycle checks passed: warm navigation, bounded rechecks, cached full text, version changes, expiry/revocation, no idle polling and scoped observation');

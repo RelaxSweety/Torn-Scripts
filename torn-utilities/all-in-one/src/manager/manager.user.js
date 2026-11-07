@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities DEV (All-in-One)
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.38-dev
+// @version      0.5.42.39-dev
 // @description  Integrated TU development bundle for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -23,10 +23,22 @@
   // Tampermonkey GM-enabled scripts use an isolated window. Publish the TU API on
   // the page window so separately installed @grant none modules can register.
   const pageWindow=typeof unsafeWindow!=='undefined'?unsafeWindow:window;
+  const nativeBridge=pageWindow.flutter_inappwebview||window.flutter_inappwebview;
+  const managerHttp=typeof nativeBridge?.callHandler==='function'?details=>{
+    let settled=false;const finish=(error,response)=>{if(settled)return;settled=true;clearTimeout(timer);if(error)details.onerror?.({error:'PDA native request failed'});else details.onload?.(response);};
+    const timer=setTimeout(()=>{if(settled)return;settled=true;details.ontimeout?.();},details.timeout||20000);
+    const method=String(details.method||'GET').toUpperCase();
+    if(!['GET','POST'].includes(method)){finish(true);return;}
+    const args=[details.url,details.headers||{}];if(method==='POST')args.push(details.data||'');
+    Promise.resolve().then(()=>nativeBridge.callHandler('PDA_http'+(method==='GET'?'Get':'Post'),...args)).then(response=>{
+      if(!response||!Number.isFinite(Number(response.status))||Number(response.status)<=0){finish(true);return;}
+      finish(false,{...response,status:Number(response.status)});
+    }).catch(()=>finish(true));
+  }:typeof GM_xmlhttpRequest==='function'?GM_xmlhttpRequest:typeof GM!=='undefined'&&typeof GM.xmlHttpRequest==='function'?GM.xmlHttpRequest.bind(GM):null;
   if (pageWindow.__RELAX_TORN_UTILITIES_PDA__) return;
   pageWindow.__RELAX_TORN_UTILITIES_PDA__ = true;
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.5.42.38-dev';
+  const TU_VERSION='0.5.42.39-dev';
   const TU_LOGO='__TU_LOGO_DATA_URL__';
   // Bundled tool directory: no external catalog, cache, or refresh requests.
   const registry={schemaVersion:1,categories:[{"id":"business","name":"Business Tools","icon":"▥","order":10},{"id":"games","name":"Games","icon":"♜","order":20},{"id":"single-player","name":"Single Player","icon":"▣","order":21,"parent":"games"},{"id":"multiplayer","name":"Multiplayer","icon":"♟","order":22,"parent":"games"},{"id":"chat","name":"Chat Tools","icon":"◉","order":30},{"id":"other","name":"War Tools","icon":"⚙","order":40}],modules:[{"id":"flight-game","name":"Flight Game","category":"single-player","version":"0.12.8","description":"Standalone Flight Game arcade module, playable anytime"},{"id":"stick-fighter","name":"Stick Fighter","category":"single-player","version":"0.2.7","description":"Standalone Stick Fighter arcade module, playable anytime"},{"id":"chat-archiver","name":"Chat Archiver","category":"chat","version":"0.1.8","description":"Archive Torn chat conversations"},{"id":"tic-tac-toe","name":"Tic-Tac-Toe","category":"multiplayer","version":"0.6.5","description":"Two-player Tic-Tac-Toe with named winners, green winning line, rematches and head-to-head history"},{"id":"torn-four","name":"Torn Four","category":"multiplayer","version":"0.2.5","description":"Connect Four: two-player multiplayer with private room codes"},{"id":"torn-fleet","name":"Torn Fleet","category":"multiplayer","version":"0.2.5","description":"Battleship: fleet placement and turn-based naval combat"},{"id":"torn-snake","name":"Slithering Streets","category":"single-player","version":"0.2.14","description":"Single-player Snake with touch controls and local high scores"},{"id":"chaos-marbles","name":"Chaos Marbles","category":"multiplayer","version":"0.2.5","description":"Online 2\u20134 player marble race with private player sessions, Waiting for Chaos staging, and game history"},{"id":"item-monitor","name":"Travel Assistant and Item Monitor","category":"business","version":"1.10.31-dev","description":"Item Monitor and Travel Assistant with D1 stock reporting, source diagnostics and stock estimation"},{"id":"war-hit-organizer","name":"War Organizer","category":"other","version":"0.3.17-dev","description":"Compact war target board, reservation controls, timer and local development settings"}]};
@@ -151,11 +163,11 @@
   const clearPlayer=()=>{authGeneration++;playerInfo=null;identityStatus='No verified session';pageWindow.dispatchEvent(new CustomEvent('tu-player-updated',{detail:null}));};
   const requestIdentity=key=>new Promise((resolve,reject)=>{
     const url='https://api.torn.com/v2/key/info';
-    if(typeof GM_xmlhttpRequest==='function')GM_xmlhttpRequest({method:'GET',url,timeout:12000,headers:{Authorization:'ApiKey '+key,Accept:'application/json'},onload:r=>{try{if(r.status<200||r.status>=300)throw Error('HTTP '+r.status);resolve(JSON.parse(r.responseText));}catch(e){reject(e)}},onerror:()=>reject(Error('Network error')),ontimeout:()=>reject(Error('Timeout'))});
+    if(typeof managerHttp==='function')managerHttp({method:'GET',url,timeout:12000,headers:{Authorization:'ApiKey '+key,Accept:'application/json'},onload:r=>{try{if(r.status<200||r.status>=300)throw Error('HTTP '+r.status);resolve(JSON.parse(r.responseText));}catch(e){reject(e)}},onerror:()=>reject(Error('Network error')),ontimeout:()=>reject(Error('Timeout'))});
     else{const c=new AbortController(),t=setTimeout(()=>c.abort(),12000);fetch(url,{headers:{Authorization:'ApiKey '+key,Accept:'application/json'},signal:c.signal,cache:'no-store'}).then(async r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(resolve,reject).finally(()=>clearTimeout(t));}
   });
   const requestPublicJson=(url,key)=>new Promise((resolve,reject)=>{
-    if(typeof GM_xmlhttpRequest==='function')GM_xmlhttpRequest({method:'GET',url,timeout:12000,headers:{Authorization:'ApiKey '+key,Accept:'application/json'},onload:r=>{try{if(r.status<200||r.status>=300)throw Error('HTTP '+r.status);const data=JSON.parse(r.responseText);if(data.error)throw Error(data.error.error||'API error');resolve(data)}catch(e){reject(e)}},onerror:()=>reject(Error('Network error')),ontimeout:()=>reject(Error('Timeout'))});
+    if(typeof managerHttp==='function')managerHttp({method:'GET',url,timeout:12000,headers:{Authorization:'ApiKey '+key,Accept:'application/json'},onload:r=>{try{if(r.status<200||r.status>=300)throw Error('HTTP '+r.status);const data=JSON.parse(r.responseText);if(data.error)throw Error(data.error.error||'API error');resolve(data)}catch(e){reject(e)}},onerror:()=>reject(Error('Network error')),ontimeout:()=>reject(Error('Timeout'))});
     else fetch(url,{headers:{Authorization:'ApiKey '+key,Accept:'application/json'},cache:'no-store'}).then(async r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(resolve,reject);
   });
   async function enrichIdentity(key,generation){
@@ -237,7 +249,7 @@
       const key=readSavedKey();if(!key)throw Error('Set Public Only API key in TU Manager Settings');
       const url='https://api.torn.com'+path;
       const raw=await new Promise((resolve,reject)=>{
-        if(typeof GM_xmlhttpRequest==='function')GM_xmlhttpRequest({method:'GET',url,timeout:30000,headers:{Authorization:'ApiKey '+key,Accept:format==='text'?'text/csv,application/json':'application/json'},onload:r=>r.status>=200&&r.status<300?resolve(r.responseText):reject(Error('HTTP '+r.status)),onerror:()=>reject(Error('Network error')),ontimeout:()=>reject(Error('Timeout'))});
+        if(typeof managerHttp==='function')managerHttp({method:'GET',url,timeout:30000,headers:{Authorization:'ApiKey '+key,Accept:format==='text'?'text/csv,application/json':'application/json'},onload:r=>r.status>=200&&r.status<300?resolve(r.responseText):reject(Error('HTTP '+r.status)),onerror:()=>reject(Error('Network error')),ontimeout:()=>reject(Error('Timeout'))});
         else fetch(url,{headers:{Authorization:'ApiKey '+key},cache:'no-store'}).then(r=>r.ok?r.text():Promise.reject(Error('HTTP '+r.status))).then(resolve,reject);
       });
       if(format==='text')return raw;
@@ -251,7 +263,7 @@
       if(!key||keyEntry?.level!=='Limited Access'||!playerInfo?.id||keyEntry.playerId!==playerInfo.id)throw Error('Recheck and select a Limited Access key for the current TU player in Settings > API Keys');
       const url='https://api.torn.com'+path;
       const data=await new Promise((resolve,reject)=>{
-        if(typeof GM_xmlhttpRequest==='function')GM_xmlhttpRequest({method:'GET',url,timeout:20000,headers:{Authorization:'ApiKey '+key,Accept:'application/json'},onload:r=>{try{if(r.status<200||r.status>=300)throw Error('HTTP '+r.status);resolve(JSON.parse(r.responseText))}catch(e){reject(e)}},onerror:()=>reject(Error('Network error')),ontimeout:()=>reject(Error('Timeout'))});
+        if(typeof managerHttp==='function')managerHttp({method:'GET',url,timeout:20000,headers:{Authorization:'ApiKey '+key,Accept:'application/json'},onload:r=>{try{if(r.status<200||r.status>=300)throw Error('HTTP '+r.status);resolve(JSON.parse(r.responseText))}catch(e){reject(e)}},onerror:()=>reject(Error('Network error')),ontimeout:()=>reject(Error('Timeout'))});
         else fetch(url,{headers:{Authorization:'ApiKey '+key,Accept:'application/json'},cache:'no-store'}).then(async r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(resolve,reject);
       });
       if(data?.error)throw Error(data.error.error||'Torn API error');
@@ -318,7 +330,7 @@
   }
   const DEV_SESSION_KEY='tu:dev:auth:session:v1';
   const devToken=()=>sessionStorage.getItem(DEV_SESSION_KEY)||'';
-  const scriptPlatform=()=>/torn[ -]?pda/i.test(navigator.userAgent)||typeof pageWindow.PDA_httpGet==='function'||typeof window.PDA_httpGet==='function'||typeof pageWindow.PDA_httpPost==='function'||typeof window.PDA_httpPost==='function'?'pda':'tampermonkey';
+  const scriptPlatform=()=>typeof nativeBridge?.callHandler==='function'||/torn[ -]?pda/i.test(navigator.userAgent)||typeof pageWindow.PDA_httpGet==='function'||typeof window.PDA_httpGet==='function'||typeof pageWindow.PDA_httpPost==='function'||typeof window.PDA_httpPost==='function'?'pda':'tampermonkey';
   let devAuthIssue='',devRenewalBlocked=false;
   function devAuthFailure(error){
     const status=error?.status;
@@ -345,26 +357,12 @@
       throw Error('Unexpected authentication response');
     };
     const transport=async()=>{
-      // Auth endpoints require Authorization headers. PDA_httpGet does not
-      // accept them, and PDA_httpPost may ignore its headers argument.
-      // Use GM's cross-origin request when a bearer token is present.
-      const gm=typeof GM_xmlhttpRequest==='function'?GM_xmlhttpRequest:
-        (typeof GM!=='undefined'&&typeof GM.xmlHttpRequest==='function'?GM.xmlHttpRequest:null);
+      const gm=managerHttp;
       if(gm){
-        try{
-          return await new Promise((resolve,reject)=>gm({method,url,headers,...(payload?{data:payload}:{}),timeout:20000,
-            onload:r=>{try{resolve({status:r.status||0,data:parse(r.responseText??r.response)})}catch(e){reject(e)}},
-            onerror:()=>reject(Error('GM request network failure')),ontimeout:()=>reject(Error('GM request timeout'))}));
-        }catch(error){console.warn('[TU] GM authentication transport failed',error.message);}
-      }
-      // Native PDA POST supports JSON bodies but may not support bearer headers.
-      // Do not treat its return value as proof of a confirmed agreement.
-      const pdaPost=pageWindow.PDA_httpPost||window.PDA_httpPost;
-      if(method==='POST'&&!token&&typeof pdaPost==='function'){
-        const raw=await pdaPost(url,payload,{'Content-Type':'application/json'});
-        const data=parse(raw);
-        if(!data?.token)throw Error('PDA registration response missing session token');
-        return {status:200,data};
+        try{return await new Promise((resolve,reject)=>gm({method,url,headers,...(payload?{data:payload}:{}),timeout:20000,
+          onload:r=>{try{resolve({status:r.status||0,data:parse(r.responseText??r.response)})}catch{reject(Error('Invalid transport response'))}},
+          onerror:()=>reject(Error('Request bridge failure')),ontimeout:()=>reject(Error('Request bridge timeout'))}));}
+        catch{throw Error('Request bridge failed for '+method+' '+path+'. Reload Torn in PDA and retry; check the app network/bridge permissions.');}
       }
       // Standard fetch is a last resort on platforms with CORS support.
       let response;try{response=await fetch(url,{method,headers,...(payload?{body:payload}:{}),cache:'no-store'});}catch(error){throw Error('Unable to reach DEV Worker (network/CORS). Check '+DEV_BASE+'/api/auth/agreement/current in a browser. '+(error?.message||''));}
@@ -568,7 +566,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.38-dev</span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.39-dev</span></footer>';
   document.body.appendChild(panel);
   const headerBrand=panel.querySelector('.tu-logo');if(headerBrand){headerBrand.textContent='';headerBrand.classList.add('tu-brand-emblem');headerBrand.setAttribute('role','img');headerBrand.setAttribute('aria-label','Torn Utilities');}
   const identityLine=document.createElement('p');
@@ -851,7 +849,7 @@
         playerVerified:!!playerInfo,
         factionId:playerInfo?.factionId??null,
         savedPublicOnlyKeyPresent:!!readSavedKey(),
-        transport:{tampermonkey:typeof GM_xmlhttpRequest==='function',pda:typeof PDA_httpGet==='function'},
+        transport:{tampermonkey:typeof managerHttp==='function',pda:typeof PDA_httpGet==='function'},
         platform:typeof unsafeWindow!=='undefined'?'Tampermonkey':'PDA or browser'
       });
       content.append(makeButton('Open Diagnostics',()=>{

@@ -1,3 +1,9 @@
+## Android PDA request transport: 0.5.42.39-dev
+
+Manager requests now use Torn PDA's documented native `flutter_inappwebview.callHandler` transport when available: `PDA_httpGet(url, headers)` and `PDA_httpPost(url, headers, JSON-body)`. This supports authenticated agreement GETs without browser CORS, preserves native HTTP status, and avoids replaying a failed bridge POST through browser fetch. Modern GM requests retain their method receiver. Regression fixtures exercise native and modern-only environments; actual affected-device registration must still be retested. The proposed feature additions are not part of this patch.
+
+Official bridge contract: https://github.com/Manuito83/torn-pda/blob/master/docs/webview/http-handlers.md
+
 ## Session/observation update: 0.5.42.38-dev
 
 [Session reuse and observer lifecycle](SESSION-AND-OBSERVERS.md) removes the idle one-second authorization timer and connected Manager observers, reuses verified identity/session state, and replaces diagnostic agreement-wording comparisons with version metadata. Use TU Test v0.2.4 (52 checks, checklist v4) against this build. Automated lifecycle checks pass; actual PDA and live-account acceptance still require retesting.

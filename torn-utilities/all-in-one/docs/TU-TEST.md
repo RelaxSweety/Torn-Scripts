@@ -1,10 +1,10 @@
 # Independent TU Testing and Diagnostics DEV
 
-This updates **TU Testing and Diagnostics DEV**, previously v0.1.9-dev, to **v0.2.4-dev**. It is the independent guided checklist at `dist/tu-diagnostics-dev.user.js`. The separate `torn-utilities/diagnostics/torn-pda-diagnostic.user.js` is unchanged.
+This updates **TU Testing and Diagnostics DEV**, previously v0.1.9-dev, to **v0.2.5-dev**. It is the independent guided checklist at `dist/tu-diagnostics-dev.user.js`. The separate `torn-utilities/diagnostics/torn-pda-diagnostic.user.js` is unchanged.
 
 [Install/update TU Test](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/all-in-one/dist/tu-diagnostics-dev.user.js)
 
-Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.38-dev**, contains **52 checks** and covers **10 tools**. Stock and Calculations is absent.
+Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.39-dev**, contains **52 checks** and covers **10 tools**. Stock and Calculations is absent.
 
 ## Using it
 
@@ -54,8 +54,8 @@ Browsers may reduce/spoof user agents, hide exact hardware models, report deskto
 
 ## Saved-key regression acceptance (v0.2.2)
 
-The 0.5.42.38-dev target adds explicit inventory and removal checks covering multiple keys of both supported levels, independent verified labels, explicit role/login selection, reload and clearing all selected-key copies. Checklist version v3 starts fresh evidence for this changed acceptance plan. Previous build/checklist results remain in their original storage namespace. Agreement acceptance requires backend event evidence; UI access alone is insufficient.
+The 0.5.42.39-dev target adds explicit inventory and removal checks covering multiple keys of both supported levels, independent verified labels, explicit role/login selection, reload and clearing all selected-key copies. Checklist version v3 starts fresh evidence for this changed acceptance plan. Previous build/checklist results remain in their original storage namespace. Agreement acceptance requires backend event evidence; UI access alone is insufficient.
 
 ## Version-only verification (v0.2.4)
 
-The checklist targets 0.5.42.38-dev and uses checklist revision v4. Review the session-cache/observer checks for cold and warm navigation, resume/expiry, version changes, backend denial and zero connected Manager observers when idle. Full agreement text is still reviewed explicitly inside TU; diagnostic consistency uses the version string only. If backend status is unavailable or the session needs renewal, authenticate/reopen TU and rerun the read-only check. See `SESSION-AND-OBSERVERS.md` for the complete contract.
+The checklist targets 0.5.42.39-dev and uses checklist revision v4. Review the session-cache/observer checks for cold and warm navigation, resume/expiry, version changes, backend denial and zero connected Manager observers when idle. Full agreement text is still reviewed explicitly inside TU; diagnostic consistency uses the version string only. If backend status is unavailable or the session needs renewal, authenticate/reopen TU and rerun the read-only check. See `SESSION-AND-OBSERVERS.md` for the complete contract.
