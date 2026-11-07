@@ -94,7 +94,7 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   if(kind==='return'&&(!s.returnMatches?.(e)||!run.purchaseConfirmed))throw Error('Confirm purchase and open the native return travel page');
   return e;
  }
- async function desktopAct(kind){
+ async function nativeAct(kind){
   const expected=run;busy=true;run.priorProof=getSnapshot().purchaseProof||null;run.stage=kind+'-pending';persist();refresh();
   const guard=()=>run===expected&&active&&run.expiresAt>now()&&String(getSnapshot().ownerId)===run.ownerId&&getSnapshot().country===run.country;
   try{
@@ -110,7 +110,7 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   if(!event?.isTrusted||busy||!run)return false;
   const s=getSnapshot(),kind=run.stage;
   if(!validRun(s)||!focused()||(kind!=='return'&&Number.isFinite(s.quantity)&&s.quantity<Math.max(1,Number(run.minimumQty)||1))||(kind!=='return'&&now()-run.stockAt>=(kind==='heal'?120000:STOCK_TTL))||!['heal','buy','return'].includes(kind)){notice('Refresh visible state/stock, or re-arm before acting');refresh();return false;}
-  if(executeAction?.enabled())return desktopAct(kind);
+  if(executeAction?.enabled())return nativeAct(kind);
   busy=true;
   try{const e=nativeControl(kind,s);run.priorProof=s.purchaseProof||null;run.stage=kind+'-pending';if(kind==='return')run.stockAt=now();persist();e.click();notice('Action sent to Torn. Complete any native confirmation; the next action waits for observed success.');statusAttempts=0;scheduleStatus();return true;}
   catch(error){notice(error.message);return false;}finally{busy=false;refresh();}

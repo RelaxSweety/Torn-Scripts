@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "checklistVersion": "dev-acceptance-2026-11-07-v8",
+  "checklistVersion": "dev-acceptance-2026-11-07-v9",
   "tests": [
     {
       "id": "runtime.build",
@@ -666,7 +666,7 @@
       "id": "tool.item-monitor.snatch-heal",
       "section": "tool.item-monitor",
       "label": "Snatch and Run hospital release",
-      "instructions": "Desktop Tampermonkey: one trusted green Heal click opens the exact selected medical inventory slot, selects Use and Yes only in its matching item confirmation. Confirm native You are out of the hospital result advances to Purchase Max; no automatic purchase. Test wrong blood type, cancellation, duplicate clicks, missing items and a medical item insufficient to release hospital. PDA adapter is not updated by this release.",
+      "instructions": "On actual PC Tampermonkey and Torn PDA separately: one green Heal click opens the exact selected inventory slot, selects Use and confirms Yes only for that item. Test Morphine and distinguish blood types. The native hospital-release result must enable Purchase Max without automatically buying. Test duplicate clicks, cancellation, lost focus, insufficient healing and stock disappearing before medical Yes.",
       "kind": "manual",
       "critical": true,
       "platforms": [
@@ -678,7 +678,7 @@
       "id": "tool.item-monitor.snatch-buy",
       "section": "tool.item-monitor",
       "label": "Snatch and Run Max and purchase confirmation",
-      "instructions": "Desktop Tampermonkey: one trusted Purchase Max click uses the native maximum icon and text quantity input, Buy, then Yes only in the monitored item-ID panel with the exact quantity/name. Confirm newly acquired selected-item inventory before Return is enabled. No automatic return. Test unrelated Yes dialogs, insufficient capacity/money, missing or disabled controls and re-hospitalization.",
+      "instructions": "On actual Torn PDA: one Purchase Max click opens the monitored buy icon, uses the visible quantity panel Max and Buy, waits for the item-specific Yes/No panel, validates exact quantity/item and selects Yes once. Hidden desktop fields must remain unused. Verify 17 purchased Dahlia plus a remaining medical item using selected-item inventory evidence. Retest the desktop inline controls, unrelated Yes dialogs, wrong item/quantity, missing capacity and cancellation.",
       "kind": "manual",
       "critical": true,
       "platforms": [
@@ -690,7 +690,7 @@
       "id": "tool.item-monitor.snatch-return",
       "section": "tool.item-monitor",
       "label": "Snatch and Run return and cleanup",
-      "instructions": "Desktop Tampermonkey: after purchase proof, one trusted Return click opens Travel home, verifies Torn in the confirmation, selects Travel Back, waits for booking proof, then selects enabled Continue. Confirm flight screen, no duplicate booking, cancellation/blur cleanup and no automatic action on reload. Record real desktop results separately; PDA behavior remains unvalidated.",
+      "instructions": "On actual PC Tampermonkey and Torn PDA: after purchase proof, one Return click opens Travel home, verifies Torn in the native question, selects Travel Back, waits for booking proof, then selects enabled Continue. Confirm the flight screen, no duplicate booking and no automatic action on navigation/reload. Run continuous diagnostics before healing; stop/export only after safely on the flight. Fixture success does not pass live host acceptance.",
       "kind": "manual",
       "critical": true,
       "platforms": [

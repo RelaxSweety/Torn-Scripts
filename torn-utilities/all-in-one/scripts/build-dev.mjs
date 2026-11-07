@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import {createDesktopTravelActions} from '../src/features/desktop-travel-actions.js';
+import {createNativeTravelActions} from '../src/features/native-travel-actions.js';
 import {createTravelEnhancements} from '../src/features/travel-enhancements.js';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -33,7 +33,7 @@ for(const tool of tools){
  }
  if(tool.id==='war-hit-organizer')source=source.replace(/"data:image\/webp;base64,[A-Za-z0-9+/=]+"/g,'manager.getLogo()');
 
- if(tool.id==='item-monitor')source='const createDesktopTravelActions='+createDesktopTravelActions.toString()+';\n'+'const createTravelEnhancements='+createTravelEnhancements.toString()+';\n'+source;
+ if(tool.id==='item-monitor')source='const createNativeTravelActions='+createNativeTravelActions.toString()+';\n'+'const createTravelEnhancements='+createTravelEnhancements.toString()+';\n'+source;
  // Each retained source runs only on first use. A private Window facade captures
  // its legacy registration internally and binds native Window methods correctly.
  // GM_info reflects the tool's version rather than the enclosing TU version.

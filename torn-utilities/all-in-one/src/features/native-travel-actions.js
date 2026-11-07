@@ -1,6 +1,6 @@
-// Captured desktop Torn travel UI. One trusted TU action may expand its native
+// Captured desktop and PDA Torn travel UI. One trusted TU action may expand its native
 // controls and confirm that same item/action; it never starts the next TU stage.
-export function createDesktopTravelActions({document,window,enabled=()=>false,now=()=>Date.now()}){
+export function createNativeTravelActions({document,window,enabled=()=>false,now=()=>Date.now()}){
  const norm=v=>String(v||'').normalize('NFKC').replace(/\s+/g,' ').trim().toLowerCase();
  const label=e=>norm(e?.getAttribute('aria-label')||e?.textContent||e?.value);
  const shown=e=>!!e?.isConnected&&!e.disabled&&e.getAttribute('aria-disabled')!=='true'&&e.getClientRects().length>0&&window.getComputedStyle(e).visibility!=='hidden'&&!e.closest('#tuim-panel,#tu-snatch-run,#tu-pda-panel');
@@ -19,7 +19,7 @@ export function createDesktopTravelActions({document,window,enabled=()=>false,no
   return {released:!!release,purchaseProof:same(purchased,run)?purchased.proof:null,purchaseItemKey:same(purchased,run)?run.watchKey:null,traveling:!!(same(booked,run)||flight),returning:!!same(booked,run)};
  }
  async function execute(kind,{run,getSnapshot,guard}){
-  if(!enabled())throw Error('Desktop Tampermonkey controls unavailable');cancel();const current=new window.AbortController();controller=current;
+  if(!enabled())throw Error('Native Tampermonkey/PDA controls unavailable');cancel();const current=new window.AbortController();controller=current;
   const signal=current.signal;let submitted=false;
   const ensure=()=>{if(signal.aborted||!guard()||document.hidden||!document.hasFocus())throw Error('Action canceled or page/player changed. Continue manually if Torn already accepted it.');};
   const click=e=>{ensure();if(!shown(e))throw Error('Native action is no longer available');e.click();};
@@ -54,18 +54,32 @@ export function createDesktopTravelActions({document,window,enabled=()=>false,no
    if(kind==='buy'){
     let s=getSnapshot();if(s.hospitalized!==false||!(s.quantity>0))throw Error('Confirm hospital release and current stock before buying');
     const id=run.watchKey.match(/^id:(\d+)$/)?.[1];if(!id)throw Error('A numeric monitored foreign item ID is required');
+    const panelId='item-'+id+'-buyPanel';
     const form=scope().querySelector('#item-'+id+'-form'),row=form?.closest('[class*=row]');
     if(!row||norm(row.querySelector('[class*=tabletColB] button')?.textContent)!==norm(run.watchName))throw Error('Monitored item ID/name does not match the native shop row');
-    if(scope().querySelector('#item-'+id+'-buyPanel'))throw Error('Close the existing purchase confirmation before Purchase Max');
-    const input=row.querySelector('input.input-money'),max=one(row.querySelectorAll('input.wai-btn[type=button]'),'native maximum control');
-    if(!input||!max||!/add the maximum amount/i.test(max.getAttribute('aria-label')||max.parentElement?.getAttribute('title')||''))throw Error('Native maximum/quantity controls are unavailable');
+    const existing=scope().querySelector('#'+panelId);
+    if(existing&&one(existing.querySelectorAll('[class*=confirmPanel]'),'existing purchase confirmation'))throw Error('Close the existing purchase confirmation before Purchase Max');
+    const icon=one([...row.querySelectorAll('button[class*=buyIconButton][aria-controls]')].filter(e=>e.getAttribute('aria-controls')===panelId),'compact Buy opener');
+    let container=row,compact=!!icon;
+    if(compact){
+     let amountPanel=existing?.querySelector('[class*=amountPanel]');
+     if(!shown(amountPanel)){click(icon);amountPanel=await wait(()=>{const panel=scope()?.querySelector('#'+panelId);const amount=panel?.querySelector('[class*=amountPanel]');return shown(amount)?amount:null;});}
+     if(norm(amountPanel.querySelector('p strong')?.textContent)!==norm(run.watchName)||!norm(amountPanel.querySelector('p')?.textContent).includes('do you want to buy'))throw Error('Compact quantity panel does not match the monitored item');
+     container=amountPanel;
+    }else if(existing&&shown(existing))throw Error('Unexpected open purchase panel; close it before Purchase Max');
+    const input=one(container.querySelectorAll('input.input-money'),'visible native quantity input');
+    const nativeMax=one(container.querySelectorAll('input.wai-btn[type=button]'),'native maximum control');
+    const max=nativeMax||one(buttons(container,'MAX').filter(e=>e.matches('button[type=button]')),'quantity-panel MAX control');
+    if(!input||!max||nativeMax&&!/add the maximum amount/i.test(max.getAttribute('aria-label')||max.parentElement?.getAttribute('title')||''))throw Error('Native maximum/quantity controls are unavailable');
     const before=inventory(run.watchName).length;click(max);await new Promise(resolve=>window.setTimeout(resolve,32));ensure();
-    const buy=await wait(()=>{const amount=Number(input.value.replace(/,/g,''));const fresh=getSnapshot();if(!Number.isSafeInteger(amount)||amount<1||amount>fresh.quantity)return null;return one([...row.querySelectorAll('button[aria-controls]')].filter(e=>e.getAttribute('aria-controls')==='item-'+id+'-buyPanel'&&label(e)==='buy'),'monitored Buy control');});
+    const buy=await wait(()=>{const amount=Number(input.value.replace(/,/g,''));const fresh=getSnapshot();if(!Number.isSafeInteger(amount)||amount<1||amount>fresh.quantity)return null;
+     return compact?one(buttons(container,'Buy'),'quantity-panel Buy control'):one([...row.querySelectorAll('button[aria-controls]')].filter(e=>e.getAttribute('aria-controls')===panelId&&label(e)==='buy'),'monitored Buy control');});
     const amount=Number(input.value.replace(/,/g,''));s=getSnapshot();if(s.hospitalized!==false||amount>s.quantity)throw Error('Hospital or stock state changed before Buy');click(buy);
-    const yes=await wait(()=>{const panel=scope()?.querySelector('#item-'+id+'-buyPanel');if(!panel)return null;const strong=panel.querySelector('p strong');if(norm(strong?.textContent)!==norm(amount+'x '+run.watchName))throw Error('Purchase confirmation quantity/item mismatch');return one(buttons(panel,'Yes'),'purchase Yes confirmation');});
+    const yes=await wait(()=>{const panel=scope()?.querySelector('#'+panelId),confirmation=panel?.querySelector('[class*=confirmPanel]');if(!shown(confirmation))return null;
+     const strong=confirmation.querySelector('p strong');if(norm(strong?.textContent)!==norm(amount+'x '+run.watchName))throw Error('Purchase confirmation quantity/item mismatch');return one(buttons(confirmation,'Yes'),'purchase Yes confirmation');});
     if(getSnapshot().hospitalized!==false)throw Error('Hospital state changed before confirmation');submitted=true;click(yes);
     await wait(()=>inventory(run.watchName).length>=before+amount);
-    purchased={...run,proof:'desktop:'+run.expiresAt+':'+id+':'+amount};return {purchaseConfirmed:true,amount};
+    purchased={...run,proof:'native:'+run.expiresAt+':'+id+':'+amount};return {purchaseConfirmed:true,amount};
    }
    if(kind==='return'){
     if(!run.purchaseConfirmed)throw Error('Confirm the purchase before returning');
@@ -77,7 +91,7 @@ export function createDesktopTravelActions({document,window,enabled=()=>false,no
     const next=await wait(()=>one([...panel.querySelectorAll('button')].filter(e=>/^continue(?:\s*\(\d+\))?$/.test(label(e))),'flight Continue control'),8000);click(next);
     return {returnBooked:true};
    }
-   throw Error('Unknown desktop action');
+   throw Error('Unknown native action');
   }catch(error){error.submitted=submitted;throw error;}finally{document.removeEventListener('visibilitychange',foreground);window.removeEventListener('blur',foreground);if(controller===current)controller=null;}
  }
  return {enabled,execute,cancel,inspect};

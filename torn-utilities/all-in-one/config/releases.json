@@ -1,5 +1,22 @@
 [
   {
+    "version": "0.5.42.44-dev",
+    "date": "2026-11-07",
+    "changes": {
+      "Features": [
+        "Enable native Snatch and Run actions in Torn PDA using captured mobile foreign-page controls"
+      ],
+      "Fixes": [
+        "Open the compact item-specific quantity panel before selecting Max, Buy and matching Yes",
+        "Ignore hidden desktop fields when using the PDA layout",
+        "Share confirmed Morphine/medical release, purchase inventory proof and Travel home/Back/Continue handling across PC and PDA"
+      ],
+      "Compatibility": [
+        "PC Tampermonkey path retained; fixture-tested on both captured layouts, live PDA acceptance pending; production unchanged"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.43-dev",
     "date": "2026-11-07",
     "changes": {

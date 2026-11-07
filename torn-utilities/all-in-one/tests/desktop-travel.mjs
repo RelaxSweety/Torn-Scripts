@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {JSDOM} from 'jsdom';
-import {createDesktopTravelActions} from '../src/features/desktop-travel-actions.js';
+import {createNativeTravelActions as createDesktopTravelActions} from '../src/features/native-travel-actions.js';
 import {createTravelEnhancements} from '../src/features/travel-enhancements.js';
 const f=JSON.parse(fs.readFileSync(new URL('./fixtures/desktop-travel.json',import.meta.url)));
 async function fixture(bundle=false,scenario=''){
