@@ -1,8 +1,8 @@
-# Travel Assistant DEV acceptance: 0.5.42.41-dev
+# Travel Assistant DEV acceptance: 0.5.42.42-dev
 
 Alarms update status and sound without changing whether the user minimized the main window. Monitoring continues while the activated tool is minimized, on the actively viewed Torn page. Exit stops its runtime. Hidden or unfocused pages are not scanned for stock.
 
-**Show monitored items only** hides unmatched native shop rows while retaining monitored zero-stock rows. It follows watch changes and dynamic shop rows. Disable the option or Exit to restore TU-hidden rows. It does not remove rows or change native filters. Unsupported layouts are left alone rather than guessing which containers to hide.
+**Show monitored items only** hides unmatched native shop rows while retaining monitored zero-stock rows. It follows watch changes and dynamic shop rows. Disable the option or Exit to restore TU-hidden rows. The checkbox sits beside its label. Unmatched foreign-shop items have their outer list containers collapsed too, so monitored items collect at the top of the item list without blank slots. It does not remove/reorder DOM nodes or change native filters. Unsupported layouts are left alone rather than guessing which containers to hide.
 
 ## Snatch and Run (opt-in DEV)
 

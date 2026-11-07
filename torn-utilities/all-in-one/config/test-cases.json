@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "checklistVersion": "dev-acceptance-2026-11-07-v6",
+  "checklistVersion": "dev-acceptance-2026-11-07-v7",
   "tests": [
     {
       "id": "runtime.build",
@@ -270,7 +270,7 @@
       "id": "core.branding",
       "section": "core",
       "label": "Approved gold logo",
-      "instructions": "Check the approved no-flare Integrated Gold master in launcher, headers and War Organizer on standard/high-density displays. Check sharpness, proportions, transparent exterior and compact launcher size.",
+      "instructions": "Check the approved no-flare Integrated Gold master in launcher, headers and War Organizer on standard/high-density displays. Check sharpness, proportions, transparent exterior and compact launcher size. About must not include a full-resolution logo link.",
       "kind": "manual",
       "critical": true,
       "platforms": [
@@ -642,7 +642,7 @@
       "id": "tool.item-monitor.filter",
       "section": "tool.item-monitor",
       "label": "Show monitored items only",
-      "instructions": "Enable the filter on a foreign shop. Monitored items remain visible including zero-stock rows; other rows hide. Change watches and trigger dynamic updates. Disable or Exit restores every row without altering native filters.",
+      "instructions": "Verify the checkbox sits beside Show monitored items only. On a foreign shop with unmonitored rows before monitored rows, enable it. Monitored items including zero-stock rows collect at the top of the item list with no empty slots; other entire item containers hide. Change watches and dynamic rows; disable or Exit restores all native rows in original order. Check native nested LI and table layouts.",
       "kind": "manual",
       "critical": true,
       "platforms": [

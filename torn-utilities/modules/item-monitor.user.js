@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.11.1-dev
+// @version      1.11.2-dev
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -120,6 +120,15 @@ const rowMatches=(row,w)=>{
  if(w.key.startsWith('id:')&&id)return w.key==='id:'+id;
  const nativeName=row.querySelector('[class*=tabletColB]')||row.querySelector('[data-item-name],[class*=itemName],[class*=ItemName]');const name=nativeName?text(nativeName).trim():nameOf(row);return !!name&&norm(name)===norm(w.name);
 };
+const filterContainer=row=>{
+ const wrapper=row.closest('[class*=stockTableWrapper]'),li=row.closest('li');
+ if(wrapper&&li&&wrapper.contains(li)){
+  // Only collapse an item container; never hide a shared list or shop wrapper.
+  const nested=[...li.querySelectorAll('[class*=row]')].filter(e=>e.querySelector('[class*=tabletColB]')&&e.querySelector('[class*=tabletColC]'));
+  if(nested.length===1&&nested[0]===row||li===row)return li;
+ }
+ return row;
+};
 const filterRows=()=>{
  const foreign=foreignShopTables().flatMap(shop=>shop.rows);if(foreign.length)return [...new Set(foreign)];
  // Only explicitly item-identified shop/market containers are eligible elsewhere.
@@ -153,10 +162,10 @@ async function getSnatchContext({inventory=false}={}){
  if(inventory){const d=await api.requestTravelInfo('inventory');snatchContext.medicalItems=d.inventory?.items||[];}
  enhancements?.check();return snatchContext;
 }
-const enhancements=typeof createTravelEnhancements==='function'?createTravelEnhancements({document,window,getItems:()=>state.items,getContext:getSnatchContext,getSnapshot:snatchSnapshot,getRows:filterRows,matchRow:rowMatches,filterEnabled:()=>!!state.cfg.monitoredOnly,onArmed:()=>{host.TUWindowNavigation?.minimize?.('tuim-panel');if(state.panel)state.panel.hidden=true;state.catalogWindow?.remove();state.catalogWindow=null;},onNotice:message=>{const el=document.getElementById('tuim-snatch-notice');if(el)el.textContent=message;},restoreRun:(()=>{try{return JSON.parse(sessionStorage.getItem('tu:snatch-run:v1')||'null')}catch{return null}})(),storeRun:value=>{if(value)sessionStorage.setItem('tu:snatch-run:v1',JSON.stringify(value));else sessionStorage.removeItem('tu:snatch-run:v1');}}):null;
+const enhancements=typeof createTravelEnhancements==='function'?createTravelEnhancements({document,window,getItems:()=>state.items,getContext:getSnatchContext,getSnapshot:snatchSnapshot,getRows:filterRows,getFilterContainer:filterContainer,matchRow:rowMatches,filterEnabled:()=>!!state.cfg.monitoredOnly,onArmed:()=>{host.TUWindowNavigation?.minimize?.('tuim-panel');if(state.panel)state.panel.hidden=true;state.catalogWindow?.remove();state.catalogWindow=null;},onNotice:message=>{const el=document.getElementById('tuim-snatch-notice');if(el)el.textContent=message;},restoreRun:(()=>{try{return JSON.parse(sessionStorage.getItem('tu:snatch-run:v1')||'null')}catch{return null}})(),storeRun:value=>{if(value)sessionStorage.setItem('tu:snatch-run:v1',JSON.stringify(value));else sessionStorage.removeItem('tu:snatch-run:v1');}}):null;
 function renderEnhancements(parent){
- const label=E('label',parent);const check=E('input',label);check.type='checkbox';check.id='tuim-monitored-only';check.checked=!!state.cfg.monitoredOnly;label.append(document.createTextNode('Show monitored items only'));check.onchange=()=>{state.cfg.monitoredOnly=check.checked;saveCfg();enhancements?.applyFilter();};
- E('style',parent,'.tu-monitor-filter-hidden{display:none!important}');
+ const label=E('label',parent);label.className='tuim-monitored-toggle';const check=E('input',label);check.type='checkbox';check.id='tuim-monitored-only';check.checked=!!state.cfg.monitoredOnly;label.append(document.createTextNode('Show monitored items only'));check.onchange=()=>{state.cfg.monitoredOnly=check.checked;saveCfg();enhancements?.applyFilter();};
+ E('style',parent,'.tu-monitor-filter-hidden{display:none!important}#tuim-panel label.tuim-monitored-toggle{display:flex;align-items:center;gap:8px;cursor:pointer}#tuim-panel input#tuim-monitored-only{display:inline-block;flex:0 0 18px;width:18px;height:18px;min-height:18px;padding:0;margin:0;accent-color:#d6b65c}');
  const notice=E('p',parent,'Snatch and Run is off until explicitly armed.');notice.id='tuim-snatch-notice';enhancements?.mount(parent);
 }
 function style(){if(document.getElementById('tuim-style'))return;const e=E('style',document.head||document.documentElement);e.id='tuim-style';e.textContent='#tuim-panel{position:fixed;z-index:2147483642;top:10vh;left:4vw;width:min(92vw,440px);min-width:220px;min-height:160px;max-width:calc(100vw - 12px);height:min(62dvh,540px);max-height:calc(100dvh - 160px)!important;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;resize:both;box-sizing:border-box;overflow-wrap:anywhere;background:#11191d;color:#eee;border:1px solid #cba953;border-radius:12px;padding:12px;font:14px/1.45 system-ui;display:block}#tuim-panel[hidden]{display:none!important}#tuim-panel *{box-sizing:border-box}#tuim-panel button{max-width:100%;white-space:normal;margin:0;padding:8px 12px;background:#d6b65c;color:#111;border:0;border-radius:5px;line-height:1.3;min-height:36px}#tuim-panel input[type=range]{touch-action:none!important;accent-color:#d6b65c;user-select:none}#tuim-panel input,#tuim-panel select{display:block;width:100%;box-sizing:border-box;padding:8px;margin:4px 0 12px;background:#283239;color:white;min-height:40px}#tuim-panel label{display:block;margin:12px 0 4px;line-height:1.4}#tuim-panel .tuim-header{display:flex;align-items:center;gap:8px;position:sticky;top:0;background:#11191d;z-index:10;padding:12px;margin:0 0 12px;touch-action:none;cursor:move;min-height:76px;border-bottom:1px solid #806a3e;isolation:isolate}#tuim-panel .tuim-header strong{flex:1;min-width:0;font-size:18px;line-height:1.3;overflow-wrap:anywhere}#tuim-panel .tuim-header [data-tu-brand-emblem]{align-self:center;flex:0 0 44px!important;width:44px!important;height:44px!important;min-width:44px!important;min-height:44px!important}#tuim-panel .tuim-header button{flex:0 0 38px;padding:7px}#tuim-panel p{display:block;margin:12px 0!important;line-height:1.5!important;min-height:0!important}#tuim-panel h3{display:block;font-size:19px;line-height:1.35!important;margin:22px 0 12px!important;padding:0!important;clear:both}#tuim-panel .tuim-entry{display:block;border:1px solid #3ba35b;border-radius:6px;padding:12px;margin:10px 0 16px;line-height:1.5}#tuim-panel .tuim-entry strong,#tuim-panel .tuim-entry small{display:block;margin:4px 0;line-height:1.5}#tuim-panel .tuim-entry button{display:block;margin-top:10px}#tuim-panel div,#tuim-panel p,#tuim-panel small{overflow-wrap:anywhere}#tuim-panel>button{display:block;margin:12px 0}#tuim-panel #tuim-status{margin:16px 0 20px!important}.tuim-watch,.tuim-wait{outline:3px solid #d83030!important;outline-offset:-2px!important}.tuim-trigger{outline:4px solid #00ff69!important;outline-offset:-2px!important}'}

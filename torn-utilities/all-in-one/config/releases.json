@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.42-dev",
+    "date": "2026-11-07",
+    "changes": {
+      "Fixes": [
+        "Remove full-resolution logo link from About",
+        "Align monitored-only checkbox beside its label",
+        "Collapse unmonitored foreign item containers so watched items rise to the top of the list; restore on disable/Exit"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.41-dev",
     "date": "2026-11-07",
     "changes": {

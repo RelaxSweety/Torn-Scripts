@@ -1,18 +1,28 @@
 // Shared source embedded only into the lazy Travel Assistant factory.
 // No gameplay requests: actions delegate once to a visible, automatically matched native control.
-export function createTravelEnhancements({document,window,getItems,getContext,getSnapshot,getRows,matchRow,onArmed=()=>{},filterEnabled,onNotice,storeRun=()=>{},restoreRun=null,now=()=>Date.now()}) {
- const hiddenRows=new Set(),TTL=15*60*1000,STOCK_TTL=30000;
+export function createTravelEnhancements({document,window,getItems,getContext,getSnapshot,getRows,matchRow,getFilterContainer=row=>row,onArmed=()=>{},filterEnabled,onNotice,storeRun=()=>{},restoreRun=null,now=()=>Date.now()}) {
+ const hiddenRows=new Map(),TTL=15*60*1000,STOCK_TTL=30000;
  let run=restoreRun&&restoreRun.expiresAt>now()?restoreRun:null,busy=false,active=false,hud=null,action=null,lastNotice='',statusTimer=null,statusAttempts=0;
  const persist=()=>storeRun(run?{...run}:null);
  const focused=()=>!document.hidden&&document.hasFocus();
  const visible=e=>!!e?.isConnected&&!e.hidden&&e.getClientRects().length>0&&!e.closest('#tuim-panel,#tuim-travel-window,#tuim-catalog,#tu-pda-panel,#tu-snatch-run');
  const notice=value=>{lastNotice=value;if(action)action.title=value;onNotice?.(value);};
- function restoreRows(){for(const e of hiddenRows){e.classList.remove('tu-monitor-filter-hidden');delete e.dataset.tuMonitorFiltered;}hiddenRows.clear();}
+ function showRow(row){const target=hiddenRows.get(row);for(const e of new Set([row,target]))if(e){e.classList.remove('tu-monitor-filter-hidden');delete e.dataset.tuMonitorFiltered;}hiddenRows.delete(row);}
+ function restoreRows(){for(const row of [...hiddenRows.keys()])showRow(row);}
  function applyFilter(){
   if(!active||!filterEnabled()||!getItems().length){restoreRows();return;}
-  const rows=getRows();const current=new Set(rows);
-  for(const e of hiddenRows)if(!e.isConnected||!current.has(e)){e.classList.remove('tu-monitor-filter-hidden');delete e.dataset.tuMonitorFiltered;hiddenRows.delete(e);}
-  for(const row of rows){const hide=!getItems().some(w=>matchRow(row,w));if(hide&&!hiddenRows.has(row)){row.classList.add('tu-monitor-filter-hidden');row.dataset.tuMonitorFiltered='1';hiddenRows.add(row);}else if(!hide&&hiddenRows.has(row)){row.classList.remove('tu-monitor-filter-hidden');delete row.dataset.tuMonitorFiltered;hiddenRows.delete(row);}}
+  const rows=getRows(),current=new Set(rows);
+  for(const row of [...hiddenRows.keys()])if(!row.isConnected||!current.has(row))showRow(row);
+  for(const row of rows){
+   const hide=!getItems().some(w=>matchRow(row,w)),target=getFilterContainer(row)||row;
+   if(hiddenRows.has(row)&&(!hide||hiddenRows.get(row)!==target))showRow(row);
+   if(hide&&!hiddenRows.has(row)){
+    // Collapse the layout-owning container too: hiding a nested row alone leaves
+    // the foreign shop's fixed-height LI in the list, producing empty slots.
+    for(const e of new Set([row,target])){e.classList.add('tu-monitor-filter-hidden');e.dataset.tuMonitorFiltered='1';}
+    hiddenRows.set(row,target);
+   }
+  }
  }
  function findControl(kind,s){
   const candidates=[...document.querySelectorAll('button,a,input[type=submit],input[type=button],[role=button]')].filter(e=>visible(e)&&!e.disabled&&e.getAttribute('aria-disabled')!=='true');
