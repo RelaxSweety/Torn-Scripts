@@ -16,13 +16,19 @@ export function createTravelDomDiagnostic({document,window,scrub,storageKey,getM
   }
   const node=copy(root,0);if(node)out.append(node);const html=out.innerHTML;return {html:html.slice(0,16000),truncated:truncated||html.length>16000,nodes:Math.min(count,160)};
  }
+ const cleanFunction=value=>{
+  if(!value||typeof value!=='object')return null;const allowed=['event','stage','item','action','step','control','controlId','panel','message','result','reason'];
+  const data=Object.fromEntries(allowed.filter(k=>typeof value[k]==='string').map(k=>[k,clean(value[k])]));
+  for(const k of ['amount','quantity','x','y'])if(Number.isFinite(value[k]))data[k]=value[k];for(const k of ['submitted','hospital'])if(typeof value[k]==='boolean')data[k]=value[k];
+  return data.event?data:null;
+ };
  let captures=[],cancel=null,shield=null,monitoring=false,observer=null,flushTimer=null,stage=stages[0],lastAction=0,sequence=0,dropped=0;
  const pending=new Set();let resumeState={};try{resumeState=JSON.parse(window.sessionStorage.getItem(storageKey+':monitor')||'{}')||{};}catch{}
  const saveMonitoring=()=>{try{window.sessionStorage.setItem(storageKey+':monitor',JSON.stringify({active:monitoring,stage,dropped,sequence}));}catch{}};
  const persist=()=>{try{window.sessionStorage.setItem(storageKey,JSON.stringify(captures));}catch{onChange('Capture kept in memory only; export before navigation.');}};
  try{const saved=JSON.parse(window.sessionStorage.getItem(storageKey)||'[]');if(Array.isArray(saved))for(const record of saved.slice(-200)){
   if(!stages.includes(record.stage)||typeof record.html!=='string')continue;const template=document.createElement('template');template.innerHTML=record.html.slice(0,16000);const safe=markup(template.content.firstElementChild||document.createElement('div'));
-  captures.push({target:Object.fromEntries(['tag','id','class','role','label'].map(k=>[k,clean(record.target?.[k])])),kind:clean(record.kind||'selection'),sequence:Number(record.sequence)||0,stage:record.stage,at:clean(record.at),host:clean(record.host),installedBuild:clean(record.installedBuild),path:clean(record.path).split(/[?#]/)[0],...safe});
+  captures.push({function:cleanFunction(record.function),target:Object.fromEntries(['tag','id','class','role','label'].map(k=>[k,clean(record.target?.[k])])),kind:clean(record.kind||'selection'),sequence:Number(record.sequence)||0,stage:record.stage,at:clean(record.at),host:clean(record.host),installedBuild:clean(record.installedBuild),path:clean(record.path).split(/[?#]/)[0],...safe});
  }}catch{}
  sequence=Math.max(Number(resumeState.sequence)||0,...captures.map(c=>c.sequence||0));dropped=Number(resumeState.dropped)||0;
  function capture(stage,target,kind='selection'){
@@ -32,9 +38,16 @@ export function createTravelDomDiagnostic({document,window,scrub,storageKey,getM
   if(region.matches('html,body')||target.matches('html,body'))throw Error('Select the specific item, control or confirmation, not the full page');
   const targetInfo={tag:target.tagName.toLowerCase(),id:clean(target.id),class:clean(target.className),role:clean(target.getAttribute('role')),label:clean(target.getAttribute('aria-label')||(/^(BUTTON|A|SPAN)$/.test(target.tagName)?target.textContent:''))};
   const entry={target:targetInfo,kind,sequence:++sequence,stage,at:new Date().toISOString(),host:clean(getMeta().host),installedBuild:clean(getMeta().installedBuild),path:window.location.pathname,...markup(region)};
-  captures.push(entry);while(captures.length>200||captures.reduce((n,c)=>n+c.html.length,0)>1000000){captures.shift();dropped++;}persist();saveMonitoring();onChange((monitoring?'Monitoring ON · ':'')+captures.length+' captures'+(dropped?' · '+dropped+' older captures discarded':'')+'.');return entry;
+  return append(entry);
  }
- function stop(){cancel?.();shield?.();monitoring=false;observer?.disconnect();observer=null;window.clearTimeout(flushTimer);flushTimer=null;pending.clear();document.removeEventListener('click',recordClick,true);document.removeEventListener('change',recordChange,true);saveMonitoring();onChange('Monitoring OFF · '+captures.length+' captures retained.');}
+ function append(entry){captures.push(entry);while(captures.length>200||captures.reduce((n,c)=>n+c.html.length,0)>1000000){captures.shift();dropped++;}persist();saveMonitoring();onChange((monitoring?'Monitoring ON · ':'')+captures.length+' captures'+(dropped?' · '+dropped+' older captures discarded':'')+'.');return entry;}
+ function recordFunction(event){
+  if(!monitoring||typeof event.detail!=='string'||event.detail.length>8192)return;
+  let data;try{data=cleanFunction(JSON.parse(event.detail));}catch{return;}if(!data)return;
+  append({kind:'function-event',function:data,sequence:++sequence,stage,at:new Date().toISOString(),host:clean(getMeta().host),installedBuild:clean(getMeta().installedBuild),path:window.location.pathname,html:'',truncated:false,nodes:0});
+ }
+ function snatchState(){const button=document.getElementById('tu-snatch-run');return {present:!!button,stage:clean(button?.dataset.snatchStage||''),label:clean(button?.textContent||''),message:clean(button?.title||''),ready:button?.getAttribute('aria-disabled')==='false'};}
+ function stop(){cancel?.();shield?.();monitoring=false;observer?.disconnect();observer=null;window.clearTimeout(flushTimer);flushTimer=null;pending.clear();document.removeEventListener('click',recordClick,true);document.removeEventListener('change',recordChange,true);document.removeEventListener('tu-snatch-run-diagnostic',recordFunction);saveMonitoring();onChange('Monitoring OFF · '+captures.length+' captures retained.');}
  const ignored=e=>!e||e.closest('#tu-test-dev-panel,#tu-test-dev-toggle,script,style,textarea,[contenteditable],input[type=password],input[type=hidden],[role=log],[class*=chatBox],[class*=chat-box]');
  const relevant=e=>!ignored(e)&&!e.matches('html,body')&&/\b(use|yes|no|buy|purchase|return|torn|hospital|flight|blood bag|medical)\b/i.test((e.getAttribute('aria-label')||'')+' '+(e.textContent||'').slice(0,1800));
  function take(target,kind){if(!monitoring||document.hidden||ignored(target))return;try{const result=capture(stage,target,kind);return result;}catch{}}
@@ -43,7 +56,7 @@ export function createTravelDomDiagnostic({document,window,scrub,storageKey,getM
  function start(selected=stages[0]){
   if(!stages.includes(selected))throw Error('Select a capture stage');if(monitoring){stage=selected;saveMonitoring();return;}
   cancel?.();shield?.();stage=selected;monitoring=true;saveMonitoring();
-  document.addEventListener('click',recordClick,{capture:true,passive:true});document.addEventListener('change',recordChange,{capture:true,passive:true});
+  document.addEventListener('click',recordClick,{capture:true,passive:true});document.addEventListener('change',recordChange,{capture:true,passive:true});document.addEventListener('tu-snatch-run-diagnostic',recordFunction);
   observer=new window.MutationObserver(records=>{
    if(!monitoring||document.hidden)return;
    for(const record of records.slice(0,50)){
@@ -65,5 +78,5 @@ export function createTravelDomDiagnostic({document,window,scrub,storageKey,getM
   const key=event=>{if(event.key==='Escape'){event.preventDefault();finish();}};
   cancel=finish;for(const kind of ['pointerdown','mousedown','touchstart'])document.addEventListener(kind,blockStart,{capture:true,passive:false});for(const kind of ['pointerup','mouseup','touchend'])document.addEventListener(kind,end,{capture:true,passive:false});document.addEventListener('click',click,true);document.addEventListener('keydown',key,true);timer=window.setTimeout(finish,30000);
  }
- return {stages,markup,capture,pick,start,stop,resume(){if(resumeState.active)start(stages.includes(resumeState.stage)?resumeState.stage:stages[0]);},setStage(value){if(stages.includes(value)){stage=value;saveMonitoring();}},report:()=>({schemaVersion:2,readOnly:true,monitoring,stage,droppedCaptures:dropped,captures:captures.map(c=>({...c})),limits:{maxCaptures:200,maxTotalHtmlCharacters:1000000,maxNodes:160,maxDepth:9,maxHtmlCharacters:16000},excluded:['input values','URLs and query strings','cookies and credentials','network requests','full-page HTML']}),clear(){stop();captures=[];dropped=0;sequence=0;try{window.sessionStorage.removeItem(storageKey);window.sessionStorage.removeItem(storageKey+':monitor');}catch{}onChange('DOM captures cleared.');}};
+ return {stages,markup,capture,pick,start,stop,resume(){if(resumeState.active)start(stages.includes(resumeState.stage)?resumeState.stage:stages[0]);},setStage(value){if(stages.includes(value)){stage=value;saveMonitoring();}},report:()=>({schemaVersion:3,readOnly:true,monitoring,stage,snatchAndRun:snatchState(),droppedCaptures:dropped,captures:captures.map(c=>({...c})),limits:{maxCaptures:200,maxTotalHtmlCharacters:1000000,maxNodes:160,maxDepth:9,maxHtmlCharacters:16000},excluded:['input values','URLs and query strings','cookies and credentials','network requests','full-page HTML']}),clear(){stop();captures=[];dropped=0;sequence=0;try{window.sessionStorage.removeItem(storageKey);window.sessionStorage.removeItem(storageKey+':monitor');}catch{}onChange('DOM captures cleared.');}};
 }

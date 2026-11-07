@@ -28,11 +28,11 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
   const flight=!!scope()?.querySelector('[aria-label="Flight progress"]')||norm(scope()?.querySelector('h4')?.textContent)==='traveling';
   return {released:!!release,purchaseProof:same(purchased,run)?purchased.proof:null,purchaseItemKey:same(purchased,run)?run.watchKey:null,traveling:!!(same(booked,run)||flight),returning:!!same(booked,run)};
  }
- async function execute(kind,{run,getSnapshot,guard}){
+ async function execute(kind,{run,getSnapshot,guard,onEvent=()=>{}}){
   if(!enabled())throw Error('Native Tampermonkey/PDA controls unavailable');cancel();const current=new window.AbortController();controller=current;
   const signal=current.signal;let submitted=false;
   const ensure=()=>{if(signal.aborted||!guard()||document.hidden||!document.hasFocus())throw Error('Action canceled or page/player changed. Continue manually if Torn already accepted it.');};
-  const click=e=>{ensure();if(!shown(e))throw Error('Native action is no longer available');e.click();};
+  const click=e=>{ensure();if(!shown(e))throw Error('Native action is no longer available');onEvent({step:'native-click',control:label(e).slice(0,220),controlId:e.id||'',panel:e.getAttribute('aria-controls')||''});e.click();};
   const wait=(read,timeout=4000)=>new Promise((resolve,reject)=>{
    let observer,timer,done=false;
    const finish=(error,value)=>{if(done)return;done=true;observer?.disconnect();window.clearTimeout(timer);signal.removeEventListener('abort',aborted);error?reject(error):resolve(value);};
@@ -91,12 +91,32 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
    }
    if(kind==='return'){
     if(!run.purchaseConfirmed)throw Error('Confirm the purchase before returning');
-    let panel=scope().querySelector('#travel-home-panel');
-    if(!panel){const home=one([...scope().querySelectorAll('a[aria-controls="travel-home-panel"]')].filter(e=>label(e)==='travel home'),'Travel home');if(!home)throw Error('Travel home control is not available');click(home);panel=await wait(()=>scope()?.querySelector('#travel-home-panel'));}
-    const text=norm(panel.querySelector('p')?.textContent);if(!text.includes('are you sure you want to travel back to torn'))throw Error('Return confirmation does not specify Torn');
-    const back=one([...panel.querySelectorAll('button')].filter(e=>/^(confirm )?travel back$/.test(label(e))),'Travel Back confirmation');if(!back)throw Error('Travel Back control is unavailable');submitted=true;click(back);
-    await wait(()=>/you make your way over to the airstrip and tell your pilot to head for torn/i.test(panel.textContent));booked={...run};
-    const next=await wait(()=>one([...panel.querySelectorAll('button')].filter(e=>/^continue(?:\s*\(\d+\))?$/.test(label(e))),'flight Continue control'),8000);click(next);
+    const currentPanel=()=>scope()?.querySelector('#travel-home-panel');
+    const prompt=panel=>norm(panel?.querySelector('p')?.textContent);
+    const returnButton=panel=>one([...(panel?.querySelectorAll('button')||[])].filter(e=>/^(confirm )?travel back$/.test(label(e))),'Travel Back confirmation');
+    let panel=currentPanel();const homeControl=one([...scope().querySelectorAll('a[aria-controls="travel-home-panel"]')].filter(e=>label(e)==='travel home'),'Travel home');
+    if(homeControl?.getAttribute('aria-expanded')==='false'||!shown(panel)||!prompt(panel).includes('are you sure you want to travel back to torn')||!returnButton(panel)){
+     const home=homeControl;
+     if(!home)throw Error('Travel home control is not available');
+     // An empty/collapsed container exists before the real question is rendered.
+     // Do not toggle an already-expanded home link while hydration is pending.
+     if(home.getAttribute('aria-expanded')!=='true')click(home);
+    }
+    const confirmation=await wait(()=>{
+     const candidate=currentPanel();if(!shown(candidate))return null;const value=prompt(candidate);
+     if(!value)return null;
+     if(/are you sure you want to travel back to/.test(value)&&!value.includes('are you sure you want to travel back to torn'))throw Error('Return confirmation does not specify Torn');
+     if(!value.includes('are you sure you want to travel back to torn'))return null;
+     const back=returnButton(candidate);return back?{panel:candidate,back}:null;
+    });
+    panel=confirmation.panel;submitted=true;click(confirmation.back);
+    panel=await wait(()=>{const candidate=currentPanel();return candidate&&/you make your way over to the airstrip and tell your pilot to head for torn/i.test(candidate.textContent)?candidate:null;});booked={...run};
+    const next=await wait(()=>{
+     // Torn may advance automatically when its countdown ends.
+     if(scope()?.querySelector('[aria-label="Flight progress"]')||norm(scope()?.querySelector('h4')?.textContent)==='traveling')return {complete:true};
+     const candidate=currentPanel(),button=one([...(candidate?.querySelectorAll('button')||[])].filter(e=>/^continue(?:\s*\(\d+\))?$/.test(label(e))),'flight Continue control');
+     return button?{button}:null;
+    },8000);if(next.button)click(next.button);
     return {returnBooked:true};
    }
    throw Error('Unknown native action');

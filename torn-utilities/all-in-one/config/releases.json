@@ -1,5 +1,23 @@
 [
   {
+    "version": "0.5.42.46-dev",
+    "date": "2026-11-07",
+    "changes": {
+      "Fixes": [
+        "Open Travel home even when its empty/collapsed panel container already exists",
+        "Wait for the rendered Torn destination question and enabled Travel Back control before confirmation",
+        "Recognize automatic flight navigation instead of waiting for a vanished Continue control"
+      ],
+      "Compatibility": [
+        "Shared PC/PDA return adapter; purchase and medical stages unchanged"
+      ],
+      "Features": [
+        "Draggable red/green Snatch and Run button with saved, bounded screen position",
+        "TU Test records Snatch and Run lifecycle, native clicks, outcomes, blocked clicks and errors"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.45-dev",
     "date": "2026-11-07",
     "changes": {

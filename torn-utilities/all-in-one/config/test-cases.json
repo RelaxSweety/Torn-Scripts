@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "checklistVersion": "dev-acceptance-2026-11-07-v10",
+  "checklistVersion": "dev-acceptance-2026-11-07-v11",
   "tests": [
     {
       "id": "runtime.build",
@@ -654,7 +654,7 @@
       "id": "tool.item-monitor.snatch-setup",
       "section": "tool.item-monitor",
       "label": "Snatch and Run eligibility and selection",
-      "instructions": "Verify domestic/in-flight states cannot arm. Abroad, select a monitored foreign item and answer hospital status. Hospital users select a labeled medical item with a Limited login. Arm: main window minimizes and exactly one red Snatch and Run button appears. Clicking red does nothing. No native-control selection buttons or floating status panel exist.",
+      "instructions": "Verify domestic/in-flight states cannot arm. Abroad, select a monitored foreign item and answer hospital status. Hospital users select a labeled medical item with a Limited login. Arm: main window minimizes and exactly one red Snatch and Run button appears. Clicking red does nothing. No native-control selection buttons or floating status panel exist. Drag the red waiting button with touch/mouse and restore after reload; repeat while green. Moving/releasing must never heal, buy or travel. Check screen bounds after resize. While TU Test monitoring is active, export must include ordered Snatch and Run function events and native-step/error details; after Stop no function events are added.",
       "kind": "manual",
       "critical": true,
       "platforms": [
@@ -690,7 +690,7 @@
       "id": "tool.item-monitor.snatch-return",
       "section": "tool.item-monitor",
       "label": "Snatch and Run return and cleanup",
-      "instructions": "On actual PC Tampermonkey and Torn PDA: after purchase proof, one Return click opens Travel home, verifies Torn in the native question, selects Travel Back, waits for booking proof, then selects enabled Continue. Confirm the flight screen, no duplicate booking and no automatic action on navigation/reload. Run continuous diagnostics before healing; stop/export only after safely on the flight. Fixture success does not pass live host acceptance.",
+      "instructions": "On actual PC Tampermonkey and Torn PDA: after purchase proof, one Return click opens Travel home, verifies Torn in the native question, selects Travel Back, waits for booking proof, then selects enabled Continue. Confirm the flight screen, no duplicate booking and no automatic action on navigation/reload. Run continuous diagnostics before healing; stop/export only after safely on the flight. Fixture success does not pass live host acceptance. Test an existing empty/collapsed travel-home-panel and delayed rendering of its question. The action must expand Travel home once and wait for the Torn question/back control. If the native countdown automatically navigates to the flight screen, it must finish without an extra Continue click or timeout.",
       "kind": "manual",
       "critical": true,
       "platforms": [

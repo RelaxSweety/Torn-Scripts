@@ -2,11 +2,12 @@
 // No gameplay requests: actions delegate once to a visible, automatically matched native control.
 export function createTravelEnhancements({document,window,getItems,getContext,getSnapshot,getRows,matchRow,getFilterContainer=row=>row,onArmed=()=>{},executeAction=null,filterEnabled,onNotice,storeRun=()=>{},restoreRun=null,now=()=>Date.now()}) {
  const hiddenRows=new Map(),TTL=15*60*1000,STOCK_TTL=30000;
- let run=restoreRun&&restoreRun.expiresAt>now()?restoreRun:null,busy=false,active=false,hud=null,action=null,lastNotice='',statusTimer=null,statusAttempts=0;
+ let run=restoreRun&&restoreRun.expiresAt>now()?restoreRun:null,busy=false,active=false,hud=null,action=null,lastNotice='',statusTimer=null,statusAttempts=0,drag=null,suppressClickUntil=0;
  const persist=()=>storeRun(run?{...run}:null);
  const focused=()=>!document.hidden&&document.hasFocus();
  const visible=e=>!!e?.isConnected&&!e.hidden&&e.getClientRects().length>0&&!e.closest('#tuim-panel,#tuim-travel-window,#tuim-catalog,#tu-pda-panel,#tu-snatch-run');
- const notice=value=>{lastNotice=value;if(action)action.title=value;onNotice?.(value);};
+ const emit=(event,fields={})=>{try{document.dispatchEvent(new window.CustomEvent('tu-snatch-run-diagnostic',{detail:JSON.stringify({event,stage:run?.stage||'off',item:run?.watchName||'',...fields})}));}catch{}};
+ const notice=value=>{lastNotice=value;if(action)action.title=value;onNotice?.(value);emit('notice',{message:String(value).slice(0,300)});};
  function showRow(row){const target=hiddenRows.get(row);for(const e of new Set([row,target]))if(e){e.classList.remove('tu-monitor-filter-hidden');delete e.dataset.tuMonitorFiltered;}hiddenRows.delete(row);}
  function restoreRows(){for(const row of [...hiddenRows.keys()])showRow(row);}
  function applyFilter(){
@@ -47,10 +48,10 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   const stockAvailable=kind==='return'||(kind==='buy'?s.quantity>=minimum:!Number.isFinite(s.quantity)||s.quantity>=minimum);
   const ready=!!(stockAvailable&&validRun(s)&&focused()&&!busy&&!waiting&&!pending&&['heal','buy','return'].includes(kind)&&(kind==='return'||now()-run.stockAt<(kind==='heal'?120000:STOCK_TTL)));
   const text=waiting?'Snatch and Run':pending?'Waiting for confirmation':kind==='complete'?'Return flight booked':kind==='buy'?'Purchase Max':kind==='heal'?'Heal from Hospital':'Return to Torn';
-  if(action.textContent!==text)action.textContent=text;
-  const state=ready?'ready':'waiting';if(action.dataset.state!==state){action.disabled=!ready;action.dataset.state=state;action.setAttribute('aria-disabled',String(!ready));action.style.backgroundColor=ready?'#167b35':'#b32424';action.style.borderColor=ready?'#66d584':'#ec8585';}
+  if(action.textContent!==text){action.textContent=text;action.setAttribute('aria-label',text+'; drag to reposition');if(action.style.top)clampPosition();}action.dataset.snatchStage=kind;
+  const state=ready?'ready':'waiting';if(action.dataset.state!==state){action.disabled=false;action.dataset.state=state;action.setAttribute('aria-disabled',String(!ready));action.style.backgroundColor=ready?'#167b35':'#b32424';action.style.borderColor=ready?'#66d584':'#ec8585';}
  }
- function disarm(reason='Snatch and Run canceled'){clearStatusTimer();executeAction?.cancel();busy=false;run=null;persist();notice(reason);refresh();}
+ function disarm(reason='Snatch and Run canceled'){emit('cancel',{message:reason});clearStatusTimer();executeAction?.cancel();busy=false;run=null;persist();notice(reason);refresh();}
  async function arm({watchKey,hospital,medical=null}={}){
   if(!active||!focused())throw Error('Open Travel Assistant on the actively viewed foreign page');
   const watch=getItems().find(w=>w.key===watchKey&&w.category==='Foreign');if(!watch)throw Error('Select a monitored foreign item');
@@ -60,11 +61,11 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   if((s.status==='Hospital')!==!!hospital)throw Error('Hospital answer does not match the verified status; refresh and try again');
   if(hospital&&(!medical?.name||!Number.isSafeInteger(Number(medical.id))||Number(medical.id)<1))throw Error('Select the medical item you intend to use');
   run={ownerId:String(s.ownerId),country:s.country,watchKey,watchName:watch.name,minimumQty:Math.max(1,Number(watch.minQty)||1),hospital:!!hospital,medical,stage:'waiting',expiresAt:now()+TTL,stockAt:0};
-  watch.fired=false;clearStatusTimer();executeAction?.cancel();busy=false;persist();notice('Armed. Waiting for the selected item alarm.');refresh();onArmed();return {...run};
+  watch.fired=false;clearStatusTimer();executeAction?.cancel();busy=false;persist();notice('Armed. Waiting for the selected item alarm.');refresh();emit('armed',{hospital:!!hospital});onArmed();return {...run};
  }
  function stock(w,s){
   if(!run||w.key!==run.watchKey||!validRun(s)||!focused()||!(s.quantity>0))return;
-  run.stockAt=now();if(run.stage==='waiting')run.stage=s.hospitalized===true?'heal':s.hospitalized===false?'buy':run.hospital?'heal':'buy';persist();refresh();
+  run.stockAt=now();if(run.stage==='waiting'){run.stage=s.hospitalized===true?'heal':s.hospitalized===false?'buy':run.hospital?'heal':'buy';emit('stock-ready',{quantity:s.quantity});}persist();refresh();
  }
  function check(){
   if(!run)return;const s=getSnapshot();
@@ -95,15 +96,15 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   return e;
  }
  async function nativeAct(kind){
-  const expected=run;busy=true;run.priorProof=getSnapshot().purchaseProof||null;run.stage=kind+'-pending';persist();refresh();
+  const expected=run;busy=true;emit('action-start',{action:kind});run.priorProof=getSnapshot().purchaseProof||null;run.stage=kind+'-pending';persist();refresh();
   const guard=()=>run===expected&&active&&run.expiresAt>now()&&String(getSnapshot().ownerId)===run.ownerId&&getSnapshot().country===run.country;
   try{
-   const result=await executeAction.execute(kind,{run:expected,getSnapshot,guard});if(run!==expected)return false;
+   const result=await executeAction.execute(kind,{run:expected,getSnapshot,guard,onEvent:fields=>emit('native-step',{action:kind,...fields})});if(run!==expected)return false;
    if(kind==='heal'&&result.hospitalReleased)run.stage='buy';
    if(kind==='buy'&&result.purchaseConfirmed){run.stage='return';run.purchaseConfirmed=true;}
    if(kind==='return'&&result.returnBooked)run.stage='complete';
-   persist();notice(kind==='heal'?'Hospital release confirmed. Purchase Max is ready.':kind==='buy'?'Purchase confirmed. Return to Torn is ready.':'Return flight booked.');return true;
-  }catch(error){if(run===expected){if(!error.submitted)run.stage=kind;else{statusAttempts=0;scheduleStatus();}persist();notice(error.message);}return false;}
+   persist();emit('action-result',{action:kind,result:'confirmed',amount:result.amount||null});notice(kind==='heal'?'Hospital release confirmed. Purchase Max is ready.':kind==='buy'?'Purchase confirmed. Return to Torn is ready.':'Return flight booked.');return true;
+  }catch(error){if(run===expected){if(!error.submitted)run.stage=kind;else{statusAttempts=0;scheduleStatus();}persist();emit('action-error',{action:kind,message:error.message,submitted:!!error.submitted});notice(error.message);}return false;}
   finally{if(run===expected){busy=false;refresh();}}
  }
  function act(event){
@@ -129,8 +130,27 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   const hospitalChanged=()=>{medicalField.hidden=hospital.value!=='yes';medicalField.style.display=medicalField.hidden?'none':'block';load.hidden=medicalField.hidden;load.style.display=load.hidden?'none':'';};hospital.onchange=hospitalChanged;hospitalChanged();
   add('Cancel Snatch and Run',()=>disarm());
  }
- function start(){active=true;if(!action){action=document.createElement('button');action.id='tu-snatch-run';action.type='button';action.style.cssText='position:fixed;bottom:12px;left:12px;max-width:calc(100vw - 24px);z-index:2147483643;color:#fff;border:2px solid;border-radius:8px;padding:12px 18px;font:bold 15px system-ui;opacity:1;cursor:pointer';action.onclick=act;document.body.append(action);hud=action;}refresh();if(run)scheduleStatus();}
+ const positionKey='tu:snatch-run:position:v1';
+ function clampPosition(x,y){
+  if(!action)return;const rect=action.getBoundingClientRect(),width=Math.max(120,rect.width||160),height=Math.max(40,rect.height||48);
+  const left=Math.max(0,Math.min(Number.isFinite(x)?x:parseFloat(action.style.left)||0,Math.max(0,window.innerWidth-width)));
+  const top=Math.max(0,Math.min(Number.isFinite(y)?y:parseFloat(action.style.top)||0,Math.max(0,window.innerHeight-height)));
+  action.style.left=left+'px';action.style.top=top+'px';action.style.bottom='auto';action.style.right='auto';
+ }
+ function resizeButton(){if(action?.style.top)clampPosition();}
+ function start(){
+  active=true;if(!action){
+   action=document.createElement('button');action.id='tu-snatch-run';action.type='button';action.style.cssText='position:fixed;bottom:12px;left:12px;max-width:calc(100vw - 24px);z-index:2147483643;color:#fff;border:2px solid;border-radius:8px;padding:12px 18px;font:bold 15px system-ui;opacity:1;cursor:grab;touch-action:none;user-select:none';
+   action.setAttribute('aria-label','Snatch and Run action; drag to reposition');
+   action.onclick=event=>{if(now()<suppressClickUntil){event?.preventDefault?.();event?.stopPropagation?.();emit('click-blocked',{reason:'drag-release'});return false;}if(action.getAttribute('aria-disabled')==='true'){emit('click-blocked',{reason:'not-ready'});return false;}return act(event);};
+   action.addEventListener('pointerdown',event=>{if(event.button!==0&&event.pointerType==='mouse')return;const rect=action.getBoundingClientRect();drag={id:event.pointerId,x:event.clientX,y:event.clientY,left:rect.left,top:rect.top,moved:false};action.setPointerCapture?.(event.pointerId);});
+   action.addEventListener('pointermove',event=>{if(!drag||drag.id!==event.pointerId)return;const x=event.clientX-drag.x,y=event.clientY-drag.y;if(Math.hypot(x,y)>6)drag.moved=true;if(drag.moved){event.preventDefault();clampPosition(drag.left+x,drag.top+y);}});
+   action.addEventListener('pointerup',event=>{if(!drag||drag.id!==event.pointerId)return;if(drag.moved){suppressClickUntil=now()+400;try{window.localStorage.setItem(positionKey,JSON.stringify({x:parseFloat(action.style.left),y:parseFloat(action.style.top)}));}catch{}emit('button-moved',{x:parseFloat(action.style.left),y:parseFloat(action.style.top)});}drag=null;});
+   action.addEventListener('pointercancel',()=>{drag=null;suppressClickUntil=now()+400;});
+   document.body.append(action);hud=action;try{const position=JSON.parse(window.localStorage.getItem(positionKey)||'null');if(Number.isFinite(position?.x)&&Number.isFinite(position?.y))clampPosition(position.x,position.y);}catch{}window.addEventListener('resize',resizeButton);
+  }refresh();if(run)scheduleStatus();
+ }
 
  function update(){applyFilter();check();if(hud&&hud.hidden!==!run)hud.hidden=!run;}
- return {start,stop(){active=false;disarm('Tool exited; sequence canceled');restoreRows();hud?.remove();hud=null;action=null;},mount,arm,act,stock,check,update,disarm,getState:()=>run?{...run}:null,applyFilter,restoreRows};
+ return {start,stop(){active=false;disarm('Tool exited; sequence canceled');restoreRows();hud?.remove();hud=null;action=null;drag=null;window.removeEventListener('resize',resizeButton);},mount,arm,act,stock,check,update,disarm,getState:()=>run?{...run}:null,applyFilter,restoreRows};
 }

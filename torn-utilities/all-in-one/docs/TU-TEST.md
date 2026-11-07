@@ -1,10 +1,10 @@
 # Independent TU Testing and Diagnostics DEV
 
-This updates **TU Testing and Diagnostics DEV**, previously v0.1.9-dev, to **v0.2.13-dev**. It is the independent guided checklist at `dist/tu-diagnostics-dev.user.js`. The separate `torn-utilities/diagnostics/torn-pda-diagnostic.user.js` is unchanged.
+This updates **TU Testing and Diagnostics DEV**, previously v0.1.9-dev, to **v0.2.14-dev**. It is the independent guided checklist at `dist/tu-diagnostics-dev.user.js`. The separate `torn-utilities/diagnostics/torn-pda-diagnostic.user.js` is unchanged.
 
 [Install/update TU Test](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/all-in-one/dist/tu-diagnostics-dev.user.js)
 
-Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.45-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
+Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.46-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
 
 ## Using it
 
@@ -54,11 +54,11 @@ Browsers may reduce/spoof user agents, hide exact hardware models, report deskto
 
 ## Saved-key regression acceptance (v0.2.2)
 
-The 0.5.42.45-dev target adds explicit inventory and removal checks covering multiple keys of both supported levels, independent verified labels, explicit role/login selection, reload and clearing all selected-key copies. Checklist version v3 starts fresh evidence for this changed acceptance plan. Previous build/checklist results remain in their original storage namespace. Agreement acceptance requires backend event evidence; UI access alone is insufficient.
+The 0.5.42.46-dev target adds explicit inventory and removal checks covering multiple keys of both supported levels, independent verified labels, explicit role/login selection, reload and clearing all selected-key copies. Checklist version v3 starts fresh evidence for this changed acceptance plan. Previous build/checklist results remain in their original storage namespace. Agreement acceptance requires backend event evidence; UI access alone is insufficient.
 
 ## Version-only verification (v0.2.4)
 
-The checklist targets 0.5.42.45-dev and uses checklist revision v10. Review the session-cache/observer checks for cold and warm navigation, resume/expiry, version changes, backend denial and zero connected Manager observers when idle. Full agreement text is still reviewed explicitly inside TU; diagnostic consistency uses the version string only. If backend status is unavailable or the session needs renewal, authenticate/reopen TU and rerun the read-only check. See `SESSION-AND-OBSERVERS.md` for the complete contract.
+The checklist targets 0.5.42.46-dev and uses checklist revision v10. Review the session-cache/observer checks for cold and warm navigation, resume/expiry, version changes, backend denial and zero connected Manager observers when idle. Full agreement text is still reviewed explicitly inside TU; diagnostic consistency uses the version string only. If backend status is unavailable or the session needs renewal, authenticate/reopen TU and rerun the read-only check. See `SESSION-AND-OBSERVERS.md` for the complete contract.
 
 The v5 checklist adds six Travel checks: minimized alarms, reversible monitored-only rows, Snatch and Run eligibility, medical release, Max/purchase confirmation, and return/cancellation/navigation. Record native PDA and Tampermonkey outcomes separately; fixture success does not pass these checks. See [Travel enhancement acceptance](TRAVEL-ENHANCEMENTS.md) for setup and current limitations.
 
@@ -68,7 +68,7 @@ Revision v7 checks the inline checkbox, removal of the About logo link, and comp
 
 ## Continuous travel DOM diagnostic (TU Test 0.2.10)
 
-Integrated TU remains 0.5.42.45-dev. Update the independent TU Test script and confirm/correct its device and actual host/version fields before starting.
+Integrated TU remains 0.5.42.46-dev. Update the independent TU Test script and confirm/correct its device and actual host/version fields before starting.
 
 **Start while still hospitalized.** In **Snatch and Run · DOM diagnostic**, leave the stage as **Workflow (continuous)** and press **Start monitoring**. TU Test minimizes and its launcher reads **TU Test · REC**. Perform the whole normal manual sequence without returning to diagnostics: healing item → Use → Yes → Max → Buy → Yes → Return to Torn → native flight confirmation. Do not pause after healing to capture or label steps. Once safely on the flight, open TU Test, press **Stop monitoring**, then **Export travel DOM and system info**.
 
@@ -83,3 +83,11 @@ Revision v8 targets the captured PC Tampermonkey native-action flow in DEV 0.5.4
 Revision v9 adds the captured Torn PDA compact purchase-panel flow to DEV 0.5.42.44 and TU Test 0.2.12. Validate PDA and PC separately. The Purchase Max click must expand the monitored icon, use the visible panel controls and confirm the exact item/quantity once; hidden desktop fields must remain unused. Healing/return are shared native flows. Continuous recording can run throughout without pausing after healing.
 
 Revision v10 covers name-based watches with Hospital No/no medical selection and Public Only keys on both hosts. TU Test 0.2.13 exports startup/launcher diagnostics even without a gameplay recording. For a missing PDA icon, use Export both host reports immediately; inspect startup.phase, startup.error, managerApiPresent and launcher state before inferring whether TU is absent.
+
+## Snatch and Run function monitoring (TU Test 0.2.14)
+
+Install both integrated DEV 0.5.42.46 and TU Test 0.2.14. Start monitoring before arming Snatch and Run, then use the complete workflow without pausing between healing, purchase and return. Stop/export after safely flying. Alongside DOM/click evidence, `travelDom` schema 3 contains `function-event` timeline entries for arming, stock readiness, action starts, individual native clicks, confirmed results, errors/submission state, cancellation, blocked clicks and button moves. `snatchAndRun` contains the current button stage, label, readiness and last message.
+
+Events cross the userscript boundary as JSON strings and the recorder exports only allowed, scrubbed fields. It records item/control labels and outcome information, not keys, tokens, request bodies or private API calls. Events are recorded only while monitoring is ON and share the existing bounded rolling buffer. Stop removes the function listener as well as the DOM observer. Existing captures and function events survive ordinary same-tab navigation; review exports before sharing. This instrumentation observes the functions and never calls them.
+
+The draggable button is validated separately: touch/mouse movement, persistence and viewport bounds must work while red and green, and drag-release must never activate an action. Revision v11 also tests empty/collapsed return panels, delayed question rendering and automatic flight navigation.
