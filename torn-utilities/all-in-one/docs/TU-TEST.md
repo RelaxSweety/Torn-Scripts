@@ -1,10 +1,10 @@
 # Independent TU Testing and Diagnostics DEV
 
-This updates **TU Testing and Diagnostics DEV**, previously v0.1.9-dev, to **v0.2.15-dev**. It is the independent guided checklist at `dist/tu-diagnostics-dev.user.js`. The separate `torn-utilities/diagnostics/torn-pda-diagnostic.user.js` is unchanged.
+This updates **TU Testing and Diagnostics DEV**, previously v0.1.9-dev, to **v0.2.16-dev**. It is the independent guided checklist at `dist/tu-diagnostics-dev.user.js`. The separate `torn-utilities/diagnostics/torn-pda-diagnostic.user.js` is unchanged.
 
 [Install/update TU Test](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/all-in-one/dist/tu-diagnostics-dev.user.js)
 
-Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.47-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
+Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.48-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
 
 ## Using it
 
@@ -54,11 +54,11 @@ Browsers may reduce/spoof user agents, hide exact hardware models, report deskto
 
 ## Saved-key regression acceptance (v0.2.2)
 
-The 0.5.42.47-dev target adds explicit inventory and removal checks covering multiple keys of both supported levels, independent verified labels, explicit role/login selection, reload and clearing all selected-key copies. Checklist version v3 starts fresh evidence for this changed acceptance plan. Previous build/checklist results remain in their original storage namespace. Agreement acceptance requires backend event evidence; UI access alone is insufficient.
+The 0.5.42.48-dev target adds explicit inventory and removal checks covering multiple keys of both supported levels, independent verified labels, explicit role/login selection, reload and clearing all selected-key copies. Checklist version v3 starts fresh evidence for this changed acceptance plan. Previous build/checklist results remain in their original storage namespace. Agreement acceptance requires backend event evidence; UI access alone is insufficient.
 
 ## Version-only verification (v0.2.4)
 
-The checklist targets 0.5.42.47-dev and uses checklist revision v10. Review the session-cache/observer checks for cold and warm navigation, resume/expiry, version changes, backend denial and zero connected Manager observers when idle. Full agreement text is still reviewed explicitly inside TU; diagnostic consistency uses the version string only. If backend status is unavailable or the session needs renewal, authenticate/reopen TU and rerun the read-only check. See `SESSION-AND-OBSERVERS.md` for the complete contract.
+The checklist targets 0.5.42.48-dev and uses checklist revision v10. Review the session-cache/observer checks for cold and warm navigation, resume/expiry, version changes, backend denial and zero connected Manager observers when idle. Full agreement text is still reviewed explicitly inside TU; diagnostic consistency uses the version string only. If backend status is unavailable or the session needs renewal, authenticate/reopen TU and rerun the read-only check. See `SESSION-AND-OBSERVERS.md` for the complete contract.
 
 The v5 checklist adds six Travel checks: minimized alarms, reversible monitored-only rows, Snatch and Run eligibility, medical release, Max/purchase confirmation, and return/cancellation/navigation. Record native PDA and Tampermonkey outcomes separately; fixture success does not pass these checks. See [Travel enhancement acceptance](TRAVEL-ENHANCEMENTS.md) for setup and current limitations.
 
@@ -68,7 +68,7 @@ Revision v7 checks the inline checkbox, removal of the About logo link, and comp
 
 ## Continuous travel DOM diagnostic (TU Test 0.2.10)
 
-Integrated TU remains 0.5.42.47-dev. Update the independent TU Test script and confirm/correct its device and actual host/version fields before starting.
+Integrated TU remains 0.5.42.48-dev. Update the independent TU Test script and confirm/correct its device and actual host/version fields before starting.
 
 **Start while still hospitalized.** In **Snatch and Run · DOM diagnostic**, leave the stage as **Workflow (continuous)** and press **Start monitoring**. TU Test minimizes and its launcher reads **TU Test · REC**. Perform the whole normal manual sequence without returning to diagnostics: healing item → Use → Yes → Max → Buy → Yes → Return to Torn → native flight confirmation. Do not pause after healing to capture or label steps. Once safely on the flight, open TU Test, press **Stop monitoring**, then **Export travel DOM and system info**.
 
@@ -93,3 +93,5 @@ Events cross the userscript boundary as JSON strings and the recorder exports on
 The draggable button is validated separately: touch/mouse movement, persistence and viewport bounds must work while red and green, and drag-release must never activate an action. Revision v12 also tests empty/collapsed return panels, delayed question rendering and automatic flight navigation.
 
 TU Test 0.2.15 targets DEV 0.5.42.47 and records capacity-check metrics (including the native Max and chosen quantity) in function events. The read-only Check TU launcher startup button displays startup phase/build, Manager/icon presence and any sanitized startup error. For the missing PDA icon, run this check/export on PDA itself; a PC export cannot establish PDA startup state. No gameplay recording is required for a startup report.
+
+Revision v13 targets the PDA loader parser fix in integrated DEV 0.5.42.48 / TU Test 0.2.16. After updating and navigating/reloading in PDA, Check TU launcher startup should report ready with Manager and icon present. Build validation now checks both original and PDA-normalized script syntax; the wrapper regression reproduces the former failure before startup. No gameplay is needed to verify launcher recovery.

@@ -61,6 +61,8 @@ ${body}
 `;
 output=output.replace(/[\t ]+$/gm,'');
 new vm.Script(output,{filename:'torn-utilities-dev.user.js'});
+// Official PDA adaptSource normalizes typography before evaluating the entire script.
+new vm.Script(output.replace(/[“”]/g,'\"').replace(/[‘’]/g,"'"),{filename:'torn-utilities-dev.pda-adapted.user.js'});
 if((output.match(/^\/\/ ==UserScript==$/gm)||[]).length!==1)throw Error('Duplicate metadata');
 for(const marker of ['tu-multiplayer-server.tuserver.workers.dev','alerts-calculations','modules.json','War Status Diagnostic','war-status-diagnostic','--- Current Version','+++ New Version'])if(output.includes(marker))throw Error('Forbidden distribution marker: '+marker);
 if(!output.startsWith('// ==UserScript==')||!output.includes('// @version      '+version))throw Error('Release metadata mismatch');

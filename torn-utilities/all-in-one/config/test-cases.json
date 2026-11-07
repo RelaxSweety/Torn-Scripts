@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "checklistVersion": "dev-acceptance-2026-11-07-v12",
+  "checklistVersion": "dev-acceptance-2026-11-07-v13",
   "tests": [
     {
       "id": "runtime.build",
@@ -282,7 +282,7 @@
       "id": "core.launcher",
       "section": "core",
       "label": "Launcher visibility and dragging",
-      "instructions": "Drag with mouse and touch as applicable; reload to verify position persistence, keep launcher on-screen after rotation/resize. On PDA, verify early script injection waits for BODY, saved positions remain on-screen after restart and TU Test startup diagnostics report ready with a launcher present.",
+      "instructions": "Drag with mouse and touch as applicable; reload to verify position persistence, keep launcher on-screen after rotation/resize. On PDA, verify early script injection waits for BODY, saved positions remain on-screen after restart and TU Test startup diagnostics report ready with a launcher present. For DEV 0.5.42.48, verify startup after PDA adaptSource quote normalization. Previous builds contained a curly apostrophe that could prevent parsing before any startup marker.",
       "kind": "manual",
       "critical": true,
       "platforms": [

@@ -1,5 +1,18 @@
 [
   {
+    "version": "0.5.42.48-dev",
+    "date": "2026-11-07",
+    "changes": {
+      "Fixes": [
+        "Remove the curly apostrophe that became a JavaScript syntax error under Torn PDA adaptSource quote normalization"
+      ],
+      "Validation": [
+        "Compile the PDA-normalized generated bundle during every build",
+        "Reproduce the official script wrapper/quote normalization and verify PDA Manager, launcher and tool registration startup"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.47-dev",
     "date": "2026-11-07",
     "changes": {

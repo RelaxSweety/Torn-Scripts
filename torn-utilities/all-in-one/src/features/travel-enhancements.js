@@ -78,7 +78,7 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   refresh();
  }
  function nativeControl(kind,s){
-  const e=findControl(kind,s);if(!e)throw Error('Open Torn’s '+(kind==='heal'?'inventory for the selected healing item':kind==='buy'?'shop for the monitored item':'return travel page')+'. A unique visible '+kind+' action is required; no action was sent.');
+  const e=findControl(kind,s);if(!e)throw Error('Open the native Torn '+(kind==='heal'?'inventory for the selected healing item':kind==='buy'?'shop for the monitored item':'return travel page')+'. A unique visible '+kind+' action is required; no action was sent.');
   if(kind==='heal'){
    if(!s.hospitalized)throw Error('Hospital status must be confirmed before using a medical item');
    if(!run.medical||!s.medicalMatches?.(e,run.medical))throw Error('The visible control does not match the selected medical item');
