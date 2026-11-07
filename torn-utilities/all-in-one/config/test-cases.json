@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "checklistVersion": "dev-acceptance-2026-11-07-v11",
+  "checklistVersion": "dev-acceptance-2026-11-07-v12",
   "tests": [
     {
       "id": "runtime.build",
@@ -678,7 +678,7 @@
       "id": "tool.item-monitor.snatch-buy",
       "section": "tool.item-monitor",
       "label": "Snatch and Run Max and purchase confirmation",
-      "instructions": "On actual Torn PDA: one Purchase Max click opens the monitored buy icon, uses the visible quantity panel Max and Buy, waits for the item-specific Yes/No panel, validates exact quantity/item and selects Yes once. Hidden desktop fields must remain unused. Verify 17 purchased Dahlia plus a remaining medical item using selected-item inventory evidence. Retest the desktop inline controls, unrelated Yes dialogs, wrong item/quantity, missing capacity and cancellation. Also arm with No hospital, no medical selection and a saved name-based watch, using a Public Only key: resolve the exact visible native form/Buy item ID and buy without healing or an inventory API request. Verify newly selected watches retain native form IDs. Duplicate same-name rows and conflicting explicit IDs must block.",
+      "instructions": "On actual Torn PDA: one Purchase Max click opens the monitored buy icon, uses the visible quantity panel Max and Buy, waits for the item-specific Yes/No panel, validates exact quantity/item and selects Yes once. Hidden desktop fields must remain unused. Verify 17 purchased Dahlia plus a remaining medical item using selected-item inventory evidence. Retest the desktop inline controls, unrelated Yes dialogs, wrong item/quantity, missing capacity and cancellation. Also arm with No hospital, no medical selection and a saved name-based watch, using a Public Only key: resolve the exact visible native form/Buy item ID and buy without healing or an inventory API request. Verify newly selected watches retain native form IDs. Duplicate same-name rows and conflicting explicit IDs must block. After healing the last carried medical item, verify freshly free capacity is 18 and a stale native Max 17 is corrected to 18 when cash/stock permit. A remaining carried item must still occupy its slot. Verify insufficient funds and limited stock cap the quantity. The function timeline must show capacity-check values; no second purchase is submitted automatically.",
       "kind": "manual",
       "critical": true,
       "platforms": [

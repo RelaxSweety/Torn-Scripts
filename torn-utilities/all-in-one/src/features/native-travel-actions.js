@@ -20,6 +20,26 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
   if(candidates.length!==1)throw Error(candidates.length?'More than one native item matches this monitor; no purchase selected':'The monitored item could not be identified in the current foreign shop. No purchase was sent.');
   return candidates[0];
  }
+ function capacityFor(row,run,stock,nativeMax){
+  const root=scope(),panel=root?.querySelector('[class*=inventoryPanel]');
+  const slots=[...(panel?.querySelectorAll('li[class*=inventorySlot]')||[])];
+  const banner=(root?.querySelector('[class*=messageContent],.info-msg')?.textContent||'');
+  const total=Number(banner.match(/you have purchased\s*[\d,]+\s*\/\s*([\d,]+)/i)?.[1]?.replace(/,/g,'')||panel?.getAttribute('aria-label')?.match(/^inventory\s+(\d+)\s+items$/i)?.[1]);
+  if(!Number.isSafeInteger(total)||total<1||slots.length!==total)return {verified:false,reason:'capacity-not-available',desired:nativeMax};
+  let occupied=slots.filter(slot=>{const b=slot.querySelector(':scope > button[aria-label]');return b&&!/^(empty|available|free|unused)\b/i.test(b.getAttribute('aria-label')||'');}).length;
+  // A consumed medical slot can retain its old button while showing the result.
+  // Ignore only that exact slot/button from this run's proven medical use.
+  const ghost=same(released,run)&&released.opener?.isConnected&&released.opener.getAttribute('aria-label')===released.slotLabel;
+  if(ghost)occupied=Math.max(0,occupied-1);
+  const free=Math.max(0,total-occupied);
+  const currency=value=>{const match=String(value||'').match(/(-?)\$\s*(-?)([\d,]+(?:\.\d+)?)(?![\w,.])/);return match?((match[1]||match[2])?-1:1)*Number(match[3].replace(/,/g,'')):NaN;};
+  const price=currency(row.querySelector('[class*=tabletColD] [class*=displayPrice]')?.textContent||row.querySelector('[class*=tabletColD]')?.textContent);
+  const displayedCash=currency(document.getElementById('user-money')?.textContent);
+  const cash=Number.isFinite(displayedCash)?displayedCash:currency(banner.match(/and have\s*(\$[\d,.]+)/i)?.[1]);
+  if(!(price>0)||!Number.isFinite(cash))return {verified:false,reason:'funds-not-available',total,occupied,free,desired:Math.min(nativeMax,free,stock)};
+  const affordable=Math.max(0,Math.floor(cash/price)),desired=Math.max(0,Math.min(free,stock,affordable));
+  return {verified:true,total,occupied,free,price,desired,affordableSlots:Math.min(free,affordable),limitedBy:desired===free?'space':desired===stock?'stock':'funds'};
+ }
  let controller=null,released=null,purchased=null,booked=null;
  function cancel(){controller?.abort();controller=null;}
  function inspect(run){
@@ -58,11 +78,12 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
     if(!(getSnapshot().quantity>=Math.max(1,Number(run.minimumQty)||1)))throw Error('Monitored stock dropped before healing; no medical item was used');
     submitted=true;click(yes);
     await wait(()=>slot.isConnected&&/you are out of the hospital!/i.test(slot.textContent));
-    released={...run,at:now(),hospital:document.querySelector('a[aria-label^="Hospital:"]')};released.hospitalLabel=released.hospital?.getAttribute('aria-label');
+    const resultOpener=slot.querySelector(':scope > button[aria-label]');released={...run,opener:resultOpener,slot,slotLabel:resultOpener?.getAttribute('aria-label'),at:now(),hospital:document.querySelector('a[aria-label^="Hospital:"]')};released.hospitalLabel=released.hospital?.getAttribute('aria-label');
     return {hospitalReleased:true};
    }
    if(kind==='buy'){
     let s=getSnapshot();if(s.hospitalized!==false||!(s.quantity>0))throw Error('Confirm hospital release and current stock before buying');
+    if(same(released,run)){const close=one([...(released.slot?.querySelectorAll('button[aria-label="Close"]')||[])],'medical result Close');if(close){click(close);await new Promise(resolve=>window.setTimeout(resolve,32));ensure();}}
     const {id,row}=resolveItem(run);
     const panelId='item-'+id+'-buyPanel';
     const existing=scope().querySelector('#'+panelId);
@@ -80,11 +101,20 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
     const max=nativeMax||one(buttons(container,'MAX').filter(e=>e.matches('button[type=button]')),'quantity-panel MAX control');
     if(!input||!max||nativeMax&&!/add the maximum amount/i.test(max.getAttribute('aria-label')||max.parentElement?.getAttribute('title')||''))throw Error('Native maximum/quantity controls are unavailable');
     const before=inventory(run.watchName).length;click(max);await new Promise(resolve=>window.setTimeout(resolve,32));ensure();
-    const buy=await wait(()=>{const amount=Number(input.value.replace(/,/g,''));const fresh=getSnapshot();if(!Number.isSafeInteger(amount)||amount<1||amount>fresh.quantity)return null;
+    const nativeAmount=Number(input.value.replace(/,/g,''));
+    const capacity=capacityFor(row,run,getSnapshot().quantity,nativeAmount);
+    onEvent({step:'capacity-check',verified:capacity.verified,capacityTotal:capacity.total,occupiedSlots:capacity.occupied,freeSlots:capacity.free,nativeMax:nativeAmount,desired:capacity.desired,limitedBy:capacity.limitedBy||capacity.reason});
+    if(!capacity.verified&&same(released,run)&&capacity.free>nativeAmount)throw Error('Cannot verify current funds for the freed medical slot; no purchase was sent');
+    if(capacity.verified){
+     if(capacity.desired<1)throw Error('No available capacity, affordable items or stock; no purchase was sent');
+     if(nativeAmount!==capacity.desired){const setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value')?.set;if(!setter)throw Error('Native quantity input cannot be updated');setter.call(input,String(capacity.desired));input.dispatchEvent(new window.Event('input',{bubbles:true}));input.dispatchEvent(new window.Event('change',{bubbles:true}));await new Promise(resolve=>window.setTimeout(resolve,32));ensure();}
+    }
+    const buy=await wait(()=>{const amount=Number(input.value.replace(/,/g,''));const fresh=getSnapshot();if(!Number.isSafeInteger(amount)||amount<1||amount>fresh.quantity||capacity.verified&&amount!==capacity.desired)return null;
      return compact?one(buttons(container,'Buy'),'quantity-panel Buy control'):one([...row.querySelectorAll('button[aria-controls]')].filter(e=>e.getAttribute('aria-controls')===panelId&&label(e)==='buy'),'monitored Buy control');});
-    const amount=Number(input.value.replace(/,/g,''));s=getSnapshot();if(s.hospitalized!==false||amount>s.quantity)throw Error('Hospital or stock state changed before Buy');click(buy);
+    const amount=Number(input.value.replace(/,/g,''));s=getSnapshot();const freshCapacity=capacityFor(row,run,s.quantity,amount);if(capacity.verified&&(!freshCapacity.verified||freshCapacity.desired!==amount))throw Error('Available capacity, stock or funds changed before Buy');if(s.hospitalized!==false||amount>s.quantity)throw Error('Hospital or stock state changed before Buy');click(buy);
     const yes=await wait(()=>{const panel=scope()?.querySelector('#'+panelId),confirmation=panel?.querySelector('[class*=confirmPanel]');if(!shown(confirmation))return null;
      const strong=confirmation.querySelector('p strong');if(norm(strong?.textContent)!==norm(amount+'x '+run.watchName))throw Error('Purchase confirmation quantity/item mismatch');return one(buttons(confirmation,'Yes'),'purchase Yes confirmation');});
+    const confirmSnapshot=getSnapshot(),confirmStock=Number.isFinite(confirmSnapshot.quantity)?confirmSnapshot.quantity:s.quantity;const finalCapacity=capacityFor(row,run,confirmStock,amount);if(capacity.verified&&finalCapacity.verified&&finalCapacity.desired!==amount)throw Error('Capacity, stock or funds changed before confirmation');
     if(getSnapshot().hospitalized!==false)throw Error('Hospital state changed before confirmation');submitted=true;click(yes);
     await wait(()=>inventory(run.watchName).length>=before+amount);
     purchased={...run,proof:'native:'+run.expiresAt+':'+id+':'+amount};return {purchaseConfirmed:true,amount};
@@ -122,5 +152,5 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
    throw Error('Unknown native action');
   }catch(error){error.submitted=submitted;throw error;}finally{document.removeEventListener('visibilitychange',foreground);window.removeEventListener('blur',foreground);if(controller===current)controller=null;}
  }
- return {enabled,execute,cancel,inspect,resolveItem};
+ return {enabled,execute,cancel,inspect,resolveItem,capacityFor};
 }

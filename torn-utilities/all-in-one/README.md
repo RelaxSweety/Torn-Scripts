@@ -1,6 +1,6 @@
 # Torn Utilities — single-script DEV
 
-Version **0.5.42.46-dev**, branch `dev/tu-all-in-one`. Install one complete userscript for desktop Tampermonkey or Torn PDA. This is a DEV release for manual acceptance; no production deployment is included.
+Version **0.5.42.47-dev**, branch `dev/tu-all-in-one`. Install one complete userscript for desktop Tampermonkey or Torn PDA. This is a DEV release for manual acceptance; no production deployment is included.
 
 [Install DEV](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/releases/dev/torn-utilities-dev.user.js) · [Installation and rollback](../INSTALLATION.md) · [Acceptance checklist](docs/DEV-ACCEPTANCE.md)
 
@@ -32,7 +32,7 @@ Historical independent sources, `modules.json`, legacy catalog Managers, and pro
 
 ## Independent TU Test
 
-Use [TU Testing and Diagnostics DEV](docs/TU-TEST.md) v0.2.14-dev for the 58-check acceptance plan, separate PDA/Tampermonkey evidence, and sanitized exports. This checklist targets the current integrated DEV build; actual host tests remain manual. `npm run build` also regenerates this independent test tool; `npm run build:diagnostics` updates only TU Test.
+Use [TU Testing and Diagnostics DEV](docs/TU-TEST.md) v0.2.15-dev for the 58-check acceptance plan, separate PDA/Tampermonkey evidence, and sanitized exports. This checklist targets the current integrated DEV build; actual host tests remain manual. `npm run build` also regenerates this independent test tool; `npm run build:diagnostics` updates only TU Test.
 
 ## Saved API keys
 
@@ -57,3 +57,5 @@ DEV 0.5.42.44 extends the captured native Snatch and Run flow to Torn PDA. Purch
 DEV 0.5.42.45 fixes native item-ID resolution for existing name-based foreign watches and direct no-hospital purchases without medical selection. It also defers early PDA startup until BODY exists and bounds saved launcher coordinates; TU Test 0.2.13 exports startup/launcher state for the missing-icon investigation.
 
 DEV 0.5.42.46 waits for a rendered return confirmation rather than treating an empty panel as ready, and handles automatic flight navigation. The red/green Snatch and Run button is draggable with persistent position and drag-release protection. TU Test 0.2.14 records its function/native-step/error timeline as well as DOM evidence when monitoring is enabled.
+
+DEV 0.5.42.47 verifies fresh free travel slots and affordability on Purchase Max, including a slot freed by the selected healing item. Stale native Max quantities are corrected before confirming Buy. TU Test 0.2.15 adds capacity-check metrics and a read-only launcher-startup check; actual PDA missing-icon diagnosis still needs a PDA export.

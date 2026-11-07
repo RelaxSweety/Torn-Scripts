@@ -1,4 +1,4 @@
-# Travel Assistant DEV acceptance: 0.5.42.46-dev
+# Travel Assistant DEV acceptance: 0.5.42.47-dev
 
 Alarms update status and sound without changing whether the user minimized the main window. Monitoring continues while the activated tool is minimized, on the actively viewed Torn page. Exit stops its runtime. Hidden or unfocused pages are not scanned for stock.
 
@@ -32,7 +32,7 @@ These tests do not perform real gameplay or establish live desktop/PDA reliabili
 
 Architecture references reviewed: Torn's public GET-only API schema at https://www.torn.com/swagger/openapi.json and script rules at https://www.torn.com/rules.php. Keep gameplay actions directly initiated by the user on the actively viewed page; never add hidden-page extraction, chaining distinct gameplay stages without a new user click or bypassing CAPTCHAs.
 
-## Name-based watches and the no-hospital path (0.5.42.46-dev)
+## Name-based watches and the no-hospital path (0.5.42.47-dev)
 
 Existing foreign watches saved as `name:...` remain usable. Purchase Max resolves one exact native item name against its current numeric form ID and matching Buy-panel control. An explicit numeric ID is never replaced with a different item; duplicate exact-name rows, mismatched identifiers and partial-name matches block rather than guessing. New page selections retain the ID from `item-N-form` or `item-N-buyPanel` even when no `data-item-id` attribute exists. No watch recreation is required.
 
@@ -44,8 +44,16 @@ The full bundle now waits for BODY before starting the Manager and registering l
 
 TU Test 0.2.13 adds `startup` to its normal export: startup phase/build/error, whether the Manager API exists, launcher presence, hidden/display/visibility state and measured rectangle. If the icon remains missing, export TU Test immediately without running gameplay. A not-observed startup marker cannot distinguish script injection being disabled from a parse failure before bootstrap; the PDA script entry still needs to be enabled/current. The actual cause of the reported missing icon remains unconfirmed until device diagnostics are available.
 
-## Return-panel readiness and movable action button (0.5.42.46-dev)
+## Return-panel readiness and movable action button (0.5.42.47-dev)
 
 An empty or collapsed `travel-home-panel` is not a valid return confirmation. The action expands Travel home once when its link is collapsed, waits for a visible Torn destination question and enabled Travel Back control, and follows the current panel if Torn replaces it during rendering. An already-expanded but still-loading panel is allowed to finish without toggling closed. Automatic countdown navigation to the flight screen counts as completion without an extra Continue click. Mismatched destinations still block.
 
 Drag the single action button with mouse or touch in red or green state. Its position is saved separately and clamped to the viewport on restore/resize. Red remains inactive for gameplay using aria-disabled and an action guard while accepting drag gestures. Releasing a drag cannot submit Heal, Purchase or Return; a short suppression window absorbs the compatibility click following the drag. A later deliberate click performs the enabled stage.
+
+## Fresh purchase capacity (0.5.42.47-dev)
+
+Purchase Max now reads the current total travel capacity and occupied native inventory slots, cash on hand, the selected item's price and current stock. The verified quantity is the smallest of free slots, affordable items and available stock. The exact medical slot consumed by this run is excluded while a stale result tile remains, and its result popover is closed before the check. A remaining carried item still occupies its slot.
+
+If Torn's Max gives 17 after the last medical item was consumed but current capacity/cash/stock allow 18, the script updates the native quantity field to 18 through input/change events, verifies that quantity on the matching confirmation and selects Yes once. It does not submit a second purchase to fill a gap. Capacity/funds changes before confirmation block submission. Unknown/incomplete layouts retain the native-Max fallback; an unverified affordability increase after healing is blocked rather than guessed.
+
+The `capacity-check` function event records verified state, total/occupied/free slots, native Max, chosen quantity and whether space, stock or funds limited it. Wallet balance is not included in this event. Tests cover stale Max, retained/cleared medical tiles, another carried item, limited funds, low stock and no-hospital purchases. These are fixture results; the other user's healed live flow still needs confirmation.

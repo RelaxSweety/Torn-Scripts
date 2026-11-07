@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Testing and Diagnostics DEV
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.2.14-dev
+// @version      0.2.15-dev
 // @description  Guided DEV acceptance, system information and sanitized travel DOM diagnostics
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -96,7 +96,7 @@
   const content=document.createElement('div');content.style.cssText='flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding-right:4px';panel.append(content);
  const button=(label,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=fn;b.style.cssText='font:600 12px Arial;color:#fff;background:#344d60;border:1px solid #7892a2;border-radius:5px;padding:8px;margin:3px;cursor:pointer';return b;};
  const text=(tag,value,parent=content)=>{const e=document.createElement(tag);e.textContent=value;parent.append(e);return e;};
- const notice=text('p','Target '+targetBuild+' · TU Test 0.2.14-dev. Record results only for the actual selected host. Automatic checks are read-only and do not prove gameplay or native bridge compatibility.');
+ const notice=text('p','Target '+targetBuild+' · TU Test 0.2.15-dev. Record results only for the actual selected host. Automatic checks are read-only and do not prove gameplay or native bridge compatibility.');
  text('p','Do not paste API keys, session tokens or room secrets into notes. This tool never registers keys, accepts/cancels agreements, creates rooms or modifies backend records.');
  const hostLabel=text('label','Actual test host: ');
  const hostSelect=document.createElement('select');hostSelect.id='tu-test-host';
@@ -124,6 +124,9 @@
  travelNotice.textContent=travelDiagnostic.report().captures.length+' saved captures. Monitoring is OFF until started or resumed from this tab.';
  travelStage.onchange=()=>travelDiagnostic.setStage(travelStage.value);
  travelSection.append(button('Start monitoring',()=>{travelDiagnostic.start(travelStage.value);panel.style.display='none';launcher.textContent='TU Test · REC';}),button('Stop monitoring',()=>{travelDiagnostic.stop();launcher.textContent='TU Test';}),button('Export travel DOM and system info',()=>exportReport()),button('Clear travel DOM captures',()=>{travelDiagnostic.clear();launcher.textContent='TU Test';}));
+ const startupStatus=text('p','');startupStatus.id='tu-test-startup-status';
+ const showStartup=()=>{const state=launcherStartupReport();startupStatus.textContent='TU startup: '+state.phase+' · '+(state.build||'build not detected')+' · Manager '+(state.managerApiPresent?'present':'not detected')+' · Icon '+(state.launcher.present?(state.launcher.hidden?'hidden':'present'):'not detected')+(state.error?' · '+state.error.name+': '+state.error.message:'');};
+ showStartup();travelSection.append(button('Check TU launcher startup',showStartup));
  const list=document.createElement('div');list.id='tu-test-checklist';content.append(list);
  const feedback=text('textarea','');feedback.placeholder='General feedback (no credentials)';feedback.id='tu-test-feedback';feedback.style.cssText='width:100%;box-sizing:border-box;min-height:70px';
  feedback.oninput=()=>{session.setMeta({feedback:feedback.value});save();};
@@ -219,14 +222,14 @@
  }
  function exportReport(){
   save();const reports={};for(const id of ['tampermonkey','pda'])reports[id]=createSession({targetBuild,checklistVersion:catalog.checklistVersion,tests,platform:id,initial:profiles[id]}).report();
-  const report={schemaVersion:2,toolVersion:'0.2.14-dev',targetBuild,installedBuild:currentBuild()||null,viewport:{width:window.innerWidth,height:window.innerHeight,devicePixelRatio:window.devicePixelRatio},checklistVersion:catalog.checklistVersion,detectedHost:detected,detectedEnvironment:Object.fromEntries(Object.entries(environment).map(([k,fields])=>[k,Object.fromEntries(Object.entries(fields).map(([name,value])=>[name,typeof value==='string'?session.scrub(value):value]))])),userAgent:session.scrub(navigator.userAgent),platforms:reports,acceptanceComplete:Object.values(reports).every(r=>r.platformReady),productionAuthorized:false,startup:launcherStartupReport(),travelDom:travelDiagnostic.report()};
+  const report={schemaVersion:2,toolVersion:'0.2.15-dev',targetBuild,installedBuild:currentBuild()||null,viewport:{width:window.innerWidth,height:window.innerHeight,devicePixelRatio:window.devicePixelRatio},checklistVersion:catalog.checklistVersion,detectedHost:detected,detectedEnvironment:Object.fromEntries(Object.entries(environment).map(([k,fields])=>[k,Object.fromEntries(Object.entries(fields).map(([name,value])=>[name,typeof value==='string'?session.scrub(value):value]))])),userAgent:session.scrub(navigator.userAgent),platforms:reports,acceptanceComplete:Object.values(reports).every(r=>r.platformReady),productionAuthorized:false,startup:launcherStartupReport(),travelDom:travelDiagnostic.report()};
   const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='tu-dev-acceptance-'+targetBuild+'-'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
  }
  actions.append(button('Export both host reports',exportReport),button('Reset selected host',()=>{
   if(!confirm('Clear results for this build and selected host? Export first to retain evidence.'))return;
   delete profiles[platform];loadSession();refreshFields();save();render();
  }));
- launcher.onclick=()=>{if(suppressClick){suppressClick=false;return;}panel.style.display=panel.style.display==='none'?'flex':'none';if(panel.style.display==='none')panelResizeObserver?.disconnect();else panelResizeObserver?.observe(panel);render();};
+ launcher.onclick=()=>{if(suppressClick){suppressClick=false;return;}panel.style.display=panel.style.display==='none'?'flex':'none';if(panel.style.display==='none')panelResizeObserver?.disconnect();else panelResizeObserver?.observe(panel);render();showStartup();};
  document.body.append(launcher,panel);refreshFields();render();travelDiagnostic.resume();travelStage.value=travelDiagnostic.report().stage;if(travelDiagnostic.report().monitoring)launcher.textContent='TU Test · REC';
  if(typeof navigator.userAgentData?.getHighEntropyValues==='function'){
   Promise.resolve().then(()=>navigator.userAgentData.getHighEntropyValues(['model','platformVersion','fullVersionList'])).then(hints=>{

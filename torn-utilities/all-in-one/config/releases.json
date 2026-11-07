@@ -1,5 +1,19 @@
 [
   {
+    "version": "0.5.42.47-dev",
+    "date": "2026-11-07",
+    "changes": {
+      "Fixes": [
+        "Recheck live travel capacity, visible cash, unit price and stock when Purchase Max is selected",
+        "Account for the exact consumed medical slot, including stale result tiles",
+        "Update the native quantity field when Max is stale and verify the item/quantity confirmation before Yes"
+      ],
+      "Diagnostics": [
+        "Record capacity verification, free slots, native Max, selected quantity and limiting factor without exposing wallet balance"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.46-dev",
     "date": "2026-11-07",
     "changes": {

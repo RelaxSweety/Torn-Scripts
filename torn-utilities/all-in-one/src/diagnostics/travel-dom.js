@@ -17,9 +17,9 @@ export function createTravelDomDiagnostic({document,window,scrub,storageKey,getM
   const node=copy(root,0);if(node)out.append(node);const html=out.innerHTML;return {html:html.slice(0,16000),truncated:truncated||html.length>16000,nodes:Math.min(count,160)};
  }
  const cleanFunction=value=>{
-  if(!value||typeof value!=='object')return null;const allowed=['event','stage','item','action','step','control','controlId','panel','message','result','reason'];
+  if(!value||typeof value!=='object')return null;const allowed=['event','stage','item','action','step','control','controlId','panel','message','result','reason','limitedBy'];
   const data=Object.fromEntries(allowed.filter(k=>typeof value[k]==='string').map(k=>[k,clean(value[k])]));
-  for(const k of ['amount','quantity','x','y'])if(Number.isFinite(value[k]))data[k]=value[k];for(const k of ['submitted','hospital'])if(typeof value[k]==='boolean')data[k]=value[k];
+  for(const k of ['amount','quantity','x','y','capacityTotal','occupiedSlots','freeSlots','nativeMax','desired'])if(Number.isFinite(value[k]))data[k]=value[k];for(const k of ['submitted','hospital','verified'])if(typeof value[k]==='boolean')data[k]=value[k];
   return data.event?data:null;
  };
  let captures=[],cancel=null,shield=null,monitoring=false,observer=null,flushTimer=null,stage=stages[0],lastAction=0,sequence=0,dropped=0;
