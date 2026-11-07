@@ -1,6 +1,6 @@
 # Torn Utilities — single-script DEV
 
-Version **0.5.42.39-dev**, branch `dev/tu-all-in-one`. Install one complete userscript for desktop Tampermonkey or Torn PDA. This is a DEV release for manual acceptance; no production deployment is included.
+Version **0.5.42.40-dev**, branch `dev/tu-all-in-one`. Install one complete userscript for desktop Tampermonkey or Torn PDA. This is a DEV release for manual acceptance; no production deployment is included.
 
 [Install DEV](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/releases/dev/torn-utilities-dev.user.js) · [Installation and rollback](../INSTALLATION.md) · [Acceptance checklist](docs/DEV-ACCEPTANCE.md)
 
@@ -32,7 +32,7 @@ Historical independent sources, `modules.json`, legacy catalog Managers, and pro
 
 ## Independent TU Test
 
-Use [TU Testing and Diagnostics DEV](docs/TU-TEST.md) v0.2.5-dev for the 52-check acceptance plan, separate PDA/Tampermonkey evidence, and sanitized exports. This checklist targets the current integrated DEV build; actual host tests remain manual. `npm run build` also regenerates this independent test tool; `npm run build:diagnostics` updates only TU Test.
+Use [TU Testing and Diagnostics DEV](docs/TU-TEST.md) v0.2.6-dev for the 58-check acceptance plan, separate PDA/Tampermonkey evidence, and sanitized exports. This checklist targets the current integrated DEV build; actual host tests remain manual. `npm run build` also regenerates this independent test tool; `npm run build:diagnostics` updates only TU Test.
 
 ## Saved API keys
 
@@ -41,3 +41,5 @@ Settings → API Keys keeps each Torn-verified Public Only/Limited key in a sepa
 ## Session and observer lifecycle
 
 DEV 0.5.42.38 reuses verified sessions, removes idle authorization polling, checks agreement versions through metadata, and limits observation to TU UI/activated tool lifecycles. See [cache bounds, verification behavior and lifecycle tests](docs/SESSION-AND-OBSERVERS.md).
+
+DEV 0.5.42.40 adds minimized-alarm preservation, reversible **Show monitored items only**, and opt-in **Snatch and Run** using visible native controls and explicit user actions. See [setup and acceptance limits](docs/TRAVEL-ENHANCEMENTS.md). Native medical selection currently requires a verified Limited login key. The bundle uses a single small WebP derived from the unchanged approved logo master; About offers an explicit original-resolution preview.

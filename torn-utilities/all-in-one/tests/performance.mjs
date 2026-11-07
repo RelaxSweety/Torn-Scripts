@@ -8,7 +8,7 @@ const dom=new JSDOM('<body><main id="torn-fixture"><div id="torn-row">Torn fixtu
 const w=dom.window,observers=[],errors=[];
 const NativeObserver=w.MutationObserver;w.MutationObserver=class extends NativeObserver{constructor(fn){super(fn);observers.push(this)}};
 w.addEventListener('error',e=>{errors.push(e.error);e.preventDefault()});w.console.error=(...args)=>errors.push(args.join(' '));
-w.alert=()=>{};w.confirm=()=>true;w.fetch=async()=>({ok:true,status:200,json:async()=>({}),text:async()=> '{}'});
+w.document.hasFocus=()=>true;w.alert=()=>{};w.confirm=()=>true;w.fetch=async()=>({ok:true,status:200,json:async()=>({}),text:async()=> '{}'});
 w.localStorage.setItem('tu:identity:public-only-key:v1','abcdef0123456789');w.localStorage.setItem('tu:agreement:accepted','fixture-v1');w.sessionStorage.setItem('tu:dev:auth:session:v1','fixture-session');
 if(withMonitor)w.localStorage.setItem('tu-item-monitor-v1',JSON.stringify([{category:'Other',name:'Fixture monitored item',key:'name:fixture monitored item',minQty:10,maxPrice:null}]));
 w.GM_xmlhttpRequest=o=>queueMicrotask(()=>o.onload?.({status:200,responseText:JSON.stringify(o.url.endsWith('/api/auth/agreement/current')?{agreement:{agreement_version:'fixture-v1',agreement_number:1,agreement_date:'2026-11-05'},content:'Complete fixture agreement.'}:o.url.endsWith('/api/auth/agreement')?{accepted:true,agreement:{agreement_version:'fixture-v1',agreement_number:1,agreement_date:'2026-11-05'}}:o.url.includes('/key/info')?{info:{access:{type:'Public Only'},user:{id:42}}}:{})}));

@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import {createTravelEnhancements} from '../src/features/travel-enhancements.js';
 import path from 'node:path';
 import vm from 'node:vm';
 import {authorizeToolRequest,isAccountAuthorizationFailure} from '../src/adapters/tool-request.js';
@@ -9,7 +10,7 @@ const read=p=>fs.readFileSync(path.join(base,p),'utf8');
 const tools=JSON.parse(read('config/tools.json'));
 const releases=JSON.parse(read('config/releases.json'));
 const version=releases[0].version;
-const logoData='data:image/png;base64,'+fs.readFileSync(path.join(root,'torn-utilities/assets/tu-logo-integrated-gold.png')).toString('base64');
+const logoData='data:image/webp;base64,'+fs.readFileSync(path.join(root,'torn-utilities/assets/tu-logo-128.webp')).toString('base64');
 let manager=read('src/manager/manager.user.js').replaceAll('__TU_LOGO_DATA_URL__',logoData);
 const registry=/const registry=\{schemaVersion:1,categories:(\[.*?\]),modules:\[.*?\]\};/;
 if(!registry.test(manager))throw Error('Manager tool directory missing');
@@ -31,6 +32,7 @@ for(const tool of tools){
  }
  if(tool.id==='war-hit-organizer')source=source.replace(/"data:image\/webp;base64,[A-Za-z0-9+/=]+"/g,'manager.getLogo()');
 
+ if(tool.id==='item-monitor')source='const createTravelEnhancements='+createTravelEnhancements.toString()+';\n'+source;
  // Each retained source runs only on first use. A private Window facade captures
  // its legacy registration internally and binds native Window methods correctly.
  // GM_info reflects the tool's version rather than the enclosing TU version.

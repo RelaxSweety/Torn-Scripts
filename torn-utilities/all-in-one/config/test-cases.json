@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "checklistVersion": "dev-acceptance-2026-11-05-v4",
+  "checklistVersion": "dev-acceptance-2026-11-06-v5",
   "tests": [
     {
       "id": "runtime.build",
@@ -619,6 +619,78 @@
       "section": "tool.war-hit-organizer",
       "label": "War Organizer \u2014 lifecycle and saved data",
       "instructions": "Open, minimize, restore, Back, Exit, switch away and reopen this tool repeatedly. Check viewport/scroll/touch behavior, one instance, saved data and cessation of polling/listeners after Exit. Verify no late errors or duplicate requests.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.item-monitor.alarm-minimized",
+      "section": "tool.item-monitor",
+      "label": "Alarm preserves minimized window",
+      "instructions": "Minimize Travel Assistant with an active watch. Trigger an alarm while Torn is actively viewed; sound/status must update without restoring the main window. Restore manually and repeat; Exit stops monitoring.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.item-monitor.filter",
+      "section": "tool.item-monitor",
+      "label": "Show monitored items only",
+      "instructions": "Enable the filter on a foreign shop. Monitored items remain visible including zero-stock rows; other rows hide. Change watches and trigger dynamic updates. Disable or Exit restores every row without altering native filters.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.item-monitor.snatch-setup",
+      "section": "tool.item-monitor",
+      "label": "Snatch and Run eligibility and selection",
+      "instructions": "Verify domestic/in-flight states cannot arm. Abroad, select a monitored foreign item and answer hospital status. A mismatch is rejected. Hospital users select medical inventory with a Limited login and bind its visible native Use control. Inventory cache is disclosed; no action runs while waiting.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.item-monitor.snatch-heal",
+      "section": "tool.item-monitor",
+      "label": "Snatch and Run hospital release",
+      "instructions": "On the selected stock alarm, use one explicit trusted click. Verify only the selected medical item is used, native confirmations remain manual and double clicks cannot repeat. Buy remains blocked until hospital release is confirmed. Never use valuable items solely to complete this test.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.item-monitor.snatch-buy",
+      "section": "tool.item-monitor",
+      "label": "Snatch and Run Max and purchase confirmation",
+      "instructions": "With fresh visible stock and hospital release confirmed (or No selected), bind the monitored native Buy control. One explicit click sets verified Max and delegates Buy once. Wrong rows, absent/disabled controls, stale stock, hidden/unfocused pages must block. Return remains blocked until matching native purchase success is observed.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "tool.item-monitor.snatch-return",
+      "section": "tool.item-monitor",
+      "label": "Snatch and Run return and cleanup",
+      "instructions": "After confirmed purchase bind the visible native Return to Torn control. One explicit click delegates once; native dialogs/navigation can require extra manual steps. Refresh status to confirm the return flight. Test Cancel, Exit, expiry, player changes and page reload: no automatic actions, stale bindings or stuck hidden rows. Record actual PDA and Tampermonkey behavior independently.",
       "kind": "manual",
       "critical": true,
       "platforms": [

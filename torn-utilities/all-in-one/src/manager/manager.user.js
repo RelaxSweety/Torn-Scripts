@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities DEV (All-in-One)
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.39-dev
+// @version      0.5.42.40-dev
 // @description  Integrated TU development bundle for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -38,7 +38,7 @@
   if (pageWindow.__RELAX_TORN_UTILITIES_PDA__) return;
   pageWindow.__RELAX_TORN_UTILITIES_PDA__ = true;
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.5.42.39-dev';
+  const TU_VERSION='0.5.42.40-dev';
   const TU_LOGO='__TU_LOGO_DATA_URL__';
   // Bundled tool directory: no external catalog, cache, or refresh requests.
   const registry={schemaVersion:1,categories:[{"id":"business","name":"Business Tools","icon":"▥","order":10},{"id":"games","name":"Games","icon":"♜","order":20},{"id":"single-player","name":"Single Player","icon":"▣","order":21,"parent":"games"},{"id":"multiplayer","name":"Multiplayer","icon":"♟","order":22,"parent":"games"},{"id":"chat","name":"Chat Tools","icon":"◉","order":30},{"id":"other","name":"War Tools","icon":"⚙","order":40}],modules:[{"id":"flight-game","name":"Flight Game","category":"single-player","version":"0.12.8","description":"Standalone Flight Game arcade module, playable anytime"},{"id":"stick-fighter","name":"Stick Fighter","category":"single-player","version":"0.2.7","description":"Standalone Stick Fighter arcade module, playable anytime"},{"id":"chat-archiver","name":"Chat Archiver","category":"chat","version":"0.1.8","description":"Archive Torn chat conversations"},{"id":"tic-tac-toe","name":"Tic-Tac-Toe","category":"multiplayer","version":"0.6.5","description":"Two-player Tic-Tac-Toe with named winners, green winning line, rematches and head-to-head history"},{"id":"torn-four","name":"Torn Four","category":"multiplayer","version":"0.2.5","description":"Connect Four: two-player multiplayer with private room codes"},{"id":"torn-fleet","name":"Torn Fleet","category":"multiplayer","version":"0.2.5","description":"Battleship: fleet placement and turn-based naval combat"},{"id":"torn-snake","name":"Slithering Streets","category":"single-player","version":"0.2.14","description":"Single-player Snake with touch controls and local high scores"},{"id":"chaos-marbles","name":"Chaos Marbles","category":"multiplayer","version":"0.2.5","description":"Online 2\u20134 player marble race with private player sessions, Waiting for Chaos staging, and game history"},{"id":"item-monitor","name":"Travel Assistant and Item Monitor","category":"business","version":"1.10.31-dev","description":"Item Monitor and Travel Assistant with D1 stock reporting, source diagnostics and stock estimation"},{"id":"war-hit-organizer","name":"War Organizer","category":"other","version":"0.3.17-dev","description":"Compact war target board, reservation controls, timer and local development settings"}]};
@@ -254,6 +254,19 @@
       });
       if(format==='text')return raw;
       const data=JSON.parse(raw);if(data?.error)throw Error(data.error.error||'Torn API error');return data;
+    },
+    async requestTravelInfo(kind){
+      if(!await ensureAuthorization())throw Error('TU authentication required');
+      const paths={profile:'/v2/user/profile',travel:'/v2/user/travel',inventory:'/v2/user/inventory?cat=medical',cooldowns:'/v2/user/cooldowns'};
+      if(!Object.hasOwn(paths,kind))throw Error('Unsupported Travel Assistant read');
+      const key=readSavedKey(),entry=readStoredKeys().find(e=>e.key===key);
+      if(kind!=='profile'&&entry?.level!=='Limited Access')throw Error('Use a verified Limited Access login key for medical inventory/travel data, then retry');
+      if(!entry?.playerId||entry.playerId!==getPlayer()?.id)throw Error('Verify the current player before loading travel data');
+      const url='https://api.torn.com'+paths[kind];
+      const response=await new Promise((resolve,reject)=>{
+        if(managerHttp)managerHttp({method:'GET',url,headers:{Authorization:'ApiKey '+key,Accept:'application/json'},timeout:12000,onload:r=>{try{if(r.status<200||r.status>=300)throw Error('Torn API HTTP '+r.status);const d=JSON.parse(r.responseText);if(d.error)throw Error('Torn rejected the travel data request');resolve(d);}catch(error){reject(error)}},onerror:()=>reject(Error('Travel data network failure')),ontimeout:()=>reject(Error('Travel data timeout'))});
+        else fetch(url,{headers:{Authorization:'ApiKey '+key},cache:'no-store'}).then(async r=>{if(!r.ok)throw Error('Torn API HTTP '+r.status);const d=await r.json();if(d.error)throw Error('Torn rejected the travel data request');return d;}).then(resolve,reject);
+      });return response;
     },
     async requestWhoTorn(path){
       if(!await ensureAuthorization())throw Error('TU Manager authentication required');
@@ -527,9 +540,10 @@
   pageWindow.TUWindowNavigation=Object.freeze({open:tuOpen,back:tuBack,minimize:tuMinimize,exit:tuExit,restore:tuRestore});
   const style = document.createElement('style');
   style.textContent = `
+:root{--tu-logo-image:url(${TU_LOGO})}
 #tu-pda-panel .tu-refresh-icon{display:inline-block}#tu-pda-panel .tu-spinning{animation:tu-refresh-spin .8s linear infinite}@keyframes tu-refresh-spin{to{transform:rotate(360deg)}}
 #tu-pda-launcher{position:fixed;left:12px;top:38%;z-index:2147483645;touch-action:none;width:43px;height:43px;border-radius:50%;border:2px solid #e3bb57;background:radial-gradient(circle at 35% 25%,#293b45,#07090b 70%);color:#f5d87e;box-shadow:0 2px 9px #000b,inset 0 0 4px #f5d87e66;font:bold italic 23px 'Palatino Linotype','Book Antiqua',Georgia,serif;letter-spacing:-2px;padding:0 2px 0 0;display:flex;align-items:center;justify-content:center;line-height:1;cursor:grab;user-select:none;-webkit-user-select:none}
-#tu-pda-launcher{border-radius:50%;border:0;background:#08090a url(${TU_LOGO}) center/cover no-repeat;color:transparent;box-shadow:0 2px 9px #000b;font-size:0;padding:0}
+#tu-pda-launcher{border-radius:50%;border:0;background:#08090a var(--tu-logo-image) center/cover no-repeat;color:transparent;box-shadow:0 2px 9px #000b;font-size:0;padding:0}
 #tu-pda-launcher:active{cursor:grabbing}
 #tu-pda-launcher[hidden]{display:none!important}
 #tu-pda-panel{position:fixed;z-index:2147483644;inset:8% 3% auto 3%;max-width:440px;margin:auto;max-height:82vh;overflow:auto;background:#101417;color:#eee;border:1px solid #c49a46;border-radius:18px;box-shadow:0 10px 35px #000d;font:14px system-ui,Arial,sans-serif}
@@ -562,11 +576,11 @@
   launcher.dataset.tuBrand='canonical';
   launcher.setAttribute('aria-label', 'Open Torn Utilities; drag to reposition');
   document.body.appendChild(launcher);
-  const brandStyle=document.createElement('style');brandStyle.textContent='.tu-brand-emblem{display:inline-grid;place-items:center;width:32px;height:32px;flex:none;border:2px solid #e3bb57;border-radius:50%;border:0;background:#08090a url('+TU_LOGO+') center/cover no-repeat;color:transparent;font-size:0;box-shadow:0 2px 9px #000b}';document.head.appendChild(brandStyle);
+  const brandStyle=document.createElement('style');brandStyle.textContent='.tu-brand-emblem{display:inline-grid;place-items:center;width:32px;height:32px;flex:none;border:2px solid #e3bb57;border-radius:50%;border:0;background:#08090a var(--tu-logo-image) center/cover no-repeat;color:transparent;font-size:0;box-shadow:0 2px 9px #000b}';document.head.appendChild(brandStyle);
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.39-dev</span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.40-dev</span></footer>';
   document.body.appendChild(panel);
   const headerBrand=panel.querySelector('.tu-logo');if(headerBrand){headerBrand.textContent='';headerBrand.classList.add('tu-brand-emblem');headerBrand.setAttribute('role','img');headerBrand.setAttribute('aria-label','Torn Utilities');}
   const identityLine=document.createElement('p');
@@ -908,6 +922,7 @@
       const p=document.createElement('p');p.textContent='Torn Utilities integration development build by RelaxSweety [4539436]. Drag TU to reposition.';content.append(p);
       if(devAuthIssue){const issue=document.createElement('p');issue.setAttribute('role','status');issue.textContent=devAuthIssue;content.append(issue,makeButton('Retry saved API key',()=>{resetDevAuthFailure();void restoreDevSession();}));}
       const agreementButton=makeButton('User Agreement',()=>{content.replaceChildren();const back=makeButton('← About',()=>render('about'));content.append(back);appendTerms(content);if(!hasAgreement())content.append(makeButton('Review and Accept Terms',showAgreement));});agreementButton.style.margin='8px 8px 8px 0';content.append(agreementButton);const notesButton=makeButton('Version Notes',()=>{content.replaceChildren();content.append(makeButton('← About',()=>render('about')));const heading=document.createElement('h3');heading.textContent='Version Notes';const notes=document.createElement('div');for(const release of TU_RELEASES){const h=document.createElement('h4');h.textContent=release.version+' · '+release.date;notes.append(h);for(const [section,items] of Object.entries(release.changes)){const p=document.createElement('p');p.textContent=section+': '+items.join('; ');notes.append(p);}}content.append(heading,notes);});notesButton.style.margin='8px 0';content.append(notesButton);
+      const masterLink=document.createElement('a');masterLink.href='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/assets/tu-logo-integrated-gold.png';masterLink.target='_blank';masterLink.rel='noopener noreferrer';masterLink.textContent='View full-resolution logo';content.append(masterLink);
       // Official-style vector marks; no remote image dependencies.
       addSocialIcon('RelaxSweety on Discord','https://discord.com/users/relaxsweety','M20.317 4.369a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.211.375-.445.865-.608 1.25a18.27 18.27 0 0 0-5.49 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037 19.736 19.736 0 0 0-4.885 1.515.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.1 18.057a.083.083 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.077.077 0 0 0 .084-.028c.462-.63.873-1.295 1.226-1.994a.075.075 0 0 0-.041-.104 13.1 13.1 0 0 1-1.872-.89.076.076 0 0 1-.008-.127c.126-.095.252-.193.372-.292a.074.074 0 0 1 .077-.01c3.929 1.793 8.185 1.793 12.068 0a.074.074 0 0 1 .078.01c.12.099.246.197.373.292a.076.076 0 0 1-.007.127c-.598.35-1.224.65-1.873.89a.076.076 0 0 0-.04.105c.36.698.77 1.363 1.225 1.993a.076.076 0 0 0 .084.028 19.83 19.83 0 0 0 6.003-3.03.077.077 0 0 0 .031-.056c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028ZM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.42 0-1.334.955-2.42 2.157-2.42 1.211 0 2.176 1.095 2.157 2.42 0 1.335-.955 2.42-2.157 2.42Zm7.96 0c-1.183 0-2.157-1.085-2.157-2.42 0-1.334.955-2.42 2.157-2.42 1.211 0 2.176 1.095 2.157 2.42 0 1.335-.946 2.42-2.157 2.42Z');
       const tornLink=document.createElement('a');tornLink.href='https://www.torn.com/profiles.php?XID=4539436';tornLink.target='_blank';tornLink.rel='noopener noreferrer';tornLink.title='RelaxSweety on Torn';tornLink.setAttribute('aria-label','RelaxSweety on Torn');

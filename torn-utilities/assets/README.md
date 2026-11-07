@@ -1,9 +1,9 @@
 # Approved TU logo and branding master
 
-The user-approved logo for all future Torn Utilities logos and branding is `tu-logo-integrated-gold.png`: the selected Integrated Gold design with flare highlights removed. This file is the version-controlled source for the launcher, shared headers and War Organizer. The build embeds its exact bytes once and reuses that image throughout the application.
+`tu-logo-integrated-gold.png` is the user-approved Integrated Gold master with flare highlights removed. Preserve its artwork and original bytes. Do not regenerate, recolor, upscale, add highlights or replace it without an explicit artwork request.
 
-Do not regenerate, upscale or recompress this asset during a build. Change it only for an explicitly requested artwork update. Keep the compact launcher dimensions and image proportions. Historical SVG/WebP files are retained for previous releases.
+The approved performance change derives two lossless WebP assets by Lanczos downsampling that master: `tu-logo-128.webp` (17,234 bytes) for small launcher/header/War Organizer branding, and `tu-logo-256.webp` (56,424 bytes) for larger or high-density uses. These preserve the approved design, proportions and transparency. They are committed once; normal builds do not convert images. The integrated DEV build embeds the 128px image once as a shared CSS image. About links the original master for an explicit full-resolution preview; startup does not download it.
 
-Use this exact master for new TU branding surfaces and documentation. Preserve the gold T-inside-U design, dark textured face and transparent exterior. Do not add flare highlights, recolor it, substitute historical variants or generate a replacement unless the user explicitly requests a branding change. Reference the repository asset or embed its exact bytes; do not maintain separately edited copies. Existing historical releases and production deployments remain unchanged.
+For an explicitly authorized asset rebuild, run `bash torn-utilities/all-in-one/scripts/build-logo-assets.sh` with ImageMagick/WebP installed. Review the output and sizes because encoder versions may differ. Never overwrite the master. Historical assets and immutable releases remain unchanged.
 
-[Download the approved master](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/assets/tu-logo-integrated-gold.png)
+[Approved master](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/assets/tu-logo-integrated-gold.png)

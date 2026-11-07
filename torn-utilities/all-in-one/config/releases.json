@@ -1,5 +1,22 @@
 [
   {
+    "version": "0.5.42.40-dev",
+    "date": "2026-11-06",
+    "changes": {
+      "Features": [
+        "Show monitored items only, with reversible native-listing filtering",
+        "Opt-in Snatch and Run native-control workflow with explicit clicks and confirmed results"
+      ],
+      "Fixes": [
+        "Monitor alarms preserve minimized windows"
+      ],
+      "Compatibility": [
+        "Optimized approved-logo WebP embedded once; original master retained",
+        "Native confirmation/navigation and actual PDA acceptance remain required"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.39-dev",
     "date": "2026-11-06",
     "changes": {
