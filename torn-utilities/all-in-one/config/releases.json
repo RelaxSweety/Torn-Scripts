@@ -1,5 +1,19 @@
 [
   {
+    "version": "0.5.42.50-dev",
+    "date": "2026-11-07",
+    "changes": {
+      "Fixes": [
+        "Keep Snatch and Run taps from dismissing native Torn confirmations while an action is pending",
+        "Show Confirming healing, Confirming purchase and Booking return flight during native actions"
+      ],
+      "Validation": [
+        "Reproduce PDA medical popover dismissal from repeated taps and verify exactly one Heal/Yes without starting Purchase",
+        "Keep passive capture diagnostics and red/green dragging functional"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.49-dev",
     "date": "2026-11-07",
     "changes": {

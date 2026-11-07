@@ -40,6 +40,26 @@ async function fixture(bundle=false,scenario=''){
  if(!bundle){engine.start();await engine.arm({watchKey:watch.key,hospital:scenario!=='name-key-no-hospital',medical:scenario==='name-key-no-hospital'?null:{id:206,name:'Morphine',uid:null}});engine.stock(watch,snapshot());}
  return {w,d,engine,adapter,counters,watch,snapshot,close(){w.TornUtilities?.closeActiveModule();engine.stop();for(const observer of observers)observer.disconnect();dom.window.close();}};
 }
+// Torn's document outside-tap handler must not dismiss the medical popover
+// when the player taps TU again while the native Yes question is rendering.
+{
+ const t=await fixture();try{
+  const button=t.d.querySelector('#tu-snatch-run');let dismissed=0,captured=0;
+  t.d.addEventListener('click',()=>captured++,true);
+  for(const type of ['pointerdown','mousedown','touchstart','click'])t.d.addEventListener(type,event=>{
+   if(!event.composedPath().includes(t.d.querySelector('[class*=inventorySlot]'))&&t.d.querySelector('[class*=itemPopover]')){
+    dismissed++;t.d.querySelector('[class*=itemPopover]').remove();
+   }
+  });
+  const pending=button.onclick({isTrusted:true,stopPropagation(){}});
+  await new Promise(resolve=>t.w.setTimeout(resolve,5));
+  for(const type of ['pointerdown','mousedown','touchstart','click'])button.dispatchEvent(new t.w.Event(type,{bubbles:true,cancelable:true}));
+  assert.equal(await pending,true,'Repeated TU taps cannot interrupt medical Yes');
+  assert.equal(dismissed,0);assert.ok(captured>0,'Passive capture diagnostics still receive clicks');
+  assert.equal(t.counters.use,1);assert.equal(t.counters.heal,1);assert.equal(t.counters.purchase,0);
+  assert.equal(button.textContent,'Purchase Max');
+ }finally{t.close()}
+}
 for(const scenario of ['', 'fallback-max','wrong-item','wrong-quantity','cancel-panel']){
  const t=await fixture(false,scenario);try{
   assert.equal(await t.engine.act({isTrusted:true}),true);assert.equal(t.engine.getState().stage,'buy');assert.equal(t.counters.purchase,0);

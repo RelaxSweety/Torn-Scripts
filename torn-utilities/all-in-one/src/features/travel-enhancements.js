@@ -47,7 +47,7 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   const minimum=Math.max(1,Number(getItems().find(w=>w.key===run.watchKey)?.minQty)||1);
   const stockAvailable=kind==='return'||(kind==='buy'?s.quantity>=minimum:!Number.isFinite(s.quantity)||s.quantity>=minimum);
   const ready=!!(stockAvailable&&validRun(s)&&focused()&&!busy&&!waiting&&!pending&&['heal','buy','return'].includes(kind)&&(kind==='return'||now()-run.stockAt<(kind==='heal'?120000:STOCK_TTL)));
-  const text=waiting?'Snatch and Run':pending?'Waiting for confirmation':kind==='complete'?'Return flight booked':kind==='buy'?'Purchase Max':kind==='heal'?'Heal from Hospital':'Return to Torn';
+  const text=waiting?'Snatch and Run':pending?(kind==='heal-pending'?'Confirming healing':kind==='buy-pending'?'Confirming purchase':'Booking return flight'):kind==='complete'?'Return flight booked':kind==='buy'?'Purchase Max':kind==='heal'?'Heal from Hospital':'Return to Torn';
   if(action.textContent!==text){action.textContent=text;action.setAttribute('aria-label',text+'; drag to reposition');if(action.style.top)clampPosition();}action.dataset.snatchStage=kind;
   const state=ready?'ready':'waiting';if(action.dataset.state!==state){action.disabled=false;action.dataset.state=state;action.setAttribute('aria-disabled',String(!ready));action.style.backgroundColor=ready?'#167b35':'#b32424';action.style.borderColor=ready?'#66d584':'#ec8585';}
  }
@@ -142,7 +142,9 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   active=true;if(!action){
    action=document.createElement('button');action.id='tu-snatch-run';action.type='button';action.style.cssText='position:fixed;bottom:12px;left:12px;max-width:calc(100vw - 24px);z-index:2147483643;color:#fff;border:2px solid;border-radius:8px;padding:12px 18px;font:bold 15px system-ui;opacity:1;cursor:grab;touch-action:none;user-select:none';
    action.setAttribute('aria-label','Snatch and Run action; drag to reposition');
-   action.onclick=event=>{if(now()<suppressClickUntil){event?.preventDefault?.();event?.stopPropagation?.();emit('click-blocked',{reason:'drag-release'});return false;}if(action.getAttribute('aria-disabled')==='true'){emit('click-blocked',{reason:'not-ready'});return false;}return act(event);};
+   // Keep TU taps inside TU: Torn treats an outside tap as dismissal of its native confirmation.
+   for(const type of ['pointerdown','pointerup','mousedown','mouseup','touchstart','touchend','dblclick'])action.addEventListener(type,event=>event.stopPropagation());
+   action.onclick=event=>{event?.stopPropagation?.();if(now()<suppressClickUntil){event?.preventDefault?.();event?.stopPropagation?.();emit('click-blocked',{reason:'drag-release'});return false;}if(action.getAttribute('aria-disabled')==='true'){emit('click-blocked',{reason:'not-ready'});return false;}return act(event);};
    action.addEventListener('pointerdown',event=>{if(event.button!==0&&event.pointerType==='mouse')return;const rect=action.getBoundingClientRect();drag={id:event.pointerId,x:event.clientX,y:event.clientY,left:rect.left,top:rect.top,moved:false};action.setPointerCapture?.(event.pointerId);});
    action.addEventListener('pointermove',event=>{if(!drag||drag.id!==event.pointerId)return;const x=event.clientX-drag.x,y=event.clientY-drag.y;if(Math.hypot(x,y)>6)drag.moved=true;if(drag.moved){event.preventDefault();clampPosition(drag.left+x,drag.top+y);}});
    action.addEventListener('pointerup',event=>{if(!drag||drag.id!==event.pointerId)return;if(drag.moved){suppressClickUntil=now()+400;try{window.localStorage.setItem(positionKey,JSON.stringify({x:parseFloat(action.style.left),y:parseFloat(action.style.top)}));}catch{}emit('button-moved',{x:parseFloat(action.style.left),y:parseFloat(action.style.top)});}drag=null;});

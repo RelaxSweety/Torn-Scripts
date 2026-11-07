@@ -4,7 +4,7 @@ This updates **TU Testing and Diagnostics DEV**, previously v0.1.9-dev, to **v0.
 
 [Install/update TU Test](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/all-in-one/dist/tu-diagnostics-dev.user.js)
 
-Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.49-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
+Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.50-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
 
 ## Using it
 
@@ -97,3 +97,5 @@ TU Test 0.2.15 targets DEV 0.5.42.47 and records capacity-check metrics (includi
 Revision v13 targets the PDA loader parser fix in integrated DEV 0.5.42.48 / TU Test 0.2.16. After updating and navigating/reloading in PDA, Check TU launcher startup should report ready with Manager and icon present. Build validation now checks both original and PDA-normalized script syntax; the wrapper regression reproduces the former failure before startup. No gameplay is needed to verify launcher recovery.
 
 Revision v14 / TU Test 0.2.17 targets DEV 0.5.42.49: validate country-only catalog labels while retaining Torn market/bazaar, and minimize/restore the main tool and planner through both the launcher and tool card. Confirm unsaved fields and the armed Snatch and Run intent remain, with no cancellation/reinitialization on resume.
+
+TU Test 0.2.18 targets DEV 0.5.42.50 with the existing v14 checklist. Record the entire PDA Heal → Purchase Max → Return flow; pending-button taps should no longer dismiss medical confirmations or start a subsequent stage.

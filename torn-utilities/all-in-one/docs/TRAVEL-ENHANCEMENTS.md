@@ -1,4 +1,4 @@
-# Travel Assistant DEV acceptance: 0.5.42.49-dev
+# Travel Assistant DEV acceptance: 0.5.42.50-dev
 
 Alarms update status and sound without changing whether the user minimized the main window. Monitoring continues while the activated tool is minimized, on the actively viewed Torn page. Exit stops its runtime. Hidden or unfocused pages are not scanned for stock.
 
@@ -71,3 +71,9 @@ Reference: Manuito83/torn-pda, `lib/providers/userscripts_provider.dart`, `adapt
 Foreign Complete List dropdown options and group headings display the country name only, e.g. Canada. Canonical location values remain internal so existing country filters and Foreign monitor selection stay compatible. The Torn / Item Market / Bazaar option and its complete catalog remain available.
 
 Opening the already-active Travel Assistant and Item Monitor card now invokes a resume hook and unhides its existing main window. It does not deactivate/restart the module, rerender forms, discard unsaved fields or cancel an armed Snatch and Run session. The TU icon continues restoring the most recently minimized main/planner window. Tests cover repeated card reopening, launcher/planner restore, no duplicate windows, country filtering and armed-flow preservation.
+
+## PDA pending-action taps (0.5.42.50-dev)
+
+The supplied .49 PDA report shows two pre-submit Heal timeouts following repeated waiting-button taps and collapsed medical popovers, then a successful Heal, 18-item purchase and return flight. TU now stops its button touch/pointer/mouse/click events from bubbling into native outside-tap handlers. Capture-phase diagnostics still record clicks. Pending labels identify healing, purchasing and return booking; repeated taps never queue the next stage or retry native submission.
+
+A fixture reproduces document outside-tap dismissal while the medical Yes question is delayed. Verify one Use/Yes, no dismissal and no purchase until a separate click. Existing desktop/PDA buy, confirmation, capacity and flight fixtures remain required. This is simulated regression coverage; a live PDA recording is still needed to confirm device behavior.

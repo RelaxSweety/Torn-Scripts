@@ -46,7 +46,7 @@ for(const sandbox of [false,true]){
  assert.ok(!requests.some(u=>u.includes('modules.json')));checks++;
  w.document.querySelector('[data-tab="about"]').click();
  const button=text=>[...w.document.querySelectorAll('button')].find(b=>b.textContent===text);
- button('Version Notes').click();assert.ok(w.document.body.textContent.includes('0.5.42.49-dev'));checks++;
+ button('Version Notes').click();assert.ok(w.document.body.textContent.includes('0.5.42.50-dev'));checks++;
  button('← About').click();button('User Agreement').click();await tick();assert.ok(w.document.body.textContent.includes('Complete fixture agreement.'));checks++;
  for(const tool of tools){
   api.closeActiveModule();
