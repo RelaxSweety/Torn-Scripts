@@ -23,7 +23,7 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
  function capacityFor(row,run,stock,nativeMax){
   const root=scope(),panel=root?.querySelector('[class*=inventoryPanel]');
   const slots=[...(panel?.querySelectorAll('li[class*=inventorySlot]')||[])];
-  const banner=(root?.querySelector('[class*=messageContent],.info-msg')?.textContent||'');
+  const banner=[...document.querySelectorAll('[class*=messageContent],.info-msg')].map(e=>e.textContent||'').find(t=>/you are in\s+.+?and have\s*\$/i.test(t))||'';
   const total=Number(banner.match(/you have purchased\s*[\d,]+\s*\/\s*([\d,]+)/i)?.[1]?.replace(/,/g,'')||panel?.getAttribute('aria-label')?.match(/^inventory\s+(\d+)\s+items$/i)?.[1]);
   if(!Number.isSafeInteger(total)||total<1||slots.length!==total)return {verified:false,reason:'capacity-not-available',desired:nativeMax};
   let occupied=slots.filter(slot=>{const b=slot.querySelector(':scope > button[aria-label]');return b&&!/^(empty|available|free|unused)\b/i.test(b.getAttribute('aria-label')||'');}).length;
@@ -35,7 +35,7 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
   const currency=value=>{const match=String(value||'').match(/(-?)\$\s*(-?)([\d,]+(?:\.\d+)?)(?![\w,.])/);return match?((match[1]||match[2])?-1:1)*Number(match[3].replace(/,/g,'')):NaN;};
   const price=currency(row.querySelector('[class*=tabletColD] [class*=displayPrice]')?.textContent||row.querySelector('[class*=tabletColD]')?.textContent);
   const displayedCash=currency(document.getElementById('user-money')?.textContent);
-  const cash=Number.isFinite(displayedCash)?displayedCash:currency(banner.match(/and have\s*(\$[\d,.]+)/i)?.[1]);
+  const cash=Number.isFinite(displayedCash)?displayedCash:currency(banner.match(/and have\s*(\$\s*-?[\d,]+(?:\.\d+)?)/i)?.[1]);
   if(!(price>0)||!Number.isFinite(cash))return {verified:false,reason:'funds-not-available',total,occupied,free,desired:Math.min(nativeMax,free,stock)};
   const affordable=Math.max(0,Math.floor(cash/price)),desired=Math.max(0,Math.min(free,stock,affordable));
   return {verified:true,total,occupied,free,price,desired,affordableSlots:Math.min(free,affordable),limitedBy:desired===free?'space':desired===stock?'stock':'funds'};
@@ -116,7 +116,7 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
      const strong=confirmation.querySelector('p strong');if(norm(strong?.textContent)!==norm(amount+'x '+run.watchName))throw Error('Purchase confirmation quantity/item mismatch');return one(buttons(confirmation,'Yes'),'purchase Yes confirmation');});
     const confirmSnapshot=getSnapshot(),confirmStock=Number.isFinite(confirmSnapshot.quantity)?confirmSnapshot.quantity:s.quantity;const finalCapacity=capacityFor(row,run,confirmStock,amount);if(capacity.verified&&finalCapacity.verified&&finalCapacity.desired!==amount)throw Error('Capacity, stock or funds changed before confirmation');
     if(getSnapshot().hospitalized!==false)throw Error('Hospital state changed before confirmation');submitted=true;click(yes);
-    await wait(()=>inventory(run.watchName).length>=before+amount);
+    await wait(()=>{const snapshot=getSnapshot();return inventory(run.watchName).length>=before+amount||snapshot.purchaseProof&&snapshot.purchaseProof!==run.priorProof&&snapshot.purchaseItemKey===run.watchKey;});
     purchased={...run,proof:'native:'+run.expiresAt+':'+id+':'+amount};return {purchaseConfirmed:true,amount};
    }
    if(kind==='return'){

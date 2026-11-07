@@ -1,5 +1,21 @@
 [
   {
+    "version": "0.5.42.51-dev",
+    "date": "2026-11-07",
+    "changes": {
+      "Fixes": [
+        "Resume previously active Item Monitor after refresh and authorization, minimized and bound to the same player",
+        "Persist monitor selection, quantity/price drafts and Snatch and Run setup",
+        "Accept matching native purchase success without waiting for delayed inventory tiles",
+        "Read foreign cash from the travel banner even when it is outside travel-root"
+      ],
+      "Validation": [
+        "Full document reload with persisted storage, explicit exit, no automatic arming",
+        "Delayed inventory purchase proof and mobile cash banner capacity fixtures"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.50-dev",
     "date": "2026-11-07",
     "changes": {

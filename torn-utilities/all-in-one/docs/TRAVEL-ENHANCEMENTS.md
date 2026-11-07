@@ -1,4 +1,4 @@
-# Travel Assistant DEV acceptance: 0.5.42.50-dev
+# Travel Assistant DEV acceptance: 0.5.42.51-dev
 
 Alarms update status and sound without changing whether the user minimized the main window. Monitoring continues while the activated tool is minimized, on the actively viewed Torn page. Exit stops its runtime. Hidden or unfocused pages are not scanned for stock.
 
@@ -77,3 +77,9 @@ Opening the already-active Travel Assistant and Item Monitor card now invokes a 
 The supplied .49 PDA report shows two pre-submit Heal timeouts following repeated waiting-button taps and collapsed medical popovers, then a successful Heal, 18-item purchase and return flight. TU now stops its button touch/pointer/mouse/click events from bubbling into native outside-tap handlers. Capture-phase diagnostics still record clicks. Pending labels identify healing, purchasing and return booking; repeated taps never queue the next stage or retry native submission.
 
 A fixture reproduces document outside-tap dismissal while the medical Yes question is delayed. Verify one Use/Yes, no dismissal and no purchase until a separate click. Existing desktop/PDA buy, confirmation, capacity and flight fixtures remain required. This is simulated regression coverage; a live PDA recording is still needed to confirm device behavior.
+
+## Refresh persistence and purchase latency (0.5.42.51-dev)
+
+The same tab resumes its previously active monitor after authorization and player identity restoration, with its panel minimized. Explicit Exit or switching tools clears the resume intent. Saved watch identities, selected item, quantity/price drafts, filter/alarm configuration and Snatch and Run setup remain stored. Restoring preferences does not newly arm Snatch and Run or submit gameplay; an existing armed run retains its original expiry and still requires user clicks.
+
+The .50 PDA report confirms Heal in 1.196 seconds and flight booking in 0.539 seconds. Purchase had native success at 05:56:53.596 but TU remained busy until the inventory-only wait timed out at 05:56:56.925. The adapter now also accepts a fresh matching native purchase proof. Cash parsing searches the foreign travel information banner outside travel-root, avoiding freed-slot rejection when mobile sidebar cash is absent. Native Max and input synchronization retain bounded 32 ms yields; no API call is added to stage actions. Torn rendering/network responses and passive diagnostic recording still contribute to wall-clock time; this report does not separate their costs.
