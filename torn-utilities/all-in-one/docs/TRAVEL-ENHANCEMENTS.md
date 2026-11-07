@@ -1,4 +1,4 @@
-# Travel Assistant DEV acceptance: 0.5.42.40-dev
+# Travel Assistant DEV acceptance: 0.5.42.41-dev
 
 Alarms update status and sound without changing whether the user minimized the main window. Monitoring continues while the activated tool is minimized, on the actively viewed Torn page. Exit stops its runtime. Hidden or unfocused pages are not scanned for stock.
 
@@ -8,17 +8,17 @@ Alarms update status and sound without changing whether the user minimized the m
 
 On a foreign page, add the item to monitor, choose it in Snatch and Run and answer whether you are hospitalized. Arming verifies the player, country and status with Torn's read-only API. Hospital users load medical inventory with the active verified Limited Access login key and select an item. Torn may cache inventory for 15 minutes; native availability must still be confirmed. Public Only keys cannot load the inventory picker.
 
-Bind the actual visible Torn Use, Buy and Return to Torn controls using the selection buttons. The selection click is captured and does not execute the action. Escape cancels selection. Controls must be selected again after navigation or replacement by Torn. Setup never stores action URLs, DOM bindings, keys or tokens.
+Press **Arm Snatch and Run** to minimize the main window and show a single red **Snatch and Run** button. A red-button click does nothing. The selected item's stock alarm turns it green. The same button presents these actions:
 
-The selected monitor's stock alarm unlocks the compact action toolbar. Each trusted user click delegates one gameplay action to a matching visible native Torn control:
+1. **Heal from Hospital** for hospitalized users. One click matches and uses the selected visible native healing item. Confirmed hospital release advances to Purchase Max. Non-hospitalized users skip healing.
+2. **Purchase Max** sets the native verified maximum and delegates Buy for the monitored row. A new matching purchase-success message enables the next stage.
+3. **Return to Torn** delegates the visible native return action. Return flight status confirms completion.
 
-1. Hospital users use the selected medical item. The next stage waits for observed hospital release. Users answering No skip this stage.
-2. Buy sets a verified native Max and delegates Buy for the monitored row. The next stage waits for a new matching native purchase-success message.
-3. Return delegates the visible native Return to Torn control. Completion requires confirmation of a return flight.
+There are no native-control selection buttons or separate floating status panel. The controller automatically matches a unique visible Torn control on each click, including after DOM replacement. Missing or ambiguous controls block action rather than guessing. Its title and the restored setup message explain blocked actions. Cancel remains in the setup, accessible by restoring the main window; Exit also cancels.
 
-Complete Torn's own confirmations manually. Use **Check result / refresh status** after state changes when needed. This reads status; it does not submit another gameplay action. Navigation, controls and dialogs can require more than three clicks. The tool does not call private mutation endpoints, retry gameplay actions automatically, or proceed on assumed success. Unknown layouts, stale stock, missing controls, unfocused pages and unverified results block progress.
+Complete Torn's own confirmations manually. After a user-initiated heal or return, up to three bounded read-only status refreshes (after 1.2, 4 and 10 seconds) check the result; they stop on confirmed transition, cancellation or Exit, and do not run in an unfocused page. They never retry gameplay actions. Navigation, controls and dialogs may still require extra manual action. No private mutation endpoints or offscreen inventory actions are assumed. Live foreign layouts must be validated before claiming a guaranteed three-click flow.
 
-A session-only intent can survive navigation for up to 15 minutes; native controls must be rebound and status refreshed. Cancel or Exit clears the sequence. No action resumes automatically. The compact toolbar does not restore the main window.
+A session-only intent can survive navigation for up to 15 minutes. Controls are matched again on the new page. No action resumes automatically. Stock must remain fresh; unknown layouts, stale stock, missing controls, unfocused pages and unverified results block progress. Setup stores no action URLs, DOM bindings, keys or tokens.
 
 ## Validation boundary
 

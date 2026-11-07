@@ -1,5 +1,19 @@
 [
   {
+    "version": "0.5.42.41-dev",
+    "date": "2026-11-07",
+    "changes": {
+      "Features": [
+        "One red/green Snatch and Run button with automatic matching of visible Torn controls",
+        "Arming minimizes the main window; labeled conditional medical selection"
+      ],
+      "Fixes": [
+        "Remove native-control selection buttons and floating status panel",
+        "Bounded status refresh after user-initiated healing and return actions"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.40-dev",
     "date": "2026-11-06",
     "changes": {

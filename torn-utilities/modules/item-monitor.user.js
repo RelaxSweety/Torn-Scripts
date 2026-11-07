@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.11.0-dev
+// @version      1.11.1-dev
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -153,7 +153,7 @@ async function getSnatchContext({inventory=false}={}){
  if(inventory){const d=await api.requestTravelInfo('inventory');snatchContext.medicalItems=d.inventory?.items||[];}
  enhancements?.check();return snatchContext;
 }
-const enhancements=typeof createTravelEnhancements==='function'?createTravelEnhancements({document,window,getItems:()=>state.items,getContext:getSnatchContext,getSnapshot:snatchSnapshot,getRows:filterRows,matchRow:rowMatches,filterEnabled:()=>!!state.cfg.monitoredOnly,saveFilter:saveCfg,onNotice:message=>{const el=document.getElementById('tuim-snatch-notice');if(el)el.textContent=message;},restoreRun:(()=>{try{return JSON.parse(sessionStorage.getItem('tu:snatch-run:v1')||'null')}catch{return null}})(),storeRun:value=>{if(value)sessionStorage.setItem('tu:snatch-run:v1',JSON.stringify(value));else sessionStorage.removeItem('tu:snatch-run:v1');}}):null;
+const enhancements=typeof createTravelEnhancements==='function'?createTravelEnhancements({document,window,getItems:()=>state.items,getContext:getSnatchContext,getSnapshot:snatchSnapshot,getRows:filterRows,matchRow:rowMatches,filterEnabled:()=>!!state.cfg.monitoredOnly,onArmed:()=>{host.TUWindowNavigation?.minimize?.('tuim-panel');if(state.panel)state.panel.hidden=true;state.catalogWindow?.remove();state.catalogWindow=null;},onNotice:message=>{const el=document.getElementById('tuim-snatch-notice');if(el)el.textContent=message;},restoreRun:(()=>{try{return JSON.parse(sessionStorage.getItem('tu:snatch-run:v1')||'null')}catch{return null}})(),storeRun:value=>{if(value)sessionStorage.setItem('tu:snatch-run:v1',JSON.stringify(value));else sessionStorage.removeItem('tu:snatch-run:v1');}}):null;
 function renderEnhancements(parent){
  const label=E('label',parent);const check=E('input',label);check.type='checkbox';check.id='tuim-monitored-only';check.checked=!!state.cfg.monitoredOnly;label.append(document.createTextNode('Show monitored items only'));check.onchange=()=>{state.cfg.monitoredOnly=check.checked;saveCfg();enhancements?.applyFilter();};
  E('style',parent,'.tu-monitor-filter-hidden{display:none!important}');
@@ -901,7 +901,7 @@ function startRuntime(){
  if(runtimeAbort)return;
  migrate();style();runtimeAbort=new AbortController();
  for(const task of runtimeTasks)task.timer=setInterval(task.fn,task.delay);
- runtimeObserver=new MutationObserver(records=>{if(document.hidden||!document.hasFocus()||!state.items.length||scanTimer!==null)return;if(records.every(record=>(record.target.nodeType===1?record.target:record.target.parentElement)?.closest('#tuim-panel,#tuim-catalog,#tuim-travel-window,#tuim-data-window,#tu-pda-panel,#tu-test-dev-panel')))return;scanTimer=setTimeout(()=>{scanTimer=null;if(runtimeAbort)scan()},400)});
+ runtimeObserver=new MutationObserver(records=>{if(document.hidden||!document.hasFocus()||!state.items.length||scanTimer!==null)return;if(records.every(record=>(record.target.nodeType===1?record.target:record.target.parentElement)?.closest('#tuim-panel,#tuim-catalog,#tuim-travel-window,#tuim-data-window,#tu-pda-panel,#tu-test-dev-panel,#tu-snatch-run')))return;scanTimer=setTimeout(()=>{scanTimer=null;if(runtimeAbort)scan()},400)});
  runtimeObserver.observe(document.documentElement,{childList:true,subtree:true,characterData:true});
  window.addEventListener('pageshow',scan,{signal:runtimeAbort.signal});
  window.addEventListener('popstate',scan,{signal:runtimeAbort.signal});
