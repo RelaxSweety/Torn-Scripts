@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TU Testing and Diagnostics DEV
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.2.8-dev
-// @description  Guided DEV acceptance for ten tools, separate PDA/Tampermonkey evidence and sanitized reports
+// @version      0.2.9-dev
+// @description  Guided DEV acceptance, system information and sanitized travel DOM diagnostics
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
@@ -159,7 +159,7 @@
   const content=document.createElement('div');content.style.cssText='flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding-right:4px';panel.append(content);
  const button=(label,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=fn;b.style.cssText='font:600 12px Arial;color:#fff;background:#344d60;border:1px solid #7892a2;border-radius:5px;padding:8px;margin:3px;cursor:pointer';return b;};
  const text=(tag,value,parent=content)=>{const e=document.createElement(tag);e.textContent=value;parent.append(e);return e;};
- const notice=text('p','Target '+targetBuild+' · TU Test 0.2.8-dev. Record results only for the actual selected host. Automatic checks are read-only and do not prove gameplay or native bridge compatibility.');
+ const notice=text('p','Target '+targetBuild+' · TU Test 0.2.9-dev. Record results only for the actual selected host. Automatic checks are read-only and do not prove gameplay or native bridge compatibility.');
  text('p','Do not paste API keys, session tokens or room secrets into notes. This tool never registers keys, accepts/cancels agreements, creates rooms or modifies backend records.');
  const hostLabel=text('label','Actual test host: ');
  const hostSelect=document.createElement('select');hostSelect.id='tu-test-host';
@@ -176,6 +176,57 @@
  for(const [id,label] of [['all','All results'],['unpassed','Not passed'],['fail','Failed'],['blocked','Blocked'],['not-tested','Not tested']]){const o=document.createElement('option');o.value=id;o.textContent=label;filter.append(o);}content.append(filter);
  const summary=text('p','');summary.id='tu-test-summary';summary.setAttribute('role','status');
  const actions=document.createElement('div');content.append(actions);
+ const travelSection=document.createElement('section');travelSection.id='tu-test-travel-dom';content.append(travelSection);
+ text('h3','Snatch and Run · DOM diagnostic',travelSection);
+ text('p','Capture the manual Heal, Yes/No, Max/Buy and Return stages separately. Choose a stage, press Select region, then tap the relevant Torn control or dialog. That selection tap is blocked: it does not use, buy, confirm or travel. Perform gameplay manually afterward. Captures stay in this tab across navigation; export before closing it. Maximum 20 captures. Review JSON before sharing.',travelSection);
+ const travelStage=document.createElement('select');travelStage.setAttribute('aria-label','Travel DOM capture stage');travelStage.style.cssText='width:100%;padding:8px';travelSection.append(travelStage);
+ const travelNotice=text('p','No DOM capture runs automatically.',travelSection);
+ const createTravelDiagnostic=function createTravelDomDiagnostic({document,window,scrub,storageKey,getMeta,onChange=()=>{}}){
+ const stages=['Foreign page / hospitalized','Selected healing item / Use control','Heal Yes/No confirmation','Hospital release result','Monitored item / Max and Buy','Purchase Yes/No confirmation','Purchase result','Return to Torn control / confirmation','Return flight result','Failed Snatch and Run attempt'];
+ const clean=value=>scrub(String(value??'')).replace(/https?:\/\/[^\s<>"']+/gi,'[URL OMITTED]').replace(/\b[A-Za-z0-9_=-]{24,}\b/g,'[REDACTED]').slice(0,600);
+ const skip='script,style,noscript,iframe,svg,canvas,img,video,audio,link,meta,textarea,[contenteditable],input[type=hidden],input[type=password],input[type=email],[autocomplete=current-password],[autocomplete=new-password]';
+ function markup(root){let count=0,truncated=false;const out=document.createElement('div');
+  function copy(node,depth){if(++count>160||depth>9){truncated=true;return null;}if(node.nodeType===3)return document.createTextNode(clean(node.nodeValue));if(node.nodeType!==1||node.matches(skip))return null;
+   const e=document.createElement(node.tagName.toLowerCase());
+   for(const name of ['id','name','class','role','title','type','aria-label','aria-controls','aria-expanded','aria-disabled','data-item-id','data-itemid','data-item-uid','data-id','min','max']){
+    if(!node.hasAttribute(name))continue;let value=node.getAttribute(name);if(name.startsWith('data-')&&!/^\d+$/.test(value))continue;if(name==='type'&&!/^(button|submit|number|text|checkbox|radio)$/i.test(value))continue;e.setAttribute(name,clean(value));
+   }
+   if(node.disabled)e.setAttribute('disabled','');
+   // Input values, URLs, form actions, handlers and arbitrary data attributes are deliberately omitted.
+   for(const child of node.childNodes){const c=copy(child,depth+1);if(c)e.append(c);if(count>160)break;}
+   return e;
+  }
+  const node=copy(root,0);if(node)out.append(node);const html=out.innerHTML;return {html:html.slice(0,16000),truncated:truncated||html.length>16000,nodes:Math.min(count,160)};
+ }
+ let captures=[],cancel=null,shield=null;
+ const persist=()=>{try{window.sessionStorage.setItem(storageKey,JSON.stringify(captures));}catch{onChange('Capture kept in memory only; export before navigation.');}};
+ try{const saved=JSON.parse(window.sessionStorage.getItem(storageKey)||'[]');if(Array.isArray(saved))for(const record of saved.slice(-20)){
+  if(!stages.includes(record.stage)||typeof record.html!=='string')continue;const template=document.createElement('template');template.innerHTML=record.html.slice(0,16000);const safe=markup(template.content.firstElementChild||document.createElement('div'));
+  captures.push({stage:record.stage,at:clean(record.at),host:clean(record.host),installedBuild:clean(record.installedBuild),path:clean(record.path).split(/[?#]/)[0],...safe});
+ }}catch{}
+ function capture(stage,target){
+  if(!stages.includes(stage))throw Error('Select a capture stage');
+  if(document.hidden||!target?.isConnected||target.closest('#tu-test-dev-panel,#tu-test-dev-toggle'))throw Error('Select a visible Torn page region');
+  const region=target.closest('[role=dialog],dialog,[aria-modal=true],.confirm-wrap,[class*=confirm i]:not(button):not(a):not(input),[data-item-id],[data-itemid],tr,[role=row],li')||(target.parentElement?.matches('html,body,main')?target:target.parentElement)||target;
+  if(region.matches('html,body')||target.matches('html,body'))throw Error('Select the specific item, control or confirmation, not the full page');
+  const entry={stage,at:new Date().toISOString(),host:clean(getMeta().host),installedBuild:clean(getMeta().installedBuild),path:window.location.pathname,...markup(region)};
+  captures.push(entry);captures=captures.slice(-20);persist();onChange('Captured '+stage+' ('+captures.length+'/20).');return entry;
+ }
+ function stop(){cancel?.();shield?.();}
+ function pick(stage,done){stop();let timer;
+  const finish=()=>{for(const kind of ['pointerdown','mousedown','touchstart'])document.removeEventListener(kind,blockStart,true);for(const kind of ['pointerup','mouseup','touchend'])document.removeEventListener(kind,end,true);document.removeEventListener('click',click,true);document.removeEventListener('keydown',key,true);window.clearTimeout(timer);cancel=null;done?.();};
+  const click=event=>{if(event.target.closest('#tu-test-dev-panel'))return;event.preventDefault();event.stopImmediatePropagation();if(!event.target.closest('#tu-test-dev-toggle')){try{capture(stage,event.target);}catch(error){onChange(error.message);}}finish();};
+  const blockStart=event=>{if(event.target.closest('#tu-test-dev-panel'))return;event.preventDefault();event.stopImmediatePropagation();};
+  const end=event=>{if(event.target.closest('#tu-test-dev-panel'))return;click(event);const block=e=>{e.preventDefault();e.stopImmediatePropagation();};let until;shield=()=>{for(const kind of ['click','mouseup','touchend'])document.removeEventListener(kind,block,true);window.clearTimeout(until);shield=null;};for(const kind of ['click','mouseup','touchend'])document.addEventListener(kind,block,true);until=window.setTimeout(()=>shield?.(),600);};
+  const key=event=>{if(event.key==='Escape'){event.preventDefault();finish();}};
+  cancel=finish;for(const kind of ['pointerdown','mousedown','touchstart'])document.addEventListener(kind,blockStart,{capture:true,passive:false});for(const kind of ['pointerup','mouseup','touchend'])document.addEventListener(kind,end,{capture:true,passive:false});document.addEventListener('click',click,true);document.addEventListener('keydown',key,true);timer=window.setTimeout(finish,30000);
+ }
+ return {stages,markup,capture,pick,stop,report:()=>({schemaVersion:1,readOnly:true,captures:captures.map(c=>({...c})),limits:{maxCaptures:20,maxNodes:160,maxDepth:9,maxHtmlCharacters:16000},excluded:['input values','URLs and query strings','cookies and credentials','network requests','full-page HTML']}),clear(){stop();captures=[];try{window.sessionStorage.removeItem(storageKey);}catch{}onChange('DOM captures cleared.');}};
+};
+ const travelDiagnostic=createTravelDiagnostic({document,window,scrub:value=>session.scrub(value),storageKey:'tu:test:travel-dom:'+targetBuild+':v1',getMeta:()=>({host:platform,installedBuild:currentBuild()||'unavailable'}),onChange:message=>{travelNotice.textContent=message;}});
+ for(const stage of travelDiagnostic.stages){const option=document.createElement('option');option.value=stage;option.textContent=stage;travelStage.append(option);}
+ travelNotice.textContent=travelDiagnostic.report().captures.length+' saved DOM captures in this tab. No automatic page monitoring.';
+ travelSection.append(button('Select region to capture',()=>{panel.style.display='none';launcher.title='Tap a Torn control/dialog to capture it without executing. Tap TU Test or press Escape to cancel.';travelDiagnostic.pick(travelStage.value,()=>{panel.style.display='flex';launcher.title='Open independent TU diagnostics';});}),button('Export travel DOM and system info',()=>exportReport()),button('Clear travel DOM captures',()=>travelDiagnostic.clear()));
  const list=document.createElement('div');list.id='tu-test-checklist';content.append(list);
  const feedback=text('textarea','');feedback.placeholder='General feedback (no credentials)';feedback.id='tu-test-feedback';feedback.style.cssText='width:100%;box-sizing:border-box;min-height:70px';
  feedback.oninput=()=>{session.setMeta({feedback:feedback.value});save();};
@@ -266,7 +317,7 @@
  const runButton=button('Run read-only checks',runChecks);actions.append(runButton);
  function exportReport(){
   save();const reports={};for(const id of ['tampermonkey','pda'])reports[id]=createSession({targetBuild,checklistVersion:catalog.checklistVersion,tests,platform:id,initial:profiles[id]}).report();
-  const report={schemaVersion:2,toolVersion:'0.2.8-dev',targetBuild,checklistVersion:catalog.checklistVersion,detectedHost:detected,detectedEnvironment:Object.fromEntries(Object.entries(environment).map(([k,fields])=>[k,Object.fromEntries(Object.entries(fields).map(([name,value])=>[name,typeof value==='string'?session.scrub(value):value]))])),userAgent:session.scrub(navigator.userAgent),platforms:reports,acceptanceComplete:Object.values(reports).every(r=>r.platformReady),productionAuthorized:false};
+  const report={schemaVersion:2,toolVersion:'0.2.9-dev',targetBuild,installedBuild:currentBuild()||null,viewport:{width:window.innerWidth,height:window.innerHeight,devicePixelRatio:window.devicePixelRatio},checklistVersion:catalog.checklistVersion,detectedHost:detected,detectedEnvironment:Object.fromEntries(Object.entries(environment).map(([k,fields])=>[k,Object.fromEntries(Object.entries(fields).map(([name,value])=>[name,typeof value==='string'?session.scrub(value):value]))])),userAgent:session.scrub(navigator.userAgent),platforms:reports,acceptanceComplete:Object.values(reports).every(r=>r.platformReady),productionAuthorized:false,travelDom:travelDiagnostic.report()};
   const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='tu-dev-acceptance-'+targetBuild+'-'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
  }
  actions.append(button('Export both host reports',exportReport),button('Reset selected host',()=>{

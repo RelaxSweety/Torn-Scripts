@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import {fileURLToPath} from 'node:url';
+import {createTravelDomDiagnostic} from '../src/diagnostics/travel-dom.js';
 import {detectTestEnvironment} from '../src/diagnostics/environment.js';
 import {createAcceptanceSession} from '../src/diagnostics/acceptance-session.js';
 const base=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
@@ -14,7 +15,7 @@ const agreementVersion=JSON.parse(read('../agreements/dev/current.json')).agreem
 const versionMetadata=JSON.stringify({agreement_version:agreementVersion},null,2)+'\n';
 const versionPath=path.join(base,'../agreements/dev/version.json');
 if(process.argv.includes('--check')){if(fs.readFileSync(versionPath,'utf8')!==versionMetadata)throw Error('Stale agreement version metadata');}else fs.writeFileSync(versionPath,versionMetadata);
-let output=read('src/diagnostics/tu-test.user.js').replace('__TU_ENVIRONMENT_DETECTOR__',()=>detectTestEnvironment.toString()).replace('__TU_ACCEPTANCE_ENGINE__',()=>createAcceptanceSession.toString()).replace('__TU_TEST_CATALOG__',()=>JSON.stringify(catalog)).replace('__TU_TEST_TOOLS__',()=>JSON.stringify(tools.map(({id,name})=>({id,name})))).replaceAll('__TU_TEST_TARGET__',target);
+let output=read('src/diagnostics/tu-test.user.js').replace('__TU_TRAVEL_DOM_DIAGNOSTIC__',()=>createTravelDomDiagnostic.toString()).replace('__TU_ENVIRONMENT_DETECTOR__',()=>detectTestEnvironment.toString()).replace('__TU_ACCEPTANCE_ENGINE__',()=>createAcceptanceSession.toString()).replace('__TU_TEST_CATALOG__',()=>JSON.stringify(catalog)).replace('__TU_TEST_TOOLS__',()=>JSON.stringify(tools.map(({id,name})=>({id,name})))).replaceAll('__TU_TEST_TARGET__',target);
 new vm.Script(output,{filename:'tu-diagnostics-dev.user.js'});
 const dest=path.join(base,'dist/tu-diagnostics-dev.user.js');
 if(process.argv.includes('--check')){if(read('dist/tu-diagnostics-dev.user.js')!==output)throw Error('Stale TU Test build');}else fs.writeFileSync(dest,output);

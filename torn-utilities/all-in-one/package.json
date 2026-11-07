@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build-dev.mjs && node scripts/build-diagnostics.mjs",
-    "test": "node tests/core-smoke.mjs && node tests/integration.mjs && node tests/diagnostics.mjs && node tests/environment.mjs && node tests/saved-keys.mjs && node tests/performance.mjs && node tests/performance.mjs --with-monitor && node tests/session-lifecycle.mjs && node tests/travel-features.mjs",
+    "test": "node tests/core-smoke.mjs && node tests/integration.mjs && node tests/diagnostics.mjs && node tests/environment.mjs && node tests/saved-keys.mjs && node tests/performance.mjs && node tests/performance.mjs --with-monitor && node tests/session-lifecycle.mjs && node tests/travel-features.mjs && node tests/travel-dom.mjs",
     "validate": "npm run build && npm test",
     "build:diagnostics": "node scripts/build-diagnostics.mjs"
   },

@@ -1,0 +1,43 @@
+// Explicit, bounded DOM-region capture. Never submits a native action or reads network/storage credentials.
+export function createTravelDomDiagnostic({document,window,scrub,storageKey,getMeta,onChange=()=>{}}){
+ const stages=['Foreign page / hospitalized','Selected healing item / Use control','Heal Yes/No confirmation','Hospital release result','Monitored item / Max and Buy','Purchase Yes/No confirmation','Purchase result','Return to Torn control / confirmation','Return flight result','Failed Snatch and Run attempt'];
+ const clean=value=>scrub(String(value??'')).replace(/https?:\/\/[^\s<>"']+/gi,'[URL OMITTED]').replace(/\b[A-Za-z0-9_=-]{24,}\b/g,'[REDACTED]').slice(0,600);
+ const skip='script,style,noscript,iframe,svg,canvas,img,video,audio,link,meta,textarea,[contenteditable],input[type=hidden],input[type=password],input[type=email],[autocomplete=current-password],[autocomplete=new-password]';
+ function markup(root){let count=0,truncated=false;const out=document.createElement('div');
+  function copy(node,depth){if(++count>160||depth>9){truncated=true;return null;}if(node.nodeType===3)return document.createTextNode(clean(node.nodeValue));if(node.nodeType!==1||node.matches(skip))return null;
+   const e=document.createElement(node.tagName.toLowerCase());
+   for(const name of ['id','name','class','role','title','type','aria-label','aria-controls','aria-expanded','aria-disabled','data-item-id','data-itemid','data-item-uid','data-id','min','max']){
+    if(!node.hasAttribute(name))continue;let value=node.getAttribute(name);if(name.startsWith('data-')&&!/^\d+$/.test(value))continue;if(name==='type'&&!/^(button|submit|number|text|checkbox|radio)$/i.test(value))continue;e.setAttribute(name,clean(value));
+   }
+   if(node.disabled)e.setAttribute('disabled','');
+   // Input values, URLs, form actions, handlers and arbitrary data attributes are deliberately omitted.
+   for(const child of node.childNodes){const c=copy(child,depth+1);if(c)e.append(c);if(count>160)break;}
+   return e;
+  }
+  const node=copy(root,0);if(node)out.append(node);const html=out.innerHTML;return {html:html.slice(0,16000),truncated:truncated||html.length>16000,nodes:Math.min(count,160)};
+ }
+ let captures=[],cancel=null,shield=null;
+ const persist=()=>{try{window.sessionStorage.setItem(storageKey,JSON.stringify(captures));}catch{onChange('Capture kept in memory only; export before navigation.');}};
+ try{const saved=JSON.parse(window.sessionStorage.getItem(storageKey)||'[]');if(Array.isArray(saved))for(const record of saved.slice(-20)){
+  if(!stages.includes(record.stage)||typeof record.html!=='string')continue;const template=document.createElement('template');template.innerHTML=record.html.slice(0,16000);const safe=markup(template.content.firstElementChild||document.createElement('div'));
+  captures.push({stage:record.stage,at:clean(record.at),host:clean(record.host),installedBuild:clean(record.installedBuild),path:clean(record.path).split(/[?#]/)[0],...safe});
+ }}catch{}
+ function capture(stage,target){
+  if(!stages.includes(stage))throw Error('Select a capture stage');
+  if(document.hidden||!target?.isConnected||target.closest('#tu-test-dev-panel,#tu-test-dev-toggle'))throw Error('Select a visible Torn page region');
+  const region=target.closest('[role=dialog],dialog,[aria-modal=true],.confirm-wrap,[class*=confirm i]:not(button):not(a):not(input),[data-item-id],[data-itemid],tr,[role=row],li')||(target.parentElement?.matches('html,body,main')?target:target.parentElement)||target;
+  if(region.matches('html,body')||target.matches('html,body'))throw Error('Select the specific item, control or confirmation, not the full page');
+  const entry={stage,at:new Date().toISOString(),host:clean(getMeta().host),installedBuild:clean(getMeta().installedBuild),path:window.location.pathname,...markup(region)};
+  captures.push(entry);captures=captures.slice(-20);persist();onChange('Captured '+stage+' ('+captures.length+'/20).');return entry;
+ }
+ function stop(){cancel?.();shield?.();}
+ function pick(stage,done){stop();let timer;
+  const finish=()=>{for(const kind of ['pointerdown','mousedown','touchstart'])document.removeEventListener(kind,blockStart,true);for(const kind of ['pointerup','mouseup','touchend'])document.removeEventListener(kind,end,true);document.removeEventListener('click',click,true);document.removeEventListener('keydown',key,true);window.clearTimeout(timer);cancel=null;done?.();};
+  const click=event=>{if(event.target.closest('#tu-test-dev-panel'))return;event.preventDefault();event.stopImmediatePropagation();if(!event.target.closest('#tu-test-dev-toggle')){try{capture(stage,event.target);}catch(error){onChange(error.message);}}finish();};
+  const blockStart=event=>{if(event.target.closest('#tu-test-dev-panel'))return;event.preventDefault();event.stopImmediatePropagation();};
+  const end=event=>{if(event.target.closest('#tu-test-dev-panel'))return;click(event);const block=e=>{e.preventDefault();e.stopImmediatePropagation();};let until;shield=()=>{for(const kind of ['click','mouseup','touchend'])document.removeEventListener(kind,block,true);window.clearTimeout(until);shield=null;};for(const kind of ['click','mouseup','touchend'])document.addEventListener(kind,block,true);until=window.setTimeout(()=>shield?.(),600);};
+  const key=event=>{if(event.key==='Escape'){event.preventDefault();finish();}};
+  cancel=finish;for(const kind of ['pointerdown','mousedown','touchstart'])document.addEventListener(kind,blockStart,{capture:true,passive:false});for(const kind of ['pointerup','mouseup','touchend'])document.addEventListener(kind,end,{capture:true,passive:false});document.addEventListener('click',click,true);document.addEventListener('keydown',key,true);timer=window.setTimeout(finish,30000);
+ }
+ return {stages,markup,capture,pick,stop,report:()=>({schemaVersion:1,readOnly:true,captures:captures.map(c=>({...c})),limits:{maxCaptures:20,maxNodes:160,maxDepth:9,maxHtmlCharacters:16000},excluded:['input values','URLs and query strings','cookies and credentials','network requests','full-page HTML']}),clear(){stop();captures=[];try{window.sessionStorage.removeItem(storageKey);}catch{}onChange('DOM captures cleared.');}};
+}
