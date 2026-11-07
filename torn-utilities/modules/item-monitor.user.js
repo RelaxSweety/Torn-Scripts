@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.11.2-dev
+// @version      1.12.0-dev
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -93,7 +93,7 @@ const listingSelector='[data-listing-id],[data-seller-id],tr,[role=row],[class*=
 const listings=()=>[...document.querySelectorAll(listingSelector)].filter(e=>!e.closest('#tuim-panel,#tu-pda-panel')&&Number.isFinite(listingPrice(e))&&(!e.parentElement?.closest(listingSelector)));
 const listingPrice=row=>{const unit=row.querySelector('[data-unit-price],[class*=unitPrice],[class*=UnitPrice],[class*=pricePer],[class*=PricePer]');if(unit){const n=money(unit.getAttribute('data-unit-price')||text(unit));if(Number.isFinite(n))return n}for(const el of row.querySelectorAll('[data-price],[class*=price],[class*=Price]')){const n=money(el.getAttribute('data-price')||text(el));if(Number.isFinite(n))return n}return money(text(row))};
 const candidates='[data-item-id],[data-itemname],[data-item-name],tr,[role=row],li,[class*=itemWrap],[class*=ItemWrap],[class*=itemRow],[class*=ItemRow],[class*=itemCard],[class*=ItemCard],[class*=row],[class*=Row],[class*=card],[class*=Card]';
-const category=()=>{const url=(location.pathname+location.search+location.hash).toLowerCase();if(/itemmarket|item-market|item_market|market.php|item.php/.test(url))return 'Item Market';const abroad=/travel|abroad|foreign|country|cayman|japan|mexico|canada|hawaii|switzerland|china|argentina|unitedkingdom|southafrica|uae/i.test(url)||document.querySelector('[class*=foreignStock],[class*=ForeignStock]');const stockTable=[...document.querySelectorAll('table, [role=table]')].some(t=>/\bStock\b/i.test(text(t).slice(0,300))&&/\bCost\b/i.test(text(t).slice(0,300))&&/\bBuy\b/i.test(text(t).slice(0,300)));if(abroad||stockTable)return 'Foreign';if(/shop|store|bazaar|city/.test(url))return 'Stores';return 'Other'};
+const category=()=>{const url=(location.pathname+location.search+location.hash).toLowerCase();if(/itemmarket|item-market|item_market|market.php|item.php/.test(url))return 'Item Market';const abroad=/travel|abroad|foreign|country|cayman|japan|mexico|canada|hawaii|switzerland|china|argentina|unitedkingdom|southafrica|uae/i.test(url)||document.querySelector('[class*=foreignStock],[class*=ForeignStock],#travel-root [class*=stockTableWrapper]');const stockTable=[...document.querySelectorAll('table, [role=table]')].some(t=>/\bStock\b/i.test(text(t).slice(0,300))&&/\bCost\b/i.test(text(t).slice(0,300))&&/\bBuy\b/i.test(text(t).slice(0,300)));if(abroad||stockTable)return 'Foreign';if(/shop|store|bazaar|city/.test(url))return 'Stores';return 'Other'};
 const nameOf=row=>{const e=row.querySelector('[data-itemname],[data-item-name],[class*=itemName],[class*=ItemName],[class*=name],[class*=Name]');return (e?.getAttribute('data-itemname')||e?.getAttribute('data-item-name')||text(e)||text(row)).split('\n').map(x=>x.trim()).find(Boolean)?.slice(0,90)||''};
 const idOf=row=>row.getAttribute('data-item-id')||row.querySelector('[data-item-id]')?.getAttribute('data-item-id')||'';
 const keyOf=row=>idOf(row)?'id:'+idOf(row):'name:'+norm(nameOf(row));
@@ -111,6 +111,8 @@ const B=(p,t,f)=>{const b=E('button',p,t);b.type='button';b.onclick=f;return b};
 const proofIds=new WeakMap();let nextProof=0,snatchContext=null;
 const liveCountry=()=>{
  if(!foreignShopTables().length)return null;
+ const heading=norm(document.querySelector('#travel-root h4')?.textContent||'');
+ const native=Object.keys(travelAliases).find(code=>travelAliases[code].some(alias=>norm(alias)===heading));if(native)return native;
  const page=[document.title,document.querySelector('main')?.textContent||'',...document.querySelectorAll('h1,h2,[data-country]')].map(e=>typeof e==='string'?e:e.getAttribute('data-country')||text(e)).join(' ').toLowerCase();
  return Object.keys(travelAliases).find(code=>travelAliases[code].some(alias=>page.includes(alias)))||null;
 };
@@ -142,13 +144,15 @@ function snatchSnapshot(watch=null){
  const declaredMax=Number(quantityInput?.getAttribute('max'));
  const ownerId=host.TornUtilities?.getPlayer?.()?.id;
  const nativeStatus=document.querySelector('[data-user-status]')?.getAttribute('data-user-status');
- const status=['Hospital','Abroad','Traveling'].includes(nativeStatus)?nativeStatus:snatchContext?.status;
+ const desktop=desktopActions?.enabled()?desktopActions.inspect(run):null;
+ const status=desktop?.traveling?'Traveling':desktop?.released?'Abroad':document.querySelector('a[aria-label^="Hospital:"]')?'Hospital':['Hospital','Abroad','Traveling'].includes(nativeStatus)?nativeStatus:snatchContext?.status;
  let purchaseProof=null,purchaseItemKey=null;
  for(const el of document.querySelectorAll('[role=alert],[role=status],.success,[class*=success]')){
   if(el.closest('#tuim-panel,#tu-snatch-run,#tu-pda-panel')||!el.getClientRects().length)continue;
   const value=text(el);if(w&&/you (?:have )?(?:bought|purchased)/i.test(value)&&norm(value).includes(norm(w.name))){if(!proofIds.has(el))proofIds.set(el,++nextProof);purchaseProof=proofIds.get(el)+':'+value;purchaseItemKey=w.key;break;}
  }
- return {ownerId,country:liveCountry()||snatchContext?.country||null,status,hospitalized:status==='Hospital'?true:status==='Abroad'?false:null,traveling:status==='Traveling',returning:status==='Traveling'&&/\b(?:to torn|returning to torn|back to torn)\b/i.test(snatchContext?.description||''),quantity:row?foreignStock(row):NaN,purchaseProof,purchaseItemKey,quantityInput,maxControl:row?[...row.querySelectorAll('button,a,[role=button]')].find(e=>/^(max|maximum)$/i.test(text(e).trim())):null,maxQuantity:declaredMax,maxVerified:Number.isSafeInteger(declaredMax)&&declaredMax>0,
+ if(desktop?.purchaseProof){purchaseProof=desktop.purchaseProof;purchaseItemKey=desktop.purchaseItemKey;}
+ return {ownerId,country:liveCountry()||snatchContext?.country||null,status,hospitalized:status==='Hospital'?true:status==='Abroad'?false:null,traveling:status==='Traveling',returning:!!desktop?.returning||status==='Traveling'&&/\b(?:to torn|returning to torn|back to torn)\b/i.test(snatchContext?.description||''),quantity:row?foreignStock(row):NaN,purchaseProof,purchaseItemKey,quantityInput,maxControl:row?[...row.querySelectorAll('button,a,[role=button]')].find(e=>/^(max|maximum)$/i.test(text(e).trim())):null,maxQuantity:declaredMax,maxVerified:Number.isSafeInteger(declaredMax)&&declaredMax>0,
  buyMatches:(control,key)=>!!row&&row.contains(control)&&w?.key===key&&/^(?:buy|purchase)(?:\s|$)/i.test(control.getAttribute('aria-label')||text(control)||control.value||''),
  medicalMatches:(control,medical)=>{const item=nativeRow(control);const id=item?.getAttribute('data-item-id')||item?.getAttribute('data-itemid');const uid=item?.getAttribute('data-item-uid');return !!item&&String(id)===String(medical.id)&&(!medical.uid||String(uid)===String(medical.uid))&&/^(?:use|take)(?:\s|$)/i.test(control.getAttribute('aria-label')||text(control)||control.value||'');},
  returnMatches:control=>/^(?:return|travel|fly)(?:\s+back)?\s+to\s+torn\b/i.test(control.getAttribute('aria-label')||text(control)||control.value||'')};
@@ -162,7 +166,8 @@ async function getSnatchContext({inventory=false}={}){
  if(inventory){const d=await api.requestTravelInfo('inventory');snatchContext.medicalItems=d.inventory?.items||[];}
  enhancements?.check();return snatchContext;
 }
-const enhancements=typeof createTravelEnhancements==='function'?createTravelEnhancements({document,window,getItems:()=>state.items,getContext:getSnatchContext,getSnapshot:snatchSnapshot,getRows:filterRows,getFilterContainer:filterContainer,matchRow:rowMatches,filterEnabled:()=>!!state.cfg.monitoredOnly,onArmed:()=>{host.TUWindowNavigation?.minimize?.('tuim-panel');if(state.panel)state.panel.hidden=true;state.catalogWindow?.remove();state.catalogWindow=null;},onNotice:message=>{const el=document.getElementById('tuim-snatch-notice');if(el)el.textContent=message;},restoreRun:(()=>{try{return JSON.parse(sessionStorage.getItem('tu:snatch-run:v1')||'null')}catch{return null}})(),storeRun:value=>{if(value)sessionStorage.setItem('tu:snatch-run:v1',JSON.stringify(value));else sessionStorage.removeItem('tu:snatch-run:v1');}}):null;
+const desktopActions=typeof createDesktopTravelActions==='function'?createDesktopTravelActions({document,window,enabled:()=>typeof GM_info!=='undefined'&&GM_info.scriptHandler==='Tampermonkey'&&!/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)&&!host.flutter_inappwebview}):null;
+const enhancements=typeof createTravelEnhancements==='function'?createTravelEnhancements({document,window,executeAction:desktopActions,getItems:()=>state.items,getContext:getSnatchContext,getSnapshot:snatchSnapshot,getRows:filterRows,getFilterContainer:filterContainer,matchRow:rowMatches,filterEnabled:()=>!!state.cfg.monitoredOnly,onArmed:()=>{host.TUWindowNavigation?.minimize?.('tuim-panel');if(state.panel)state.panel.hidden=true;state.catalogWindow?.remove();state.catalogWindow=null;},onNotice:message=>{const el=document.getElementById('tuim-snatch-notice');if(el)el.textContent=message;},restoreRun:(()=>{try{return JSON.parse(sessionStorage.getItem('tu:snatch-run:v1')||'null')}catch{return null}})(),storeRun:value=>{if(value)sessionStorage.setItem('tu:snatch-run:v1',JSON.stringify(value));else sessionStorage.removeItem('tu:snatch-run:v1');}}):null;
 function renderEnhancements(parent){
  const label=E('label',parent);label.className='tuim-monitored-toggle';const check=E('input',label);check.type='checkbox';check.id='tuim-monitored-only';check.checked=!!state.cfg.monitoredOnly;label.append(document.createTextNode('Show monitored items only'));check.onchange=()=>{state.cfg.monitoredOnly=check.checked;saveCfg();enhancements?.applyFilter();};
  E('style',parent,'.tu-monitor-filter-hidden{display:none!important}#tuim-panel label.tuim-monitored-toggle{display:flex;align-items:center;gap:8px;cursor:pointer}#tuim-panel input#tuim-monitored-only{display:inline-block;flex:0 0 18px;width:18px;height:18px;min-height:18px;padding:0;margin:0;accent-color:#d6b65c}');

@@ -1,5 +1,23 @@
 [
   {
+    "version": "0.5.42.43-dev",
+    "date": "2026-11-07",
+    "changes": {
+      "Features": [
+        "Desktop Tampermonkey native Snatch and Run action adapter based on captured foreign-page DOM"
+      ],
+      "Fixes": [
+        "Heal opens the selected inventory slot, uses the item and confirms its matching Yes",
+        "Purchase Max uses the native icon/text input and matching item/quantity Yes confirmation",
+        "Return to Torn handles Travel home, Travel Back and Continue",
+        "Native release and selected-item inventory changes advance stages without waiting for cached API status"
+      ],
+      "Compatibility": [
+        "Desktop Tampermonkey only; PDA action path unchanged; production remains on hold"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.42-dev",
     "date": "2026-11-07",
     "changes": {

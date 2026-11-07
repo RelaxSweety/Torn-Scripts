@@ -1,4 +1,4 @@
-# Travel Assistant DEV acceptance: 0.5.42.42-dev
+# Travel Assistant DEV acceptance: 0.5.42.43-dev
 
 Alarms update status and sound without changing whether the user minimized the main window. Monitoring continues while the activated tool is minimized, on the actively viewed Torn page. Exit stops its runtime. Hidden or unfocused pages are not scanned for stock.
 
@@ -10,18 +10,24 @@ On a foreign page, add the item to monitor, choose it in Snatch and Run and answ
 
 Press **Arm Snatch and Run** to minimize the main window and show a single red **Snatch and Run** button. A red-button click does nothing. The selected item's stock alarm turns it green. The same button presents these actions:
 
-1. **Heal from Hospital** for hospitalized users. One click matches and uses the selected visible native healing item. Confirmed hospital release advances to Purchase Max. Non-hospitalized users skip healing.
-2. **Purchase Max** sets the native verified maximum and delegates Buy for the monitored row. A new matching purchase-success message enables the next stage.
-3. **Return to Torn** delegates the visible native return action. Return flight status confirms completion.
+Desktop Tampermonkey (PC) uses the foreign-page DOM recorded on Edge/Tampermonkey. Each trusted click handles exactly one requested gameplay stage, including its matching native confirmation:
 
-There are no native-control selection buttons or separate floating status panel. The controller automatically matches a unique visible Torn control on each click, including after DOM replacement. Missing or ambiguous controls block action rather than guessing. Its title and the restored setup message explain blocked actions. Cancel remains in the setup, accessible by restoring the main window; Exit also cancels.
+1. **Heal from Hospital** finds the selected medical item by its exact inventory-slot label (including blood type), expands the slot, selects **Use**, verifies the named item in its own question and selects **Yes**. It waits for **You are out of the hospital!** before offering Purchase Max. It does not purchase automatically. If the medical item does not release the user, it never consumes another item automatically. Non-hospitalized users skip healing.
+2. **Purchase Max** uses the monitored numeric item ID and exact native row name, clicks its maximum icon, reads the native text quantity input, selects Buy and verifies that item's own confirmation quantity/name before selecting **Yes**. It waits for the selected-item inventory count to increase by the confirmed amount before offering Return to Torn. No automatic return follows.
+3. **Return to Torn** opens **Travel home**, verifies Torn in the return question, selects **Travel Back**, waits for the airstrip/pilot booking message and selects the enabled **Continue** button. Disabled countdown controls are respected. It does not book a second flight or repeat a submission.
 
-Complete Torn's own confirmations manually. After a user-initiated heal or return, up to three bounded read-only status refreshes (after 1.2, 4 and 10 seconds) check the result; they stop on confirmed transition, cancellation or Exit, and do not run in an unfocused page. They never retry gameplay actions. Navigation, controls and dialogs may still require extra manual action. No private mutation endpoints or offscreen inventory actions are assumed. Live foreign layouts must be validated before claiming a guaranteed three-click flow.
+The single button stays red/inactive until stock conditions are met. Arming minimizes the main window, and alarms preserve minimization. There are no native-control selection buttons or separate status panel. Exact item type/quantity/destination mismatches, ambiguous confirmations, missing controls, stale stock, changed player/country, loss of focus and cancellation block further clicks. Cancel is available by restoring the main setup; Exit cancels as well. Stock is rechecked before medical confirmation, and native hospitalization state is checked before buying.
+
+The desktop adapter exists only for PC Tampermonkey without a PDA bridge/mobile user agent. PDA retains its previous action implementation and is not fixed or validated by this change. Its native confirmations may still need manual handling.
+
+During a desktop action, a bounded DOM observer waits for the next control/result; it disconnects on success, failure or cancellation. There is no additional observer/polling when idle. Native result evidence advances successful desktop stages without waiting for cached API status. If a heal/return submission was accepted but its result was not established, existing bounded status refreshes may help recover; submissions never retry automatically. Unknown intermediate outcomes remain pending for manual resolution rather than risking duplicate item use/purchase.
 
 A session-only intent can survive navigation for up to 15 minutes. Controls are matched again on the new page. No action resumes automatically. Stock must remain fresh; unknown layouts, stale stock, missing controls, unfocused pages and unverified results block progress. Setup stores no action URLs, DOM bindings, keys or tokens.
 
 ## Validation boundary
 
-Automated fixtures cover minimized alarms, reversible filtering, explicit gestures, Max/Buy delegation, confirmed transitions, stale stock, focus, expiry and cleanup. They do not establish compatibility with the live logged-in foreign shop, medical inventory or travel controls. Actual Android PDA and Tampermonkey acceptance remains required, including the new TU Test checks. Exact native markup and usable confirmation messages must be recorded before considering this feature production-ready.
+Automated fixtures include sanitized structural excerpts from the 2026-11-07 desktop recording: inventory slot/popover and medical Yes/No, native maximum/text-input/Buy controls, item-specific purchase confirmation, and Travel home/Back/Continue. Tests exercise the exported adapter and complete generated bundle with synthetic host/API responses, plus wrong blood type, quantity/destination mismatch, unrelated Yes, re-hospitalization, duplicate clicks and cancellation. Only the necessary item/control excerpts are committed; the user's video, full export and profile/sidebar details are not.
 
-Architecture references reviewed: Torn's public GET-only API schema at https://www.torn.com/swagger/openapi.json and script rules at https://www.torn.com/rules.php. Keep gameplay actions directly initiated by the user on the actively viewed page; never add hidden-page extraction, automatic chaining or CAPTCHA bypasses.
+These tests do not perform real gameplay or establish live desktop/PDA reliability. Actual PC acceptance remains required before production; production and Workers are unchanged. PDA needs separate live DOM evidence and implementation validation.
+
+Architecture references reviewed: Torn's public GET-only API schema at https://www.torn.com/swagger/openapi.json and script rules at https://www.torn.com/rules.php. Keep gameplay actions directly initiated by the user on the actively viewed page; never add hidden-page extraction, chaining distinct gameplay stages without a new user click or bypassing CAPTCHAs.

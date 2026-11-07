@@ -1,6 +1,6 @@
 // Shared source embedded only into the lazy Travel Assistant factory.
 // No gameplay requests: actions delegate once to a visible, automatically matched native control.
-export function createTravelEnhancements({document,window,getItems,getContext,getSnapshot,getRows,matchRow,getFilterContainer=row=>row,onArmed=()=>{},filterEnabled,onNotice,storeRun=()=>{},restoreRun=null,now=()=>Date.now()}) {
+export function createTravelEnhancements({document,window,getItems,getContext,getSnapshot,getRows,matchRow,getFilterContainer=row=>row,onArmed=()=>{},executeAction=null,filterEnabled,onNotice,storeRun=()=>{},restoreRun=null,now=()=>Date.now()}) {
  const hiddenRows=new Map(),TTL=15*60*1000,STOCK_TTL=30000;
  let run=restoreRun&&restoreRun.expiresAt>now()?restoreRun:null,busy=false,active=false,hud=null,action=null,lastNotice='',statusTimer=null,statusAttempts=0;
  const persist=()=>storeRun(run?{...run}:null);
@@ -50,7 +50,7 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   if(action.textContent!==text)action.textContent=text;
   const state=ready?'ready':'waiting';if(action.dataset.state!==state){action.disabled=!ready;action.dataset.state=state;action.setAttribute('aria-disabled',String(!ready));action.style.backgroundColor=ready?'#167b35':'#b32424';action.style.borderColor=ready?'#66d584':'#ec8585';}
  }
- function disarm(reason='Snatch and Run canceled'){clearStatusTimer();run=null;persist();notice(reason);refresh();}
+ function disarm(reason='Snatch and Run canceled'){clearStatusTimer();executeAction?.cancel();busy=false;run=null;persist();notice(reason);refresh();}
  async function arm({watchKey,hospital,medical=null}={}){
   if(!active||!focused())throw Error('Open Travel Assistant on the actively viewed foreign page');
   const watch=getItems().find(w=>w.key===watchKey&&w.category==='Foreign');if(!watch)throw Error('Select a monitored foreign item');
@@ -59,8 +59,8 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   if(!s.country||s.traveling||!s.ownerId||!['Abroad','Hospital'].includes(s.status))throw Error('A confirmed foreign location and non-flying status are required');
   if((s.status==='Hospital')!==!!hospital)throw Error('Hospital answer does not match the verified status; refresh and try again');
   if(hospital&&(!medical?.name||!Number.isSafeInteger(Number(medical.id))||Number(medical.id)<1))throw Error('Select the medical item you intend to use');
-  run={ownerId:String(s.ownerId),country:s.country,watchKey,watchName:watch.name,hospital:!!hospital,medical,stage:'waiting',expiresAt:now()+TTL,stockAt:0};
-  watch.fired=false;clearStatusTimer();persist();notice('Armed. Waiting for the selected item alarm.');refresh();onArmed();return {...run};
+  run={ownerId:String(s.ownerId),country:s.country,watchKey,watchName:watch.name,minimumQty:Math.max(1,Number(watch.minQty)||1),hospital:!!hospital,medical,stage:'waiting',expiresAt:now()+TTL,stockAt:0};
+  watch.fired=false;clearStatusTimer();executeAction?.cancel();busy=false;persist();notice('Armed. Waiting for the selected item alarm.');refresh();onArmed();return {...run};
  }
  function stock(w,s){
   if(!run||w.key!==run.watchKey||!validRun(s)||!focused()||!(s.quantity>0))return;
@@ -94,10 +94,23 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   if(kind==='return'&&(!s.returnMatches?.(e)||!run.purchaseConfirmed))throw Error('Confirm purchase and open the native return travel page');
   return e;
  }
+ async function desktopAct(kind){
+  const expected=run;busy=true;run.priorProof=getSnapshot().purchaseProof||null;run.stage=kind+'-pending';persist();refresh();
+  const guard=()=>run===expected&&active&&run.expiresAt>now()&&String(getSnapshot().ownerId)===run.ownerId&&getSnapshot().country===run.country;
+  try{
+   const result=await executeAction.execute(kind,{run:expected,getSnapshot,guard});if(run!==expected)return false;
+   if(kind==='heal'&&result.hospitalReleased)run.stage='buy';
+   if(kind==='buy'&&result.purchaseConfirmed){run.stage='return';run.purchaseConfirmed=true;}
+   if(kind==='return'&&result.returnBooked)run.stage='complete';
+   persist();notice(kind==='heal'?'Hospital release confirmed. Purchase Max is ready.':kind==='buy'?'Purchase confirmed. Return to Torn is ready.':'Return flight booked.');return true;
+  }catch(error){if(run===expected){if(!error.submitted)run.stage=kind;else{statusAttempts=0;scheduleStatus();}persist();notice(error.message);}return false;}
+  finally{if(run===expected){busy=false;refresh();}}
+ }
  function act(event){
   if(!event?.isTrusted||busy||!run)return false;
   const s=getSnapshot(),kind=run.stage;
-  if(!validRun(s)||!focused()||(kind!=='return'&&now()-run.stockAt>=(kind==='heal'?120000:STOCK_TTL))||!['heal','buy','return'].includes(kind)){notice('Refresh visible state/stock, or re-arm before acting');refresh();return false;}
+  if(!validRun(s)||!focused()||(kind!=='return'&&Number.isFinite(s.quantity)&&s.quantity<Math.max(1,Number(run.minimumQty)||1))||(kind!=='return'&&now()-run.stockAt>=(kind==='heal'?120000:STOCK_TTL))||!['heal','buy','return'].includes(kind)){notice('Refresh visible state/stock, or re-arm before acting');refresh();return false;}
+  if(executeAction?.enabled())return desktopAct(kind);
   busy=true;
   try{const e=nativeControl(kind,s);run.priorProof=s.purchaseProof||null;run.stage=kind+'-pending';if(kind==='return')run.stockAt=now();persist();e.click();notice('Action sent to Torn. Complete any native confirmation; the next action waits for observed success.');statusAttempts=0;scheduleStatus();return true;}
   catch(error){notice(error.message);return false;}finally{busy=false;refresh();}
