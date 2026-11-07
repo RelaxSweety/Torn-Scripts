@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Testing and Diagnostics DEV
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.2.9-dev
+// @version      0.2.10-dev
 // @description  Guided DEV acceptance, system information and sanitized travel DOM diagnostics
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -96,7 +96,7 @@
   const content=document.createElement('div');content.style.cssText='flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding-right:4px';panel.append(content);
  const button=(label,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=fn;b.style.cssText='font:600 12px Arial;color:#fff;background:#344d60;border:1px solid #7892a2;border-radius:5px;padding:8px;margin:3px;cursor:pointer';return b;};
  const text=(tag,value,parent=content)=>{const e=document.createElement(tag);e.textContent=value;parent.append(e);return e;};
- const notice=text('p','Target '+targetBuild+' · TU Test 0.2.9-dev. Record results only for the actual selected host. Automatic checks are read-only and do not prove gameplay or native bridge compatibility.');
+ const notice=text('p','Target '+targetBuild+' · TU Test 0.2.10-dev. Record results only for the actual selected host. Automatic checks are read-only and do not prove gameplay or native bridge compatibility.');
  text('p','Do not paste API keys, session tokens or room secrets into notes. This tool never registers keys, accepts/cancels agreements, creates rooms or modifies backend records.');
  const hostLabel=text('label','Actual test host: ');
  const hostSelect=document.createElement('select');hostSelect.id='tu-test-host';
@@ -115,14 +115,15 @@
  const actions=document.createElement('div');content.append(actions);
  const travelSection=document.createElement('section');travelSection.id='tu-test-travel-dom';content.append(travelSection);
  text('h3','Snatch and Run · DOM diagnostic',travelSection);
- text('p','Capture the manual Heal, Yes/No, Max/Buy and Return stages separately. Choose a stage, press Select region, then tap the relevant Torn control or dialog. That selection tap is blocked: it does not use, buy, confirm or travel. Perform gameplay manually afterward. Captures stay in this tab across navigation; export before closing it. Maximum 20 captures. Review JSON before sharing.',travelSection);
+ text('p','Start monitoring, minimize TU Test, then perform Heal, Yes/No, Max/Buy and Return manually. Clicks and related DOM changes are recorded without blocking actions. Recording continues across navigation in this tab until Stop monitoring. Stage labels are optional. Latest 200 captures / 1 MB of HTML are retained; older entries are discarded at the limit. Review exported JSON before sharing.',travelSection);
  const travelStage=document.createElement('select');travelStage.setAttribute('aria-label','Travel DOM capture stage');travelStage.style.cssText='width:100%;padding:8px';travelSection.append(travelStage);
  const travelNotice=text('p','No DOM capture runs automatically.',travelSection);
  const createTravelDiagnostic=__TU_TRAVEL_DOM_DIAGNOSTIC__;
  const travelDiagnostic=createTravelDiagnostic({document,window,scrub:value=>session.scrub(value),storageKey:'tu:test:travel-dom:'+targetBuild+':v1',getMeta:()=>({host:platform,installedBuild:currentBuild()||'unavailable'}),onChange:message=>{travelNotice.textContent=message;}});
  for(const stage of travelDiagnostic.stages){const option=document.createElement('option');option.value=stage;option.textContent=stage;travelStage.append(option);}
- travelNotice.textContent=travelDiagnostic.report().captures.length+' saved DOM captures in this tab. No automatic page monitoring.';
- travelSection.append(button('Select region to capture',()=>{panel.style.display='none';launcher.title='Tap a Torn control/dialog to capture it without executing. Tap TU Test or press Escape to cancel.';travelDiagnostic.pick(travelStage.value,()=>{panel.style.display='flex';launcher.title='Open independent TU diagnostics';});}),button('Export travel DOM and system info',()=>exportReport()),button('Clear travel DOM captures',()=>travelDiagnostic.clear()));
+ travelNotice.textContent=travelDiagnostic.report().captures.length+' saved captures. Monitoring is OFF until started or resumed from this tab.';
+ travelStage.onchange=()=>travelDiagnostic.setStage(travelStage.value);
+ travelSection.append(button('Start monitoring',()=>{travelDiagnostic.start(travelStage.value);panel.style.display='none';launcher.textContent='TU Test · REC';}),button('Stop monitoring',()=>{travelDiagnostic.stop();launcher.textContent='TU Test';}),button('Export travel DOM and system info',()=>exportReport()),button('Clear travel DOM captures',()=>{travelDiagnostic.clear();launcher.textContent='TU Test';}));
  const list=document.createElement('div');list.id='tu-test-checklist';content.append(list);
  const feedback=text('textarea','');feedback.placeholder='General feedback (no credentials)';feedback.id='tu-test-feedback';feedback.style.cssText='width:100%;box-sizing:border-box;min-height:70px';
  feedback.oninput=()=>{session.setMeta({feedback:feedback.value});save();};
@@ -213,7 +214,7 @@
  const runButton=button('Run read-only checks',runChecks);actions.append(runButton);
  function exportReport(){
   save();const reports={};for(const id of ['tampermonkey','pda'])reports[id]=createSession({targetBuild,checklistVersion:catalog.checklistVersion,tests,platform:id,initial:profiles[id]}).report();
-  const report={schemaVersion:2,toolVersion:'0.2.9-dev',targetBuild,installedBuild:currentBuild()||null,viewport:{width:window.innerWidth,height:window.innerHeight,devicePixelRatio:window.devicePixelRatio},checklistVersion:catalog.checklistVersion,detectedHost:detected,detectedEnvironment:Object.fromEntries(Object.entries(environment).map(([k,fields])=>[k,Object.fromEntries(Object.entries(fields).map(([name,value])=>[name,typeof value==='string'?session.scrub(value):value]))])),userAgent:session.scrub(navigator.userAgent),platforms:reports,acceptanceComplete:Object.values(reports).every(r=>r.platformReady),productionAuthorized:false,travelDom:travelDiagnostic.report()};
+  const report={schemaVersion:2,toolVersion:'0.2.10-dev',targetBuild,installedBuild:currentBuild()||null,viewport:{width:window.innerWidth,height:window.innerHeight,devicePixelRatio:window.devicePixelRatio},checklistVersion:catalog.checklistVersion,detectedHost:detected,detectedEnvironment:Object.fromEntries(Object.entries(environment).map(([k,fields])=>[k,Object.fromEntries(Object.entries(fields).map(([name,value])=>[name,typeof value==='string'?session.scrub(value):value]))])),userAgent:session.scrub(navigator.userAgent),platforms:reports,acceptanceComplete:Object.values(reports).every(r=>r.platformReady),productionAuthorized:false,travelDom:travelDiagnostic.report()};
   const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='tu-dev-acceptance-'+targetBuild+'-'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
  }
  actions.append(button('Export both host reports',exportReport),button('Reset selected host',()=>{
@@ -221,7 +222,7 @@
   delete profiles[platform];loadSession();refreshFields();save();render();
  }));
  launcher.onclick=()=>{if(suppressClick){suppressClick=false;return;}panel.style.display=panel.style.display==='none'?'flex':'none';if(panel.style.display==='none')panelResizeObserver?.disconnect();else panelResizeObserver?.observe(panel);render();};
- document.body.append(launcher,panel);refreshFields();render();
+ document.body.append(launcher,panel);refreshFields();render();travelDiagnostic.resume();travelStage.value=travelDiagnostic.report().stage;if(travelDiagnostic.report().monitoring)launcher.textContent='TU Test · REC';
  if(typeof navigator.userAgentData?.getHighEntropyValues==='function'){
   Promise.resolve().then(()=>navigator.userAgentData.getHighEntropyValues(['model','platformVersion','fullVersionList'])).then(hints=>{
    const previous=describeEnvironment();environment=detectEnvironment({...baseEnvironment,uaData:{platform:navigator.userAgentData.platform,brands:navigator.userAgentData.brands,...hints}});

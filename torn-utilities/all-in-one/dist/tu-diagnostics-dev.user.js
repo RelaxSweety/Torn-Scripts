@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Testing and Diagnostics DEV
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.2.9-dev
+// @version      0.2.10-dev
 // @description  Guided DEV acceptance, system information and sanitized travel DOM diagnostics
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -159,7 +159,7 @@
   const content=document.createElement('div');content.style.cssText='flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding-right:4px';panel.append(content);
  const button=(label,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=fn;b.style.cssText='font:600 12px Arial;color:#fff;background:#344d60;border:1px solid #7892a2;border-radius:5px;padding:8px;margin:3px;cursor:pointer';return b;};
  const text=(tag,value,parent=content)=>{const e=document.createElement(tag);e.textContent=value;parent.append(e);return e;};
- const notice=text('p','Target '+targetBuild+' · TU Test 0.2.9-dev. Record results only for the actual selected host. Automatic checks are read-only and do not prove gameplay or native bridge compatibility.');
+ const notice=text('p','Target '+targetBuild+' · TU Test 0.2.10-dev. Record results only for the actual selected host. Automatic checks are read-only and do not prove gameplay or native bridge compatibility.');
  text('p','Do not paste API keys, session tokens or room secrets into notes. This tool never registers keys, accepts/cancels agreements, creates rooms or modifies backend records.');
  const hostLabel=text('label','Actual test host: ');
  const hostSelect=document.createElement('select');hostSelect.id='tu-test-host';
@@ -178,11 +178,11 @@
  const actions=document.createElement('div');content.append(actions);
  const travelSection=document.createElement('section');travelSection.id='tu-test-travel-dom';content.append(travelSection);
  text('h3','Snatch and Run · DOM diagnostic',travelSection);
- text('p','Capture the manual Heal, Yes/No, Max/Buy and Return stages separately. Choose a stage, press Select region, then tap the relevant Torn control or dialog. That selection tap is blocked: it does not use, buy, confirm or travel. Perform gameplay manually afterward. Captures stay in this tab across navigation; export before closing it. Maximum 20 captures. Review JSON before sharing.',travelSection);
+ text('p','Start monitoring, minimize TU Test, then perform Heal, Yes/No, Max/Buy and Return manually. Clicks and related DOM changes are recorded without blocking actions. Recording continues across navigation in this tab until Stop monitoring. Stage labels are optional. Latest 200 captures / 1 MB of HTML are retained; older entries are discarded at the limit. Review exported JSON before sharing.',travelSection);
  const travelStage=document.createElement('select');travelStage.setAttribute('aria-label','Travel DOM capture stage');travelStage.style.cssText='width:100%;padding:8px';travelSection.append(travelStage);
  const travelNotice=text('p','No DOM capture runs automatically.',travelSection);
  const createTravelDiagnostic=function createTravelDomDiagnostic({document,window,scrub,storageKey,getMeta,onChange=()=>{}}){
- const stages=['Foreign page / hospitalized','Selected healing item / Use control','Heal Yes/No confirmation','Hospital release result','Monitored item / Max and Buy','Purchase Yes/No confirmation','Purchase result','Return to Torn control / confirmation','Return flight result','Failed Snatch and Run attempt'];
+ const stages=['Workflow (continuous)','Foreign page / hospitalized','Selected healing item / Use control','Heal Yes/No confirmation','Hospital release result','Monitored item / Max and Buy','Purchase Yes/No confirmation','Purchase result','Return to Torn control / confirmation','Return flight result','Failed Snatch and Run attempt'];
  const clean=value=>scrub(String(value??'')).replace(/https?:\/\/[^\s<>"']+/gi,'[URL OMITTED]').replace(/\b[A-Za-z0-9_=-]{24,}\b/g,'[REDACTED]').slice(0,600);
  const skip='script,style,noscript,iframe,svg,canvas,img,video,audio,link,meta,textarea,[contenteditable],input[type=hidden],input[type=password],input[type=email],[autocomplete=current-password],[autocomplete=new-password]';
  function markup(root){let count=0,truncated=false;const out=document.createElement('div');
@@ -198,21 +198,47 @@
   }
   const node=copy(root,0);if(node)out.append(node);const html=out.innerHTML;return {html:html.slice(0,16000),truncated:truncated||html.length>16000,nodes:Math.min(count,160)};
  }
- let captures=[],cancel=null,shield=null;
+ let captures=[],cancel=null,shield=null,monitoring=false,observer=null,flushTimer=null,stage=stages[0],lastAction=0,sequence=0,dropped=0;
+ const pending=new Set();let resumeState={};try{resumeState=JSON.parse(window.sessionStorage.getItem(storageKey+':monitor')||'{}')||{};}catch{}
+ const saveMonitoring=()=>{try{window.sessionStorage.setItem(storageKey+':monitor',JSON.stringify({active:monitoring,stage,dropped,sequence}));}catch{}};
  const persist=()=>{try{window.sessionStorage.setItem(storageKey,JSON.stringify(captures));}catch{onChange('Capture kept in memory only; export before navigation.');}};
- try{const saved=JSON.parse(window.sessionStorage.getItem(storageKey)||'[]');if(Array.isArray(saved))for(const record of saved.slice(-20)){
+ try{const saved=JSON.parse(window.sessionStorage.getItem(storageKey)||'[]');if(Array.isArray(saved))for(const record of saved.slice(-200)){
   if(!stages.includes(record.stage)||typeof record.html!=='string')continue;const template=document.createElement('template');template.innerHTML=record.html.slice(0,16000);const safe=markup(template.content.firstElementChild||document.createElement('div'));
-  captures.push({stage:record.stage,at:clean(record.at),host:clean(record.host),installedBuild:clean(record.installedBuild),path:clean(record.path).split(/[?#]/)[0],...safe});
+  captures.push({target:Object.fromEntries(['tag','id','class','role','label'].map(k=>[k,clean(record.target?.[k])])),kind:clean(record.kind||'selection'),sequence:Number(record.sequence)||0,stage:record.stage,at:clean(record.at),host:clean(record.host),installedBuild:clean(record.installedBuild),path:clean(record.path).split(/[?#]/)[0],...safe});
  }}catch{}
- function capture(stage,target){
+ sequence=Math.max(Number(resumeState.sequence)||0,...captures.map(c=>c.sequence||0));dropped=Number(resumeState.dropped)||0;
+ function capture(stage,target,kind='selection'){
   if(!stages.includes(stage))throw Error('Select a capture stage');
   if(document.hidden||!target?.isConnected||target.closest('#tu-test-dev-panel,#tu-test-dev-toggle'))throw Error('Select a visible Torn page region');
   const region=target.closest('[role=dialog],dialog,[aria-modal=true],.confirm-wrap,[class*=confirm i]:not(button):not(a):not(input),[data-item-id],[data-itemid],tr,[role=row],li')||(target.parentElement?.matches('html,body,main')?target:target.parentElement)||target;
   if(region.matches('html,body')||target.matches('html,body'))throw Error('Select the specific item, control or confirmation, not the full page');
-  const entry={stage,at:new Date().toISOString(),host:clean(getMeta().host),installedBuild:clean(getMeta().installedBuild),path:window.location.pathname,...markup(region)};
-  captures.push(entry);captures=captures.slice(-20);persist();onChange('Captured '+stage+' ('+captures.length+'/20).');return entry;
+  const targetInfo={tag:target.tagName.toLowerCase(),id:clean(target.id),class:clean(target.className),role:clean(target.getAttribute('role')),label:clean(target.getAttribute('aria-label')||(/^(BUTTON|A|SPAN)$/.test(target.tagName)?target.textContent:''))};
+  const entry={target:targetInfo,kind,sequence:++sequence,stage,at:new Date().toISOString(),host:clean(getMeta().host),installedBuild:clean(getMeta().installedBuild),path:window.location.pathname,...markup(region)};
+  captures.push(entry);while(captures.length>200||captures.reduce((n,c)=>n+c.html.length,0)>1000000){captures.shift();dropped++;}persist();saveMonitoring();onChange((monitoring?'Monitoring ON · ':'')+captures.length+' captures'+(dropped?' · '+dropped+' older captures discarded':'')+'.');return entry;
  }
- function stop(){cancel?.();shield?.();}
+ function stop(){cancel?.();shield?.();monitoring=false;observer?.disconnect();observer=null;window.clearTimeout(flushTimer);flushTimer=null;pending.clear();document.removeEventListener('click',recordClick,true);document.removeEventListener('change',recordChange,true);saveMonitoring();onChange('Monitoring OFF · '+captures.length+' captures retained.');}
+ const ignored=e=>!e||e.closest('#tu-test-dev-panel,#tu-test-dev-toggle,script,style,textarea,[contenteditable],input[type=password],input[type=hidden],[role=log],[class*=chatBox],[class*=chat-box]');
+ const relevant=e=>!ignored(e)&&!e.matches('html,body')&&/\b(use|yes|no|buy|purchase|return|torn|hospital|flight|blood bag|medical)\b/i.test((e.getAttribute('aria-label')||'')+' '+(e.textContent||'').slice(0,1800));
+ function take(target,kind){if(!monitoring||document.hidden||ignored(target))return;try{const result=capture(stage,target,kind);return result;}catch{}}
+ function recordClick(event){const target=event.target.nodeType===1?event.target:event.target.parentElement;if(ignored(target))return;lastAction=Date.now();take(target,'click');}
+ function recordChange(event){if(!ignored(event.target)){lastAction=Date.now();take(event.target,'change');}}
+ function start(selected=stages[0]){
+  if(!stages.includes(selected))throw Error('Select a capture stage');if(monitoring){stage=selected;saveMonitoring();return;}
+  cancel?.();shield?.();stage=selected;monitoring=true;saveMonitoring();
+  document.addEventListener('click',recordClick,{capture:true,passive:true});document.addEventListener('change',recordChange,{capture:true,passive:true});
+  observer=new window.MutationObserver(records=>{
+   if(!monitoring||document.hidden)return;
+   for(const record of records.slice(0,50)){
+    const target=record.target.nodeType===1?record.target:record.target.parentElement;if(ignored(target))continue;
+    for(const node of [target,...record.addedNodes].slice(0,12)){if(node.nodeType!==1||!relevant(node))continue;if(Date.now()-lastAction>12000&&!node.closest('[role=dialog],dialog,[class*=confirm i],[class*=popover i],[class*=hospital i],[class*=travel i]')&&!/would you like|you (?:have )?(?:used|purchased|bought)|return(?:ing)? to torn/i.test((node.textContent||'').slice(0,1800)))continue;pending.add(node);if(pending.size>=12)break;}
+    if(pending.size>=12)break;
+   }
+   if(pending.size&&flushTimer===null)flushTimer=window.setTimeout(()=>{flushTimer=null;if(!monitoring)return;let count=0;for(const node of pending){if(node.isConnected&&count++<6)take(node,'dom-change');}pending.clear();},180);
+  });
+  observer.observe(document.body,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['aria-expanded','aria-disabled']});
+  onChange('Monitoring ON · clicks and related DOM changes are recorded until Stop monitoring. Play manually as usual.');
+ }
+
  function pick(stage,done){stop();let timer;
   const finish=()=>{for(const kind of ['pointerdown','mousedown','touchstart'])document.removeEventListener(kind,blockStart,true);for(const kind of ['pointerup','mouseup','touchend'])document.removeEventListener(kind,end,true);document.removeEventListener('click',click,true);document.removeEventListener('keydown',key,true);window.clearTimeout(timer);cancel=null;done?.();};
   const click=event=>{if(event.target.closest('#tu-test-dev-panel'))return;event.preventDefault();event.stopImmediatePropagation();if(!event.target.closest('#tu-test-dev-toggle')){try{capture(stage,event.target);}catch(error){onChange(error.message);}}finish();};
@@ -221,12 +247,13 @@
   const key=event=>{if(event.key==='Escape'){event.preventDefault();finish();}};
   cancel=finish;for(const kind of ['pointerdown','mousedown','touchstart'])document.addEventListener(kind,blockStart,{capture:true,passive:false});for(const kind of ['pointerup','mouseup','touchend'])document.addEventListener(kind,end,{capture:true,passive:false});document.addEventListener('click',click,true);document.addEventListener('keydown',key,true);timer=window.setTimeout(finish,30000);
  }
- return {stages,markup,capture,pick,stop,report:()=>({schemaVersion:1,readOnly:true,captures:captures.map(c=>({...c})),limits:{maxCaptures:20,maxNodes:160,maxDepth:9,maxHtmlCharacters:16000},excluded:['input values','URLs and query strings','cookies and credentials','network requests','full-page HTML']}),clear(){stop();captures=[];try{window.sessionStorage.removeItem(storageKey);}catch{}onChange('DOM captures cleared.');}};
+ return {stages,markup,capture,pick,start,stop,resume(){if(resumeState.active)start(stages.includes(resumeState.stage)?resumeState.stage:stages[0]);},setStage(value){if(stages.includes(value)){stage=value;saveMonitoring();}},report:()=>({schemaVersion:2,readOnly:true,monitoring,stage,droppedCaptures:dropped,captures:captures.map(c=>({...c})),limits:{maxCaptures:200,maxTotalHtmlCharacters:1000000,maxNodes:160,maxDepth:9,maxHtmlCharacters:16000},excluded:['input values','URLs and query strings','cookies and credentials','network requests','full-page HTML']}),clear(){stop();captures=[];dropped=0;sequence=0;try{window.sessionStorage.removeItem(storageKey);window.sessionStorage.removeItem(storageKey+':monitor');}catch{}onChange('DOM captures cleared.');}};
 };
  const travelDiagnostic=createTravelDiagnostic({document,window,scrub:value=>session.scrub(value),storageKey:'tu:test:travel-dom:'+targetBuild+':v1',getMeta:()=>({host:platform,installedBuild:currentBuild()||'unavailable'}),onChange:message=>{travelNotice.textContent=message;}});
  for(const stage of travelDiagnostic.stages){const option=document.createElement('option');option.value=stage;option.textContent=stage;travelStage.append(option);}
- travelNotice.textContent=travelDiagnostic.report().captures.length+' saved DOM captures in this tab. No automatic page monitoring.';
- travelSection.append(button('Select region to capture',()=>{panel.style.display='none';launcher.title='Tap a Torn control/dialog to capture it without executing. Tap TU Test or press Escape to cancel.';travelDiagnostic.pick(travelStage.value,()=>{panel.style.display='flex';launcher.title='Open independent TU diagnostics';});}),button('Export travel DOM and system info',()=>exportReport()),button('Clear travel DOM captures',()=>travelDiagnostic.clear()));
+ travelNotice.textContent=travelDiagnostic.report().captures.length+' saved captures. Monitoring is OFF until started or resumed from this tab.';
+ travelStage.onchange=()=>travelDiagnostic.setStage(travelStage.value);
+ travelSection.append(button('Start monitoring',()=>{travelDiagnostic.start(travelStage.value);panel.style.display='none';launcher.textContent='TU Test · REC';}),button('Stop monitoring',()=>{travelDiagnostic.stop();launcher.textContent='TU Test';}),button('Export travel DOM and system info',()=>exportReport()),button('Clear travel DOM captures',()=>{travelDiagnostic.clear();launcher.textContent='TU Test';}));
  const list=document.createElement('div');list.id='tu-test-checklist';content.append(list);
  const feedback=text('textarea','');feedback.placeholder='General feedback (no credentials)';feedback.id='tu-test-feedback';feedback.style.cssText='width:100%;box-sizing:border-box;min-height:70px';
  feedback.oninput=()=>{session.setMeta({feedback:feedback.value});save();};
@@ -317,7 +344,7 @@
  const runButton=button('Run read-only checks',runChecks);actions.append(runButton);
  function exportReport(){
   save();const reports={};for(const id of ['tampermonkey','pda'])reports[id]=createSession({targetBuild,checklistVersion:catalog.checklistVersion,tests,platform:id,initial:profiles[id]}).report();
-  const report={schemaVersion:2,toolVersion:'0.2.9-dev',targetBuild,installedBuild:currentBuild()||null,viewport:{width:window.innerWidth,height:window.innerHeight,devicePixelRatio:window.devicePixelRatio},checklistVersion:catalog.checklistVersion,detectedHost:detected,detectedEnvironment:Object.fromEntries(Object.entries(environment).map(([k,fields])=>[k,Object.fromEntries(Object.entries(fields).map(([name,value])=>[name,typeof value==='string'?session.scrub(value):value]))])),userAgent:session.scrub(navigator.userAgent),platforms:reports,acceptanceComplete:Object.values(reports).every(r=>r.platformReady),productionAuthorized:false,travelDom:travelDiagnostic.report()};
+  const report={schemaVersion:2,toolVersion:'0.2.10-dev',targetBuild,installedBuild:currentBuild()||null,viewport:{width:window.innerWidth,height:window.innerHeight,devicePixelRatio:window.devicePixelRatio},checklistVersion:catalog.checklistVersion,detectedHost:detected,detectedEnvironment:Object.fromEntries(Object.entries(environment).map(([k,fields])=>[k,Object.fromEntries(Object.entries(fields).map(([name,value])=>[name,typeof value==='string'?session.scrub(value):value]))])),userAgent:session.scrub(navigator.userAgent),platforms:reports,acceptanceComplete:Object.values(reports).every(r=>r.platformReady),productionAuthorized:false,travelDom:travelDiagnostic.report()};
   const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='tu-dev-acceptance-'+targetBuild+'-'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
  }
  actions.append(button('Export both host reports',exportReport),button('Reset selected host',()=>{
@@ -325,7 +352,7 @@
   delete profiles[platform];loadSession();refreshFields();save();render();
  }));
  launcher.onclick=()=>{if(suppressClick){suppressClick=false;return;}panel.style.display=panel.style.display==='none'?'flex':'none';if(panel.style.display==='none')panelResizeObserver?.disconnect();else panelResizeObserver?.observe(panel);render();};
- document.body.append(launcher,panel);refreshFields();render();
+ document.body.append(launcher,panel);refreshFields();render();travelDiagnostic.resume();travelStage.value=travelDiagnostic.report().stage;if(travelDiagnostic.report().monitoring)launcher.textContent='TU Test · REC';
  if(typeof navigator.userAgentData?.getHighEntropyValues==='function'){
   Promise.resolve().then(()=>navigator.userAgentData.getHighEntropyValues(['model','platformVersion','fullVersionList'])).then(hints=>{
    const previous=describeEnvironment();environment=detectEnvironment({...baseEnvironment,uaData:{platform:navigator.userAgentData.platform,brands:navigator.userAgentData.brands,...hints}});

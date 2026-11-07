@@ -1,6 +1,6 @@
 // Explicit, bounded DOM-region capture. Never submits a native action or reads network/storage credentials.
 export function createTravelDomDiagnostic({document,window,scrub,storageKey,getMeta,onChange=()=>{}}){
- const stages=['Foreign page / hospitalized','Selected healing item / Use control','Heal Yes/No confirmation','Hospital release result','Monitored item / Max and Buy','Purchase Yes/No confirmation','Purchase result','Return to Torn control / confirmation','Return flight result','Failed Snatch and Run attempt'];
+ const stages=['Workflow (continuous)','Foreign page / hospitalized','Selected healing item / Use control','Heal Yes/No confirmation','Hospital release result','Monitored item / Max and Buy','Purchase Yes/No confirmation','Purchase result','Return to Torn control / confirmation','Return flight result','Failed Snatch and Run attempt'];
  const clean=value=>scrub(String(value??'')).replace(/https?:\/\/[^\s<>"']+/gi,'[URL OMITTED]').replace(/\b[A-Za-z0-9_=-]{24,}\b/g,'[REDACTED]').slice(0,600);
  const skip='script,style,noscript,iframe,svg,canvas,img,video,audio,link,meta,textarea,[contenteditable],input[type=hidden],input[type=password],input[type=email],[autocomplete=current-password],[autocomplete=new-password]';
  function markup(root){let count=0,truncated=false;const out=document.createElement('div');
@@ -16,21 +16,47 @@ export function createTravelDomDiagnostic({document,window,scrub,storageKey,getM
   }
   const node=copy(root,0);if(node)out.append(node);const html=out.innerHTML;return {html:html.slice(0,16000),truncated:truncated||html.length>16000,nodes:Math.min(count,160)};
  }
- let captures=[],cancel=null,shield=null;
+ let captures=[],cancel=null,shield=null,monitoring=false,observer=null,flushTimer=null,stage=stages[0],lastAction=0,sequence=0,dropped=0;
+ const pending=new Set();let resumeState={};try{resumeState=JSON.parse(window.sessionStorage.getItem(storageKey+':monitor')||'{}')||{};}catch{}
+ const saveMonitoring=()=>{try{window.sessionStorage.setItem(storageKey+':monitor',JSON.stringify({active:monitoring,stage,dropped,sequence}));}catch{}};
  const persist=()=>{try{window.sessionStorage.setItem(storageKey,JSON.stringify(captures));}catch{onChange('Capture kept in memory only; export before navigation.');}};
- try{const saved=JSON.parse(window.sessionStorage.getItem(storageKey)||'[]');if(Array.isArray(saved))for(const record of saved.slice(-20)){
+ try{const saved=JSON.parse(window.sessionStorage.getItem(storageKey)||'[]');if(Array.isArray(saved))for(const record of saved.slice(-200)){
   if(!stages.includes(record.stage)||typeof record.html!=='string')continue;const template=document.createElement('template');template.innerHTML=record.html.slice(0,16000);const safe=markup(template.content.firstElementChild||document.createElement('div'));
-  captures.push({stage:record.stage,at:clean(record.at),host:clean(record.host),installedBuild:clean(record.installedBuild),path:clean(record.path).split(/[?#]/)[0],...safe});
+  captures.push({target:Object.fromEntries(['tag','id','class','role','label'].map(k=>[k,clean(record.target?.[k])])),kind:clean(record.kind||'selection'),sequence:Number(record.sequence)||0,stage:record.stage,at:clean(record.at),host:clean(record.host),installedBuild:clean(record.installedBuild),path:clean(record.path).split(/[?#]/)[0],...safe});
  }}catch{}
- function capture(stage,target){
+ sequence=Math.max(Number(resumeState.sequence)||0,...captures.map(c=>c.sequence||0));dropped=Number(resumeState.dropped)||0;
+ function capture(stage,target,kind='selection'){
   if(!stages.includes(stage))throw Error('Select a capture stage');
   if(document.hidden||!target?.isConnected||target.closest('#tu-test-dev-panel,#tu-test-dev-toggle'))throw Error('Select a visible Torn page region');
   const region=target.closest('[role=dialog],dialog,[aria-modal=true],.confirm-wrap,[class*=confirm i]:not(button):not(a):not(input),[data-item-id],[data-itemid],tr,[role=row],li')||(target.parentElement?.matches('html,body,main')?target:target.parentElement)||target;
   if(region.matches('html,body')||target.matches('html,body'))throw Error('Select the specific item, control or confirmation, not the full page');
-  const entry={stage,at:new Date().toISOString(),host:clean(getMeta().host),installedBuild:clean(getMeta().installedBuild),path:window.location.pathname,...markup(region)};
-  captures.push(entry);captures=captures.slice(-20);persist();onChange('Captured '+stage+' ('+captures.length+'/20).');return entry;
+  const targetInfo={tag:target.tagName.toLowerCase(),id:clean(target.id),class:clean(target.className),role:clean(target.getAttribute('role')),label:clean(target.getAttribute('aria-label')||(/^(BUTTON|A|SPAN)$/.test(target.tagName)?target.textContent:''))};
+  const entry={target:targetInfo,kind,sequence:++sequence,stage,at:new Date().toISOString(),host:clean(getMeta().host),installedBuild:clean(getMeta().installedBuild),path:window.location.pathname,...markup(region)};
+  captures.push(entry);while(captures.length>200||captures.reduce((n,c)=>n+c.html.length,0)>1000000){captures.shift();dropped++;}persist();saveMonitoring();onChange((monitoring?'Monitoring ON · ':'')+captures.length+' captures'+(dropped?' · '+dropped+' older captures discarded':'')+'.');return entry;
  }
- function stop(){cancel?.();shield?.();}
+ function stop(){cancel?.();shield?.();monitoring=false;observer?.disconnect();observer=null;window.clearTimeout(flushTimer);flushTimer=null;pending.clear();document.removeEventListener('click',recordClick,true);document.removeEventListener('change',recordChange,true);saveMonitoring();onChange('Monitoring OFF · '+captures.length+' captures retained.');}
+ const ignored=e=>!e||e.closest('#tu-test-dev-panel,#tu-test-dev-toggle,script,style,textarea,[contenteditable],input[type=password],input[type=hidden],[role=log],[class*=chatBox],[class*=chat-box]');
+ const relevant=e=>!ignored(e)&&!e.matches('html,body')&&/\b(use|yes|no|buy|purchase|return|torn|hospital|flight|blood bag|medical)\b/i.test((e.getAttribute('aria-label')||'')+' '+(e.textContent||'').slice(0,1800));
+ function take(target,kind){if(!monitoring||document.hidden||ignored(target))return;try{const result=capture(stage,target,kind);return result;}catch{}}
+ function recordClick(event){const target=event.target.nodeType===1?event.target:event.target.parentElement;if(ignored(target))return;lastAction=Date.now();take(target,'click');}
+ function recordChange(event){if(!ignored(event.target)){lastAction=Date.now();take(event.target,'change');}}
+ function start(selected=stages[0]){
+  if(!stages.includes(selected))throw Error('Select a capture stage');if(monitoring){stage=selected;saveMonitoring();return;}
+  cancel?.();shield?.();stage=selected;monitoring=true;saveMonitoring();
+  document.addEventListener('click',recordClick,{capture:true,passive:true});document.addEventListener('change',recordChange,{capture:true,passive:true});
+  observer=new window.MutationObserver(records=>{
+   if(!monitoring||document.hidden)return;
+   for(const record of records.slice(0,50)){
+    const target=record.target.nodeType===1?record.target:record.target.parentElement;if(ignored(target))continue;
+    for(const node of [target,...record.addedNodes].slice(0,12)){if(node.nodeType!==1||!relevant(node))continue;if(Date.now()-lastAction>12000&&!node.closest('[role=dialog],dialog,[class*=confirm i],[class*=popover i],[class*=hospital i],[class*=travel i]')&&!/would you like|you (?:have )?(?:used|purchased|bought)|return(?:ing)? to torn/i.test((node.textContent||'').slice(0,1800)))continue;pending.add(node);if(pending.size>=12)break;}
+    if(pending.size>=12)break;
+   }
+   if(pending.size&&flushTimer===null)flushTimer=window.setTimeout(()=>{flushTimer=null;if(!monitoring)return;let count=0;for(const node of pending){if(node.isConnected&&count++<6)take(node,'dom-change');}pending.clear();},180);
+  });
+  observer.observe(document.body,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['aria-expanded','aria-disabled']});
+  onChange('Monitoring ON · clicks and related DOM changes are recorded until Stop monitoring. Play manually as usual.');
+ }
+
  function pick(stage,done){stop();let timer;
   const finish=()=>{for(const kind of ['pointerdown','mousedown','touchstart'])document.removeEventListener(kind,blockStart,true);for(const kind of ['pointerup','mouseup','touchend'])document.removeEventListener(kind,end,true);document.removeEventListener('click',click,true);document.removeEventListener('keydown',key,true);window.clearTimeout(timer);cancel=null;done?.();};
   const click=event=>{if(event.target.closest('#tu-test-dev-panel'))return;event.preventDefault();event.stopImmediatePropagation();if(!event.target.closest('#tu-test-dev-toggle')){try{capture(stage,event.target);}catch(error){onChange(error.message);}}finish();};
@@ -39,5 +65,5 @@ export function createTravelDomDiagnostic({document,window,scrub,storageKey,getM
   const key=event=>{if(event.key==='Escape'){event.preventDefault();finish();}};
   cancel=finish;for(const kind of ['pointerdown','mousedown','touchstart'])document.addEventListener(kind,blockStart,{capture:true,passive:false});for(const kind of ['pointerup','mouseup','touchend'])document.addEventListener(kind,end,{capture:true,passive:false});document.addEventListener('click',click,true);document.addEventListener('keydown',key,true);timer=window.setTimeout(finish,30000);
  }
- return {stages,markup,capture,pick,stop,report:()=>({schemaVersion:1,readOnly:true,captures:captures.map(c=>({...c})),limits:{maxCaptures:20,maxNodes:160,maxDepth:9,maxHtmlCharacters:16000},excluded:['input values','URLs and query strings','cookies and credentials','network requests','full-page HTML']}),clear(){stop();captures=[];try{window.sessionStorage.removeItem(storageKey);}catch{}onChange('DOM captures cleared.');}};
+ return {stages,markup,capture,pick,start,stop,resume(){if(resumeState.active)start(stages.includes(resumeState.stage)?resumeState.stage:stages[0]);},setStage(value){if(stages.includes(value)){stage=value;saveMonitoring();}},report:()=>({schemaVersion:2,readOnly:true,monitoring,stage,droppedCaptures:dropped,captures:captures.map(c=>({...c})),limits:{maxCaptures:200,maxTotalHtmlCharacters:1000000,maxNodes:160,maxDepth:9,maxHtmlCharacters:16000},excluded:['input values','URLs and query strings','cookies and credentials','network requests','full-page HTML']}),clear(){stop();captures=[];dropped=0;sequence=0;try{window.sessionStorage.removeItem(storageKey);window.sessionStorage.removeItem(storageKey+':monitor');}catch{}onChange('DOM captures cleared.');}};
 }

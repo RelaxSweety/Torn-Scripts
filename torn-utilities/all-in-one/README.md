@@ -32,7 +32,7 @@ Historical independent sources, `modules.json`, legacy catalog Managers, and pro
 
 ## Independent TU Test
 
-Use [TU Testing and Diagnostics DEV](docs/TU-TEST.md) v0.2.9-dev for the 58-check acceptance plan, separate PDA/Tampermonkey evidence, and sanitized exports. This checklist targets the current integrated DEV build; actual host tests remain manual. `npm run build` also regenerates this independent test tool; `npm run build:diagnostics` updates only TU Test.
+Use [TU Testing and Diagnostics DEV](docs/TU-TEST.md) v0.2.10-dev for the 58-check acceptance plan, separate PDA/Tampermonkey evidence, and sanitized exports. This checklist targets the current integrated DEV build; actual host tests remain manual. `npm run build` also regenerates this independent test tool; `npm run build:diagnostics` updates only TU Test.
 
 ## Saved API keys
 
@@ -47,3 +47,5 @@ DEV 0.5.42.40 adds minimized-alarm preservation, reversible **Show monitored ite
 DEV 0.5.42.41 simplifies Snatch and Run to one red/green action button. Arming minimizes the main window; matching visible native controls replaces manual binding. The separate floating status panel is removed. TU Test 0.2.7 uses checklist v6 for the revised flow.
 
 DEV 0.5.42.42 removes the About logo link and fixes inline monitored-only checkbox alignment and full native item-container collapse. Hidden foreign items no longer leave empty list slots; disabling or exiting restores them in place.
+
+TU Test 0.2.10 adds continuous, passive travel recording. Start monitoring while hospitalized, complete healing, purchase and return without changing diagnostic stages, then stop and export after reaching the flight screen. Recording resumes across navigation in the same tab and retains a bounded rolling buffer. This does not change integrated TU gameplay behavior.
