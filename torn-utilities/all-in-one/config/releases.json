@@ -1,5 +1,19 @@
 [
   {
+    "version": "0.5.42.49-dev",
+    "date": "2026-11-07",
+    "changes": {
+      "Fixes": [
+        "Display foreign catalog locations as country names while retaining Torn Item Market/Bazaar",
+        "Restore the existing Travel Assistant and Item Monitor window when opening an already-active tool"
+      ],
+      "Validation": [
+        "Preserve unsaved fields, monitor runtime and armed Snatch and Run intent during resume",
+        "Exercise repeated minimize, launcher restore, card reopen and planner navigation"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.48-dev",
     "date": "2026-11-07",
     "changes": {

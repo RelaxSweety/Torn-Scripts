@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "checklistVersion": "dev-acceptance-2026-11-07-v13",
+  "checklistVersion": "dev-acceptance-2026-11-07-v14",
   "tests": [
     {
       "id": "runtime.build",
@@ -582,7 +582,7 @@
       "id": "tool.item-monitor.function",
       "section": "tool.item-monitor",
       "label": "Travel Assistant and Item Monitor \u2014 functional test",
-      "instructions": "Select/cancel items, manage watches, trigger quantity/price alerts, verify alarms and persistence. Exercise Travel planning, live DEV reporting, predictions and failure recovery on representative Torn pages.",
+      "instructions": "Select/cancel items, manage watches, trigger quantity/price alerts, verify alarms and persistence. Exercise Travel planning, live DEV reporting, predictions and failure recovery on representative Torn pages. Complete List location labels must show only foreign country names, e.g. Canada; Torn Item Market/Bazaar remains available. Country filtering and selecting a Foreign monitor must retain their original meaning.",
       "kind": "manual",
       "critical": true,
       "platforms": [
@@ -594,7 +594,7 @@
       "id": "tool.item-monitor.lifecycle",
       "section": "tool.item-monitor",
       "label": "Travel Assistant and Item Monitor \u2014 lifecycle and saved data",
-      "instructions": "Open, minimize, restore, Back, Exit, switch away and reopen this tool repeatedly. Check viewport/scroll/touch behavior, one instance, saved data and cessation of polling/listeners after Exit. Verify no late errors or duplicate requests.",
+      "instructions": "Open, minimize, restore, Back, Exit, switch away and reopen this tool repeatedly. Check viewport/scroll/touch behavior, one instance, saved data and cessation of polling/listeners after Exit. Verify no late errors or duplicate requests. Minimize the main monitor and planner, restore through the TU icon, and reopen the active tool through its Business Tools card repeatedly. Exactly one window must restore with unsaved input and an armed Snatch and Run intent preserved; no monitor restart/cancellation.",
       "kind": "manual",
       "critical": true,
       "platforms": [

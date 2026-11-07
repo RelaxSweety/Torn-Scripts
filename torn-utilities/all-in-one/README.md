@@ -1,6 +1,6 @@
 # Torn Utilities — single-script DEV
 
-Version **0.5.42.48-dev**, branch `dev/tu-all-in-one`. Install one complete userscript for desktop Tampermonkey or Torn PDA. This is a DEV release for manual acceptance; no production deployment is included.
+Version **0.5.42.49-dev**, branch `dev/tu-all-in-one`. Install one complete userscript for desktop Tampermonkey or Torn PDA. This is a DEV release for manual acceptance; no production deployment is included.
 
 [Install DEV](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/releases/dev/torn-utilities-dev.user.js) · [Installation and rollback](../INSTALLATION.md) · [Acceptance checklist](docs/DEV-ACCEPTANCE.md)
 
@@ -32,7 +32,7 @@ Historical independent sources, `modules.json`, legacy catalog Managers, and pro
 
 ## Independent TU Test
 
-Use [TU Testing and Diagnostics DEV](docs/TU-TEST.md) v0.2.16-dev for the 58-check acceptance plan, separate PDA/Tampermonkey evidence, and sanitized exports. This checklist targets the current integrated DEV build; actual host tests remain manual. `npm run build` also regenerates this independent test tool; `npm run build:diagnostics` updates only TU Test.
+Use [TU Testing and Diagnostics DEV](docs/TU-TEST.md) v0.2.17-dev for the 58-check acceptance plan, separate PDA/Tampermonkey evidence, and sanitized exports. This checklist targets the current integrated DEV build; actual host tests remain manual. `npm run build` also regenerates this independent test tool; `npm run build:diagnostics` updates only TU Test.
 
 ## Saved API keys
 
@@ -61,3 +61,5 @@ DEV 0.5.42.46 waits for a rendered return confirmation rather than treating an e
 DEV 0.5.42.47 verifies fresh free travel slots and affordability on Purchase Max, including a slot freed by the selected healing item. Stale native Max quantities are corrected before confirming Buy. TU Test 0.2.15 adds capacity-check metrics and a read-only launcher-startup check; actual PDA missing-icon diagnosis still needs a PDA export.
 
 DEV 0.5.42.48 fixes a syntax error introduced by Torn PDA’s global quote normalization, which could prevent the entire bundle and startup marker from running. Builds and regression tests now reproduce PDA’s source adaptation before asserting launcher startup.
+
+DEV 0.5.42.49 simplifies foreign catalog labels to country names and restores an already-active minimized Travel Assistant and Item Monitor through its tool card without restarting it or losing its state.
