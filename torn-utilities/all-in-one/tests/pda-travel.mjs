@@ -33,10 +33,11 @@ async function fixture(bundle=false,scenario=''){
   });};
  });};
  root.querySelector('a[aria-controls="travel-home-panel"]').onclick=()=>{counters.home++;delay(()=>{const holder=d.createElement('div');holder.innerHTML=f.returnConfirmation;const panel=holder.firstElementChild;root.append(panel);panel.querySelector('button').onclick=()=>{counters.back++;delay(()=>{const wrap=d.createElement('div');wrap.innerHTML=f.booked;panel.innerHTML=wrap.firstElementChild.innerHTML;panel.querySelector('button').onclick=()=>{counters.continue++;root.innerHTML='<h4>Traveling</h4><section aria-label="Flight progress">Mexico to Torn</section>';};});};});};
- const watch={key:'id:260',name:'Dahlia',category:'Foreign',minQty:1};let engine;
+ const watch={key:scenario==='name-key-no-hospital'?'name:dahlia':'id:260',name:'Dahlia',category:'Foreign',minQty:1};let engine;
  const snapshot=()=>{const state=adapter.inspect(engine?.getState());return {ownerId:'42',country:'mexico',hospitalized:state.released?false:!!d.querySelector('a[aria-label^="Hospital:"]'),quantity:stock,...state};};
- engine=createTravelEnhancements({document:d,window:w,getItems:()=>[watch],getContext:async()=>({ownerId:'42',country:'mexico',status:'Hospital'}),getSnapshot:snapshot,getRows:()=>[],matchRow:()=>false,filterEnabled:()=>false,executeAction:adapter});
- if(!bundle){engine.start();await engine.arm({watchKey:watch.key,hospital:true,medical:{id:206,name:'Morphine',uid:null}});engine.stock(watch,snapshot());}
+ engine=createTravelEnhancements({document:d,window:w,getItems:()=>[watch],getContext:async()=>({ownerId:'42',country:'mexico',status:scenario==='name-key-no-hospital'?'Abroad':'Hospital'}),getSnapshot:snapshot,getRows:()=>[],matchRow:()=>false,filterEnabled:()=>false,executeAction:adapter});
+ if(scenario==='name-key-no-hospital')d.querySelector('a[aria-label^="Hospital:"]')?.remove();
+ if(!bundle){engine.start();await engine.arm({watchKey:watch.key,hospital:scenario!=='name-key-no-hospital',medical:scenario==='name-key-no-hospital'?null:{id:206,name:'Morphine',uid:null}});engine.stock(watch,snapshot());}
  return {w,d,engine,adapter,counters,watch,snapshot,close(){w.TornUtilities?.closeActiveModule();engine.stop();for(const observer of observers)observer.disconnect();dom.window.close();}};
 }
 for(const scenario of ['', 'fallback-max','wrong-item','wrong-quantity','cancel-panel']){
@@ -49,17 +50,17 @@ for(const scenario of ['', 'fallback-max','wrong-item','wrong-quantity','cancel-
   assert.equal(await t.engine.act({isTrusted:true}),true);assert.equal(t.engine.getState().stage,'complete');assert.equal(t.counters.back,1);assert.equal(t.counters.continue,1);assert.equal(t.counters.wrong,0);
  }finally{t.close()}
 }
-{
- const t=await fixture(true);try{
+for(const scenario of ['', 'name-key-no-hospital']){
+ const t=await fixture(true,scenario);try{
   const {w,d}=t,errors=[],requests=[];w.alert=()=>{};w.confirm=()=>true;w.fetch=async()=>{throw Error('Unexpected fetch')};w.addEventListener('error',e=>{errors.push(e.error);e.preventDefault()});w.HTMLElement.prototype.setPointerCapture=()=>{};
   Object.defineProperty(w.navigator,'userAgent',{value:'Mozilla/5.0 (Linux; Android 13; wv) Chrome/156.0.8078.47 Mobile Safari/537.36 com.manuito.tornpda'});
   w.localStorage.setItem('tu:identity:public-only-key:v1','abcdef0123456789');w.localStorage.setItem('tu:agreement:accepted','fixture-v1');w.sessionStorage.setItem('tu:dev:auth:session:v1','fixture-token');w.localStorage.setItem('tu-item-monitor-v1',JSON.stringify([t.watch]));
-  w.flutter_inappwebview={callHandler:async(method,url)=>{requests.push({method,url});return {status:200,responseText:JSON.stringify(url.endsWith('/api/auth/agreement')?{accepted:true,agreement:{agreement_version:'fixture-v1',agreement_number:1,agreement_date:'2026-11-07'}}:url.includes('/key/info')?{info:{access:{type:'Limited Access'},user:{id:42}}}:url.includes('/inventory?')?{inventory:{items:[{id:206,name:'Morphine',amount:2,uid:null}]}}:{profile:{name:'Fixture',status:{state:'Hospital'}}})};}};
+  w.flutter_inappwebview={callHandler:async(method,url)=>{requests.push({method,url});return {status:200,responseText:JSON.stringify(url.endsWith('/api/auth/agreement')?{accepted:true,agreement:{agreement_version:'fixture-v1',agreement_number:1,agreement_date:'2026-11-07'}}:url.includes('/key/info')?{info:{access:{type:scenario==='name-key-no-hospital'?'Public Only':'Limited Access'},user:{id:42}}}:url.includes('/inventory?')?{inventory:{items:[{id:206,name:'Morphine',amount:2,uid:null}]}}:{profile:{name:'Fixture',status:{state:scenario==='name-key-no-hospital'?'Abroad':'Hospital'}}})};}};
   w.eval(fs.readFileSync(new URL('../dist/tu-integrated-staging-dev.user.js',import.meta.url),'utf8'));const pause=ms=>new Promise(r=>setTimeout(r,ms));await pause(100);
   d.querySelector('[data-tab="modules"]').click();const card=name=>[...d.querySelectorAll('.tu-card')].find(c=>c.querySelector('strong')?.textContent===name).querySelector('button').click();card('Business Tools');card('Travel Assistant and Item Monitor');await pause(100);
-  const hospital=d.querySelector('[aria-label="Are you hospitalized?"]');hospital.value='yes';hospital.dispatchEvent(new w.Event('change'));
-  const button=name=>[...d.querySelectorAll('#tuim-panel button')].find(b=>b.textContent===name);button('Load medical inventory').click();await pause(50);button('Arm Snatch and Run').click();await pause(900);
-  const action=d.querySelector('#tu-snatch-run');assert.equal(action.textContent,'Heal from Hospital');assert.equal(d.querySelector('#tuim-panel').hidden,true);assert.equal(await action.onclick({isTrusted:true}),true);assert.equal(action.textContent,'Purchase Max');assert.equal(await action.onclick({isTrusted:true}),true);assert.equal(action.textContent,'Return to Torn');assert.equal(await action.onclick({isTrusted:true}),true);assert.equal(action.textContent,'Return flight booked');assert.equal(t.counters.hiddenMax,0);assert.equal(t.counters.wrong,0);assert.ok(requests.some(r=>r.method==='PDA_httpGet'&&r.url.includes('/inventory?')));assert.deepEqual(errors,[]);w.TornUtilities.closeActiveModule();
+  const hospital=d.querySelector('[aria-label="Are you hospitalized?"]');hospital.value=scenario==='name-key-no-hospital'?'no':'yes';hospital.dispatchEvent(new w.Event('change'));
+  const button=name=>[...d.querySelectorAll('#tuim-panel button')].find(b=>b.textContent===name);if(scenario!=='name-key-no-hospital'){button('Load medical inventory').click();await pause(50);}button('Arm Snatch and Run').click();await pause(900);
+  const action=d.querySelector('#tu-snatch-run');assert.equal(d.querySelector('#tuim-panel').hidden,true);if(scenario==='name-key-no-hospital'){assert.equal(action.textContent,'Purchase Max');assert.equal(t.counters.heal,0);}else{assert.equal(action.textContent,'Heal from Hospital');assert.equal(await action.onclick({isTrusted:true}),true);assert.equal(action.textContent,'Purchase Max');}assert.equal(await action.onclick({isTrusted:true}),true);assert.equal(action.textContent,'Return to Torn');assert.equal(await action.onclick({isTrusted:true}),true);assert.equal(action.textContent,'Return flight booked');assert.equal(t.counters.hiddenMax,0);assert.equal(t.counters.wrong,0);assert.equal(requests.some(r=>r.method==='PDA_httpGet'&&r.url.includes('/inventory?')),scenario!=='name-key-no-hospital','No-hospital purchase must not request medical inventory');assert.deepEqual(errors,[]);w.TornUtilities.closeActiveModule();
  }finally{t.close()}
 }
 console.log('PDA travel passed: captured Morphine/Yes, compact panel expansion, visible Max/Buy/Yes, hidden-field isolation, quantity/item checks, cancellation, inventory proof and full bridge-backed generated bundle');

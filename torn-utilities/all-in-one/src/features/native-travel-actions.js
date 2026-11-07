@@ -10,6 +10,16 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
  const itemName=e=>norm(e?.getAttribute('aria-label')).replace(/\s+slot\s+\d+$/,'');
  const inventory=name=>[...(scope()?.querySelectorAll('[class*=inventorySlot] > button[aria-label]')||[])].filter(e=>shown(e)&&itemName(e)===norm(name));
  const same=(a,b)=>a&&b&&a.ownerId===b.ownerId&&a.expiresAt===b.expiresAt&&a.watchKey===b.watchKey;
+ function resolveItem(run){
+  const declared=String(run.watchKey||'').match(/^id:(\d+)$/)?.[1];
+  const candidates=[...(scope()?.querySelectorAll('form[id^="item-"][id$="-form"]')||[])].map(form=>({form,id:form.id.match(/^item-(\d+)-form$/)?.[1],row:form.closest('[class*=row]')})).filter(({row,id})=>{
+   if(!id||declared&&id!==declared||!shown(row)||norm(row.querySelector('[class*=tabletColB] button')?.textContent)!==norm(run.watchName))return false;
+   const data=row.getAttribute('data-item-id')||row.getAttribute('data-itemid');if(data&&String(data)!==id)return false;
+   return [...row.querySelectorAll('button[aria-controls]')].some(e=>e.getAttribute('aria-controls')==='item-'+id+'-buyPanel');
+  });
+  if(candidates.length!==1)throw Error(candidates.length?'More than one native item matches this monitor; no purchase selected':'The monitored item could not be identified in the current foreign shop. No purchase was sent.');
+  return candidates[0];
+ }
  let controller=null,released=null,purchased=null,booked=null;
  function cancel(){controller?.abort();controller=null;}
  function inspect(run){
@@ -53,10 +63,8 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
    }
    if(kind==='buy'){
     let s=getSnapshot();if(s.hospitalized!==false||!(s.quantity>0))throw Error('Confirm hospital release and current stock before buying');
-    const id=run.watchKey.match(/^id:(\d+)$/)?.[1];if(!id)throw Error('A numeric monitored foreign item ID is required');
+    const {id,row}=resolveItem(run);
     const panelId='item-'+id+'-buyPanel';
-    const form=scope().querySelector('#item-'+id+'-form'),row=form?.closest('[class*=row]');
-    if(!row||norm(row.querySelector('[class*=tabletColB] button')?.textContent)!==norm(run.watchName))throw Error('Monitored item ID/name does not match the native shop row');
     const existing=scope().querySelector('#'+panelId);
     if(existing&&one(existing.querySelectorAll('[class*=confirmPanel]'),'existing purchase confirmation'))throw Error('Close the existing purchase confirmation before Purchase Max');
     const icon=one([...row.querySelectorAll('button[class*=buyIconButton][aria-controls]')].filter(e=>e.getAttribute('aria-controls')===panelId),'compact Buy opener');
@@ -94,5 +102,5 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
    throw Error('Unknown native action');
   }catch(error){error.submitted=submitted;throw error;}finally{document.removeEventListener('visibilitychange',foreground);window.removeEventListener('blur',foreground);if(controller===current)controller=null;}
  }
- return {enabled,execute,cancel,inspect};
+ return {enabled,execute,cancel,inspect,resolveItem};
 }

@@ -39,6 +39,26 @@ for(const tool of tools){
  // GM_info reflects the tool's version rather than the enclosing TU version.
  output+=`\n/* Integrated tool: ${tool.id} (${tool.version}) */\n(()=>{\nconst realWindow=window,manager=(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities;\nlet definition=null,loaded=false;\nconst nativeGMInfo=typeof GM_info==='undefined'?{}:GM_info;\nconst nativeFetch=fetch,nativeGM=typeof GM_xmlhttpRequest==='function'?GM_xmlhttpRequest:(typeof GM!=='undefined'&&typeof GM.xmlHttpRequest==='function'?GM.xmlHttpRequest.bind(GM):null);\nconst authorize=${transport};\nconst prepare=(url,options)=>authorize(url,options,{authorized:manager.isAuthorized(),token:sessionStorage.getItem('tu:dev:auth:session:v1')});\nconst accountFailure=${isAccountAuthorizationFailure.toString()};\nconst reportAuth=(url,status,data)=>{if(accountFailure(url,status,data))manager.handleBackendAuthorizationFailure();};\nconst toolAPI=Object.freeze({...manager,register(def){if(def.id!==${JSON.stringify(tool.id)})throw Error('Unexpected tool registration');definition=def;return true;},isRegistered(id){return id===${JSON.stringify(tool.id)}&&!!definition;}});\nconst facade=new Proxy({},{get(target,key){if(key==='TornUtilities')return toolAPI;const v=Reflect.get(realWindow,key,realWindow);return typeof v==='function'&&!/^[A-Z]/.test(String(key))?v.bind(realWindow):v;},set(target,key,value){return Reflect.set(realWindow,key,value,realWindow);}});\nfunction load(){const fetch=async(url,options)=>{const r=await nativeFetch(url,prepare(url,options));if([401,403].includes(r.status)){let data;try{data=await r.clone().json()}catch{}reportAuth(url,r.status,data);}return r;},GM_xmlhttpRequest=nativeGM?options=>nativeGM({...prepare(options.url,options),onload:r=>{options.onload?.(r);if([401,403].includes(r.status)){let data;try{data=JSON.parse(r.responseText)}catch{}reportAuth(options.url,r.status,data);}}}):undefined;const window=facade,unsafeWindow=facade,host=facade,GM_info={...nativeGMInfo,script:{...nativeGMInfo.script,version:${JSON.stringify(tool.version)}}};\n${source}\n}\nmanager.registerTool({id:${JSON.stringify(tool.id)},version:${JSON.stringify(tool.version)},activate(context){if(!loaded){load();if(!definition)throw Error('Tool did not register');loaded=true;}return definition.activate(context);},deactivate(){definition?.deactivate();}});\n})();\n`;
 }
+// PDA can inject a userscript before BODY exists, irrespective of @run-at.
+// Delay the Manager AND lazy tool registrations together; never poll the DOM.
+const metadataEnd=output.indexOf('// ==/UserScript==')+'// ==/UserScript=='.length;
+const body=output.slice(metadataEnd);
+output=output.slice(0,metadataEnd)+'\n'+String.raw`(()=>{
+ const owner=typeof unsafeWindow!=='undefined'?unsafeWindow:window;
+ const version=${JSON.stringify(version)};
+ const previous=owner.__TU_DEV_STARTUP__;
+ if(previous?.build===version&&['waiting-for-body','starting','ready'].includes(previous.phase))return;
+ const status={build:version,phase:'waiting-for-body',at:new Date().toISOString(),error:null};owner.__TU_DEV_STARTUP__=status;
+ const start=()=>{
+  status.phase='starting';
+  try{
+${body}
+   status.phase='ready';
+  }catch(error){status.phase='failed';status.error={name:String(error?.name||'Error'),message:String(error?.message||'Startup failed').replace(/https?:\/\/[^\s]+/gi,'[URL OMITTED]').replace(/\b[A-Za-z0-9_-]{16,}\b/g,'[REDACTED]').slice(0,240)};throw error;}
+ };
+ if(document.body)start();else document.addEventListener('DOMContentLoaded',start,{once:true});
+})();
+`;
 output=output.replace(/[\t ]+$/gm,'');
 new vm.Script(output,{filename:'torn-utilities-dev.user.js'});
 if((output.match(/^\/\/ ==UserScript==$/gm)||[]).length!==1)throw Error('Duplicate metadata');

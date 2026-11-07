@@ -1,6 +1,6 @@
 # Torn Utilities — single-script DEV
 
-Version **0.5.42.44-dev**, branch `dev/tu-all-in-one`. Install one complete userscript for desktop Tampermonkey or Torn PDA. This is a DEV release for manual acceptance; no production deployment is included.
+Version **0.5.42.45-dev**, branch `dev/tu-all-in-one`. Install one complete userscript for desktop Tampermonkey or Torn PDA. This is a DEV release for manual acceptance; no production deployment is included.
 
 [Install DEV](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/releases/dev/torn-utilities-dev.user.js) · [Installation and rollback](../INSTALLATION.md) · [Acceptance checklist](docs/DEV-ACCEPTANCE.md)
 
@@ -32,7 +32,7 @@ Historical independent sources, `modules.json`, legacy catalog Managers, and pro
 
 ## Independent TU Test
 
-Use [TU Testing and Diagnostics DEV](docs/TU-TEST.md) v0.2.12-dev for the 58-check acceptance plan, separate PDA/Tampermonkey evidence, and sanitized exports. This checklist targets the current integrated DEV build; actual host tests remain manual. `npm run build` also regenerates this independent test tool; `npm run build:diagnostics` updates only TU Test.
+Use [TU Testing and Diagnostics DEV](docs/TU-TEST.md) v0.2.13-dev for the 58-check acceptance plan, separate PDA/Tampermonkey evidence, and sanitized exports. This checklist targets the current integrated DEV build; actual host tests remain manual. `npm run build` also regenerates this independent test tool; `npm run build:diagnostics` updates only TU Test.
 
 ## Saved API keys
 
@@ -53,3 +53,5 @@ TU Test 0.2.10 adds continuous, passive travel recording. Start monitoring while
 DEV 0.5.42.43 updates PC Tampermonkey Snatch and Run from captured native DOM: the Heal click includes Use/Yes, Purchase Max includes its item-specific Yes, and Return handles Travel home/Back/Continue. Native outcome evidence gates each separately clicked stage. PDA gameplay handling and production are unchanged. See [desktop acceptance and limits](docs/TRAVEL-ENHANCEMENTS.md).
 
 DEV 0.5.42.44 extends the captured native Snatch and Run flow to Torn PDA. Purchase Max opens the mobile item-specific quantity panel and uses its visible Max/Buy/Yes controls; desktop inline controls remain supported. Both layouts use confirmed native medical release and selected-item inventory proof. Actual host acceptance remains required before production.
+
+DEV 0.5.42.45 fixes native item-ID resolution for existing name-based foreign watches and direct no-hospital purchases without medical selection. It also defers early PDA startup until BODY exists and bounds saved launcher coordinates; TU Test 0.2.13 exports startup/launcher state for the missing-icon investigation.

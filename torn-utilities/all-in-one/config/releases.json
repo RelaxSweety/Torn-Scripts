@@ -1,5 +1,20 @@
 [
   {
+    "version": "0.5.42.45-dev",
+    "date": "2026-11-07",
+    "changes": {
+      "Fixes": [
+        "Resolve legacy name-based foreign monitors from an exact current native item form and Buy panel",
+        "Retain native form/Buy item IDs when selecting new watches",
+        "Support Purchase Max without hospitalization or medical selection for both hosts",
+        "Defer integrated startup until BODY exists and keep saved launcher coordinates within bounds"
+      ],
+      "Diagnostics": [
+        "Export startup phase/error and launcher presence/position to distinguish PDA loading failures from hidden UI"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.44-dev",
     "date": "2026-11-07",
     "changes": {

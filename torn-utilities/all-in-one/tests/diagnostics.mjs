@@ -69,6 +69,10 @@ console.log('TU Test regression checks passed: catalog coverage, redaction, buil
  const b=boot();try{
   const {w,button}=b;const dialog=w.document.createElement('div');dialog.setAttribute('role','dialog');dialog.innerHTML='<p>Use a First Aid Kit?</p><button>Yes</button><button>No</button>';w.document.body.append(dialog);let submitted=0;dialog.querySelector('button').onclick=()=>submitted++;
   button('Start monitoring').click();dialog.querySelector('button').dispatchEvent(new w.MouseEvent('click',{bubbles:true,cancelable:true}));assert.equal(submitted,1);button('Stop monitoring').click();
-  button('Export travel DOM and system info').click();const report=b.report();assert.equal(report.toolVersion,'0.2.12-dev');assert.equal(report.installedBuild,targetBuild);assert.equal(report.travelDom.captures.length,1);assert.equal(report.travelDom.captures[0].installedBuild,targetBuild);assert.ok(report.travelDom.captures[0].html.includes('Yes'));assert.ok(report.detectedEnvironment.os);assert.ok(report.detectedEnvironment.browser);assert.ok(report.platforms.tampermonkey.meta);assert.equal(b.requests.length,0,'Region capture/export makes no network requests');assert.deepEqual(b.errors,[]);
+  button('Export travel DOM and system info').click();const report=b.report();assert.equal(report.toolVersion,'0.2.13-dev');assert.equal(report.installedBuild,targetBuild);assert.equal(report.travelDom.captures.length,1);assert.equal(report.travelDom.captures[0].installedBuild,targetBuild);assert.ok(report.travelDom.captures[0].html.includes('Yes'));assert.ok(report.detectedEnvironment.os);assert.ok(report.detectedEnvironment.browser);assert.ok(report.platforms.tampermonkey.meta);assert.equal(b.requests.length,0,'Region capture/export makes no network requests');assert.deepEqual(b.errors,[]);
  }finally{b.close()}
+}
+
+{
+ const b=boot();try{b.w.__TU_DEV_STARTUP__={build:targetBuild,phase:'failed',error:{name:'TypeError',message:'ApiKey abcdef0123456789'}};b.button('Export both host reports').click();const r=b.report();assert.equal(r.startup.phase,'failed');assert.equal(r.startup.launcher.present,false);assert.ok(!JSON.stringify(r.startup).includes('abcdef0123456789'));}finally{b.close()}
 }

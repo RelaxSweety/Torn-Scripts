@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.12.1-dev
+// @version      1.12.2-dev
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -95,7 +95,14 @@ const listingPrice=row=>{const unit=row.querySelector('[data-unit-price],[class*
 const candidates='[data-item-id],[data-itemname],[data-item-name],tr,[role=row],li,[class*=itemWrap],[class*=ItemWrap],[class*=itemRow],[class*=ItemRow],[class*=itemCard],[class*=ItemCard],[class*=row],[class*=Row],[class*=card],[class*=Card]';
 const category=()=>{const url=(location.pathname+location.search+location.hash).toLowerCase();if(/itemmarket|item-market|item_market|market.php|item.php/.test(url))return 'Item Market';const abroad=/travel|abroad|foreign|country|cayman|japan|mexico|canada|hawaii|switzerland|china|argentina|unitedkingdom|southafrica|uae/i.test(url)||document.querySelector('[class*=foreignStock],[class*=ForeignStock],#travel-root [class*=stockTableWrapper]');const stockTable=[...document.querySelectorAll('table, [role=table]')].some(t=>/\bStock\b/i.test(text(t).slice(0,300))&&/\bCost\b/i.test(text(t).slice(0,300))&&/\bBuy\b/i.test(text(t).slice(0,300)));if(abroad||stockTable)return 'Foreign';if(/shop|store|bazaar|city/.test(url))return 'Stores';return 'Other'};
 const nameOf=row=>{const e=row.querySelector('[data-itemname],[data-item-name],[class*=itemName],[class*=ItemName],[class*=name],[class*=Name]');return (e?.getAttribute('data-itemname')||e?.getAttribute('data-item-name')||text(e)||text(row)).split('\n').map(x=>x.trim()).find(Boolean)?.slice(0,90)||''};
-const idOf=row=>row.getAttribute('data-item-id')||row.querySelector('[data-item-id]')?.getAttribute('data-item-id')||'';
+const idOf=row=>{
+ const data=row.getAttribute('data-item-id')||row.getAttribute('data-itemid')||row.querySelector('[data-item-id]')?.getAttribute('data-item-id');if(/^\d+$/.test(data||''))return data;
+ // Foreign React rows identify items through their native form/Buy panel,
+ // even when no data-item-id exists on the item selected by the user.
+ const form=row.matches('form')?row:row.querySelector('form[id^="item-"]');const formId=form?.id.match(/^item-(\d+)-form$/)?.[1];if(formId)return formId;
+ for(const el of [row,...row.querySelectorAll('[aria-controls^="item-"]')]){const id=el.getAttribute('aria-controls')?.match(/^item-(\d+)-buyPanel$/)?.[1];if(id)return id;}
+ return '';
+};
 const keyOf=row=>idOf(row)?'id:'+idOf(row):'name:'+norm(nameOf(row));
 const foreignRow=w=>foreignShopTables().flatMap(s=>s.rows).find(row=>rowMatches(row,w))||null;
 const foreignStock=row=>{
@@ -118,7 +125,7 @@ const liveCountry=()=>{
 };
 const nativeRow=control=>control?.closest('[data-item-id],[data-itemid],tr,[role=row],li,[class*=itemRow],[class*=row]');
 const rowMatches=(row,w)=>{
- const id=row.getAttribute('data-item-id')||row.getAttribute('data-itemid')||row.querySelector('[data-item-id]')?.getAttribute('data-item-id')||row.querySelector('[aria-controls^="item-"]')?.getAttribute('aria-controls')?.match(/^item-(\d+)-/)?.[1];
+ const id=idOf(row);
  if(w.key.startsWith('id:')&&id)return w.key==='id:'+id;
  const nativeName=row.querySelector('[class*=tabletColB]')||row.querySelector('[data-item-name],[class*=itemName],[class*=ItemName]');const name=nativeName?text(nativeName).trim():nameOf(row);return !!name&&norm(name)===norm(w.name);
 };

@@ -1,4 +1,4 @@
-# Travel Assistant DEV acceptance: 0.5.42.44-dev
+# Travel Assistant DEV acceptance: 0.5.42.45-dev
 
 Alarms update status and sound without changing whether the user minimized the main window. Monitoring continues while the activated tool is minimized, on the actively viewed Torn page. Exit stops its runtime. Hidden or unfocused pages are not scanned for stock.
 
@@ -31,3 +31,15 @@ Automated fixtures include sanitized structural excerpts from the 2026-11-07 des
 These tests do not perform real gameplay or establish live desktop/PDA reliability. Both host-specific implementations still require actual live acceptance before production; production and Workers are unchanged. The PDA evidence proves the manual native structure, not successful live Snatch and Run execution. No further diagnostic interruptions are needed between healing, buying and returning: start continuous monitoring beforehand, execute the whole sequence and stop/export only once safely flying.
 
 Architecture references reviewed: Torn's public GET-only API schema at https://www.torn.com/swagger/openapi.json and script rules at https://www.torn.com/rules.php. Keep gameplay actions directly initiated by the user on the actively viewed page; never add hidden-page extraction, chaining distinct gameplay stages without a new user click or bypassing CAPTCHAs.
+
+## Name-based watches and the no-hospital path (0.5.42.45-dev)
+
+Existing foreign watches saved as `name:...` remain usable. Purchase Max resolves one exact native item name against its current numeric form ID and matching Buy-panel control. An explicit numeric ID is never replaced with a different item; duplicate exact-name rows, mismatched identifiers and partial-name matches block rather than guessing. New page selections retain the ID from `item-N-form` or `item-N-buyPanel` even when no `data-item-id` attribute exists. No watch recreation is required.
+
+When Hospital is No, no medical item or medical inventory request is needed. Both PC and PDA generated-bundle tests cover this route with Public Only keys, legacy name watches and no medical selection. The desktop Jaguar Plushie report established the previous numeric-key-only failure.
+
+## PDA launcher startup diagnostics
+
+The full bundle now waits for BODY before starting the Manager and registering lazy tools together. This covers PDA injection before normal document-idle timing. A startup status marker records waiting-for-body, starting, ready or failed and sanitized error information. No polling or persistent DOM observer is added. Saved launcher positions reserve the icon's 34px size even if layout measurements report zero, preventing placement beyond the screen boundary.
+
+TU Test 0.2.13 adds `startup` to its normal export: startup phase/build/error, whether the Manager API exists, launcher presence, hidden/display/visibility state and measured rectangle. If the icon remains missing, export TU Test immediately without running gameplay. A not-observed startup marker cannot distinguish script injection being disabled from a parse failure before bootstrap; the PDA script entry still needs to be enabled/current. The actual cause of the reported missing icon remains unconfirmed until device diagnostics are available.
