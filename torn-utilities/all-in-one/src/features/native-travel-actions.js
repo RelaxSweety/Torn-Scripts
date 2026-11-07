@@ -84,7 +84,7 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
    if(kind==='buy'){
     let s=getSnapshot();if(s.hospitalized!==false||!(s.quantity>0))throw Error('Confirm hospital release and current stock before buying');
     if(same(released,run)){const close=one([...(released.slot?.querySelectorAll('button[aria-label="Close"]')||[])],'medical result Close');if(close){click(close);await new Promise(resolve=>window.setTimeout(resolve,32));ensure();}}
-    const {id,row}=resolveItem(run);
+    let {id,row}=resolveItem(run);
     const panelId='item-'+id+'-buyPanel';
     const existing=scope().querySelector('#'+panelId);
     if(existing&&one(existing.querySelectorAll('[class*=confirmPanel]'),'existing purchase confirmation'))throw Error('Close the existing purchase confirmation before Purchase Max');
@@ -96,7 +96,7 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
      if(norm(amountPanel.querySelector('p strong')?.textContent)!==norm(run.watchName)||!norm(amountPanel.querySelector('p')?.textContent).includes('do you want to buy'))throw Error('Compact quantity panel does not match the monitored item');
      container=amountPanel;
     }else if(existing&&shown(existing))throw Error('Unexpected open purchase panel; close it before Purchase Max');
-    const input=one(container.querySelectorAll('input.input-money'),'visible native quantity input');
+    let input=one(container.querySelectorAll('input.input-money'),'visible native quantity input');
     const nativeMax=one(container.querySelectorAll('input.wai-btn[type=button]'),'native maximum control');
     const max=nativeMax||one(buttons(container,'MAX').filter(e=>e.matches('button[type=button]')),'quantity-panel MAX control');
     if(!input||!max||nativeMax&&!/add the maximum amount/i.test(max.getAttribute('aria-label')||max.parentElement?.getAttribute('title')||''))throw Error('Native maximum/quantity controls are unavailable');
@@ -107,9 +107,17 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
     if(!capacity.verified&&same(released,run)&&capacity.free>nativeAmount)throw Error('Cannot verify current funds for the freed medical slot; no purchase was sent');
     if(capacity.verified){
      if(capacity.desired<1)throw Error('No available capacity, affordable items or stock; no purchase was sent');
-     if(nativeAmount!==capacity.desired){const setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value')?.set;if(!setter)throw Error('Native quantity input cannot be updated');setter.call(input,String(capacity.desired));input.dispatchEvent(new window.Event('input',{bubbles:true}));input.dispatchEvent(new window.Event('change',{bubbles:true}));await new Promise(resolve=>window.setTimeout(resolve,32));ensure();}
+     // React may replace the quantity form after closing a medical result.
+     // Prepare each current input once; never retry a submitted purchase.
     }
-    const buy=await wait(()=>{const amount=Number(input.value.replace(/,/g,''));const fresh=getSnapshot();if(!Number.isSafeInteger(amount)||amount<1||amount>fresh.quantity||capacity.verified&&amount!==capacity.desired)return null;
+    const prepared=new WeakSet();
+    const prepare=element=>{if(!capacity.verified||Number(element.value.replace(/,/g,''))===capacity.desired||prepared.has(element))return;const fresh=capacityFor(row,run,getSnapshot().quantity,Number(element.value));if(!fresh.verified||fresh.desired!==capacity.desired)throw Error('Capacity, stock or funds changed while preparing quantity');prepared.add(element);const setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value')?.set;if(!setter)throw Error('Native quantity input cannot be updated');setter.call(element,String(capacity.desired));element.dispatchEvent(new window.Event('input',{bubbles:true}));element.dispatchEvent(new window.Event('change',{bubbles:true}));onEvent({step:'quantity-prepared',amount:Number(element.value.replace(/,/g,'')),desired:capacity.desired});};
+    prepare(input);await new Promise(resolve=>window.setTimeout(resolve,32));ensure();
+    const reported=new Set();const readiness=(reason,amount)=>{const key=reason+':'+amount;if(!reported.has(key)){reported.add(key);onEvent({step:'quantity-wait',reason,amount,desired:capacity.desired});}};
+    const buy=await wait(()=>{
+     ({row}=resolveItem(run));container=compact?scope()?.querySelector('#'+panelId+' [class*=amountPanel]'):row;
+     const current=one(container?.querySelectorAll('input.input-money')||[],'current quantity input');if(!current){readiness('input-unavailable',null);return null;}input=current;prepare(input);if(!input.isConnected)return null;
+     const amount=Number(input.value.replace(/,/g,''));const fresh=getSnapshot();if(!Number.isSafeInteger(amount)||amount<1||amount>fresh.quantity||capacity.verified&&amount!==capacity.desired){readiness('quantity-not-ready',amount);return null;}
      return compact?one(buttons(container,'Buy'),'quantity-panel Buy control'):one([...row.querySelectorAll('button[aria-controls]')].filter(e=>e.getAttribute('aria-controls')===panelId&&label(e)==='buy'),'monitored Buy control');});
     const amount=Number(input.value.replace(/,/g,''));s=getSnapshot();const freshCapacity=capacityFor(row,run,s.quantity,amount);if(capacity.verified&&(!freshCapacity.verified||freshCapacity.desired!==amount))throw Error('Available capacity, stock or funds changed before Buy');if(s.hospitalized!==false||amount>s.quantity)throw Error('Hospital or stock state changed before Buy');click(buy);
     const yes=await wait(()=>{const panel=scope()?.querySelector('#'+panelId),confirmation=panel?.querySelector('[class*=confirmPanel]');if(!shown(confirmation))return null;

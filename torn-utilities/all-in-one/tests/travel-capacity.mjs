@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import {JSDOM} from 'jsdom';
 import {createNativeTravelActions} from '../src/features/native-travel-actions.js';
 const f=JSON.parse(fs.readFileSync(new URL('./fixtures/desktop-travel.json',import.meta.url)));
-async function check({occupied=1,heal=true,cash=1000000,stock=611,expected=18,keepGhost=true,proofOnly=false,mobileCash=false}={}){
+async function check({occupied=1,heal=true,cash=1000000,stock=611,expected=18,keepGhost=true,proofOnly=false,mobileCash=false,replaceQuantity=false}={}){
  const dom=new JSDOM(`<body><span id="user-money">$${cash.toLocaleString('en-US')}</span><div id="travel-root"><h4>Canada</h4><ul class="inventoryPanel_fixture" aria-label="Inventory 18 items"></ul><ul class="shop">${f.shopItem}</ul></div></body>`,{url:'https://www.torn.com/',pretendToBeVisual:true});
  const w=dom.window,d=w.document;if(mobileCash){d.getElementById('user-money').remove();const banner=d.createElement('div');banner.className='messageContent_fixture';banner.textContent='You are in Canada and have $'+cash.toLocaleString('en-US')+'. You have purchased 1 / 18 items so far.';d.body.prepend(banner);}d.hasFocus=()=>true;w.HTMLElement.prototype.getClientRects=function(){return this.disabled?[]:[{}]};const root=d.querySelector('#travel-root'),items=root.querySelector('ul'),shop=root.querySelector('.shop');
  let currentQuantity=stock,purchased=0,stateValue=0,healed=false,closed=0;const events=[];
@@ -17,7 +17,7 @@ async function check({occupied=1,heal=true,cash=1000000,stock=611,expected=18,ke
   };
  };
  const row=shop.querySelector('[class*=row]'),input=row.querySelector('.input-money'),buy=[...row.querySelectorAll('button')].find(e=>e.textContent==='Buy');
- input.addEventListener('input',()=>{stateValue=Number(input.value);});input.addEventListener('change',()=>{stateValue=Number(input.value);});
+ let replacementDone=false;input.addEventListener('input',()=>{stateValue=Number(input.value);if(replaceQuantity&&!replacementDone){replacementDone=true;const next=input.cloneNode();next.value='17';next.addEventListener('input',()=>{stateValue=Number(next.value);});input.replaceWith(next);input.value='17';}});input.addEventListener('change',()=>{stateValue=Number(input.value);});
  row.querySelector('.wai-btn').onclick=()=>{input.value='17';stateValue=17;};
  buy.onclick=e=>{e.preventDefault();const panel=d.createElement('div');panel.id='item-261-buyPanel';panel.innerHTML='<div class="confirmPanel_fixture"><p>Buy <strong>'+stateValue+'x Wolverine Plushie</strong> for <strong>$'+(stateValue*20)+'</strong>?</p><button>Yes</button><button>No</button></div>';root.append(panel);panel.querySelector('button').onclick=()=>{
   purchased=stateValue;if(heal)medical.replaceChildren();let remaining=stateValue;
@@ -32,6 +32,7 @@ async function check({occupied=1,heal=true,cash=1000000,stock=611,expected=18,ke
   assert.equal(result.amount,expected);assert.equal(purchased,expected);const capacity=events.find(e=>e.step==='capacity-check');assert.equal(capacity.verified,true);assert.equal(capacity.desired,expected);assert.equal(capacity.freeSlots,18-occupied+(heal?1:0));if(heal)assert.equal(closed,1);
  }finally{adapter.cancel();w.close()}
 }
+await check({replaceQuantity:true});
 await check({proofOnly:true});
 await check({mobileCash:true});
 await check(); // Stale native Max 17, one consumed medical slot: purchase 18.

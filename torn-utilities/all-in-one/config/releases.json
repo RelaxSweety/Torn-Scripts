@@ -1,5 +1,21 @@
 [
   {
+    "version": "0.5.42.53-dev",
+    "date": "2026-11-07",
+    "changes": {
+      "Fixes": [
+        "Reacquire current quantity input and item row while preparing Purchase Max after native form updates",
+        "Prepare replacement quantity inputs against freshly verified capacity before Buy"
+      ],
+      "Diagnostics": [
+        "Record quantity preparation and quantity readiness reasons without logging credentials"
+      ],
+      "Validation": [
+        "Replace a quantity input during native input handling and verify one full-capacity purchase"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.52-dev",
     "date": "2026-11-07",
     "changes": {
