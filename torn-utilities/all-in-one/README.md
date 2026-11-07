@@ -1,6 +1,6 @@
 # Torn Utilities — single-script DEV
 
-Version **0.5.42.51-dev**, branch `dev/tu-all-in-one`. Install one complete userscript for desktop Tampermonkey or Torn PDA. This is a DEV release for manual acceptance; no production deployment is included.
+Version **0.5.42.52-dev**, branch `dev/tu-all-in-one`. Install one complete userscript for desktop Tampermonkey or Torn PDA. This is a DEV release for manual acceptance; no production deployment is included.
 
 [Install DEV](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/releases/dev/torn-utilities-dev.user.js) · [Installation and rollback](../INSTALLATION.md) · [Acceptance checklist](docs/DEV-ACCEPTANCE.md)
 
@@ -65,3 +65,5 @@ DEV 0.5.42.48 fixes a syntax error introduced by Torn PDA’s global quote norma
 DEV 0.5.42.49 simplifies foreign catalog labels to country names and restores an already-active minimized Travel Assistant and Item Monitor through its tool card without restarting it or losing its state.
 
 DEV 0.5.42.50 isolates Snatch and Run touch/mouse events from native outside-tap dismissal handlers and shows action-specific pending labels. Each subsequent stage still requires a fresh user click.
+
+DEV 0.5.42.52 loads the complete item catalog with the verified TU login key through Manager on both PC and PDA, including Public Only keys.

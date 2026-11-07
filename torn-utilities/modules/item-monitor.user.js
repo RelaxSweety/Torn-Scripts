@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.12.8-dev
+// @version      1.12.9-dev
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -291,7 +291,7 @@ async function getCatalog(){
  if(cached?.items?.length&&Date.now()-cached.time<86400000){state.catalog=cached.items;return state.catalog}
  const pdaKey='###PDA-APIKEY###';
  const apiKey=!pdaKey.includes('PDA-APIKEY')?pdaKey:(host.TornUtilities?.apiKey||host.TornUtilities?.getApiKey?.()||'');
- if(!apiKey)throw Error('PDA API key unavailable. Configure your key in Torn PDA, then reload the script.');
+ if(!apiKey&&typeof host.TornUtilities?.requestTravelInfo!=='function')throw Error('Verify your Torn API login key in TU Settings > API Keys, then try again.');
  const url='https://api.torn.com/v2/torn/items?key='+encodeURIComponent(apiKey);
  let payload=null;
  const unpack=response=>{
@@ -302,7 +302,8 @@ async function getCatalog(){
    return data;
  };
  try{
-   if(typeof PDA_httpGet==='function')payload=unpack(await PDA_httpGet(url));
+   if(typeof host.TornUtilities?.requestTravelInfo==='function')payload=unpack(await host.TornUtilities.requestTravelInfo('catalog'));
+   else if(typeof PDA_httpGet==='function')payload=unpack(await PDA_httpGet(url));
    else {const response=await fetch(url);if(!response.ok)throw Error('HTTP '+response.status);payload=unpack(await response.json())}
  }catch(e){console.warn('[TU Item Monitor] Catalog fetch:',e);if(cached?.items?.length){state.catalog=cached.items;return state.catalog}throw Error('Catalog request failed: '+e.message)}
  if(!payload){if(cached?.items?.length){state.catalog=cached.items;return state.catalog}throw Error('Could not retrieve item catalog. Configure Torn API access in PDA/TU and try again.')}

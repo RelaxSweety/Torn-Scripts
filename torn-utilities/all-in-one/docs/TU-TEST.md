@@ -4,7 +4,7 @@ This updates **TU Testing and Diagnostics DEV**, previously v0.1.9-dev, to **v0.
 
 [Install/update TU Test](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/all-in-one/dist/tu-diagnostics-dev.user.js)
 
-Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.51-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
+Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.52-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
 
 ## Using it
 
@@ -101,3 +101,5 @@ Revision v14 / TU Test 0.2.17 targets DEV 0.5.42.49: validate country-only catal
 TU Test 0.2.18 targets DEV 0.5.42.50 with the existing v14 checklist. Record the entire PDA Heal → Purchase Max → Return flow; pending-button taps should no longer dismiss medical confirmations or start a subsequent stage.
 
 TU Test 0.2.19 targets 0.5.42.51. Validate same-tab refresh with a minimized monitor, setup retention, explicit Exit disabling resume, and immediate Return readiness after a matching purchase success.
+
+TU Test 0.2.20 targets 0.5.42.52. Validate Select Item from Complete List on a cold catalog cache on PC and PDA, using a verified Public Only or Limited Access login key.

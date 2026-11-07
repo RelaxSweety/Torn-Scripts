@@ -1,5 +1,18 @@
 [
   {
+    "version": "0.5.42.52-dev",
+    "date": "2026-11-07",
+    "changes": {
+      "Fixes": [
+        "Load complete item catalog through authenticated TU Manager transport on desktop and PDA",
+        "Permit Public Only and Limited Access login keys for the shared catalog read"
+      ],
+      "Validation": [
+        "Cold desktop catalog without PDA key or cached items; authenticated request and cached reopen"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.51-dev",
     "date": "2026-11-07",
     "changes": {
