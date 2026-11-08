@@ -4,7 +4,7 @@ This updates **TU Testing and Diagnostics DEV**, previously v0.1.9-dev, to **v0.
 
 [Install/update TU Test](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/all-in-one/dist/tu-diagnostics-dev.user.js)
 
-Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.54-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
+Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.55-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
 
 ## Using it
 
@@ -112,4 +112,6 @@ Sections identify System/test host, Travel/Snatch and Run, Chat Archiver, tool a
 
 The single Export all diagnostics button includes both host checklists, system/startup information, travel/Snatch and Run evidence and chat behavior records collected so far. It does not claim unperformed tests passed. Update both TU and TU Test for new capture events.
 
-Native timestamp support reads explicit message attributes or full timestamps, preserving unknown/group-only values when exact evidence is absent. Exact parity with the separately referenced M’aol archiver still requires its source reference; no capture-time fallback is treated as a message timestamp.
+Native timestamp support reads explicit message attributes or full timestamps, preserving unknown/group-only values when exact evidence is absent. The provided M'AOL 0.1.29 source now supplies the native React id/createdAt method; no capture-time fallback is treated as a message timestamp.
+
+TU Test 0.2.23 targets 0.5.42.55. Chat exact timestamp counts include native createdAt metadata. Verify JSON/CSV exports preserve native message ID, UTC timestamp, Unix milliseconds and source torn-react-createdAt; identical messages must remain separate.

@@ -1,5 +1,20 @@
 [
   {
+    "version": "0.5.42.55-dev",
+    "date": "2026-11-08",
+    "changes": {
+      "Chat timestamps": [
+        "Adapt M'AOL 0.1.29 bounded React message id/createdAt reading without hover or capture-time fallback",
+        "Store original UTC time, Unix milliseconds, source and native message identity in chat exports",
+        "Keep identical private messages separate by native identity across virtualized windows",
+        "Reject ambiguous metadata and prevent hover timestamps overwriting native creation time"
+      ],
+      "Validation": [
+        "React props/fiber fixtures, secret/accessor exclusion, ambiguous IDs, native identity mismatch and repeated private-message text"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.54-dev",
     "date": "2026-11-08",
     "changes": {

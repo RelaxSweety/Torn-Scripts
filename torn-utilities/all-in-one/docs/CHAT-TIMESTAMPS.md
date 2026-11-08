@@ -1,0 +1,9 @@
+# Native chat timestamps — DEV 0.5.42.55
+
+Reference: user-provided M'AOL Chat Capture DEV 0.1.29, nativeMessageMeta and syncNativeTimestamps. TU adapts the bounded read-only React props/fiber traversal to recover a unique string message ID and original numeric createdAt in milliseconds (same supported date range). It converts that value with new Date(at).toISOString() and records source torn-react-createdAt. No local capture/export time becomes a message timestamp, and no hover is required for this path.
+
+Traversal is limited to four fiber ancestors, seven object levels, sixty fields per object and 1,200 visited objects per message. It skips secret-like fields, accessor getters, cycles and DOM/state-node children. Multiple identities, conflicting times and existing message identity mismatches are rejected. Unlike the reference's prompt/response ledger, TU archives all selected-chat messages; private native IDs distinguish repeated identical text and survive virtualized window replacement. Existing group and Torn hover tooltip timestamps remain fallbacks and never overwrite original native creation time.
+
+Archive JSON records expose sourceMessageId, exactTimestamp, exactTimestampUnixMs and exactTimestampSource. CSV appends matching source ID, Unix milliseconds and source columns. Diagnostic exports include timestamp counts and scroll behavior, not message text or React object contents. The chat support factory is embedded in the integrated DEV build; no additional scripts, requests or perpetual polling are introduced.
+
+Fixture coverage includes props and fibers, UTC conversion, ambiguous metadata, identity mismatch, skipped getters/secrets, cycles and repeated private messages across virtualization. A live Torn/PDA recording remains necessary to confirm the current deployed React shape. Unknown native metadata stays unknown rather than being guessed.

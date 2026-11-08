@@ -19,7 +19,7 @@
     "id": "chat-archiver",
     "name": "Chat Archiver",
     "category": "chat",
-    "version": "0.1.9",
+    "version": "0.1.10",
     "description": "Archive Torn chat conversations",
     "source": "chat-archiver/pda/src/torn-multi-chat-archiver-pda.user.js"
   },

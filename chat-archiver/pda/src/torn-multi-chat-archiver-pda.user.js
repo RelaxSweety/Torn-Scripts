@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Multi-Chat Archiver PDA
 // @namespace    RelaxSweety.Torn
-// @version      0.1.9
+// @version      0.1.10
 // @description  Mobile/PDA chat archiver based on desktop v1.9; touch-friendly controls
 // @match        https://www.torn.com/*
 // @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/chat-archiver/pda/src/torn-multi-chat-archiver-pda.user.js
@@ -923,7 +923,7 @@
 
             isSelf: rendered.isSelf,
 
-            exactTimestamp: chatSupport?.timestamp(rendered.wrapper||rendered.box)||'',
+            exactTimestamp: chatSupport?.timestamp(rendered.virtualItem||rendered.box)||'',
 
             groupTimestamp:
                 groupTimestamp || '',
@@ -932,6 +932,7 @@
                 rendered.message
         };
 
+        chatSupport?.applyNative(record,rendered.virtualItem||rendered.box);
         archive.set(id, record);
 
         return id;
@@ -954,6 +955,14 @@
             };
         }
 
+        const nativeRows=rendered.map(message=>({message,meta:chatSupport?.nativeMeta(message.virtualItem||message.box)}));
+        if(nativeRows.length&&nativeRows.every(row=>row.meta)){
+            const groups=assignGroupTimestamps(rendered,collectGroupSeparators());let added=0,historicalAdded=0,updated=0;const known=new Map([...archive.values()].filter(r=>r.sourceMessageId).map(r=>[r.sourceMessageId,r]));
+            const earliest=Math.min(...[...archive.values()].map(r=>r.exactTimestampUnixMs).filter(Number.isFinite));
+            nativeRows.forEach(({message,meta},index)=>{let record=known.get(meta.id);if(!record){const id=addPrivateRecord(message,groups.get(index)||'');record=archive.get(id);messageOrder.push(id);added++;if(Number.isFinite(earliest)&&meta.at<earliest)historicalAdded++;}else if(chatSupport.applyNative(record,message.virtualItem||message.box))updated++;});
+            if(added)messageOrder.sort((a,b)=>(archive.get(a).exactTimestampUnixMs||0)-(archive.get(b).exactTimestampUnixMs||0));
+            return {added,historicalAdded,liveAdded:added-historicalAdded,updated};
+        }
         const separators =
             collectGroupSeparators();
 
@@ -1195,7 +1204,7 @@
                         false,
 
                     exactTimestamp:
-                        chatSupport?.timestamp(msg.wrapper||msg.box)||'',
+                        chatSupport?.timestamp(msg.virtualItem||msg.box)||'',
 
                     groupTimestamp,
 
@@ -1203,6 +1212,7 @@
                         msg.message
                 };
 
+                chatSupport?.applyNative(record,msg.virtualItem||msg.box);
                 archive.set(
                     msg.messageId,
                     record
@@ -1246,6 +1256,7 @@
                 }
 
             } else {
+                if(chatSupport?.applyNative(record,msg.virtualItem||msg.box))updated++;
                 if (
                     groupTimestamp &&
                     !record.groupTimestamp
@@ -1459,12 +1470,12 @@
                     );
 
                 if (
-                    record &&
+                    record &&record.exactTimestampSource!=='torn-react-createdAt'&&
                     record.exactTimestamp !==
                         timestamp
                 ) {
                     record.exactTimestamp =
-                        timestamp;
+                        timestamp;record.exactTimestampSource='torn-hover-tooltip';
 
                     updateStatus();
                 }
@@ -1512,12 +1523,12 @@
                 archive.get(id);
 
             if (
-                record &&
+                record &&record.exactTimestampSource!=='torn-react-createdAt'&&
                 record.exactTimestamp !==
                     timestamp
             ) {
                 record.exactTimestamp =
-                    timestamp;
+                    timestamp;record.exactTimestampSource='torn-hover-tooltip';
 
                 updateStatus();
             }
@@ -2472,7 +2483,7 @@
             'Direction',
             'Exact Timestamp',
             'Group Timestamp',
-            'Message'
+            'Message','Source Message ID','Exact Timestamp Unix Ms','Exact Timestamp Source'
         ]];
 
         for (
@@ -2500,7 +2511,7 @@
 
                 msg.groupTimestamp,
 
-                msg.message
+                msg.message,msg.sourceMessageId||'',msg.exactTimestampUnixMs??'',msg.exactTimestampSource||''
             ]);
         }
 
@@ -3557,7 +3568,7 @@
       const panel=document.getElementById('tca-panel'); if(panel) panel.style.display='none';
       const playbar=document.getElementById('tca-playbar'); if(playbar) playbar.style.display='none';
     }
-    const definition={id:'chat-archiver',version:'0.1.8',activate:activateFromTU,deactivate:deactivateFromTU};
+    const definition={id:'chat-archiver',version:'0.1.10',activate:activateFromTU,deactivate:deactivateFromTU};
     function registerTU(){if(window.TornUtilities?.register) window.TornUtilities.register(definition);}
     window.addEventListener('torn-utilities-ready',registerTU); registerTU();
 
