@@ -1,5 +1,24 @@
 [
   {
+    "version": "0.5.42.54-dev",
+    "date": "2026-11-08",
+    "changes": {
+      "Travel": [
+        "Allow outbound foreign-flight arming; preserve waiting intent without a 15-minute timeout",
+        "Keep armed intent during identity loading and hide completed return button",
+        "Evaluate watched item identities across shop categories and explain empty filtered lists"
+      ],
+      "Chat Archiver": [
+        "Read explicit native timestamps when available; retain unknown/group time when not available",
+        "Pause history capture on a detected reset to latest messages, retaining archive and avoiding false end detection"
+      ],
+      "Diagnostics": [
+        "Add opt-in passive chat scrolling/progress monitoring with text excluded",
+        "Organize system, travel, chat and checklist sections; single Export all diagnostics includes all recorded evidence"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.53-dev",
     "date": "2026-11-07",
     "changes": {

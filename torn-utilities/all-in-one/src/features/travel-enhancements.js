@@ -1,18 +1,18 @@
 // Shared source embedded only into the lazy Travel Assistant factory.
 // No gameplay requests: actions delegate once to a visible, automatically matched native control.
 export function createTravelEnhancements({document,window,getItems,getContext,getSnapshot,getRows,matchRow,getSetup=()=>({}),storeSetup=()=>{},getFilterContainer=row=>row,onArmed=()=>{},executeAction=null,filterEnabled,onNotice,storeRun=()=>{},restoreRun=null,now=()=>Date.now()}) {
- const hiddenRows=new Map(),TTL=15*60*1000,STOCK_TTL=30000;
- let run=restoreRun&&restoreRun.expiresAt>now()?restoreRun:null,busy=false,active=false,hud=null,action=null,lastNotice='',statusTimer=null,statusAttempts=0,drag=null,suppressClickUntil=0;
+ const hiddenRows=new Map(),TTL=Number.MAX_SAFE_INTEGER,STOCK_TTL=30000;
+ let run=restoreRun?{...restoreRun,expiresAt:Number.MAX_SAFE_INTEGER}:null,busy=false,active=false,hud=null,action=null,lastNotice='',statusTimer=null,statusAttempts=0,drag=null,suppressClickUntil=0;
  const persist=()=>storeRun(run?{...run}:null);
  const focused=()=>!document.hidden&&document.hasFocus();
  const visible=e=>!!e?.isConnected&&!e.hidden&&e.getClientRects().length>0&&!e.closest('#tuim-panel,#tuim-travel-window,#tuim-catalog,#tu-pda-panel,#tu-snatch-run');
  const emit=(event,fields={})=>{try{document.dispatchEvent(new window.CustomEvent('tu-snatch-run-diagnostic',{detail:JSON.stringify({event,stage:run?.stage||'off',item:run?.watchName||'',...fields})}));}catch{}};
  const notice=value=>{lastNotice=value;if(action)action.title=value;onNotice?.(value);emit('notice',{message:String(value).slice(0,300)});};
  function showRow(row){const target=hiddenRows.get(row);for(const e of new Set([row,target]))if(e){e.classList.remove('tu-monitor-filter-hidden');delete e.dataset.tuMonitorFiltered;}hiddenRows.delete(row);}
- function restoreRows(){for(const row of [...hiddenRows.keys()])showRow(row);}
+ function restoreRows(){document.getElementById('tuim-filter-empty')?.remove();for(const row of [...hiddenRows.keys()])showRow(row);}
  function applyFilter(){
   if(!active||!filterEnabled()||!getItems().length){restoreRows();return;}
-  const rows=getRows(),current=new Set(rows);
+  const rows=getRows(),current=new Set(rows);const matches=rows.filter(row=>getItems().some(w=>matchRow(row,w)));let empty=document.getElementById('tuim-filter-empty');if(!matches.length&&rows.length){if(!empty){empty=document.createElement('p');empty.id='tuim-filter-empty';empty.textContent='No monitored items are listed here. Turn off Show monitored items only to see all items.';rows[0].parentElement?.before(empty);}}else empty?.remove();
   for(const row of [...hiddenRows.keys()])if(!row.isConnected||!current.has(row))showRow(row);
   for(const row of rows){
    const hide=!getItems().some(w=>matchRow(row,w)),target=getFilterContainer(row)||row;
@@ -42,7 +42,7 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
  }
  const validRun=s=>run&&active&&run.expiresAt>now()&&String(s.ownerId)===run.ownerId&&s.country===run.country&&!s.traveling;
  function refresh(){
-  if(!action)return;if(action.hidden!==!run)action.hidden=!run;const display=run?'block':'none';if(action.style.display!==display)action.style.display=display;if(!run)return;
+  if(!action)return;const hide=!run||run.stage==='complete';if(action.hidden!==hide)action.hidden=hide;const display=hide?'none':'block';if(action.style.display!==display)action.style.display=display;if(!run)return;
   const s=getSnapshot(),kind=run.stage,waiting=kind==='waiting',pending=kind.endsWith('-pending');
   const minimum=Math.max(1,Number(getItems().find(w=>w.key===run.watchKey)?.minQty)||1);
   const stockAvailable=kind==='return'||(kind==='buy'?s.quantity>=minimum:!Number.isFinite(s.quantity)||s.quantity>=minimum);
@@ -57,10 +57,10 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   const watch=getItems().find(w=>w.key===watchKey&&w.category==='Foreign');if(!watch)throw Error('Select a monitored foreign item');
   const s=await getContext();
   if(!active||!focused())throw Error('Travel Assistant was closed or the page lost focus; arm again');
-  if(!s.country||s.traveling||!s.ownerId||!['Abroad','Hospital'].includes(s.status))throw Error('A confirmed foreign location and non-flying status are required');
-  if((s.status==='Hospital')!==!!hospital)throw Error('Hospital answer does not match the verified status; refresh and try again');
+  if(!s.country||!s.ownerId||!['Abroad','Hospital','Traveling'].includes(s.status)||s.returning)throw Error('A confirmed foreign destination or current foreign location is required');
+  if(s.status!=='Traveling'&&(s.status==='Hospital')!==!!hospital)throw Error('Hospital answer does not match the verified status; refresh and try again');
   if(hospital&&(!medical?.name||!Number.isSafeInteger(Number(medical.id))||Number(medical.id)<1))throw Error('Select the medical item you intend to use');
-  run={ownerId:String(s.ownerId),country:s.country,watchKey,watchName:watch.name,minimumQty:Math.max(1,Number(watch.minQty)||1),hospital:!!hospital,medical,stage:'waiting',expiresAt:now()+TTL,stockAt:0};
+  run={intentId:window.crypto?.randomUUID?.()||String(now())+':'+Math.random(),ownerId:String(s.ownerId),country:s.country,watchKey,watchName:watch.name,minimumQty:Math.max(1,Number(watch.minQty)||1),hospital:!!hospital,medical,stage:'waiting',expiresAt:TTL,stockAt:0};
   watch.fired=false;clearStatusTimer();executeAction?.cancel();busy=false;persist();notice('Armed. Waiting for the selected item alarm.');refresh();emit('armed',{hospital:!!hospital});onArmed();return {...run};
  }
  function stock(w,s){
@@ -69,7 +69,8 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
  }
  function check(){
   if(!run)return;const s=getSnapshot();
-  if(run.expiresAt<=now()||String(s.ownerId)!==run.ownerId){disarm('Session expired or player changed; arm again');return;}
+  if(s.ownerId==null){refresh();return;}
+  if(String(s.ownerId)!==run.ownerId){disarm('Player changed; arm again');return;}
   if(run.stage==='heal'&&s.hospitalized===false){run.stage='buy';persist();}
   if(run.stage==='buy'&&s.hospitalized===true){if(run.medical){run.stage='heal';persist();}else{notice('Hospitalized: restore Travel Assistant and select a healing item, then re-arm.');}}
   if(run.stage==='heal-pending'&&s.hospitalized===false){clearStatusTimer();run.stage='buy';persist();notice('Hospital release confirmed. Return to the monitored shop and verify fresh stock before buying.');}
@@ -153,6 +154,6 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   }refresh();if(run)scheduleStatus();
  }
 
- function update(){applyFilter();check();if(hud&&hud.hidden!==!run)hud.hidden=!run;}
+ function update(){applyFilter();check();if(hud)hud.hidden=!run||run.stage==='complete';}
  return {start,stop(){active=false;disarm('Tool exited; sequence canceled');restoreRows();hud?.remove();hud=null;action=null;drag=null;window.removeEventListener('resize',resizeButton);},mount,arm,act,stock,check,update,disarm,getState:()=>run?{...run}:null,applyFilter,restoreRows};
 }

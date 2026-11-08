@@ -27,6 +27,8 @@ try{
  assert.equal(t.d.querySelector('[aria-label="Are you hospitalized?"]').value,'yes');assert.equal(JSON.parse(t.d.querySelector('[aria-label="Selected medical item"]').value).name,'Morphine');assert.ok(t.d.querySelector('#tuim-panel').textContent.includes('Current selection: Foreign / Fixture Flower'));assert.equal(t.d.querySelector('#tuim-panel input[type=number]').value,'7');
  assert.equal(JSON.parse(t.w.localStorage.getItem('tu-item-monitor-v1')).length,1);
  assert.equal(t.d.querySelector('#tu-snatch-run').hidden,true,'Restoring preferences does not arm gameplay');
+ const hospitalAgain=t.d.querySelector('[aria-label="Are you hospitalized?"]');hospitalAgain.value='no';hospitalAgain.dispatchEvent(new t.w.Event('change'));button(t.d.querySelector('#tuim-panel'),'Arm Snatch and Run').click();await pause();const armed=t.w.sessionStorage.getItem('tu:snatch-run:v1');assert.ok(armed);
+ const armedStorage=Object.fromEntries(['localStorage','sessionStorage'].map(store=>[store,Object.fromEntries(Object.keys(t.w[store]).map(k=>[k,t.w[store].getItem(k)]))]));t.close();t=await boot(armedStorage);assert.equal(t.w.TornUtilities.isActive('item-monitor'),true);assert.equal(JSON.parse(t.w.sessionStorage.getItem('tu:snatch-run:v1')).intentId,JSON.parse(armed).intentId,'Refresh preserves this exact armed intent');assert.equal(t.d.querySelector('#tu-snatch-run').hidden,false,'Waiting button returns after authorized refresh');
  t.w.TornUtilities.closeActiveModule();assert.equal(t.w.sessionStorage.getItem('tu:monitor:resume:v1'),null,'Explicit exit prevents automatic restart');
  assert.deepEqual(t.errors,[]);
 }finally{t.close()}

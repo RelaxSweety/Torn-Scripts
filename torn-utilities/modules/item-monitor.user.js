@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.12.10-dev
+// @version      1.12.11-dev
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -152,7 +152,7 @@ function snatchSnapshot(watch=null){
  const ownerId=host.TornUtilities?.getPlayer?.()?.id;
  const nativeStatus=document.querySelector('[data-user-status]')?.getAttribute('data-user-status');
  const nativeState=nativeActions?.enabled()?nativeActions.inspect(run):null;
- const status=nativeState?.traveling?'Traveling':nativeState?.released?'Abroad':document.querySelector('a[aria-label^="Hospital:"]')?'Hospital':['Hospital','Abroad','Traveling'].includes(nativeStatus)?nativeStatus:snatchContext?.status;
+ const status=nativeState?.traveling?'Traveling':nativeState?.released?'Abroad':document.querySelector('a[aria-label^="Hospital:"]')?'Hospital':liveCountry()?'Abroad':['Hospital','Abroad','Traveling'].includes(nativeStatus)?nativeStatus:snatchContext?.status;
  let purchaseProof=null,purchaseItemKey=null;
  for(const el of document.querySelectorAll('[role=alert],[role=status],.success,[class*=success]')){
   if(el.closest('#tuim-panel,#tu-snatch-run,#tu-pda-panel')||!el.getClientRects().length)continue;
@@ -168,8 +168,11 @@ async function getSnatchContext({inventory=false}={}){
  const api=host.TornUtilities;if(typeof api?.requestTravelInfo!=='function')throw Error('Update the integrated TU Manager to use Snatch and Run');
  const data=await api.requestTravelInfo('profile'),profile=data.profile||data;
  let country=liveCountry(),status=profile.status?.state||'',description=profile.status?.description||'';
- if(!country){try{const trip=await api.requestTravelInfo('travel');const destination=trip.travel?.destination;country=Object.keys(travelAliases).find(code=>travelAliases[code].some(alias=>norm(alias)===norm(destination)));}catch{}}
- snatchContext={ownerId:api.getPlayer()?.id,country,status,description,checkedAt:Date.now()};
+ const route=document.querySelector('#travel-root [aria-label="Flight progress"]')?.textContent||'';
+ const traveling=status==='Traveling',returning=traveling&&/\b(?:to|back to|returning to) torn\b/i.test(description+' '+route);
+ if(traveling){country=Object.keys(travelAliases).find(code=>travelAliases[code].some(alias=>norm(description).includes(norm(alias))||new RegExp('(?:to|→)\\s*'+alias+'\\b','i').test(route)))||null;}
+ if(!country&&!returning){try{const trip=await api.requestTravelInfo('travel');const destination=trip.travel?.destination;country=Object.keys(travelAliases).find(code=>travelAliases[code].some(alias=>norm(alias)===norm(destination)));}catch{}}
+ snatchContext={ownerId:api.getPlayer()?.id,country,status,traveling,returning,description,checkedAt:Date.now()};
  if(inventory){const d=await api.requestTravelInfo('inventory');snatchContext.medicalItems=d.inventory?.items||[];}
  enhancements?.check();return snatchContext;
 }
@@ -187,10 +190,9 @@ function alertItem(w,reason){const p=state.panel?.querySelector('#tuim-status');
 function scan(){
   if(document.hidden||!document.hasFocus())return;if(!state.items.length){enhancements?.restoreRows();return;}enhancements?.update();
   style();
-  const cat=category(),rows=state.items.some(w=>w.category===cat)?[...document.querySelectorAll(candidates)].filter(e=>!e.closest('#tuim-panel,#tu-pda-panel')):[];
+  const cat=category(),rows=state.items.length?[...document.querySelectorAll(candidates)].filter(e=>!e.closest('#tuim-panel,#tu-pda-panel')):[];
   for(const w of state.items){
     const previous=w.row;
-    if(w.category!==cat){previous?.classList.remove('tuim-watch','tuim-trigger','tuim-wait');w.row=null;w.status='Waiting for '+w.category;w.fired=false;continue}
     if(cat==='Item Market'){
       previous?.classList.remove('tuim-watch','tuim-trigger','tuim-wait');w.row=null;
       const active=pageItem();

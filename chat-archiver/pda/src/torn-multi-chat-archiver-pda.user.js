@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Multi-Chat Archiver PDA
 // @namespace    RelaxSweety.Torn
-// @version      0.1.8
+// @version      0.1.9
 // @description  Mobile/PDA chat archiver based on desktop v1.9; touch-friendly controls
 // @match        https://www.torn.com/*
 // @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/chat-archiver/pda/src/torn-multi-chat-archiver-pda.user.js
@@ -62,6 +62,15 @@
     const PANEL_POS_KEY = 'RelaxSweety_TCA_PDA_v01_panelPosition';
     const PANEL_MIN_KEY = 'RelaxSweety_TCA_PDA_v01_minimized';
 
+    const chatSupport=typeof createChatCaptureSupport==='function'?createChatCaptureSupport():null;
+    let lastDiagnosticAt=0;
+    const chatEvent=(event,fields={})=>{try{document.dispatchEvent(new CustomEvent('tu-chat-diagnostic',{detail:JSON.stringify({event,running:autoRunning,...fields})}));}catch{}};
+    const scrollMetrics=scroller=>({top:scroller.scrollTop,height:scroller.scrollHeight,viewport:scroller.clientHeight});
+    function detectHistoryReset(before,scroller){
+        if(!chatSupport?.interrupted(before,scrollMetrics(scroller)))return false;
+        autoRunning=false;autoPaused=true;chatEvent('scroll-interrupted',scrollMetrics(scroller));
+        setStatus('History scrolling interrupted: chat returned to latest messages. Archive retained; restore your history position and resume.');updateIndicators();return true;
+    }
     let scrollStep = 20;
     let scrollDelay = 40;
 
@@ -914,7 +923,7 @@
 
             isSelf: rendered.isSelf,
 
-            exactTimestamp: '',
+            exactTimestamp: chatSupport?.timestamp(rendered.wrapper||rendered.box)||'',
 
             groupTimestamp:
                 groupTimestamp || '',
@@ -1186,7 +1195,7 @@
                         false,
 
                     exactTimestamp:
-                        '',
+                        chatSupport?.timestamp(msg.wrapper||msg.box)||'',
 
                     groupTimestamp,
 
@@ -1318,6 +1327,7 @@
             beginLiveMessageYield();
         }
 
+        if(performance.now()-lastDiagnosticAt>250){lastDiagnosticAt=performance.now();const values=[...archive.values()];chatEvent('scan',{historicalAdded:result.historicalAdded,liveAdded:result.liveAdded,total:archive.size,exactTimes:values.filter(r=>r.exactTimestamp).length,groupTimes:values.filter(r=>r.groupTimestamp).length});}
         updateStatus();
 
         return result;
@@ -2109,6 +2119,7 @@
                 getScroller();
 
             if (liveScroller) {
+                if(scroller&&liveScroller!==scroller&&detectHistoryReset(scrollMetrics(scroller),liveScroller))return;
                 scroller =
                     liveScroller;
             }
@@ -2128,6 +2139,7 @@
              */
             // Capture the outgoing virtualized window before it disappears.
             scan();
+            const beforeScroll=scrollMetrics(scroller);
             performAutoScrollStep(
                 scroller
             );
@@ -2154,6 +2166,7 @@
                 continue;
             }
 
+            if(detectHistoryReset(beforeScroll,scroller))return;
             // PDA virtual lists may change without emitting a scroll event.
             scan();
             const now =
@@ -2211,6 +2224,7 @@
                     return;
                 }
 
+                if(detectHistoryReset(beforeScroll,getScroller()||scroller))return;
                 scan();
 
                 if (lastHistoricalProgressAt > before) {
@@ -2831,6 +2845,7 @@
     }
 
     function setStatus(note) {
+        chatEvent('status');
         if (note) {
             currentStatusNote =
                 note;

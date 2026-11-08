@@ -9,7 +9,7 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
  const scope=()=>document.querySelector('#travel-root');
  const itemName=e=>norm(e?.getAttribute('aria-label')).replace(/\s+slot\s+\d+$/,'');
  const inventory=name=>[...(scope()?.querySelectorAll('[class*=inventorySlot] > button[aria-label]')||[])].filter(e=>shown(e)&&itemName(e)===norm(name));
- const same=(a,b)=>a&&b&&a.ownerId===b.ownerId&&a.expiresAt===b.expiresAt&&a.watchKey===b.watchKey;
+ const same=(a,b)=>a&&b&&a.ownerId===b.ownerId&&a.intentId===b.intentId&&a.expiresAt===b.expiresAt&&a.watchKey===b.watchKey;
  function resolveItem(run){
   const declared=String(run.watchKey||'').match(/^id:(\d+)$/)?.[1];
   const candidates=[...(scope()?.querySelectorAll('form[id^="item-"][id$="-form"]')||[])].map(form=>({form,id:form.id.match(/^item-(\d+)-form$/)?.[1],row:form.closest('[class*=row]')})).filter(({row,id})=>{
@@ -125,7 +125,7 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
     const confirmSnapshot=getSnapshot(),confirmStock=Number.isFinite(confirmSnapshot.quantity)?confirmSnapshot.quantity:s.quantity;const finalCapacity=capacityFor(row,run,confirmStock,amount);if(capacity.verified&&finalCapacity.verified&&finalCapacity.desired!==amount)throw Error('Capacity, stock or funds changed before confirmation');
     if(getSnapshot().hospitalized!==false)throw Error('Hospital state changed before confirmation');submitted=true;click(yes);
     await wait(()=>{const snapshot=getSnapshot();return inventory(run.watchName).length>=before+amount||snapshot.purchaseProof&&snapshot.purchaseProof!==run.priorProof&&snapshot.purchaseItemKey===run.watchKey;});
-    purchased={...run,proof:'native:'+run.expiresAt+':'+id+':'+amount};return {purchaseConfirmed:true,amount};
+    purchased={...run,proof:'native:'+(run.intentId||run.expiresAt)+':'+id+':'+amount};return {purchaseConfirmed:true,amount};
    }
    if(kind==='return'){
     if(!run.purchaseConfirmed)throw Error('Confirm the purchase before returning');

@@ -1,4 +1,4 @@
-# Travel Assistant DEV acceptance: 0.5.42.51-dev
+# Travel Assistant DEV acceptance: 0.5.42.54-dev
 
 Alarms update status and sound without changing whether the user minimized the main window. Monitoring continues while the activated tool is minimized, on the actively viewed Torn page. Exit stops its runtime. Hidden or unfocused pages are not scanned for stock.
 
@@ -22,7 +22,7 @@ The shared adapter enables for Tampermonkey or a detected Torn PDA bridge/user a
 
 During a native action, a bounded DOM observer waits for the next control/result; it disconnects on success, failure or cancellation. There is no additional observer/polling when idle. Native result evidence advances successful native stages without waiting for cached API status. If a heal/return submission was accepted but its result was not established, existing bounded status refreshes may help recover; submissions never retry automatically. Unknown intermediate outcomes remain pending for manual resolution rather than risking duplicate item use/purchase.
 
-A session-only intent can survive navigation for up to 15 minutes. Controls are matched again on the new page. No action resumes automatically. Stock must remain fresh; unknown layouts, stale stock, missing controls, unfocused pages and unverified results block progress. Setup stores no action URLs, DOM bindings, keys or tokens.
+A same-tab armed intent survives navigation and waiting without a fixed timer. Cancel, explicit tool exit or a verified player change ends it. Controls are matched again on the new page. No action resumes automatically. Stock must remain fresh; unknown layouts, stale stock, missing controls, unfocused pages and unverified results block progress. Setup stores no action URLs, DOM bindings, keys or tokens.
 
 ## Validation boundary
 
@@ -87,3 +87,9 @@ The .50 PDA report confirms Heal in 1.196 seconds and flight booking in 0.539 se
 ## Purchase quantity readiness (0.5.42.53-dev)
 
 A PC .52 report shows a four-second pre-submit timeout after verified capacity 18 and stale native Max 17. The second attempt succeeded. Input values are intentionally absent from the DOM snippets, so the report alone does not establish whether Torn replaced the input or reset its value. The adapter now reacquires the current item row/input during readiness checks and prepares replacement inputs once, rechecking live capacity first. A regression replaces the input during preparation and confirms one 18-item purchase. Quantity preparation/readiness events expose the next observed value and reason without raw input dumps. This hardens form replacement; live confirmation is still required for the reported pause.
+
+## Outbound arming, persistence and filtering (0.5.42.54-dev)
+
+Arm while Traveling to a recognized foreign destination. The action remains red until the destination page is visible, identity matches and fresh stock is observed. A return-to-Torn flight cannot be armed as an outbound trip. Completion hides the floating button. The old 15-minute intent expiry is removed; fresh-stock and per-action timeout protections remain. An unloaded player identity cannot cancel intent; a verified different player does cancel it. Refresh never replays a submitted native action automatically.
+
+Watch matching uses stable item ID or exact item name, without a country restriction. Scanner evaluation no longer restricts a saved watch to its original shop category. Quantity and price thresholds apply where those values are available; a quantity-only watch does not create a price target. An active filter hides absent/unmonitored items and explicitly explains when no watched items are listed here.

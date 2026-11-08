@@ -4,7 +4,7 @@ This updates **TU Testing and Diagnostics DEV**, previously v0.1.9-dev, to **v0.
 
 [Install/update TU Test](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/all-in-one/dist/tu-diagnostics-dev.user.js)
 
-Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.53-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
+Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.54-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
 
 ## Using it
 
@@ -14,7 +14,7 @@ Install alongside the integrated TU DEV userscript. The current checklist target
 4. Exercise real DEV authentication and backend agreement acceptance/cancellation yourself. The test tool never accepts terms, registers keys, creates rooms, submits gameplay, or deploys backend changes. Controlled agreement-version-change tests need an authorized DEV setup; leave BLOCKED when unavailable.
 5. Complete functional and lifecycle checks for every tool. Multiplayer requires separate DEV accounts and fresh DEV rooms; check full games, reconnects, rematches, histories and token handling. Use device-specific input/audio/rendering checks for games.
 6. Repeat on the other host. PDA and Tampermonkey results are independent, keyed by target build and checklist version. A mock/browser fixture cannot count as native host evidence. When testing on separate devices, export each device's report and retain both; results are not synchronized or automatically merged.
-7. Use **Export both host reports** to save JSON evidence. Both host checklists must pass every critical check and include device/host metadata for `acceptanceComplete`. SKIP, BLOCKED and NOT TESTED do not satisfy completion. `productionAuthorized` always remains false; production still requires review and a separate explicit decision.
+7. Use **Export all diagnostics** to save JSON evidence. Both host checklists must pass every critical check and include device/host metadata for `acceptanceComplete`. SKIP, BLOCKED and NOT TESTED do not satisfy completion. `productionAuthorized` always remains false; production still requires review and a separate explicit decision.
 
 Notes/feedback are sanitized for common API key, bearer token, UUID and JWT patterns. Never enter credentials: redaction is a safeguard, not a credential-input feature. Exports include every check, including untested entries and instructions, separate host summaries, target version and method of verification.
 
@@ -70,7 +70,7 @@ Revision v7 checks the inline checkbox, removal of the About logo link, and comp
 
 Integrated TU remains 0.5.42.49-dev. Update the independent TU Test script and confirm/correct its device and actual host/version fields before starting.
 
-**Start while still hospitalized.** In **Snatch and Run · DOM diagnostic**, leave the stage as **Workflow (continuous)** and press **Start monitoring**. TU Test minimizes and its launcher reads **TU Test · REC**. Perform the whole normal manual sequence without returning to diagnostics: healing item → Use → Yes → Max → Buy → Yes → Return to Torn → native flight confirmation. Do not pause after healing to capture or label steps. Once safely on the flight, open TU Test, press **Stop monitoring**, then **Export travel DOM and system info**.
+**Start while still hospitalized.** In **Snatch and Run · DOM diagnostic**, leave the stage as **Workflow (continuous)** and press **Start monitoring**. TU Test minimizes and its launcher reads **TU Test · REC**. Perform the whole normal manual sequence without returning to diagnostics: healing item → Use → Yes → Max → Buy → Yes → Return to Torn → native flight confirmation. Do not pause after healing to capture or label steps. Once safely on the flight, open TU Test, press **Stop monitoring**, then **Export all diagnostics**.
 
 Recording observes clicks/changes in chronological order and captures related DOM updates such as a newly opened confirmation. It does not prevent, submit, repeat, confirm or otherwise automate native gameplay actions. There is no one-click capture stop or 30-second monitoring cutoff. The optional stage selector can annotate a later test, but no stage changes are required during the workflow. Closing/minimizing the TU Test panel does not stop recording. Monitoring and records resume across normal page navigation/reload in the same tab; a new tab, different WebView or cleared sessionStorage may not retain them. Stop removes its listeners, pending capture work and DOM observer.
 
@@ -82,7 +82,7 @@ Revision v8 targets the captured PC Tampermonkey native-action flow in DEV 0.5.4
 
 Revision v9 adds the captured Torn PDA compact purchase-panel flow to DEV 0.5.42.44 and TU Test 0.2.12. Validate PDA and PC separately. The Purchase Max click must expand the monitored icon, use the visible panel controls and confirm the exact item/quantity once; hidden desktop fields must remain unused. Healing/return are shared native flows. Continuous recording can run throughout without pausing after healing.
 
-Revision v10 covers name-based watches with Hospital No/no medical selection and Public Only keys on both hosts. TU Test 0.2.13 exports startup/launcher diagnostics even without a gameplay recording. For a missing PDA icon, use Export both host reports immediately; inspect startup.phase, startup.error, managerApiPresent and launcher state before inferring whether TU is absent.
+Revision v10 covers name-based watches with Hospital No/no medical selection and Public Only keys on both hosts. TU Test 0.2.13 exports startup/launcher diagnostics even without a gameplay recording. For a missing PDA icon, use Export all diagnostics immediately; inspect startup.phase, startup.error, managerApiPresent and launcher state before inferring whether TU is absent.
 
 ## Snatch and Run function monitoring (TU Test 0.2.14)
 
@@ -105,3 +105,11 @@ TU Test 0.2.19 targets 0.5.42.51. Validate same-tab refresh with a minimized mon
 TU Test 0.2.20 targets 0.5.42.52. Validate Select Item from Complete List on a cold catalog cache on PC and PDA, using a verified Public Only or Limited Access login key.
 
 TU Test 0.2.21 targets 0.5.42.53. Quantity preparation/readiness events help distinguish an unavailable form from a native quantity reset during post-heal Purchase Max.
+
+## Chat Archiver behavior monitor and combined export (0.2.22-dev)
+
+Sections identify System/test host, Travel/Snatch and Run, Chat Archiver, tool acceptance results and export. Start chat monitoring before capture or historical scrolling. Scroll positions, abrupt jumps, archive progress and exact/group timestamp counts are recorded; chat text, room names and player identities are excluded. Stop afterward. The passive monitor is limited to 300 events, sampled scroll events are throttled, and same-tab recording resumes across navigation. A jump to the latest end pauses automated archiving and retains its captured records instead of declaring history complete. Large history prepends are not classified as jumps.
+
+The single Export all diagnostics button includes both host checklists, system/startup information, travel/Snatch and Run evidence and chat behavior records collected so far. It does not claim unperformed tests passed. Update both TU and TU Test for new capture events.
+
+Native timestamp support reads explicit message attributes or full timestamps, preserving unknown/group-only values when exact evidence is absent. Exact parity with the separately referenced M’aol archiver still requires its source reference; no capture-time fallback is treated as a message timestamp.

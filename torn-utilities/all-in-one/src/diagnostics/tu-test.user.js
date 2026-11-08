@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Testing and Diagnostics DEV
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.2.21-dev
+// @version      0.2.22-dev
 // @description  Guided DEV acceptance, system information and sanitized travel DOM diagnostics
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -96,8 +96,9 @@
   const content=document.createElement('div');content.style.cssText='flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding-right:4px';panel.append(content);
  const button=(label,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=fn;b.style.cssText='font:600 12px Arial;color:#fff;background:#344d60;border:1px solid #7892a2;border-radius:5px;padding:8px;margin:3px;cursor:pointer';return b;};
  const text=(tag,value,parent=content)=>{const e=document.createElement(tag);e.textContent=value;parent.append(e);return e;};
- const notice=text('p','Target '+targetBuild+' · TU Test 0.2.21-dev. Record results only for the actual selected host. Automatic checks are read-only and do not prove gameplay or native bridge compatibility.');
+ const notice=text('p','Target '+targetBuild+' · TU Test 0.2.22-dev. Record results only for the actual selected host. Automatic checks are read-only and do not prove gameplay or native bridge compatibility.');
  text('p','Do not paste API keys, session tokens or room secrets into notes. This tool never registers keys, accepts/cancels agreements, creates rooms or modifies backend records.');
+ text('h2','System and test host');
  const hostLabel=text('label','Actual test host: ');
  const hostSelect=document.createElement('select');hostSelect.id='tu-test-host';
  for(const [id,label] of [['unknown','Select actual host'],['tampermonkey','Tampermonkey'],['pda','Torn PDA']]){const o=document.createElement('option');o.value=id;o.textContent=label;hostSelect.append(o);}hostSelect.value=platform;hostLabel.append(hostSelect);
@@ -106,6 +107,7 @@
  for(const e of [device,hostVersion]){e.style.cssText='display:block;width:100%;box-sizing:border-box;padding:8px;margin:6px 0';e.oninput=()=>{session.setMeta({device:device.value,hostVersion:hostVersion.value});save();updateSummary();};}
  const contextWarning=text('p','');
  const detectedDetails=text('p','');detectedDetails.id='tu-test-detected-environment';
+ text('h2','Acceptance checklist filters');
  const section=document.createElement('select');section.id='tu-test-section';
  const sections=[['all','All sections'],['automatic','Read-only automatic checks'],['auth','Authentication & agreement'],['core','Manager, data & release'],...tools.map(t=>['tool.'+t.id,t.name])];
  for(const [id,label] of sections){const o=document.createElement('option');o.value=id;o.textContent=label;section.append(o);}content.append(section);
@@ -123,10 +125,12 @@
  for(const stage of travelDiagnostic.stages){const option=document.createElement('option');option.value=stage;option.textContent=stage;travelStage.append(option);}
  travelNotice.textContent=travelDiagnostic.report().captures.length+' saved captures. Monitoring is OFF until started or resumed from this tab.';
  travelStage.onchange=()=>travelDiagnostic.setStage(travelStage.value);
- travelSection.append(button('Start monitoring',()=>{travelDiagnostic.start(travelStage.value);panel.style.display='none';launcher.textContent='TU Test · REC';}),button('Stop monitoring',()=>{travelDiagnostic.stop();launcher.textContent='TU Test';}),button('Export travel DOM and system info',()=>exportReport()),button('Clear travel DOM captures',()=>{travelDiagnostic.clear();launcher.textContent='TU Test';}));
+ travelSection.append(button('Start monitoring',()=>{travelDiagnostic.start(travelStage.value);panel.style.display='none';launcher.textContent='TU Test · REC';}),button('Stop monitoring',()=>{travelDiagnostic.stop();launcher.textContent='TU Test';}),button('Clear travel DOM captures',()=>{travelDiagnostic.clear();launcher.textContent='TU Test';}));
  const startupStatus=text('p','');startupStatus.id='tu-test-startup-status';
  const showStartup=()=>{const state=launcherStartupReport();startupStatus.textContent='TU startup: '+state.phase+' · '+(state.build||'build not detected')+' · Manager '+(state.managerApiPresent?'present':'not detected')+' · Icon '+(state.launcher.present?(state.launcher.hidden?'hidden':'present'):'not detected')+(state.error?' · '+state.error.name+': '+state.error.message:'');};
  showStartup();travelSection.append(button('Check TU launcher startup',showStartup));
+ const chatSection=document.createElement('section');chatSection.id='tu-test-chat-monitor';content.append(chatSection);text('h2','Chat Archiver · behavior monitor',chatSection);text('p','Record chat scrolling, position jumps, capture progress and available timestamp counts. Chat text and player identities are excluded. Start before scrolling history; Stop when finished. All captured evidence is included in the single Export all diagnostics action.',chatSection);const chatNotice=text('p','Not recording',chatSection);const createChatMonitor=__TU_CHAT_MONITOR__;const chatMonitor=createChatMonitor({document,window,storageKey:'tu:test:chat:'+targetBuild,onChange:value=>chatNotice.textContent=value});chatSection.append(button('Start chat monitoring',()=>{chatMonitor.start();panel.style.display='none';}),button('Stop chat monitoring',()=>chatMonitor.stop()),button('Clear chat monitoring',()=>chatMonitor.clear()));
+ text('h2','Tool acceptance results');
  const list=document.createElement('div');list.id='tu-test-checklist';content.append(list);
  const feedback=text('textarea','');feedback.placeholder='General feedback (no credentials)';feedback.id='tu-test-feedback';feedback.style.cssText='width:100%;box-sizing:border-box;min-height:70px';
  feedback.oninput=()=>{session.setMeta({feedback:feedback.value});save();};
@@ -149,13 +153,13 @@
  }
  const currentBuild=()=>document.querySelector('#tu-pda-panel footer')?.textContent.match(/Torn Utilities v([^\s]+)/)?.[1]||null;
  function render(){
-  list.replaceChildren();updateSummary();const results=session.snapshot().results;
+  list.replaceChildren();updateSummary();let lastGroup='';const results=session.snapshot().results;
   for(const t of tests){
    const r=results[t.id]||{status:'not-tested',note:''};
    if(section.value!=='all'&&section.value!==t.section)continue;
    if(filter.value==='unpassed'&&r.status==='pass')continue;
    if(!['all','unpassed'].includes(filter.value)&&r.status!==filter.value)continue;
-   const row=document.createElement('section');row.dataset.testId=t.id;row.style.cssText='border-top:1px solid #789;padding:10px 0';list.append(row);
+   const group=sections.find(([id])=>id===t.section)?.[1]||t.section;if(group!==lastGroup){text('h3',group,list);lastGroup=group;}const row=document.createElement('section');row.dataset.testId=t.id;row.style.cssText='border-top:1px solid #789;padding:10px 0';list.append(row);
    text('strong',t.label,row);text('div',(t.kind==='automatic'?'READ-ONLY AUTO':'MANUAL · ACTUAL HOST')+' · '+statusLabel(r.status),row);
    text('p',t.instructions,row);
    const note=document.createElement('textarea');note.placeholder='Observed behavior, reproduction steps or reason blocked/skipped. Never enter credentials.';note.value=r.note;note.style.cssText='width:100%;box-sizing:border-box;min-height:45px';row.append(note);
@@ -222,15 +226,16 @@
  }
  function exportReport(){
   save();const reports={};for(const id of ['tampermonkey','pda'])reports[id]=createSession({targetBuild,checklistVersion:catalog.checklistVersion,tests,platform:id,initial:profiles[id]}).report();
-  const report={schemaVersion:2,toolVersion:'0.2.21-dev',targetBuild,installedBuild:currentBuild()||null,viewport:{width:window.innerWidth,height:window.innerHeight,devicePixelRatio:window.devicePixelRatio},checklistVersion:catalog.checklistVersion,detectedHost:detected,detectedEnvironment:Object.fromEntries(Object.entries(environment).map(([k,fields])=>[k,Object.fromEntries(Object.entries(fields).map(([name,value])=>[name,typeof value==='string'?session.scrub(value):value]))])),userAgent:session.scrub(navigator.userAgent),platforms:reports,acceptanceComplete:Object.values(reports).every(r=>r.platformReady),productionAuthorized:false,startup:launcherStartupReport(),travelDom:travelDiagnostic.report()};
+  const report={schemaVersion:2,toolVersion:'0.2.22-dev',targetBuild,installedBuild:currentBuild()||null,viewport:{width:window.innerWidth,height:window.innerHeight,devicePixelRatio:window.devicePixelRatio},checklistVersion:catalog.checklistVersion,detectedHost:detected,detectedEnvironment:Object.fromEntries(Object.entries(environment).map(([k,fields])=>[k,Object.fromEntries(Object.entries(fields).map(([name,value])=>[name,typeof value==='string'?session.scrub(value):value]))])),userAgent:session.scrub(navigator.userAgent),platforms:reports,acceptanceComplete:Object.values(reports).every(r=>r.platformReady),productionAuthorized:false,startup:launcherStartupReport(),travelDom:travelDiagnostic.report(),chatArchiver:chatMonitor.report()};
   const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='tu-dev-acceptance-'+targetBuild+'-'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
  }
- actions.append(button('Export both host reports',exportReport),button('Reset selected host',()=>{
+ text('h2','Export all diagnostics',actions);text('p','One JSON file includes all recorded checks for both hosts, system information, startup, travel/Snatch and Run recordings, and chat archiver monitoring. Export does not run tests that have not been performed.',actions);
+ actions.append(button('Export all diagnostics',exportReport),button('Reset selected host',()=>{
   if(!confirm('Clear results for this build and selected host? Export first to retain evidence.'))return;
   delete profiles[platform];loadSession();refreshFields();save();render();
  }));
  launcher.onclick=()=>{if(suppressClick){suppressClick=false;return;}panel.style.display=panel.style.display==='none'?'flex':'none';if(panel.style.display==='none')panelResizeObserver?.disconnect();else panelResizeObserver?.observe(panel);render();showStartup();};
- document.body.append(launcher,panel);refreshFields();render();travelDiagnostic.resume();travelStage.value=travelDiagnostic.report().stage;if(travelDiagnostic.report().monitoring)launcher.textContent='TU Test · REC';
+ document.body.append(launcher,panel);refreshFields();render();travelDiagnostic.resume();chatMonitor.resume();travelStage.value=travelDiagnostic.report().stage;if(travelDiagnostic.report().monitoring)launcher.textContent='TU Test · REC';
  if(typeof navigator.userAgentData?.getHighEntropyValues==='function'){
   Promise.resolve().then(()=>navigator.userAgentData.getHighEntropyValues(['model','platformVersion','fullVersionList'])).then(hints=>{
    const previous=describeEnvironment();environment=detectEnvironment({...baseEnvironment,uaData:{platform:navigator.userAgentData.platform,brands:navigator.userAgentData.brands,...hints}});

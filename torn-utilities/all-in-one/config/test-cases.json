@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "checklistVersion": "dev-acceptance-2026-11-07-v14",
+  "checklistVersion": "dev-acceptance-2026-11-08-v15",
   "tests": [
     {
       "id": "runtime.build",
@@ -438,7 +438,7 @@
       "id": "tool.chat-archiver.function",
       "section": "tool.chat-archiver",
       "label": "Chat Archiver \u2014 functional test",
-      "instructions": "Capture live/history chats, select channels, pause/resume/stop, scroll without jumping, preserve records, and verify complete CSV/JSON exports.",
+      "instructions": "Capture live/history chats, select channels, pause/resume/stop, scroll without jumping, preserve records, and verify complete CSV/JSON exports. Record chat behavior monitoring while scrolling older history. Verify native message timestamps, distinguish missing exact time from group labels, detect a reset to latest messages and retain captured history without declaring completion.",
       "kind": "manual",
       "critical": true,
       "platforms": [
@@ -594,7 +594,7 @@
       "id": "tool.item-monitor.lifecycle",
       "section": "tool.item-monitor",
       "label": "Travel Assistant and Item Monitor \u2014 lifecycle and saved data",
-      "instructions": "Open, minimize, restore, Back, Exit, switch away and reopen this tool repeatedly. Check viewport/scroll/touch behavior, one instance, saved data and cessation of polling/listeners after Exit. Verify no late errors or duplicate requests. Minimize the main monitor and planner, restore through the TU icon, and reopen the active tool through its Business Tools card repeatedly. Exactly one window must restore with unsaved input and an armed Snatch and Run intent preserved; no monitor restart/cancellation.",
+      "instructions": "Open, minimize, restore, Back, Exit, switch away and reopen this tool repeatedly. Check viewport/scroll/touch behavior, one instance, saved data and cessation of polling/listeners after Exit. Verify no late errors or duplicate requests. Minimize the main monitor and planner, restore through the TU icon, and reopen the active tool through its Business Tools card repeatedly. Exactly one window must restore with unsaved input and an armed Snatch and Run intent preserved; no monitor restart/cancellation. Arm during an outbound foreign flight, refresh and wait over 15 minutes, confirm arrival enables fresh-stock actions and return flight hides the button. Check unknown identity during startup preserves intent and another player cannot use it.",
       "kind": "manual",
       "critical": true,
       "platforms": [

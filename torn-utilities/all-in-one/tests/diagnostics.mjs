@@ -42,37 +42,37 @@ for(const isolated of [false,true]){
  const b=boot({isolated});try{
   const {w,button,requests,errors,alerts}=b;
   assert.equal(w.document.querySelectorAll('[data-test-id]').length,58);
-  button('Export both host reports').click();assert.equal(b.report().platforms.tampermonkey.counts.pass,0,'Legacy results are not imported');assert.equal(b.report().platforms.pda.results.length,58);
+  button('Export all diagnostics').click();assert.equal(b.report().platforms.tampermonkey.counts.pass,0,'Legacy results are not imported');assert.equal(b.report().platforms.pda.results.length,58);
   button('Run read-only checks').click();await tick();await tick();
-  button('Export both host reports').click();assert.equal(b.report().platforms.tampermonkey.counts.pass,7);assert.equal(b.report().platforms.pda.counts.pass,0);assert.equal(b.report().acceptanceComplete,false);
+  button('Export all diagnostics').click();assert.equal(b.report().platforms.tampermonkey.counts.pass,7);assert.equal(b.report().platforms.pda.counts.pass,0);assert.equal(b.report().acceptanceComplete,false);
   assert.equal(requests.length,2);assert.ok(requests.some(r=>r.url.endsWith('/agreements/dev/version.json')));assert.ok(!requests.some(r=>r.url.includes('/agreement/current')||r.url.endsWith('/agreements/dev/current.json')),'Do not download full agreements for version comparison');for(const r of requests){assert.equal(r.method,'GET');assert.ok(!('data' in r));assert.ok(!Object.keys(r.headers).some(k=>k.toLowerCase()==='authorization'));}
   const auth=w.document.querySelector('[data-test-id="auth.public"]');auth.querySelector('button').click();assert.ok(alerts.pop().includes('evidence'));
   auth.querySelector('textarea').value='Registered a DEV Public Only test account; verified label';auth.querySelector('button').click();
-  button('Export both host reports').click();assert.equal(b.report().platforms.tampermonkey.counts.pass,8);
+  button('Export all diagnostics').click();assert.equal(b.report().platforms.tampermonkey.counts.pass,8);
   const filter=w.document.querySelector('#tu-test-status');filter.value='not-tested';filter.dispatchEvent(new w.Event('change'));assert.equal(w.document.querySelectorAll('[data-test-id]').length,50);
   filter.value='all';filter.dispatchEvent(new w.Event('change'));
   const section=w.document.querySelector('#tu-test-section');section.value='tool.war-hit-organizer';section.dispatchEvent(new w.Event('change'));assert.equal(w.document.querySelectorAll('[data-test-id]').length,2);
-  const host=w.document.querySelector('#tu-test-host');host.value='pda';host.dispatchEvent(new w.Event('change'));button('Export both host reports').click();assert.equal(b.report().platforms.pda.counts.pass,0);
-  button('Reset selected host').click();button('Export both host reports').click();assert.equal(b.report().platforms.tampermonkey.counts.pass,8,'Reset only affects selected host');
+  const host=w.document.querySelector('#tu-test-host');host.value='pda';host.dispatchEvent(new w.Event('change'));button('Export all diagnostics').click();assert.equal(b.report().platforms.pda.counts.pass,0);
+  button('Reset selected host').click();button('Export all diagnostics').click();assert.equal(b.report().platforms.tampermonkey.counts.pass,8,'Reset only affects selected host');
   w.eval(source);assert.equal(w.document.querySelectorAll('#tu-test-dev-toggle').length,1);
   assert.deepEqual(errors,[]);
  }finally{b.close()}
 }
 {
- const b=boot({offline:true});try{b.button('Run read-only checks').click();await tick();await tick();b.button('Export both host reports').click();const r=b.report().platforms.tampermonkey;assert.equal(r.counts.pass,3);assert.equal(r.counts.blocked,4);assert.equal(r.counts.fail,0);assert.equal(r.counts['not-tested'],51);}finally{b.close()}
+ const b=boot({offline:true});try{b.button('Run read-only checks').click();await tick();await tick();b.button('Export all diagnostics').click();const r=b.report().platforms.tampermonkey;assert.equal(r.counts.pass,3);assert.equal(r.counts.blocked,4);assert.equal(r.counts.fail,0);assert.equal(r.counts['not-tested'],51);}finally{b.close()}
 }
 {
- const b=boot({wrongBuild:true});try{const row=b.w.document.querySelector('[data-test-id="auth.public"]');row.querySelector('textarea').value='Unrelated old build';row.querySelector('button').click();assert.ok(b.alerts.pop().includes(targetBuild));b.button('Export both host reports').click();assert.equal(b.report().platforms.tampermonkey.counts.pass,0);}finally{b.close()}
+ const b=boot({wrongBuild:true});try{const row=b.w.document.querySelector('[data-test-id="auth.public"]');row.querySelector('textarea').value='Unrelated old build';row.querySelector('button').click();assert.ok(b.alerts.pop().includes(targetBuild));b.button('Export all diagnostics').click();assert.equal(b.report().platforms.tampermonkey.counts.pass,0);}finally{b.close()}
 }
 console.log('TU Test regression checks passed: catalog coverage, redaction, build/host isolation, evidence gates, UI, exports and blocked networking');
 {
  const b=boot();try{
   const {w,button}=b;const dialog=w.document.createElement('div');dialog.setAttribute('role','dialog');dialog.innerHTML='<p>Use a First Aid Kit?</p><button>Yes</button><button>No</button>';w.document.body.append(dialog);let submitted=0;dialog.querySelector('button').onclick=()=>submitted++;
   button('Start monitoring').click();dialog.querySelector('button').dispatchEvent(new w.MouseEvent('click',{bubbles:true,cancelable:true}));assert.equal(submitted,1);button('Stop monitoring').click();
-  button('Export travel DOM and system info').click();const report=b.report();assert.equal(report.toolVersion,'0.2.21-dev');assert.equal(report.installedBuild,targetBuild);assert.equal(report.travelDom.captures.length,1);assert.equal(report.travelDom.captures[0].installedBuild,targetBuild);assert.ok(report.travelDom.captures[0].html.includes('Yes'));assert.ok(report.detectedEnvironment.os);assert.ok(report.detectedEnvironment.browser);assert.ok(report.platforms.tampermonkey.meta);assert.equal(b.requests.length,0,'Region capture/export makes no network requests');assert.deepEqual(b.errors,[]);
+  button('Export all diagnostics').click();const report=b.report();assert.equal(report.toolVersion,'0.2.22-dev');assert.equal(report.installedBuild,targetBuild);assert.equal(report.travelDom.captures.length,1);assert.equal(report.travelDom.captures[0].installedBuild,targetBuild);assert.ok(report.travelDom.captures[0].html.includes('Yes'));assert.ok(report.detectedEnvironment.os);assert.ok(report.detectedEnvironment.browser);assert.ok(report.platforms.tampermonkey.meta);assert.equal(b.requests.length,0,'Region capture/export makes no network requests');assert.deepEqual(b.errors,[]);
  }finally{b.close()}
 }
 
 {
- const b=boot();try{b.w.__TU_DEV_STARTUP__={build:targetBuild,phase:'failed',error:{name:'TypeError',message:'ApiKey abcdef0123456789'}};b.button('Export both host reports').click();const r=b.report();assert.equal(r.startup.phase,'failed');assert.equal(r.startup.launcher.present,false);assert.ok(!JSON.stringify(r.startup).includes('abcdef0123456789'));}finally{b.close()}
+ const b=boot();try{b.w.__TU_DEV_STARTUP__={build:targetBuild,phase:'failed',error:{name:'TypeError',message:'ApiKey abcdef0123456789'}};b.button('Export all diagnostics').click();const r=b.report();assert.equal(r.startup.phase,'failed');assert.equal(r.startup.launcher.present,false);assert.ok(!JSON.stringify(r.startup).includes('abcdef0123456789'));}finally{b.close()}
 }
