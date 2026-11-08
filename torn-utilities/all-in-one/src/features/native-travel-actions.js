@@ -81,6 +81,27 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
     const resultOpener=slot.querySelector(':scope > button[aria-label]');released={...run,opener:resultOpener,slot,slotLabel:resultOpener?.getAttribute('aria-label'),at:now(),hospital:document.querySelector('a[aria-label^="Hospital:"]')};released.hospitalLabel=released.hospital?.getAttribute('aria-label');
     return {hospitalReleased:true};
    }
+   if(kind==='destroy'){
+    if(!run.destroyInventory||!run.destroyAccepted||run.destroyDone)throw Error('Inventory Destruction is not accepted for this armed run');
+    const eligible=()=>{ensure();const state=getSnapshot();if(state.hospitalized!==false||!(state.quantity>=Math.max(1,Number(run.minimumQty)||1)))throw Error('Hospital release and available monitored stock are required before destroying items');};
+    const current=()=>{const panel=scope()?.querySelector('[class*=inventoryPanel]');if(!panel)throw Error('Foreign travel inventory is not visible');return [...panel.querySelectorAll('li[class*=inventorySlot] > button[aria-label]')].filter(e=>shown(e)&&! /^(empty|available|free|unused)\b/i.test(e.getAttribute('aria-label')||'')&&!(same(released,run)&&e===released.opener&&e.getAttribute('aria-label')===released.slotLabel));};
+    const counts=()=>{const result=new Map();for(const e of current())result.set(itemName(e),(result.get(itemName(e))||0)+1);return result;};
+    eligible();let remaining=counts();const total=[...remaining.values()].reduce((a,b)=>a+b,0);if(total>100)throw Error('Unexpected travel inventory size; no destruction started');let destroyed=0;
+    for(const name of [...remaining.keys()])while((remaining.get(name)||0)>0){
+     eligible();const actual=counts();if(actual.size!==remaining.size||[...remaining].some(([key,n])=>actual.get(key)!==n))throw Error('Travel inventory changed during destruction; no further items selected');
+     const opener=current().find(e=>itemName(e)===name);if(!opener)throw Error('Approved travel item is no longer present');const slot=opener.closest('li');
+     if(slot.querySelector('[class*=confirmQuestion]'))throw Error('Close the existing inventory confirmation before destroying items');
+     if(opener.getAttribute('aria-expanded')!=='true')click(opener);
+     const trash=await wait(()=>one(buttons(slot,'Trash'),'travel inventory Trash control'));click(trash);
+     const yes=await wait(()=>{const question=slot.querySelector('[class*=confirmQuestion]');if(!question)return null;const text=norm(question.textContent);if(norm(question.querySelector('strong')?.textContent)!==name||! /\b(trash|destroy|throw away|discard)\b/.test(text))throw Error('Trash confirmation does not match the approved travel inventory item');return one(buttons(question,'Yes'),'travel Trash Yes confirmation');});
+     eligible();submitted=true;click(yes);
+     const beforeCount=[...remaining.values()].reduce((a,b)=>a+b,0);
+     const result=await wait(()=>{if(current().length<beforeCount)return {removed:true};const close=one(slot.querySelectorAll('button[aria-label="Close"]'),'Trash result Close');return close&&/\b(trashed|destroyed|discarded)\b/i.test(slot.textContent)?{close}:null;});
+     if(result.close){click(result.close);await wait(()=>current().length<beforeCount);}
+     const left=(remaining.get(name)||0)-1;if(left)remaining.set(name,left);else remaining.delete(name);destroyed++;onEvent({step:'inventory-item-destroyed',amount:destroyed,quantity:total});
+    }
+    eligible();if(current().length)throw Error('Travel inventory did not finish clearing');return {inventoryDestroyed:true,amount:destroyed};
+   }
    if(kind==='buy'){
     let s=getSnapshot();if(s.hospitalized!==false||!(s.quantity>0))throw Error('Confirm hospital release and current stock before buying');
     if(same(released,run)){const close=one([...(released.slot?.querySelectorAll('button[aria-label="Close"]')||[])],'medical result Close');if(close){click(close);await new Promise(resolve=>window.setTimeout(resolve,32));ensure();}}

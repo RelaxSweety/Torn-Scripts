@@ -1,5 +1,21 @@
 [
   {
+    "version": "0.5.42.56-dev",
+    "date": "2026-11-08",
+    "changes": {
+      "Snatch and Run": [
+        "Optional screen-edge alert: thick red while armed/waiting, flashing green with available monitored stock",
+        "Optional accepted Inventory Destruction stage: Heal if needed, Destroy Travel Inventory, Purchase Max, Return",
+        "Exact user warning with explicit Accept/Decline; decline keeps destruction off",
+        "Only native foreign travel inventory Trash confirmations are used; stop on mismatches, stock/hospital changes or unverified removal"
+      ],
+      "Validation": [
+        "Screen alert states/cleanup, consent gate and decline",
+        "Separate trusted action stages, exact Trash/Yes scope, duplicate items, home inventory exclusion and partial-batch stop"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.55-dev",
     "date": "2026-11-08",
     "changes": {

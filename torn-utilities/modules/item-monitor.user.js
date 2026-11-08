@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.12.11-dev
+// @version      1.12.12-dev
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -177,9 +177,10 @@ async function getSnatchContext({inventory=false}={}){
  enhancements?.check();return snatchContext;
 }
 const nativeActions=typeof createNativeTravelActions==='function'?createNativeTravelActions({document,window,enabled:()=>typeof GM_info!=='undefined'&&GM_info.scriptHandler==='Tampermonkey'||typeof host.flutter_inappwebview?.callHandler==='function'||typeof host.PDA_httpGet==='function'||typeof host.PDA_httpPost==='function'||/com\.manuito\.tornpda/i.test(navigator.userAgent)}):null;
-const enhancements=typeof createTravelEnhancements==='function'?createTravelEnhancements({document,window,executeAction:nativeActions,getItems:()=>state.items,getSetup:()=>state.cfg.snatchSetup||{},storeSetup:value=>{state.cfg.snatchSetup=value;saveCfg();},getContext:getSnatchContext,getSnapshot:snatchSnapshot,getRows:filterRows,getFilterContainer:filterContainer,matchRow:rowMatches,filterEnabled:()=>!!state.cfg.monitoredOnly,onArmed:()=>{host.TUWindowNavigation?.minimize?.('tuim-panel');if(state.panel)state.panel.hidden=true;state.catalogWindow?.remove();state.catalogWindow=null;},onNotice:message=>{const el=document.getElementById('tuim-snatch-notice');if(el)el.textContent=message;},restoreRun:(()=>{try{return JSON.parse(sessionStorage.getItem('tu:snatch-run:v1')||'null')}catch{return null}})(),storeRun:value=>{if(value)sessionStorage.setItem('tu:snatch-run:v1',JSON.stringify(value));else sessionStorage.removeItem('tu:snatch-run:v1');}}):null;
+const enhancements=typeof createTravelEnhancements==='function'?createTravelEnhancements({document,window,executeAction:nativeActions,getItems:()=>state.items,getSetup:()=>state.cfg.snatchSetup||{},screenAlertEnabled:()=>!!state.cfg.screenAlert,storeSetup:value=>{state.cfg.snatchSetup=value;saveCfg();},getContext:getSnatchContext,getSnapshot:snatchSnapshot,getRows:filterRows,getFilterContainer:filterContainer,matchRow:rowMatches,filterEnabled:()=>!!state.cfg.monitoredOnly,onArmed:()=>{host.TUWindowNavigation?.minimize?.('tuim-panel');if(state.panel)state.panel.hidden=true;state.catalogWindow?.remove();state.catalogWindow=null;},onNotice:message=>{const el=document.getElementById('tuim-snatch-notice');if(el)el.textContent=message;},restoreRun:(()=>{try{return JSON.parse(sessionStorage.getItem('tu:snatch-run:v1')||'null')}catch{return null}})(),storeRun:value=>{if(value)sessionStorage.setItem('tu:snatch-run:v1',JSON.stringify(value));else sessionStorage.removeItem('tu:snatch-run:v1');}}):null;
 function renderEnhancements(parent){
  const label=E('label',parent);label.className='tuim-monitored-toggle';const check=E('input',label);check.type='checkbox';check.id='tuim-monitored-only';check.checked=!!state.cfg.monitoredOnly;label.append(document.createTextNode('Show monitored items only'));check.onchange=()=>{state.cfg.monitoredOnly=check.checked;saveCfg();enhancements?.applyFilter();};
+ const edgeLabel=E('label',parent);edgeLabel.className='tuim-monitored-toggle';const edge=E('input',edgeLabel);edge.type='checkbox';edge.id='tuim-screen-color-alert';edge.checked=!!state.cfg.screenAlert;edge.style.cssText='width:18px;height:18px;min-height:18px;flex:none';edgeLabel.append(document.createTextNode('Snatch and Run screen color alert'));edge.onchange=()=>{state.cfg.screenAlert=edge.checked;saveCfg();enhancements?.update();};
  E('style',parent,'.tu-monitor-filter-hidden{display:none!important}#tuim-panel label.tuim-monitored-toggle{display:flex;align-items:center;gap:8px;cursor:pointer}#tuim-panel input#tuim-monitored-only{display:inline-block;flex:0 0 18px;width:18px;height:18px;min-height:18px;padding:0;margin:0;accent-color:#d6b65c}');
  const notice=E('p',parent,'Snatch and Run is off until explicitly armed.');notice.id='tuim-snatch-notice';enhancements?.mount(parent);
 }

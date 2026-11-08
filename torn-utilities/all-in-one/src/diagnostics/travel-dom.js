@@ -1,6 +1,6 @@
 // Explicit, bounded DOM-region capture. Never submits a native action or reads network/storage credentials.
 export function createTravelDomDiagnostic({document,window,scrub,storageKey,getMeta,onChange=()=>{}}){
- const stages=['Workflow (continuous)','Foreign page / hospitalized','Selected healing item / Use control','Heal Yes/No confirmation','Hospital release result','Monitored item / Max and Buy','Purchase Yes/No confirmation','Purchase result','Return to Torn control / confirmation','Return flight result','Failed Snatch and Run attempt'];
+ const stages=['Workflow (continuous)','Foreign page / hospitalized','Inventory Trash / Yes confirmation','Selected healing item / Use control','Heal Yes/No confirmation','Hospital release result','Monitored item / Max and Buy','Purchase Yes/No confirmation','Purchase result','Return to Torn control / confirmation','Return flight result','Failed Snatch and Run attempt'];
  const clean=value=>scrub(String(value??'')).replace(/https?:\/\/[^\s<>"']+/gi,'[URL OMITTED]').replace(/\b[A-Za-z0-9_=-]{24,}\b/g,'[REDACTED]').slice(0,600);
  const skip='script,style,noscript,iframe,svg,canvas,img,video,audio,link,meta,textarea,[contenteditable],input[type=hidden],input[type=password],input[type=email],[autocomplete=current-password],[autocomplete=new-password]';
  function markup(root){let count=0,truncated=false;const out=document.createElement('div');
