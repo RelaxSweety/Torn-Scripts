@@ -1,7 +1,7 @@
 import {createTravelRequestCapture} from './travel-request-capture.js';
 // Experimental user-triggered website POST. Never uses API keys or sends via TU services.
 export function createDirectQuickItems({window,document,fetchImpl,isAuthorized=()=>false,onEvent=()=>{},now=()=>Date.now(),timeoutMs=12000,build='unknown',capturePage=window}){
- const capture=createTravelRequestCapture({window,document,pageWindow:capturePage,build});
+ const capture=capturePage.__TU_QUICKITEMS_CAPTURE__||createTravelRequestCapture({window,document,pageWindow:capturePage,build});
  const KEY='tu:quickitems-test:attempt:v1',LOG='tu:quickitems-test:log:v1';
  let panel=null,controller=null,busy=false,records=[];
  try{const saved=JSON.parse(window.sessionStorage.getItem(LOG)||'[]');if(Array.isArray(saved))records=saved.slice(-100).map(clean);}catch{}

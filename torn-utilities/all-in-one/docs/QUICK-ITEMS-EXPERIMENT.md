@@ -1,12 +1,12 @@
 # TU Direct Quick Items and travel-request test build
 
-Version: **0.5.42.81-quickitems-test.1**, based on **0.5.42.81-dev**. This has a separate userscript name, namespace and update URL. It does not replace the ordinary DEV artifact or represent a completed compliance clearance.
+Version: **0.5.42.81-quickitems-test.2**, based on **0.5.42.81-dev**. This has a separate userscript name, namespace and update URL. It does not replace the ordinary DEV artifact or represent a completed compliance clearance.
 
 Install: https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/releases/experimental/torn-utilities-quick-items-test.user.js
 
 ## Install and record one normal trip
 
-1. Disable the ordinary TU and any older TU Manager/tool installations before enabling this experiment. Do not run both versions together. Refresh Torn and confirm the footer shows `0.5.42.81-quickitems-test.1`.
+1. Disable the ordinary TU and any older TU Manager/tool installations before enabling this experiment. Do not run both versions together. Refresh Torn and confirm the footer shows `0.5.42.81-quickitems-test.2`.
 2. On Torn's Travel Agency page, open Business Tools → Travel Assistant and Item Monitor → **Open Item Monitor**. This starts the existing diagnostic monitors and the experimental travel network recorder. The diagnostic indicator must be green. Configure this experiment's monitors/settings as needed: its Item Monitor settings and armed run are separate from normal DEV.
 3. Minimize TU and make the normal outbound trip. Perform the planned inventory use, healing, purchase and return actions. Using Torn's native controls manually is useful for identifying the exact native request contracts. Existing Snatch and Run actions can also be observed; the timeline distinguishes actual user clicks from synthetic native clicks.
 4. Keep the same browser tab/PDA WebView. Recording resumes after same-tab navigation/refresh while the module/diagnostics are active. Closing the tool stops recording; minimize and Back keep it running.
@@ -40,3 +40,11 @@ The experiment shares existing TU login credentials/agreement/session and other 
 - `node scripts/build-dev.mjs --check` confirms ordinary DEV has not changed.
 
 Validation uses fixtures and mocked requests. No live item was consumed, purchased or destroyed during development tests.
+
+## Test .2 recorder revision
+
+The first PDA report from test .1 contained a native DOM result showing a Blood Bag was added, but zero intercepted requests and zero native actions. Hooks being marked installed did not establish live coverage. Test .2 installs passive page-world hooks at document-start, before normal module activation, to cover transport functions cached by Torn. Recording remains off until diagnostics start. It observes pointerdown and click, deduplicates the physical gesture, and accepts native inventory picker controls without exporting their text.
+
+The export now includes `instrumentedAt`, `documentState`, `documentMatchesPage`, transport/control counters and `resourceEndpoints` from a metadata-only PerformanceObserver. Resource entries can reveal a route/timing when a cached or alternative request path bypasses the full hook, but cannot supply its POST body. They are not a substitute for full capture. Live PDA coverage is still to be verified.
+
+After updating, first record a short Travel Agency search/Add operation and generate a report. Check that native actions, requests or resource endpoints appear before relying on an entire-trip recording. This revision does not claim that the cause of the first report's blind spot is conclusively proven.

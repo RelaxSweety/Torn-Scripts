@@ -14,7 +14,7 @@ let output=original.replaceAll(cfg.baseBuild,cfg.version).replaceAll('1.12.36-de
 output=output.replace('^\\d+(?:\\.\\d+){3}-dev$', '^\\d+(?:\\.\\d+){3}-(?:dev|quickitems-test\\.\\d+)$');
 output=output.replace(/^\/\/ @name\s+.*$/m,'// @name         '+cfg.name).replace(/^\/\/ @namespace\s+.*$/m,'// @namespace    '+cfg.namespace).replace(/^\/\/ @description\s+.*$/m,'// @description  Separate personal Quick Items POST test; disable other TU scripts; foreign Snatch transport unchanged');
 for(const key of ['updateURL','downloadURL'])output=output.replace(new RegExp('^// @'+key+'\\s+.*$','m'),'// @'+key+'    '+cfg.url);
-const notes={version:cfg.version,date:'2026-11-09',changes:{'Experimental direct Quick Items':['Based on '+cfg.baseBuild+'; separately named and separately updated','Personal medical item POST from one explicit click; no automatic retries','Request timing and uncertainty logs are included in Report Generation','Foreign travel inventory endpoints are not yet verified; Snatch and Run transport remains unchanged']}};
+const notes={version:cfg.version,date:'2026-11-09',changes:{'Experimental direct Quick Items':['Based on '+cfg.baseBuild+'; separately named and separately updated','Personal medical item POST from one explicit click; no automatic retries','Early page-world request hooks, pointer controls and resource/counter coverage evidence','Request timing and uncertainty logs are included in Report Generation','Foreign travel inventory endpoints are not yet verified; Snatch and Run transport remains unchanged']}};
 output=output.replace(/const TU_RELEASES=(\[.*\]);/,()=>{const source=original.match(/const TU_RELEASES=(\[.*\]);/);return 'const TU_RELEASES='+JSON.stringify([notes,...JSON.parse(source[1])])+';';});
 const marker='const TU_INTEGRATED_BUILD='+JSON.stringify(cfg.version)+';';
 if(output.split(marker).length!==2)throw Error('Item Monitor integration marker mismatch');
@@ -49,6 +49,10 @@ for(const [from,to] of Object.entries(namespaces))output=output.replaceAll(from,
 // Do not allow the ordinary diagnostic DOM serializer to retain this test panel/results.
 output=output.replace("const privateRegions='#tuim-menu,", "const privateRegions='#tuim-quickitems-test,#tuim-menu,");
 output=output.replace("const skip='[role=log]", "const skip='#global,#trade,#faction,[class*=\"message___\"],[class*=\"senderContainer\"],#tuim-quickitems-test,[role=log]");
+const metadataEnd=output.indexOf('// ==/UserScript==')+'// ==/UserScript=='.length;
+const early='\n/* Early passive page-world transport probe; no recording until diagnostics start. */\n(()=>{const page=typeof unsafeWindow!==\'undefined\'?unsafeWindow:window;try{if(!page.__TU_QUICKITEMS_CAPTURE__){const create='+createTravelRequestCapture.toString()+';page.__TU_QUICKITEMS_CAPTURE__=create({window:page,document:page.document,pageWindow:page,build:'+JSON.stringify(cfg.version)+'});page.__TU_QUICKITEMS_CAPTURE__.install();}}catch{}})();\n';
+output=output.slice(0,metadataEnd)+early+output.slice(metadataEnd);
+output=output.replace('// @run-at       document-idle','// @run-at       document-start');
 new vm.Script(output);new vm.Script(output.replace(/[“”]/g,'"').replace(/[‘’]/g,"'"));
 if(!output.includes('Open Direct Quick Items Test')||!output.includes('quickItemExperiment:quickItemTest.report()'))throw Error('Experiment not integrated');
 if(output.includes('// @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/releases/dev/'))throw Error('Experiment would update to ordinary DEV');
