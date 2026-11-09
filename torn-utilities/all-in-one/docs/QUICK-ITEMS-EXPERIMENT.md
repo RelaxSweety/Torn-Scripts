@@ -74,3 +74,11 @@ Open Direct Quick Items Test, inspect current travel inventory, select one A+ or
 Each click fetches complete live inventory, matches the selected slot ID, item ID and name, then sends one `travelData/useItem` JSON POST with the current slotID. It checks the fresh inventory after the response. Slot IDs are reusable containers; a changed occupant blocks the request. No actionForm request, automatic retry, second item, purchase, destruction or travel is triggered. Uncertain outcomes retain a same-tab reload lock until the user checks Torn and clears it. Partial healing never advances a workflow; explicit release messages remain labeled as requiring a current status check.
 
 Export Report Generation after testing. The report includes travel consumption/release evidence and passive request captures. Ordinary DEV and the existing Snatch and Run action path remain unchanged.
+
+## Test .8: experimental Snatch and Run integration
+
+Hospitalize Me, + Hosp?, and Heal now use the direct travel blood bag adapter in the experimental bundle. Configure and arm Snatch and Run normally; no separate pilot inspection is needed. Only the validated A+ (732) and AB+ (736) bags are supported; another selected item blocks rather than falling back to simulated use clicks. Existing before-landing confirmation is retained. Each original trusted click performs a fresh slot-to-item check, one use POST, removal verification, and a separate profile status read.
+
+Hospital state must confirm hospitalization, extension must increase the deadline, and healing advances only when profile state is Abroad. A partial heal remains Heal. Unknown status blocks progression; existing read-only status reconciliation can recover a confirmed consumption after a transient status read failure. An uncertain use itself remains locked for manual review and is never resolved solely by hospital status. Capacity is credited once per confirmed consumption. Diagnostic reports include direct-item steps and profile state evidence. Buying, destruction, and return use their existing native transport. Ordinary DEV is unchanged.
+
+Test hospitalization during flight and abroad, + Hosp? with a remaining bag, partial and complete healing, then the existing purchase/return sequence. Export Report Generation after each run.

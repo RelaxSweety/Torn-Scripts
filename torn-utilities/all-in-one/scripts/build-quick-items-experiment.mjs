@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {createTravelRequestCapture} from '../src/experimental/travel-request-capture.js';
 import {createDirectQuickItems} from '../src/experimental/direct-quick-items.js';
+import {createSnatchDirectItems} from '../src/experimental/snatch-direct-items.js';
 const base=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),root=path.resolve(base,'../..');
 const cfg=JSON.parse(fs.readFileSync(path.join(base,'config/quick-items-experiment.json'),'utf8'));
 const originalPath=path.join(root,`torn-utilities/releases/dev/torn-utilities-${cfg.baseBuild}.user.js`),original=fs.readFileSync(originalPath,'utf8');
@@ -12,19 +13,35 @@ const fingerprint=crypto.createHash('sha256').update(original).digest('hex');
 if(!original.includes('// @version      '+cfg.baseBuild))throw Error('Base build mismatch');
 let output=original.replaceAll(cfg.baseBuild,cfg.version).replaceAll('1.12.36-dev',cfg.itemMonitorVersion);
 output=output.replace('^\\d+(?:\\.\\d+){3}-dev$', '^\\d+(?:\\.\\d+){3}-(?:dev|quickitems-test\\.\\d+)$');
-output=output.replace(/^\/\/ @name\s+.*$/m,'// @name         '+cfg.name).replace(/^\/\/ @namespace\s+.*$/m,'// @namespace    '+cfg.namespace).replace(/^\/\/ @description\s+.*$/m,'// @description  Separate personal Quick Items POST test; disable other TU scripts; foreign Snatch transport unchanged');
+output=output.replace(/^\/\/ @name\s+.*$/m,'// @name         '+cfg.name).replace(/^\/\/ @namespace\s+.*$/m,'// @namespace    '+cfg.namespace).replace(/^\/\/ @description\s+.*$/m,'// @description  Separate personal Quick Items POST test; disable other TU scripts; experimental Snatch healing and hospitalization use direct requests');
 for(const key of ['updateURL','downloadURL'])output=output.replace(new RegExp('^// @'+key+'\\s+.*$','m'),'// @'+key+'    '+cfg.url);
-const notes={version:cfg.version,date:'2026-11-09',changes:{'Experimental direct Quick Items':['Based on '+cfg.baseBuild+'; separately named and separately updated','Personal medical item POST from one explicit click; no automatic retries','Early page-world request hooks, pointer controls and resource/counter coverage evidence','Request timing and uncertainty logs are included in Report Generation','Separate travel blood bag POST pilot with fresh inventory identity checks; Snatch and Run transport remains unchanged']}};
+const notes={version:cfg.version,date:'2026-11-09',changes:{'Experimental direct Quick Items':['Based on '+cfg.baseBuild+'; separately named and separately updated','Personal medical item POST from one explicit click; no automatic retries','Early page-world request hooks, pointer controls and resource/counter coverage evidence','Request timing and uncertainty logs are included in Report Generation','Snatch healing and hospitalization use the direct blood bag adapter with live slot and profile status checks']}};
 output=output.replace(/const TU_RELEASES=(\[.*\]);/,()=>{const source=original.match(/const TU_RELEASES=(\[.*\]);/);return 'const TU_RELEASES='+JSON.stringify([notes,...JSON.parse(source[1])])+';';});
 const marker='const TU_INTEGRATED_BUILD='+JSON.stringify(cfg.version)+';';
 if(output.split(marker).length!==2)throw Error('Item Monitor integration marker mismatch');
-output=output.replace(marker,'const createTravelRequestCapture='+createTravelRequestCapture.toString()+';\nconst createDirectQuickItems='+createDirectQuickItems.toString()+';\n'+marker);
+output=output.replace(marker,'const createSnatchDirectItems='+createSnatchDirectItems.toString()+';\nconst createTravelRequestCapture='+createTravelRequestCapture.toString()+';\nconst createDirectQuickItems='+createDirectQuickItems.toString()+';\n'+marker);
 const factoryMarker='/* Integrated tool: item-monitor (';const factoryStart=output.indexOf(factoryMarker);const factoryBody=output.indexOf('(()=>{',factoryStart)+'(()=>{'.length;if(factoryStart<0)throw Error('Item Monitor factory missing');output=output.slice(0,factoryBody)+'\nconst quickItemCapturePage=typeof unsafeWindow!==\'undefined\'?unsafeWindow:window;'+output.slice(factoryBody);
 const menu="B(p,'Open Item Monitor',()=>{state.lastView='monitor';sessionStorage.setItem('tu:item-monitor:view:v1','monitor');tuModuleOpen('tuim-panel');diagnosticStart();});";
 if(!output.includes(menu))throw Error('Menu integration changed');
-output=output.replace(menu,menu+"E('h3',p,'Experimental Direct Requests');E('p',p,'Personal medical items only. Snatch and Run still uses the existing native action path.');B(p,'Open Direct Quick Items Test',()=>{diagnosticStart();quickItemTest.open();});");
+output=output.replace(menu,menu+"E('h3',p,'Experimental Direct Requests');E('p',p,'Experimental Snatch blood bag actions use direct requests with fresh slot and hospital status checks.');B(p,'Open Direct Quick Items Test',()=>{diagnosticStart();quickItemTest.open();});");
+output=output.replace('const hospitalUntil=hospitalClock?.read()||snatchContext?.hospitalUntil||null;', 'const hospitalUntil=nativeState?.hospitalUntil||hospitalClock?.read()||snatchContext?.hospitalUntil||null;');
+output=output.replace('return {ownerId,hospitalUntil,hospitalClock:', 'return {ownerId,directItemConsumed:!!nativeState?.directItemConsumed,directItemUncertain:!!nativeState?.directItemUncertain,hospitalUntil,hospitalClock:');
+output=output.replace('if(!run)return;const s=getSnapshot();', 'if(!run)return;const s=getSnapshot();if(s.directItemUncertain){refresh();return;}');
+output=output.replace('enhancements?.check();return snatchContext;', 'nativeActions.observeProfile?.(profile);enhancements?.check();return snatchContext;');
+output=output.replace("if(run.stage==='heal-pending'&&s.hospitalized===false){", "if(run.stage==='heal-pending'&&s.directItemConsumed&&s.hospitalized===true){clearStatusTimer();run.stage='heal';persist();}if(run.stage==='heal-pending'&&s.hospitalized===false){");
+// Only experimental output gets the facade and original trusted event forwarding.
+const nativeDeclaration=output.match(/^const nativeActions=typeof createNativeTravelActions.*$/m)?.[0];
+if(!nativeDeclaration)throw Error('Native action integration marker changed');
+output=output.replace(nativeDeclaration,nativeDeclaration.replace('const nativeActions=','const nativeBaseActions=')+"\nconst nativeActions=createSnatchDirectItems({native:nativeBaseActions,getPilot:()=>quickItemTest,getProfile:()=>host.TornUtilities.requestTravelInfo('profile'),window});");
+for(const [from,to] of [
+ ["nativeAct('hospitalize',{extendHospital:true})","nativeAct('hospitalize',{extendHospital:true,event})"],
+ ['async function hospitalizeBeforeLanding(){','async function hospitalizeBeforeLanding(event){'],
+ ["nativeAct('hospitalize',{allowBeforeLanding:true})","nativeAct('hospitalize',{allowBeforeLanding:true,event})"],
+ ['return hospitalizeBeforeLanding();','return hospitalizeBeforeLanding(event);'],
+ ['return nativeAct(kind);','return nativeAct(kind,{event});']
+]){if(!output.includes(from))throw Error('Trusted event integration changed: '+from);output=output.replace(from,to);}
 output=output.replace('function renderMenu(){',"const quickItemTest=createDirectQuickItems({window,document,fetchImpl:fetch,capturePage:quickItemCapturePage,isAuthorized:()=>host.TornUtilities?.isAuthorized?.()===true,build:TU_INTEGRATED_BUILD});\nfunction renderMenu(){");
-output=output.replace('productionAuthorized:false,evidenceBuilds,stockMonitor:', 'productionAuthorized:false,quickItemExperiment:quickItemTest.report(),evidenceBuilds,stockMonitor:');
+output=output.replace('productionAuthorized:false,evidenceBuilds,stockMonitor:', 'productionAuthorized:false,quickItemExperiment:{...quickItemTest.report(),snatchDirectItems:nativeActions.report()},evidenceBuilds,stockMonitor:');
 output=output.replace("function diagnosticStart(){try{embeddedDiagnostic?.start('Workflow (continuous)');","function diagnosticStart(){try{quickItemTest.captureStart();embeddedDiagnostic?.start('Workflow (continuous)');");
 output=output.replace('function diagnosticStop(){try{embeddedDiagnostic?.stop();','function diagnosticStop(){try{quickItemTest.captureStop();embeddedDiagnostic?.stop();');
 output=output.replace('embeddedDiagnostic?.resume();if(embeddedDiagnostic?.isMonitoring())stockDiagnostic?.start();','embeddedDiagnostic?.resume();if(embeddedDiagnostic?.isMonitoring()){stockDiagnostic?.start();quickItemTest.captureStart();}');
@@ -54,7 +71,7 @@ const early='\n/* Early passive page-world transport probe; no recording until d
 output=output.slice(0,metadataEnd)+early+output.slice(metadataEnd);
 output=output.replace('// @run-at       document-idle','// @run-at       document-start');
 new vm.Script(output);new vm.Script(output.replace(/[“”]/g,'"').replace(/[‘’]/g,"'"));
-if(!output.includes('Open Direct Quick Items Test')||!output.includes('quickItemExperiment:quickItemTest.report()'))throw Error('Experiment not integrated');
+if(!output.includes('Open Direct Quick Items Test')||!output.includes('snatchDirectItems:nativeActions.report()'))throw Error('Experiment not integrated');
 if(output.includes('// @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/releases/dev/'))throw Error('Experiment would update to ordinary DEV');
 if(output.includes('https://tu-multiplayer-server.tuserver.workers.dev'))throw Error('Production endpoint in experiment');
 const targets=['dist/tu-quick-items-test.user.js','../releases/experimental/torn-utilities-quick-items-test.user.js',`../releases/experimental/torn-utilities-${cfg.version}.user.js`];
