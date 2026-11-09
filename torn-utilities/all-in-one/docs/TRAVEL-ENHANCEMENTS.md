@@ -173,3 +173,7 @@ TU Test .37 captured the Torn Travel Agency inventory with aria-label Inventory 
 ### DEV 0.5.42.71: destruction selection reset
 
 Unchecking Inventory Destruction clears the selected item types and accepted-warning flag and immediately displays Selected for destruction: No items selected. Reopening setup cannot restore disabled stale selections. Inventory overview annotations are refreshed; an armed destruction run is canceled as before, requiring a new arm. Re-enabling requires fresh selection and acceptance.
+
+### DEV 0.5.42.72: visible flight inventory
+
+A PDA Traveling-page capture exposes the same 18 numbered active slots and three blocked decorative cells, with Inventory 2 items describing two carried blood bags. Numbered-slot capacity detection now accepts the Traveling heading as well as Travel Agency. The captured layout establishes 18 total / 2 used / 16 free and a valid pre-action capacity baseline. Unknown-capacity guidance now refers to visible travel inventory rather than requiring a foreign page.

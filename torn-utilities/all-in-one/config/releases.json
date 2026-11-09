@@ -1,5 +1,20 @@
 [
   {
+    "version": "0.5.42.72-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Flight inventory capacity": [
+        "Recognize the complete numbered inventory on Traveling pages as well as Travel Agency pages",
+        "Treat Inventory N items as occupancy and exclude decorative blocked cells during flights",
+        "Replace foreign-only inventory guidance with page-neutral wording"
+      ],
+      "Validation": [
+        "Captured PDA flight inventory: 18 total slots, 2 carried blood bags and 16 free slots",
+        "Flight pre-action capacity baseline and existing agency, purchase and native-action regressions"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.71-dev",
     "date": "2026-11-09",
     "changes": {

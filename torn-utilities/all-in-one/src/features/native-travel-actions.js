@@ -44,10 +44,10 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
   const slots=[...panel.querySelectorAll('li[class*=inventorySlot]')],banner=travelBanner();
   const bannerTotal=Number(banner.match(/you have purchased\s*[\d,]+\s*\/\s*([\d,]+)/i)?.[1]?.replace(/,/g,''));
   const labelCount=Number(panel.getAttribute('aria-label')?.match(/^inventory\s+(\d+)\s+items$/i)?.[1]);
-  // Inventory N items is occupied count on the agency page, not total capacity.
+  // Inventory N items is occupied count on agency and flight pages, not total capacity.
   // Count only real, consecutively numbered LI slots; decorative blocked cells are DIVs.
-  const agency=[...scope().querySelectorAll('h1,h2,h3,h4')].some(e=>/^travel agency$/i.test(e.textContent.trim()));
-  const numbered=agency&&slots.length>0&&slots.every((slot,index)=>{
+  const numberedPage=[...scope().querySelectorAll('h1,h2,h3,h4')].some(e=>/^(travel agency|traveling)$/i.test(e.textContent.trim()));
+  const numbered=numberedPage&&slots.length>0&&slots.every((slot,index)=>{
    const button=slot.querySelector(':scope > button[aria-label]');const label=button?.getAttribute('aria-label')||slot.querySelector('[class*=srOnly]')?.textContent||'';
    const number=label.match(/\bslot\s+(\d+)\b/i);return number&&Number(number[1])===index+1;
   });
