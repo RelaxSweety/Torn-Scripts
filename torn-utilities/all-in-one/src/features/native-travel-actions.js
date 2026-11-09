@@ -48,7 +48,7 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
   const flight=!!scope()?.querySelector('[aria-label="Flight progress"]')||norm(scope()?.querySelector('h4')?.textContent)==='traveling';
   return {...(same(hospitalizedProof,run)&&!hospitalizedProof.healed&&!release&&now()-hospitalizedProof.at<120000?{hospitalized:true}:{}),released:!!release,purchaseProof:same(purchased,run)?purchased.proof:null,purchaseItemKey:same(purchased,run)?run.watchKey:null,traveling:!!(same(booked,run)||flight),returning:!!same(booked,run)};
  }
- async function execute(kind,{run,getSnapshot,guard,onEvent=()=>{}}){
+ async function execute(kind,{run,getSnapshot,guard,allowBeforeLanding=false,onEvent=()=>{}}){
   if(!enabled())throw Error('Native Tampermonkey/PDA controls unavailable');cancel();const current=new window.AbortController();controller=current;
   const signal=current.signal;let submitted=false;
   const ensure=()=>{if(signal.aborted||!guard()||document.hidden||!document.hasFocus())throw Error('Action canceled or page/player changed. Continue manually if Torn already accepted it.');};
@@ -66,12 +66,13 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
    ensure();if(!scope())throw Error('Open the native foreign travel page');
    if(kind==='hospitalize'){
     if(!run.planHospitalize||!run.hospitalization?.name)throw Error('Select the planned hospitalization item first');
-    const state=getSnapshot();if(state.hospitalized!==false||!Number.isFinite(state.quantity)||state.quantity>=Math.max(1,Number(run.minimumQty)||1))throw Error('Hospitalization is only available while out of hospital and waiting for stock');
-    const item=run.hospitalization,opener=inventory(item.name).filter(e=>!item.uid||String(e.closest('li')?.getAttribute('data-item-uid'))===String(item.uid))[0];if(!opener)throw Error('Selected hospitalization item is not carried in the foreign inventory');const slot=opener.closest('li');
+    const eligible=state=>allowBeforeLanding?state.traveling===true&&!state.returning&&state.hospitalized!==true:!state.traveling&&state.hospitalized===false&&Number.isFinite(state.quantity)&&state.quantity<Math.max(1,Number(run.minimumQty)||1);
+    const state=getSnapshot();if(!eligible(state))throw Error('Hospitalization state changed or before-landing confirmation is missing');
+    const item=run.hospitalization,opener=inventory(item.name).filter(e=>!item.uid||String(e.closest('li')?.getAttribute('data-item-uid'))===String(item.uid))[0];if(!opener)throw Error(allowBeforeLanding?'Torn is not exposing the selected item in the current flight inventory. Open its native inventory controls and retry; no item was used.':'Selected hospitalization item is not carried in the foreign inventory');const slot=opener.closest('li');
     if(slot.querySelector('[class*=confirmQuestion]'))throw Error('Close the existing item confirmation first');if(opener.getAttribute('aria-expanded')!=='true')click(opener);
     const use=await wait(()=>one(buttons(slot,'Use'),'hospitalization Use control'));click(use);
     const yes=await wait(()=>{const q=slot.querySelector('[class*=confirmQuestion]');if(!q)return null;if(norm(q.querySelector('strong')?.textContent)!==norm(item.name)||!norm(q.textContent).includes('would you like to use'))throw Error('Hospitalization confirmation does not match the selected item');return one(buttons(q,'Yes'),'hospitalization Yes confirmation');});
-    const fresh=getSnapshot();if(fresh.hospitalized!==false||!Number.isFinite(fresh.quantity)||fresh.quantity>=Math.max(1,Number(run.minimumQty)||1)){const no=one(buttons(slot.querySelector('[class*=confirmQuestion]'),'No'),'hospitalization No control');if(no)click(no);throw Error('Stock or hospital status changed; hospitalization was not submitted');}
+    const fresh=getSnapshot();if(!eligible(fresh)){const no=one(buttons(slot.querySelector('[class*=confirmQuestion]'),'No'),'hospitalization No control');if(no)click(no);throw Error('Stock or hospital status changed; hospitalization was not submitted');}
     submitted=true;click(yes);await wait(()=>getSnapshot().hospitalized===true||document.querySelector('a[aria-label^="Hospital:"]')||/you (?:are|have been) (?:now )?(?:in|sent to|put in|admitted to) (?:the )?hospital/i.test(slot.textContent));hospitalizedProof={...run,at:now(),opener:slot.querySelector(':scope > button[aria-label]'),slotLabel:slot.querySelector(':scope > button[aria-label]')?.getAttribute('aria-label')};released=null;return {hospitalized:true};
    }
    if(kind==='heal'){

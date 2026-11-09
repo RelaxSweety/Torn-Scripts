@@ -1,5 +1,20 @@
 [
   {
+    "version": "0.5.42.60-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Before landing": [
+        "Hospitalize Me is actionable on the outbound flight with a named-item confirmation prompt",
+        "Confirming rechecks the current player and outbound destination before selected native item Use/Yes",
+        "Decline, changed flight/player, absent native controls and unconfirmed results stop without queuing a later use",
+        "Before-landing permission is transient and does not enable healing/destruction/purchases during flight"
+      ],
+      "Validation": [
+        "Confirmation decline, return-flight/player changes, repeated clicks and native Use/Yes proof"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.59-dev",
     "date": "2026-11-09",
     "changes": {

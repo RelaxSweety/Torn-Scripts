@@ -42,13 +42,15 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
  }
  const afterHeal=()=>run.destroyInventory&&!run.destroyDone?'destroy':'buy';
  function screenAlert(s){let edge=document.getElementById('tu-snatch-screen-alert');if(!run||run.stage==='complete'||!screenAlertEnabled()){edge?.remove();return;}if(!edge){edge=document.createElement('div');edge.id='tu-snatch-screen-alert';edge.setAttribute('aria-hidden','true');edge.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:2147483642;box-sizing:border-box;border:10px solid #d71920';const style=document.createElement('style');style.textContent='@keyframes tu-snatch-edge-flash{0%,49%{opacity:1}50%,100%{opacity:.15}}#tu-snatch-screen-alert[data-ready="true"]{border-color:#00ee4d!important;animation:tu-snatch-edge-flash .4s steps(1,end) infinite}';edge.append(style);document.body.append(edge);}const available=validRun(s)&&(run.stage==='return'||run.stage==='return-pending'||Number.isFinite(s.quantity)&&s.quantity>=Math.max(1,Number(run.minimumQty)||1)&&now()-run.stockAt<STOCK_TTL&&run.stage!=='waiting');if(edge.dataset.ready!==String(!!available))edge.dataset.ready=String(!!available);}
- const validRun=s=>run&&active&&run.expiresAt>now()&&String(s.ownerId)===run.ownerId&&s.country===run.country&&!s.traveling;
+ const sameTrip=s=>run&&active&&run.expiresAt>now()&&String(s.ownerId)===run.ownerId&&s.country===run.country;
+ const outbound=s=>sameTrip(s)&&s.traveling&&!s.returning&&s.hospitalized!==true;
+ const validRun=s=>sameTrip(s)&&!s.traveling;
  function refresh(){
   if(!action)return;const hide=!run||run.stage==='complete';if(action.hidden!==hide)action.hidden=hide;const display=hide?'none':'block';if(action.style.display!==display)action.style.display=display;if(!run){document.getElementById('tu-snatch-screen-alert')?.remove();return;}
   const s=getSnapshot();screenAlert(s);const kind=run.stage,waiting=kind==='waiting',pending=kind.endsWith('-pending');
   const minimum=Math.max(1,Number(getItems().find(w=>w.key===run.watchKey)?.minQty)||1);
-  const stockAvailable=kind==='hospitalize'?Number.isFinite(s.quantity)&&s.quantity<minimum&&s.hospitalized===false:kind==='return'||(['buy','destroy'].includes(kind)?s.quantity>=minimum:!Number.isFinite(s.quantity)||s.quantity>=minimum);
-  const ready=!!(stockAvailable&&validRun(s)&&focused()&&!busy&&!waiting&&!pending&&(kind!=='destroy'||s.hospitalized===false)&&['hospitalize','heal','destroy','buy','return'].includes(kind)&&(['return','hospitalize'].includes(kind)||now()-run.stockAt<(kind==='heal'?120000:STOCK_TTL)));
+  const stockAvailable=kind==='hospitalize'?outbound(s)||Number.isFinite(s.quantity)&&s.quantity<minimum&&s.hospitalized===false:kind==='return'||(['buy','destroy'].includes(kind)?s.quantity>=minimum:!Number.isFinite(s.quantity)||s.quantity>=minimum);
+  const ready=!!(stockAvailable&&(validRun(s)||kind==='hospitalize'&&outbound(s))&&focused()&&!busy&&!waiting&&!pending&&(kind!=='destroy'||s.hospitalized===false)&&['hospitalize','heal','destroy','buy','return'].includes(kind)&&(['return','hospitalize'].includes(kind)||now()-run.stockAt<(kind==='heal'?120000:STOCK_TTL)));
   const text=waiting?'Waiting for available stock':kind==='hospitalize'?'Hospitalize Me':pending?(kind==='hospitalize-pending'?'Confirming hospitalization':kind==='heal-pending'?'Confirming healing':kind==='buy-pending'?'Confirming purchase':kind==='destroy-pending'?'Destroying travel inventory':'Booking return flight'):kind==='complete'?'Return flight booked':kind==='destroy'?'Destroy Selected Items':kind==='buy'?'Purchase Max':kind==='heal'?'Heal from Hospital':'Return to Torn';
   if(action.textContent!==text){action.textContent=text;action.setAttribute('aria-label',text+'; drag to reposition');if(action.style.top)clampPosition();}action.dataset.snatchStage=kind;
   const state=ready?'ready':'waiting';if(action.dataset.state!==state){action.disabled=false;action.dataset.state=state;action.setAttribute('aria-disabled',String(!ready));action.style.backgroundColor=ready?'#167b35':'#b32424';action.style.borderColor=ready?'#66d584':'#ec8585';}
@@ -106,11 +108,11 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   if(kind==='return'&&(!s.returnMatches?.(e)||!run.purchaseConfirmed))throw Error('Confirm purchase and open the native return travel page');
   return e;
  }
- async function nativeAct(kind){
+ async function nativeAct(kind,options={}){
   const expected=run;busy=true;emit('action-start',{action:kind});run.priorProof=getSnapshot().purchaseProof||null;run.stage=kind+'-pending';persist();refresh();
   const guard=()=>run===expected&&active&&run.expiresAt>now()&&String(getSnapshot().ownerId)===run.ownerId&&getSnapshot().country===run.country;
   try{
-   const result=await executeAction.execute(kind,{run:expected,getSnapshot,guard,onEvent:fields=>emit('native-step',{action:kind,...fields})});if(run!==expected)return false;
+   const result=await executeAction.execute(kind,{...options,run:expected,getSnapshot,guard,onEvent:fields=>emit('native-step',{action:kind,...fields})});if(run!==expected)return false;
    if(kind==='hospitalize'&&result.hospitalized){run.stage='waiting';const state=getSnapshot();if(Number.isFinite(state.quantity)&&state.quantity>=run.minimumQty){run.stockAt=now();run.stage='heal';}}
    if(kind==='heal'&&result.hospitalReleased)run.stage=afterHeal();
    if(kind==='destroy'&&result.inventoryDestroyed){run.destroyDone=true;run.stage='buy';}
@@ -120,9 +122,20 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   }catch(error){if(run===expected){if(!error.submitted)run.stage=kind;else{statusAttempts=0;scheduleStatus();}persist();emit('action-error',{action:kind,message:error.message,submitted:!!error.submitted});notice(error.message);}return false;}
   finally{if(run===expected){busy=false;check();}}
  }
+ async function hospitalizeBeforeLanding(){
+  const expected=run;if(!expected||busy||!focused()||!outbound(getSnapshot()))return false;busy=true;refresh();
+  try{
+   emit('before-landing-confirmation',{action:'hospitalize'});
+   if(!window.confirm('Hospitalize before landing? Use your selected hospitalization item, '+expected.hospitalization?.name+', now while flying to '+expected.country+'?')){emit('before-landing-declined',{action:'hospitalize'});return false;}
+   if(!executeAction?.enabled())throw Error('Native inventory controls are unavailable; no item was used');
+   const current=await getContext();if(run!==expected||!active||!focused()||current.status!=='Traveling'||current.returning||current.country!==expected.country||String(current.ownerId)!==expected.ownerId||!outbound(getSnapshot()))throw Error('The outbound flight changed or could not be verified. No item was used.');
+   emit('before-landing-confirmed',{action:'hospitalize'});return await nativeAct('hospitalize',{allowBeforeLanding:true});
+  }catch(error){notice(error.message);return false;}finally{if(run===expected){busy=false;refresh();}}
+ }
  function act(event){
   if(!event?.isTrusted||busy||!run)return false;
   const s=getSnapshot(),kind=run.stage;
+  if(kind==='hospitalize'&&outbound(s))return hospitalizeBeforeLanding();
   if(!validRun(s)||!focused()||(!['return','hospitalize'].includes(kind)&&Number.isFinite(s.quantity)&&s.quantity<Math.max(1,Number(run.minimumQty)||1))||(!['return','hospitalize'].includes(kind)&&now()-run.stockAt>=(kind==='heal'?120000:STOCK_TTL))||!['hospitalize','heal','destroy','buy','return'].includes(kind)){notice('Refresh visible state/stock, or re-arm before acting');refresh();return false;}
   if(kind==='hospitalize'&&(s.hospitalized!==false||!Number.isFinite(s.quantity)||s.quantity>=Math.max(1,Number(run.minimumQty)||1))){check();return false;}
   if(executeAction?.enabled())return nativeAct(kind);

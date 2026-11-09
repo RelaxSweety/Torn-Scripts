@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "checklistVersion": "dev-acceptance-2026-11-09-v17",
+  "checklistVersion": "dev-acceptance-2026-11-09-v18",
   "tests": [
     {
       "id": "runtime.build",
@@ -594,7 +594,7 @@
       "id": "tool.item-monitor.lifecycle",
       "section": "tool.item-monitor",
       "label": "Travel Assistant and Item Monitor \u2014 lifecycle and saved data",
-      "instructions": "Open, minimize, restore, Back, Exit, switch away and reopen this tool repeatedly. Check viewport/scroll/touch behavior, one instance, saved data and cessation of polling/listeners after Exit. Verify no late errors or duplicate requests. Minimize the main monitor and planner, restore through the TU icon, and reopen the active tool through its Business Tools card repeatedly. Exactly one window must restore with unsaved input and an armed Snatch and Run intent preserved; no monitor restart/cancellation. Arm during an outbound foreign flight, refresh and wait over 15 minutes, confirm arrival enables fresh-stock actions and return flight hides the button. Check unknown identity during startup preserves intent and another player cannot use it.",
+      "instructions": "Open, minimize, restore, Back, Exit, switch away and reopen this tool repeatedly. Check viewport/scroll/touch behavior, one instance, saved data and cessation of polling/listeners after Exit. Verify no late errors or duplicate requests. Minimize the main monitor and planner, restore through the TU icon, and reopen the active tool through its Business Tools card repeatedly. Exactly one window must restore with unsaved input and an armed Snatch and Run intent preserved; no monitor restart/cancellation. Arm during an outbound foreign flight, refresh and wait over 15 minutes, confirm arrival enables fresh-stock actions and return flight hides the button. Check unknown identity during startup preserves intent and another player cannot use it. During the outbound flight with hospitalization planned, Hospitalize Me must ask confirmation naming the selected item. Decline uses nothing; confirmation verifies the same player/outbound destination and uses only native controls. Return flights, unavailable controls and repeated pending clicks must not cause a use or queued use at arrival.",
       "kind": "manual",
       "critical": true,
       "platforms": [
