@@ -4,7 +4,7 @@ This updates **TU Testing and Diagnostics DEV**, previously v0.1.9-dev, to **v0.
 
 [Install/update TU Test](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/all-in-one/dist/tu-diagnostics-dev.user.js)
 
-Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.66-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
+Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.67-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
 
 ## Using it
 
@@ -135,3 +135,5 @@ TU Test 0.2.31 targets 0.5.42.63. Every export now includes travelDom.snatchAndR
 TU Test 0.2.32 / checklist v22 validates native-first purchase and at most one remainder transaction. Continuous Snatch monitoring captures purchase-confirmed, capacity-reconcile and reconcile-stopped native-step events with exact quantities. Verify 17 then 1 rather than repeated 17, and Return readiness after a confirmed initial purchase when reconciliation cannot complete.
 
 DEV .65 diagnostics also report the companion hospital button label, presence, warning state and blink period. Use the Snatch and Run monitor to capture extra hospitalization and partial-heal actions through their native confirmations. Verify both hosts with multiple item types, remaining copies, exhausted inventory, threshold crossing, audio volume/sound and refresh persistence.
+
+Hospital evidence in TU Test 0.2.34 / TU DEV .67 includes configured versus armed warning seconds, whether rearming is needed, sound enable and selection, live shared volume, threshold state/time to threshold, alarm dispatch deadline and audio context support/state. Selected and carried hospitalization item counts and an explicit availability reason explain missing + Hosp? controls. These are read-only, explicitly named TU settings; arbitrary input values remain excluded. Settings snapshots accompany clicks, changes and function events and survive same-tab navigation. Threshold transitions and alarm attempts are distinct; audible output always remains unverified. On older .66, named UI settings can be read, but armed runtime evidence is unavailable until TU is updated. Update both rolling DEV and diagnostics scripts for complete evidence.

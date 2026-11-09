@@ -1,5 +1,17 @@
 [
   {
+    "version": "0.5.42.67-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Hospital diagnostic evidence": [
+        "Expose safe configured and armed threshold/alarm settings, shared volume and rearm mismatch",
+        "Record threshold transition and alarm dispatch events with seconds, limit, sound and volume",
+        "Report selected/carried hospitalization item counts and companion button availability reason",
+        "Preserve safe settings snapshots across diagnostic navigation; no arbitrary input values, credentials or network capture"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.66-dev",
     "date": "2026-11-09",
     "changes": {
