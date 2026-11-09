@@ -1,5 +1,21 @@
 [
   {
+    "version": "0.5.42.74-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Per-item monitor alerts": [
+        "Add independent Audible alerts and Visual alerts checkboxes to every monitored item",
+        "Keep silent monitors active for stock/price tracking and monitored-only filtering",
+        "Gate row highlights and optional Snatch screen border by the selected item visual preference; Snatch action readiness remains functional",
+        "Persist preferences across reloads and item edits; preserve enabled defaults for legacy watches",
+        "Stop remaining sound pulses when their source item is muted; retain shared alarm settings"
+      ],
+      "Validation": [
+        "Mixed three-item audio/visual settings, runtime toggling, silent filtering and Snatch readiness, screen-border gating, edit preservation and fresh-page persistence"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.73-dev",
     "date": "2026-11-09",
     "changes": {

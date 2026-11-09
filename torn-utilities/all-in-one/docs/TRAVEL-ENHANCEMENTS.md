@@ -181,3 +181,9 @@ A PDA Traveling-page capture exposes the same 18 numbered active slots and three
 ### DEV 0.5.42.73: precise item assignment labels
 
 Inventory overview labels use only each item's selected assignments: Heal, Hospitalize (when planning is enabled), Destroy, or Keep. If a heal/hospitalization item is also explicitly selected for destruction, its later action is labeled destroy remaining copies. This describes destruction after item use; it does not silently remove an accepted destruction selection. Labels refresh as selections change.
+
+### DEV 0.5.42.74: per-item audible and visual alerts
+
+Each monitor entry has independent Audible alerts and Visual alerts checkboxes. Omitted legacy preferences default to enabled. Saved preferences survive reloads and updating an existing monitor. Turning off audible alerts cancels remaining scheduled sound pulses if that item was their source; volume/sound remain shared. Turning on an already-triggered item's audible option sounds its current alert. Visual settings govern red/green item/listing highlights and the optional screen border for the selected Snatch item, with the global screen-border setting still required.
+
+Monitoring, qualifying stock/price status and monitored-only filtering continue even when both alerts are off. The Snatch action button still shows readiness and remains usable. Hospital timer alarms keep their separately enabled setting. A Canada user can therefore keep Xanax alerts on and plushie/flower alerts off while tracking all three.
