@@ -1,5 +1,21 @@
 [
   {
+    "version": "0.5.42.58-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Inventory pickers": [
+        "Populate healing, hospitalization and destruction choices directly from current carried foreign inventory",
+        "Do not gate visible carried items on inventory/profile API calls",
+        "Group duplicate carried item quantities, omit empty slots/home inventory, preserve name-based native selections without invented IDs",
+        "Remove the uncategorized inventory request; retain labeled medical API fallback outside visible foreign inventory"
+      ],
+      "Validation": [
+        "Generated PC UI with rejecting inventory endpoints and current native slots",
+        "Both dropdowns, quantities, empty inventory, native ID absence, and existing PC/PDA native action flows"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.57-dev",
     "date": "2026-11-09",
     "changes": {

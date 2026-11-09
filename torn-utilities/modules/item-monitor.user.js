@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.12.13-dev
+// @version      1.12.14-dev
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -166,6 +166,7 @@ function snatchSnapshot(watch=null){
 }
 async function getSnatchContext({inventory=false}={}){
  const api=host.TornUtilities;if(typeof api?.requestTravelInfo!=='function')throw Error('Update the integrated TU Manager to use Snatch and Run');
+ if(inventory){const carried=nativeActions?.listInventory?.();if(carried!==null&&carried!==undefined){const grouped=new Map();for(const item of carried){const key=norm(item.name);const existing=grouped.get(key);if(existing)existing.amount+=Number(item.amount)||1;else grouped.set(key,{...item,amount:Number(item.amount)||1,source:'travel-dom'});}const items=[...grouped.values()];return {...snatchContext,ownerId:api.getPlayer()?.id,country:liveCountry(),inventorySource:'travel-dom',inventoryItems:items,medicalItems:items};}}
  const data=await api.requestTravelInfo('profile'),profile=data.profile||data;
  let country=liveCountry(),status=profile.status?.state||'',description=profile.status?.description||'';
  const route=document.querySelector('#travel-root [aria-label="Flight progress"]')?.textContent||'';
@@ -173,7 +174,7 @@ async function getSnatchContext({inventory=false}={}){
  if(traveling){country=Object.keys(travelAliases).find(code=>travelAliases[code].some(alias=>norm(description).includes(norm(alias))||new RegExp('(?:to|→)\\s*'+alias+'\\b','i').test(route)))||null;}
  if(!country&&!returning){try{const trip=await api.requestTravelInfo('travel');const destination=trip.travel?.destination;country=Object.keys(travelAliases).find(code=>travelAliases[code].some(alias=>norm(alias)===norm(destination)));}catch{}}
  snatchContext={ownerId:api.getPlayer()?.id,country,status,traveling,returning,description,checkedAt:Date.now()};
- if(inventory){const [d,all]=await Promise.all([api.requestTravelInfo('inventory'),api.requestTravelInfo('travelInventory')]);snatchContext.medicalItems=d.inventory?.items||[];snatchContext.inventoryItems=all.inventory?.items||[];const carried=nativeActions?.listInventory?.();if(carried){const names=new Set(carried.map(item=>norm(item.name)));snatchContext.inventoryItems=snatchContext.inventoryItems.filter(item=>names.has(norm(item.name)));snatchContext.medicalItems=snatchContext.medicalItems.filter(item=>names.has(norm(item.name)));}}
+ if(inventory){const d=await api.requestTravelInfo('inventory');const raw=Array.isArray(d.inventory)?d.inventory:d.inventory?.items||[];snatchContext.medicalItems=raw;snatchContext.inventoryItems=raw;snatchContext.inventorySource='medical-api';}
  enhancements?.check();return snatchContext;
 }
 const nativeActions=typeof createNativeTravelActions==='function'?createNativeTravelActions({document,window,enabled:()=>typeof GM_info!=='undefined'&&GM_info.scriptHandler==='Tampermonkey'||typeof host.flutter_inappwebview?.callHandler==='function'||typeof host.PDA_httpGet==='function'||typeof host.PDA_httpPost==='function'||/com\.manuito\.tornpda/i.test(navigator.userAgent)}):null;
