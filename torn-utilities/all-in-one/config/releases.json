@@ -1,5 +1,17 @@
 [
   {
+    "version": "0.5.42.66-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Alarm settings and formatting": [
+        "Move hospital warning, enabled checkbox, sound and test into the existing Alarm settings section",
+        "Use the existing volume slider for both stock and hospital alarms, including changes while armed",
+        "Default hospital sound to Siren; preserve saved sound choices",
+        "Standardize gold checkbox accents, checkbox placement, control fonts, field borders and button spacing"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.65-dev",
     "date": "2026-11-09",
     "changes": {
