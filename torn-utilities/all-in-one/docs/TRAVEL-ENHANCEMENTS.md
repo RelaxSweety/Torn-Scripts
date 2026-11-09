@@ -177,3 +177,7 @@ Unchecking Inventory Destruction clears the selected item types and accepted-war
 ### DEV 0.5.42.72: visible flight inventory
 
 A PDA Traveling-page capture exposes the same 18 numbered active slots and three blocked decorative cells, with Inventory 2 items describing two carried blood bags. Numbered-slot capacity detection now accepts the Traveling heading as well as Travel Agency. The captured layout establishes 18 total / 2 used / 16 free and a valid pre-action capacity baseline. Unknown-capacity guidance now refers to visible travel inventory rather than requiring a foreign page.
+
+### DEV 0.5.42.73: precise item assignment labels
+
+Inventory overview labels use only each item's selected assignments: Heal, Hospitalize (when planning is enabled), Destroy, or Keep. If a heal/hospitalization item is also explicitly selected for destruction, its later action is labeled destroy remaining copies. This describes destruction after item use; it does not silently remove an accepted destruction selection. Labels refresh as selections change.

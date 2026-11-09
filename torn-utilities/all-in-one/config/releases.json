@@ -1,5 +1,17 @@
 [
   {
+    "version": "0.5.42.73-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Inventory item assignments": [
+        "Show only configured Heal, enabled Hospitalize and accepted Destroy assignments per item",
+        "For heal/hospitalization items also selected for destruction, label the later action destroy remaining copies",
+        "Use Keep for unassigned items; hide hospitalization annotation when planning is disabled",
+        "Preserve actual item selections and gameplay actions"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.72-dev",
     "date": "2026-11-09",
     "changes": {
