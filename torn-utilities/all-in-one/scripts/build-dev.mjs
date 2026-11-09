@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import {createHospitalClock} from '../src/features/hospital-clock.js';
 import {createChatCaptureSupport} from '../src/features/chat-capture.js';
 import {createNativeTravelActions} from '../src/features/native-travel-actions.js';
 import {createTravelEnhancements} from '../src/features/travel-enhancements.js';
@@ -34,7 +35,7 @@ for(const tool of tools){
  }
  if(tool.id==='war-hit-organizer')source=source.replace(/"data:image\/webp;base64,[A-Za-z0-9+/=]+"/g,'manager.getLogo()');
 
- if(tool.id==='item-monitor')source='const createNativeTravelActions='+createNativeTravelActions.toString()+';\n'+'const createTravelEnhancements='+createTravelEnhancements.toString()+';\n'+source;
+ if(tool.id==='item-monitor')source='const createHospitalClock='+createHospitalClock.toString()+';\n'+'const createNativeTravelActions='+createNativeTravelActions.toString()+';\n'+'const createTravelEnhancements='+createTravelEnhancements.toString()+';\n'+source;
  if(tool.id==='chat-archiver')source='const createChatCaptureSupport='+createChatCaptureSupport.toString()+';\n'+source;
  // Each retained source runs only on first use. A private Window facade captures
  // its legacy registration internally and binds native Window methods correctly.

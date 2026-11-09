@@ -1,5 +1,20 @@
 [
   {
+    "version": "0.5.42.62-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Hospital countdown": [
+        "Show Hospital: N seconds remaining under Waiting for available stock while hospitalized",
+        "Read the hospital-specific profile until or native hospital timer; never use flight arrival as hospital time",
+        "Update text locally once per second without inventory scans or API polling",
+        "Stop the timer when stock is available, the user is released, the sequence ends or the tool exits; show unavailable for unknown timing"
+      ],
+      "Validation": [
+        "Seconds/milliseconds conversion, anchored relative labels, flight-time exclusion, zero/unknown states and timer cleanup"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.61-dev",
     "date": "2026-11-09",
     "changes": {

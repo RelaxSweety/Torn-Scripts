@@ -4,7 +4,7 @@ This updates **TU Testing and Diagnostics DEV**, previously v0.1.9-dev, to **v0.
 
 [Install/update TU Test](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/all-in-one/dist/tu-diagnostics-dev.user.js)
 
-Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.61-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
+Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.62-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
 
 ## Using it
 
@@ -127,3 +127,5 @@ TU Test 0.2.27 targets 0.5.42.59. Confirm the destruction warning automatically 
 TU Test 0.2.28 / checklist v18 covers the before-landing hospitalization confirmation. Continuous recording includes before-landing-confirmation, before-landing-declined/confirmed, native Use/Yes and result/error events. Capture the in-flight inventory layout if native controls are unavailable.
 
 TU Test 0.2.29 / checklist v19 verifies explicit None hospitalization selection, already-hospitalized arming and no in-flight Hospitalize Me prompt without a selected item.
+
+TU Test 0.2.30 / checklist v20 covers the second-line hospital countdown while waiting, hospital versus flight timing, unknown/zero states, no gameplay at expiry, and removal when stock enables the next action.

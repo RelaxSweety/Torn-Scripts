@@ -127,3 +127,9 @@ The native adapter checks the outbound flight again before the item's Yes confir
 ## No hospitalization item needed (0.5.42.61-dev)
 
 The hospitalization selector includes None — already used / skip hospitalization. This allows arming with the chosen healing item after a hospitalization item has already been consumed, even while the profile is still Traveling or status updates lag. None stores a null hospitalization item and disables the hospitalization step and before-landing prompt for that intent. Once stock is available, observed hospital status determines Heal versus selected destruction/Purchase Max. Setup retains an explicit None instead of restoring an earlier saved item.
+
+## Waiting hospital countdown (0.5.42.62-dev)
+
+While hospitalized and waiting for available stock, the button adds a second line: Hospital: N seconds remaining. The deadline comes from Hospital profile status.until or a native hospital timer. Flight until is excluded. Numeric timestamps accept seconds or milliseconds, and relative hospital labels are anchored rather than resetting their deadline on every scan. Unknown timing is explicitly unavailable.
+
+Only the countdown text updates each second: no profile polling, inventory scanning or storage write is performed by the tick. A confirmed hospitalization can trigger one asynchronous profile read to obtain the deadline without delaying the next button state. Timer cleanup occurs on leaving the waiting/hospital state, cancel, completion, tool exit or a hidden page; the normal foreground update restores it using the absolute deadline. Zero does not establish hospital release and never triggers a heal, purchase or travel action. Deadlines survive same-tab refresh with the armed intent.

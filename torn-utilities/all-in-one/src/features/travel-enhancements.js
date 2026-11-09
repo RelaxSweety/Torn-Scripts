@@ -2,7 +2,7 @@
 // No gameplay requests: actions delegate once to a visible, automatically matched native control.
 export function createTravelEnhancements({document,window,getItems,getContext,getSnapshot,getRows,matchRow,getSetup=()=>({}),storeSetup=()=>{},screenAlertEnabled=()=>false,getFilterContainer=row=>row,onArmed=()=>{},executeAction=null,filterEnabled,onNotice,storeRun=()=>{},restoreRun=null,now=()=>Date.now()}) {
  const hiddenRows=new Map(),TTL=Number.MAX_SAFE_INTEGER,STOCK_TTL=30000;
- let run=restoreRun?{...restoreRun,expiresAt:Number.MAX_SAFE_INTEGER}:null,busy=false,active=false,hud=null,action=null,lastNotice='',statusTimer=null,statusAttempts=0,drag=null,suppressClickUntil=0,warningCancel=null;
+ let run=restoreRun?{...restoreRun,expiresAt:Number.MAX_SAFE_INTEGER}:null,busy=false,active=false,hud=null,action=null,lastNotice='',statusTimer=null,statusAttempts=0,drag=null,suppressClickUntil=0,warningCancel=null,countdownTimer=null,countdownBase='',countdownShown=false;
  const persist=()=>storeRun(run?{...run}:null);
  const focused=()=>!document.hidden&&document.hasFocus();
  const visible=e=>!!e?.isConnected&&!e.hidden&&e.getClientRects().length>0&&!e.closest('#tuim-panel,#tuim-travel-window,#tuim-catalog,#tu-pda-panel,#tu-snatch-run');
@@ -45,14 +45,18 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
  const sameTrip=s=>run&&active&&run.expiresAt>now()&&String(s.ownerId)===run.ownerId&&s.country===run.country;
  const outbound=s=>sameTrip(s)&&s.traveling&&!s.returning&&s.hospitalized!==true;
  const validRun=s=>sameTrip(s)&&!s.traveling;
+ function stopCountdown(){if(countdownTimer!==null)window.clearInterval(countdownTimer);countdownTimer=null;}
+ function paintCountdown(){if(!action||!run)return;const end=Number(run.hospitalUntil);const suffix=countdownShown?'\nHospital: '+(Number.isFinite(end)&&end>0?Math.max(0,Math.ceil((end-now())/1000))+' seconds remaining':'time unavailable'):'';const text=countdownBase+suffix;if(action.textContent!==text){action.textContent=text;action.setAttribute('aria-label',text.replace('\n','. ')+'; drag to reposition');}}
+ function updateCountdown(text,show,s){if(Number.isFinite(s.hospitalUntil)&&s.hospitalUntil>0&&run.hospitalUntil!==s.hospitalUntil){run.hospitalUntil=s.hospitalUntil;persist();}const layoutChanged=countdownBase!==text||countdownShown!==show;countdownBase=text;countdownShown=show;action.style.whiteSpace='pre-line';paintCountdown();if(layoutChanged&&action.style.top)clampPosition();if(show&&Number(run.hospitalUntil)>0&&!document.hidden){if(countdownTimer===null)countdownTimer=window.setInterval(()=>{if(document.hidden){stopCountdown();return;}paintCountdown();},1000);}else stopCountdown();}
+ async function loadHospitalClock(){const expected=run;try{const context=await getContext();if(run===expected&&context.hospitalUntil>0){run.hospitalUntil=context.hospitalUntil;persist();refresh();}}catch{emit('hospital-clock-unavailable');}}
  function refresh(){
-  if(!action)return;const hide=!run||run.stage==='complete';if(action.hidden!==hide)action.hidden=hide;const display=hide?'none':'block';if(action.style.display!==display)action.style.display=display;if(!run){document.getElementById('tu-snatch-screen-alert')?.remove();return;}
+  if(!action)return;const hide=!run||run.stage==='complete';if(action.hidden!==hide)action.hidden=hide;const display=hide?'none':'block';if(action.style.display!==display)action.style.display=display;if(!run){stopCountdown();document.getElementById('tu-snatch-screen-alert')?.remove();return;}
   const s=getSnapshot();screenAlert(s);const kind=run.stage,waiting=kind==='waiting',pending=kind.endsWith('-pending');
   const minimum=Math.max(1,Number(getItems().find(w=>w.key===run.watchKey)?.minQty)||1);
   const stockAvailable=kind==='hospitalize'?outbound(s)||Number.isFinite(s.quantity)&&s.quantity<minimum&&s.hospitalized===false:kind==='return'||(['buy','destroy'].includes(kind)?s.quantity>=minimum:!Number.isFinite(s.quantity)||s.quantity>=minimum);
   const ready=!!(stockAvailable&&(validRun(s)||kind==='hospitalize'&&outbound(s))&&focused()&&!busy&&!waiting&&!pending&&(kind!=='destroy'||s.hospitalized===false)&&['hospitalize','heal','destroy','buy','return'].includes(kind)&&(['return','hospitalize'].includes(kind)||now()-run.stockAt<(kind==='heal'?120000:STOCK_TTL)));
   const text=waiting?'Waiting for available stock':kind==='hospitalize'?'Hospitalize Me':pending?(kind==='hospitalize-pending'?'Confirming hospitalization':kind==='heal-pending'?'Confirming healing':kind==='buy-pending'?'Confirming purchase':kind==='destroy-pending'?'Destroying travel inventory':'Booking return flight'):kind==='complete'?'Return flight booked':kind==='destroy'?'Destroy Selected Items':kind==='buy'?'Purchase Max':kind==='heal'?'Heal from Hospital':'Return to Torn';
-  if(action.textContent!==text){action.textContent=text;action.setAttribute('aria-label',text+'; drag to reposition');if(action.style.top)clampPosition();}action.dataset.snatchStage=kind;
+  updateCountdown(text,waiting&&(s.hospitalized===true||s.hospitalized==null&&run.hospitalizedConfirmed),s);action.dataset.snatchStage=kind;
   const state=ready?'ready':'waiting';if(action.dataset.state!==state){action.disabled=false;action.dataset.state=state;action.setAttribute('aria-disabled',String(!ready));action.style.backgroundColor=ready?'#167b35':'#b32424';action.style.borderColor=ready?'#66d584':'#ec8585';}
  }
  function disarm(reason='Snatch and Run canceled'){emit('cancel',{message:reason});clearStatusTimer();executeAction?.cancel();busy=false;run=null;persist();notice(reason);refresh();}
@@ -67,7 +71,7 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   if((hospital||planHospitalize)&&!selectedItem(medical))throw Error('Select the medical item you intend to use');
   if(destroyInventory&&!destroyAccepted)throw Error('Accept the Inventory Destruction warning before arming');
   if(destroyInventory&&(!Array.isArray(destroyItems)||!destroyItems.length||destroyItems.some(item=>!item?.name)))throw Error('Confirm the inventory items selected for destruction');
-  run={planHospitalize:!!planHospitalize&&selectedItem(hospitalization),hospitalization:selectedItem(hospitalization)?hospitalization:null,destroyItems:destroyItems.map(item=>({name:item.name,id:item.id??null})),destroyInventory:!!destroyInventory,destroyAccepted:!!destroyInventory&&!!destroyAccepted,destroyDone:false,intentId:window.crypto?.randomUUID?.()||String(now())+':'+Math.random(),ownerId:String(s.ownerId),country:s.country,watchKey,watchName:watch.name,minimumQty:Math.max(1,Number(watch.minQty)||1),hospital:!!hospital,medical,stage:'waiting',expiresAt:TTL,stockAt:0};
+  run={planHospitalize:!!planHospitalize&&selectedItem(hospitalization),hospitalization:selectedItem(hospitalization)?hospitalization:null,destroyItems:destroyItems.map(item=>({name:item.name,id:item.id??null})),destroyInventory:!!destroyInventory,destroyAccepted:!!destroyInventory&&!!destroyAccepted,destroyDone:false,intentId:window.crypto?.randomUUID?.()||String(now())+':'+Math.random(),ownerId:String(s.ownerId),country:s.country,watchKey,watchName:watch.name,minimumQty:Math.max(1,Number(watch.minQty)||1),hospital:!!hospital,medical,hospitalUntil:s.hospitalUntil||null,hospitalizedConfirmed:s.status==='Hospital',stage:'waiting',expiresAt:TTL,stockAt:0};
   if(run.planHospitalize&&s.status!=='Hospital')run.stage='hospitalize';const snapshot=getSnapshot();if(planHospitalize&&!s.traveling&&Number.isFinite(snapshot.quantity)&&snapshot.quantity>=run.minimumQty){run.stockAt=now();run.stage=snapshot.hospitalized?'heal':afterHeal();}
   watch.fired=false;clearStatusTimer();executeAction?.cancel();busy=false;persist();notice('Armed. Waiting for the selected item alarm.');refresh();emit('armed',{hospital:!!hospital});onArmed();return {...run};
  }
@@ -112,8 +116,8 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   const guard=()=>run===expected&&active&&run.expiresAt>now()&&String(getSnapshot().ownerId)===run.ownerId&&getSnapshot().country===run.country;
   try{
    const result=await executeAction.execute(kind,{...options,run:expected,getSnapshot,guard,onEvent:fields=>emit('native-step',{action:kind,...fields})});if(run!==expected)return false;
-   if(kind==='hospitalize'&&result.hospitalized){run.stage='waiting';const state=getSnapshot();if(Number.isFinite(state.quantity)&&state.quantity>=run.minimumQty){run.stockAt=now();run.stage='heal';}}
-   if(kind==='heal'&&result.hospitalReleased)run.stage=afterHeal();
+   if(kind==='hospitalize'&&result.hospitalized){run.hospitalizedConfirmed=true;run.stage='waiting';void loadHospitalClock();const state=getSnapshot();if(Number.isFinite(state.quantity)&&state.quantity>=run.minimumQty){run.stockAt=now();run.stage='heal';}}
+   if(kind==='heal'&&result.hospitalReleased){run.hospitalizedConfirmed=false;run.stage=afterHeal();}
    if(kind==='destroy'&&result.inventoryDestroyed){run.destroyDone=true;run.stage='buy';}
    if(kind==='buy'&&result.purchaseConfirmed){run.stage='return';run.purchaseConfirmed=true;}
    if(kind==='return'&&result.returnBooked)run.stage='complete';
