@@ -29,6 +29,14 @@ output=output.replace('return {ownerId,hospitalUntil,hospitalClock:', 'return {o
 output=output.replace('if(!run)return;const s=getSnapshot();', 'if(!run)return;const s=getSnapshot();if(s.directItemUncertain){refresh();return;}');
 output=output.replace('enhancements?.check();return snatchContext;', 'nativeActions.observeProfile?.(profile);enhancements?.check();return snatchContext;');
 output=output.replace("if(run.stage==='heal-pending'&&s.hospitalized===false){", "if(run.stage==='heal-pending'&&s.directItemConsumed&&s.hospitalized===true){clearStatusTimer();run.stage='heal';persist();}if(run.stage==='heal-pending'&&s.hospitalized===false){");
+// Keep arming failures visible beside the clicked button, including pre-departure rejection.
+const armLine=output.match(/^  add\('Arm Snatch and Run'.*$/m)?.[0];
+if(!armLine)throw Error('Arm feedback integration marker changed');
+const armFeedback="  const armFeedback=document.createElement('p');armFeedback.id='tuim-arm-feedback';armFeedback.setAttribute('role','alert');armFeedback.setAttribute('aria-live','assertive');armFeedback.hidden=true;armFeedback.style.cssText='padding:12px;border:2px solid #ec8585;background:#5c2020;color:white;white-space:pre-wrap';section.append(armFeedback);\n";
+const improvedArm=armLine.replace("add('Arm Snatch and Run',async()=>{try{", "const armButton=add('Arm Snatch and Run',async()=>{armFeedback.hidden=true;armButton.disabled=true;try{").replace('catch(error){notice(error.message);}});', "catch(error){notice(error.message);armFeedback.textContent=error.message;armFeedback.hidden=false;armFeedback.scrollIntoView?.({block:'nearest'});}finally{armButton.disabled=false;}});");
+if(improvedArm===armLine)throw Error('Arm feedback replacement failed');
+output=output.replace(armLine,armFeedback+improvedArm);
+output=output.replace("throw Error('A confirmed foreign destination or current foreign location is required');", "throw Error([...document.querySelectorAll('#travel-root h1,#travel-root h2,#travel-root h3,#travel-root h4')].some(node=>/^travel agency$/i.test(node.textContent.trim()))?'Start your outbound flight first, then arm Snatch and Run while flying or abroad. Item setup can be completed here, but arming is unavailable before departure from Torn.':'Cannot verify your foreign destination or player status. Confirm you are on an outbound flight or abroad, then retry Arm.');");
 // Only experimental output gets the facade and original trusted event forwarding.
 const nativeDeclaration=output.match(/^const nativeActions=typeof createNativeTravelActions.*$/m)?.[0];
 if(!nativeDeclaration)throw Error('Native action integration marker changed');

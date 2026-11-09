@@ -82,3 +82,7 @@ Hospitalize Me, + Hosp?, and Heal now use the direct travel blood bag adapter in
 Hospital state must confirm hospitalization, extension must increase the deadline, and healing advances only when profile state is Abroad. A partial heal remains Heal. Unknown status blocks progression; existing read-only status reconciliation can recover a confirmed consumption after a transient status read failure. An uncertain use itself remains locked for manual review and is never resolved solely by hospital status. Capacity is credited once per confirmed consumption. Diagnostic reports include direct-item steps and profile state evidence. Buying, destruction, and return use their existing native transport. Ordinary DEV is unchanged.
 
 Test hospitalization during flight and abroad, + Hosp? with a remaining bag, partial and complete healing, then the existing purchase/return sequence. Export Report Generation after each run.
+
+## Test .9: visible arming feedback
+
+The reported .8 attempt was made before departure at Torn Travel Agency. Existing arming requires a confirmed outbound flight or foreign location. Setup can be completed at the agency, but depart first and then Arm. Arming failures now appear in a prominent live alert beside the Arm button and scroll into view. The button is disabled while its context lookup runs and restored afterward. No arming eligibility or gameplay action was added.
