@@ -42,8 +42,16 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
  function inventorySummary(){
   const panel=scope()?.querySelector('[class*=inventoryPanel]');if(!panel)return null;
   const slots=[...panel.querySelectorAll('li[class*=inventorySlot]')],banner=travelBanner();
-  const declared=Number(banner.match(/you have purchased\s*[\d,]+\s*\/\s*([\d,]+)/i)?.[1]?.replace(/,/g,'')||panel.getAttribute('aria-label')?.match(/^inventory\s+(\d+)\s+items$/i)?.[1]);
-  const total=Number.isSafeInteger(declared)&&declared>0&&slots.length===declared?declared:null;
+  const bannerTotal=Number(banner.match(/you have purchased\s*[\d,]+\s*\/\s*([\d,]+)/i)?.[1]?.replace(/,/g,''));
+  const labelCount=Number(panel.getAttribute('aria-label')?.match(/^inventory\s+(\d+)\s+items$/i)?.[1]);
+  // Inventory N items is occupied count on the agency page, not total capacity.
+  // Count only real, consecutively numbered LI slots; decorative blocked cells are DIVs.
+  const agency=[...scope().querySelectorAll('h1,h2,h3,h4')].some(e=>/^travel agency$/i.test(e.textContent.trim()));
+  const numbered=agency&&slots.length>0&&slots.every((slot,index)=>{
+   const button=slot.querySelector(':scope > button[aria-label]');const label=button?.getAttribute('aria-label')||slot.querySelector('[class*=srOnly]')?.textContent||'';
+   const number=label.match(/\bslot\s+(\d+)\b/i);return number&&Number(number[1])===index+1;
+  });
+  const total=Number.isSafeInteger(bannerTotal)&&bannerTotal>0?(slots.length===bannerTotal?bannerTotal:null):numbered?slots.length:Number.isSafeInteger(labelCount)&&labelCount>0&&slots.length===labelCount?labelCount:null;
   const groups=new Map();let occupied=0;for(const slot of slots){const e=slot.querySelector(':scope > button[aria-label]');if(!e||isConsumed(e)||/^(empty|available|free|unused)\b/i.test(e.getAttribute('aria-label')||''))continue;occupied++;const name=(e.getAttribute('aria-label')||'').replace(/\s+slot\s+\d+$/i,'');groups.set(name,(groups.get(name)||0)+1);}
   return {verified:total!==null,total,occupied,free:total===null?null:Math.max(0,total-occupied),items:[...groups].map(([name,amount])=>({name,amount})),source:'travel-dom'};
  }
@@ -239,6 +247,13 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
    throw Error('Unknown native action');
   }catch(error){if(submitted&&run.capacityLedger){run.capacityLedger.valid=false;run.capacityLedger.reason='unconfirmed-submitted-action';}error.submitted=submitted;throw error;}finally{document.removeEventListener('visibilitychange',foreground);window.removeEventListener('blur',foreground);if(controller===current)controller=null;}
  }
+ function listAgencyItems(){
+  const root=scope();if(!root||![...root.querySelectorAll('h1,h2,h3,h4')].some(e=>/^travel agency$/i.test(e.textContent.trim())))return [];
+  const items=new Map();for(const option of root.querySelectorAll('[class*=itemPicker] [role=listbox] [role=option]')){
+   if(option.getAttribute('aria-disabled')==='true')continue;const name=option.querySelector('[class*=itemNameText]')?.textContent?.trim(),amount=Number(option.querySelector('[class*=itemName] b')?.textContent?.match(/x\s*([\d,]+)/i)?.[1]?.replace(/,/g,''));
+   if(name&&Number.isSafeInteger(amount)&&amount>0)items.set(norm(name),{name,id:null,uid:null,amount,source:'agency-picker'});
+  }return [...items.values()];
+ }
  function listInventory(){const panel=scope()?.querySelector('[class*=inventoryPanel]');if(!panel)return null;return [...panel.querySelectorAll('li[class*=inventorySlot] > button[aria-label]')].filter(e=>e.isConnected&&!isConsumed(e)&&! /^(empty|available|free|unused)\b/i.test(e.getAttribute('aria-label')||'')).map(e=>({name:(e.getAttribute('aria-label')||'').replace(/\s+slot\s+\d+$/i,''),id:Number(e.closest('li')?.getAttribute('data-item-id'))||null,uid:null,amount:1,source:'travel-dom'}));}
- return {enabled,execute,cancel,forget,prepareRun,inventorySummary,inspect,resolveItem,capacityFor,listInventory};
+ return {enabled,execute,cancel,forget,prepareRun,inventorySummary,inspect,resolveItem,capacityFor,listInventory,listAgencyItems};
 }

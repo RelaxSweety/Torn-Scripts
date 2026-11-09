@@ -4,7 +4,7 @@ This updates **TU Testing and Diagnostics DEV**, previously v0.1.9-dev, to **v0.
 
 [Install/update TU Test](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/all-in-one/dist/tu-diagnostics-dev.user.js)
 
-Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.69-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
+Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.70-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
 
 ## Using it
 
@@ -147,3 +147,5 @@ TU Test 0.2.36 / DEV .69 reports confirmation-capacity-check with desired quanti
 While Snatch and Run / travel monitoring is ON, the tool captures bounded native travel-page fragments at Start and on relevant native layout/control changes, including inventory panels, inventory search/Add/Fill controls and destination sections. No individual element selection is required. Debounced scans have a minimum 1.5-second interval and unchanged fragments are deduplicated. Text-only ticker/countdown updates do not trigger full page-fragment scans. Stop removes the observer, route listeners and pending scan; same-tab resume captures the new page.
 
 Report travelDom.pageContext distinguishes Travel Agency/travel pages, retains only an allowlisted sid travel category and the pathname, and reports native-root presence. travelDom.pageDom stores at most 64 sanitized fragments / 512 KB separately from the existing 200-action timeline. Unknown page layouts may still require a selected capture. The tool excludes script/style/media, arbitrary input values, credentials, URLs, chat/log regions and TU overlays from automatic page captures. This gathers evidence for Travel Agency inventory support; it does not change gameplay or add that support itself.
+
+For DEV .70 Travel Agency validation, confirm the overview reports 18 free slots for the captured empty layout. Pack an intended healing or hospitalization item using Torn's own controls, then use TU Load inventory and verify the carried name, occupied/free count and selection annotations. The diagnostic capture established empty-slot structure; the occupied agency item case remains a live acceptance check.

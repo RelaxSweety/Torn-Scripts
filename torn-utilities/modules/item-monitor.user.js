@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.12.25-dev
+// @version      1.12.26-dev
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -168,7 +168,7 @@ function snatchSnapshot(watch=null){
 }
 async function getSnatchContext({inventory=false}={}){
  const api=host.TornUtilities;if(typeof api?.requestTravelInfo!=='function')throw Error('Update the integrated TU Manager to use Snatch and Run');
- if(inventory){const carried=nativeActions?.listInventory?.();if(carried!==null&&carried!==undefined){const grouped=new Map();for(const item of carried){const key=norm(item.name);const existing=grouped.get(key);if(existing)existing.amount+=Number(item.amount)||1;else grouped.set(key,{...item,amount:Number(item.amount)||1,source:'travel-dom'});}const items=[...grouped.values()];return {...snatchContext,ownerId:api.getPlayer()?.id,country:liveCountry(),inventorySource:'travel-dom',inventoryItems:items,medicalItems:items};}}
+ if(inventory){const carried=nativeActions?.listInventory?.();if(carried!==null&&carried!==undefined){const grouped=new Map();for(const item of carried){const key=norm(item.name);const existing=grouped.get(key);if(existing)existing.amount+=Number(item.amount)||1;else grouped.set(key,{...item,amount:Number(item.amount)||1,source:'travel-dom'});}const items=[...grouped.values()],choices=new Map(items.map(item=>[norm(item.name),item]));for(const item of nativeActions?.listAgencyItems?.()||[])if(!choices.has(norm(item.name)))choices.set(norm(item.name),item);const selectionItems=[...choices.values()];return {...snatchContext,ownerId:api.getPlayer()?.id,country:liveCountry(),inventorySource:'travel-dom',inventoryItems:items,medicalItems:selectionItems,selectionItems,agencyPage:[...document.querySelectorAll('#travel-root h1,#travel-root h2,#travel-root h3,#travel-root h4')].some(e=>/^travel agency$/i.test(e.textContent.trim()))};}}
  const data=await api.requestTravelInfo('profile'),profile=data.profile||data;
  let country=liveCountry(),status=profile.status?.state||'',description=profile.status?.description||'';
  const route=document.querySelector('#travel-root [aria-label="Flight progress"]')?.textContent||'';

@@ -1,5 +1,21 @@
 [
   {
+    "version": "0.5.42.70-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Travel Agency inventory capacity": [
+        "Interpret Inventory N items as occupied count when active slots are explicitly numbered",
+        "Determine capacity from consecutive native inventorySlot LI elements; ignore decorative blocked DIV cells",
+        "Keep foreign-page explicit total capacity authoritative and reject incomplete slot layouts",
+        "Read rendered native agency item-picker choices with available-to-pack annotations, separately from carried inventory and destruction choices"
+      ],
+      "Validation": [
+        "Captured PDA agency panel: Inventory 0 items, 18 numbered empty slots, three decorative blocked cells",
+        "Simulated carried Morphine in slot 1 reports 18 total, 1 used, 17 free; gapped numbering is rejected"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.69-dev",
     "date": "2026-11-09",
     "changes": {
