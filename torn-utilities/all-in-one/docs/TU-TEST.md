@@ -4,7 +4,7 @@ This updates **TU Testing and Diagnostics DEV**, previously v0.1.9-dev, to **v0.
 
 [Install/update TU Test](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/all-in-one/dist/tu-diagnostics-dev.user.js)
 
-Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.75-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
+Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.76-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
 
 ## Using it
 
@@ -155,3 +155,5 @@ For DEV .70 Travel Agency validation, confirm the overview reports 18 free slots
 Exports include travelDom.retainedSnatchRun even if action monitoring was off. This reads only TU's known same-tab run key and exports an allowlist of stage/flags, selected destruction count and numeric capacity-ledger fields (total, initial occupancy, confirmed frees/purchases, spending, starting funds and computed remaining capacity). Player identity, credentials, arbitrary storage and raw session contents are excluded. Missing/invalid state is explicit. It is a point-in-time retained summary, not proof of unrecorded action order or failure cause. Export from the original tab before rearming or closing it to preserve the affected run.
 
 DEV .75 launcher validation: tap the TU icon over Torn Home and other clickable controls; the menu should remain open and Torn must not navigate. Dragging must reposition without opening. Keyboard activation remains supported. A local 500 ms guard suppresses duplicate clicks only inside the icon's prior rectangle; other controls remain usable.
+
+The DEV Item Monitor opens from **Open Item Monitor** on the tool menu. This starts the bundled diagnostic recorder automatically. The temporary section at the bottom offers **Diagnostic Monitor Activation**, **Monitoring Deactivation**, and **Report Generation**. Recording continues while minimized, after Back, and across same-tab page navigation; manual deactivation or explicit tool exit stops recording and retains evidence. Reports include bounded, sanitized native DOM and action records, without a separate diagnostic userscript. Storage writes are deferred off action dispatch; older DOM captures are evicted before action records when limits are reached. Live PDA acceptance remains required.

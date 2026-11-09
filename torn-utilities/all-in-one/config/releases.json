@@ -1,5 +1,19 @@
 [
   {
+    "version": "0.5.42.76-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Item Monitor screen and embedded DEV diagnostics": [
+        "Replace the combined entry screen with Open Travel Assistant and Open Item Monitor menu actions",
+        "Move monitoring, alarms and Snatch and Run to the dedicated Item Monitor screen",
+        "Automatically start the embedded DEV recorder when Open Item Monitor is selected",
+        "Add Diagnostic Monitor Activation, Monitoring Deactivation and Report Generation at the bottom",
+        "Keep recording across minimize, Back and same-tab navigation; explicit exit stops resources and preserves evidence",
+        "Bundle system detection, sanitized action/DOM recording and retained capacity export into TU; defer action-log storage writes off native event dispatch"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.75-dev",
     "date": "2026-11-09",
     "changes": {

@@ -22,7 +22,7 @@ try{
  w.document.querySelector('[data-tab="modules"]').click();
  const open=name=>{const card=[...w.document.querySelectorAll('.tu-card')].find(c=>c.querySelector('strong')?.textContent===name);assert.ok(card,name);card.querySelector('button').click()};
  open('Business Tools');open('Travel Assistant and Item Monitor');await delay(550);
- const panel=getById('tuim-panel');assert.ok(panel);assert.equal(panel.hidden,false);
+ const panel=getById('tuim-menu');assert.ok(panel);assert.equal(panel.hidden,false);
  if(!measureOnly){
   const probe=w.document.createElement('section');probe.id='tu-diagnostics-window';probe.innerHTML='<header><strong>Fixture</strong><button>×</button></header>';w.document.body.append(probe);await delay(60);
   const bar=probe.querySelector('header');assert.equal(bar.querySelectorAll('[data-tu-nav-controls]').length,1);

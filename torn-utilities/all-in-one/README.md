@@ -1,6 +1,6 @@
 # Torn Utilities — single-script DEV
 
-Version **0.5.42.75-dev**, branch `dev/tu-all-in-one`. Install one complete userscript for desktop Tampermonkey or Torn PDA. This is a DEV release for manual acceptance; no production deployment is included.
+Version **0.5.42.76-dev**, branch `dev/tu-all-in-one`. Install one complete userscript for desktop Tampermonkey or Torn PDA. This is a DEV release for manual acceptance; no production deployment is included.
 
 [Install DEV](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/releases/dev/torn-utilities-dev.user.js) · [Installation and rollback](../INSTALLATION.md) · [Acceptance checklist](docs/DEV-ACCEPTANCE.md)
 
@@ -67,3 +67,7 @@ DEV 0.5.42.49 simplifies foreign catalog labels to country names and restores an
 DEV 0.5.42.50 isolates Snatch and Run touch/mouse events from native outside-tap dismissal handlers and shows action-specific pending labels. Each subsequent stage still requires a fresh user click.
 
 DEV 0.5.42.52 loads the complete item catalog with the verified TU login key through Manager on both PC and PDA, including Public Only keys.
+
+The DEV Item Monitor opens from **Open Item Monitor** on the tool menu. This starts the bundled diagnostic recorder automatically. The temporary section at the bottom offers **Diagnostic Monitor Activation**, **Monitoring Deactivation**, and **Report Generation**. Recording continues while minimized, after Back, and across same-tab page navigation; manual deactivation or explicit tool exit stops recording and retains evidence. Reports include bounded, sanitized native DOM and action records, without a separate diagnostic userscript. Storage writes are deferred off action dispatch; older DOM captures are evicted before action records when limits are reached. Live PDA acceptance remains required.
+
+The temporary bundled recorder increases the DEV artifact to approximately 729 KB; the regression payload cap is 750 KB while embedded development diagnostics are included.

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "checklistVersion": "dev-acceptance-2026-11-09-v24",
+  "checklistVersion": "dev-acceptance-2026-11-09-v25",
   "tests": [
     {
       "id": "runtime.build",
@@ -691,6 +691,18 @@
       "section": "tool.item-monitor",
       "label": "Snatch and Run return and cleanup",
       "instructions": "On actual PC Tampermonkey and Torn PDA: after purchase proof, one Return click opens Travel home, verifies Torn in the native question, selects Travel Back, waits for booking proof, then selects enabled Continue. Confirm the flight screen, no duplicate booking and no automatic action on navigation/reload. Run continuous diagnostics before healing; stop/export only after safely on the flight. Fixture success does not pass live host acceptance. Test an existing empty/collapsed travel-home-panel and delayed rendering of its question. The action must expand Travel home once and wait for the Torn question/back control. If the native countdown automatically navigates to the flight screen, it must finish without an extra Continue click or timeout.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "tampermonkey",
+        "pda"
+      ]
+    },
+    {
+      "id": "item-monitor.embedded-diagnostics",
+      "section": "tool.item-monitor",
+      "label": "Item Monitor screen and embedded diagnostics",
+      "instructions": "Open Travel Assistant and Item Monitor. Confirm the menu has Open Travel Assistant and Open Item Monitor. Select Open Item Monitor: monitoring and Snatch and Run appear and diagnostic recording starts automatically. At the bottom, test Monitoring Deactivation, Diagnostic Monitor Activation and Report Generation. Confirm minimize, Back and same-tab refresh retain recording; explicit tool exit stops it. Export one report with native page DOM and action evidence without a separate test script.",
       "kind": "manual",
       "critical": true,
       "platforms": [

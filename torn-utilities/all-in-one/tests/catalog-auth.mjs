@@ -9,7 +9,7 @@ const requests=[];w.GM_xmlhttpRequest=o=>{requests.push(o);queueMicrotask(()=>o.
 const pause=()=>new Promise(r=>setTimeout(r,60)),button=(root,name)=>[...root.querySelectorAll('button')].find(e=>e.textContent===name);
 const pointerClick=node=>{for(const type of ['pointerdown','pointerup']){const event=new w.Event(type);Object.assign(event,{pointerId:1,pointerType:'touch',button:0,clientX:10,clientY:10});node.dispatchEvent(event);}node.click();};
 try{
- w.eval(fs.readFileSync(new URL('../dist/tu-integrated-staging-dev.user.js',import.meta.url),'utf8'));await pause();d.querySelector('[data-tab="modules"]').click();const card=name=>[...d.querySelectorAll('.tu-card')].find(c=>c.querySelector('strong')?.textContent===name).querySelector('button').click();card('Business Tools');card('Travel Assistant and Item Monitor');await pause();
+ w.eval(fs.readFileSync(new URL('../dist/tu-integrated-staging-dev.user.js',import.meta.url),'utf8'));await pause();d.querySelector('[data-tab="modules"]').click();const card=name=>[...d.querySelectorAll('.tu-card')].find(c=>c.querySelector('strong')?.textContent===name).querySelector('button').click();card('Business Tools');card('Travel Assistant and Item Monitor');await pause();[...d.querySelectorAll('#tuim-menu button')].find(b=>b.textContent==='Open Item Monitor').click();await pause();
  button(d.querySelector('#tuim-panel'),'Select Item from Complete List').click();await pause();
  assert.ok(d.querySelector('#tuim-catalog').textContent.includes('Cold catalog flower'));
  const catalogRequests=requests.filter(o=>o.url.includes('/v2/torn/items'));assert.equal(catalogRequests.length,1);assert.equal(catalogRequests[0].headers.Authorization,'ApiKey abcdef0123456789');assert.ok(!catalogRequests[0].url.includes('key='));

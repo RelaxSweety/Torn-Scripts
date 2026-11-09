@@ -17,7 +17,7 @@ w.eval(fs.readFileSync(new URL('../dist/tu-integrated-staging-dev.user.js',impor
 const button=(root,name)=>[...root.querySelectorAll('button')].find(e=>e.textContent===name);
 let t=await boot();
 try{
- t.d.querySelector('[data-tab="modules"]').click();const card=name=>[...t.d.querySelectorAll('.tu-card')].find(c=>c.querySelector('strong')?.textContent===name).querySelector('button').click();card('Business Tools');card('Travel Assistant and Item Monitor');await pause();
+ t.d.querySelector('[data-tab="modules"]').click();const card=name=>[...t.d.querySelectorAll('.tu-card')].find(c=>c.querySelector('strong')?.textContent===name).querySelector('button').click();card('Business Tools');card('Travel Assistant and Item Monitor');await pause();button(t.d.querySelector('#tuim-menu'),'Open Item Monitor').click();await pause();
  const panel=t.d.querySelector('#tuim-panel'),hospital=panel.querySelector('[aria-label="Planning to Hospitalize?"]');hospital.value='yes';hospital.dispatchEvent(new t.w.Event('change'));
  const quantity=panel.querySelector('input[type=number]');quantity.value='7';quantity.dispatchEvent(new t.w.Event('input'));
  assert.equal(t.w.sessionStorage.getItem('tu:monitor:resume:v1'),'42');
