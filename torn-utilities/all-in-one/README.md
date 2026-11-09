@@ -1,6 +1,6 @@
 # Torn Utilities — single-script DEV
 
-Version **0.5.42.80-dev**, branch `dev/tu-all-in-one`. Install one complete userscript for desktop Tampermonkey or Torn PDA. This is a DEV release for manual acceptance; no production deployment is included.
+Version **0.5.42.81-dev**, branch `dev/tu-all-in-one`. Install one complete userscript for desktop Tampermonkey or Torn PDA. This is a DEV release for manual acceptance; no production deployment is included.
 
 [Install DEV](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/releases/dev/torn-utilities-dev.user.js) · [Installation and rollback](../INSTALLATION.md) · [Acceptance checklist](docs/DEV-ACCEPTANCE.md)
 
@@ -70,10 +70,14 @@ DEV 0.5.42.52 loads the complete item catalog with the verified TU login key thr
 
 The DEV Item Monitor opens from **Open Item Monitor** on the tool menu. This starts the bundled diagnostic recorder automatically. The temporary section at the bottom offers **Diagnostic Monitor Activation**, **Monitoring Deactivation**, and **Report Generation**. Recording continues while minimized, after Back, and across same-tab page navigation; manual deactivation or explicit tool exit stops recording and retains evidence. Reports include bounded, sanitized native DOM and action records, without a separate diagnostic userscript. Storage writes are deferred off action dispatch; older DOM captures are evicted before action records when limits are reached. Live PDA acceptance remains required.
 
-The temporary bundled recorder increases the DEV artifact to approximately 729 KB; the regression payload cap is 750 KB while embedded development diagnostics are included.
+The temporary bundled recorder increases the DEV artifact to approximately 756 KB; the regression payload cap is 800 KB while embedded development diagnostics are included.
 
 Outbound flight readiness now recovers the destination from Torn’s visible Flight progress route after refresh and updates on focus/visibility changes. Reports include `snatchAndRun.readinessReason`; before-landing item use still requires confirmation and a fresh trip/player check.
 
 Destination landing alarms are optional under Alarm settings: choose lead seconds (default 60) and sound (default Chime), using the one master volume slider. A flashing landing banner appears once per outbound flight at the threshold. The native Flight progress timer drives a local countdown; no polling requests are added. Snatch and Run displays Dest ETA in seconds during outbound travel, independent of the alarm checkbox. Same-tab refresh retains the fired-flight marker. Close program stops alarms and Snatch and Run; Minimize leaves them active. Audio requires browser permission through a user interaction; locked/suspended pages cannot guarantee timely sound.
 
 Inventory, hospital and destination landing alarms now share the same Alarm settings group. Each has its own numeric duration or Alarm until muted option. Inventory and hospital mute buttons float above Torn while sounding; clicking the Landing soon banner (Click to Mute) removes it and stops its sound. Muting one channel leaves other alarms running. Audio is scheduled in bounded batches and stopped on tool exit.
+
+Missed-restock evidence is exported under `stockMonitor`, independently of the DOM capture ring: 512 compact samples and 256 decision/dispatch events with loss counters, a one-minute unchanged-state heartbeat, first/last times, and repeat counts. Native shop quantities and engine/cache results are separate; visible unfocused pages can provide passive native observations without changing scan/action gating. Hidden or unrendered stock remains unknown. It records settings, threshold/latch decisions, row/cache mismatches, scan errors/skips, Snatch stock rejections and audio requests/context (not proof of audible output). Allowlisted records persist in this tab, with build provenance and deferred writes; no network calls or general DOM/chat text are added. The approximately 756 KB DEV artifact now has an 800 KB regression cap to include the stock recorder.
+
+Assess installedBuild first, then each retained event’s installedBuild/build: one export can contain older sessions. Embedded exports now summarize retained record counts by build in evidenceBuilds, while preserving per-record provenance. Older-version failures must not be described as confirmed current-version regressions.

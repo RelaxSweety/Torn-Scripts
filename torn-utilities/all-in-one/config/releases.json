@@ -1,5 +1,17 @@
 [
   {
+    "version": "0.5.42.81-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Missed-stock diagnostic evidence": [
+        "Separate compact stock history from the DOM buffer; retain native quantity, engine quantity, threshold, scan/focus state and cached-row source",
+        "Record alarm requests, dispatch/context, mute/suppression and Snatch stock acceptance/rejection reasons",
+        "Coalesce unchanged samples with a one-minute heartbeat and deferred session writes; retain same-tab history with build provenance and loss counters",
+        "Observe visible native stock during unfocused skipped scans without changing gameplay or alarm gating"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.80-dev",
     "date": "2026-11-09",
     "changes": {

@@ -107,9 +107,10 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   if(run.planHospitalize&&s.status!=='Hospital')run.stage='hospitalize';const snapshot=getSnapshot();if(planHospitalize&&!s.traveling&&Number.isFinite(snapshot.quantity)&&snapshot.quantity>=run.minimumQty){run.stockAt=now();run.stage=snapshot.hospitalized?'heal':afterHeal();}
   watch.fired=false;clearStatusTimer();executeAction?.cancel();busy=false;persist();notice('Armed. Waiting for the selected item alarm.');refresh();emit('armed',{hospital:!!hospital,threshold:run.hospitalWarningSeconds,enabled:run.hospitalAlarm,selectedCount:hospitalItems().length});onArmed();return {...run};
  }
+ const stockIgnoredEvidence=new Map();
  function stock(w,s){
-  if(!run||w.key!==run.watchKey||!validRun(s)||!focused()||!(s.quantity>0))return;
-  run.stockAt=now();if(['waiting','hospitalize'].includes(run.stage)){run.stage=s.hospitalized===true?'heal':s.hospitalized===false?afterHeal():run.hospital?'heal':afterHeal();emit('stock-ready',{quantity:s.quantity});}persist();refresh();
+  if(!run||w.key!==run.watchKey||!validRun(s)||!focused()||!(s.quantity>0)){const reason=!run?'not-armed':w.key!==run.watchKey?'different-armed-item':!focused()?'page-not-focused':s.traveling?'traveling':String(s.ownerId)!==run.ownerId?'player-unavailable-or-changed':s.country!==run.country?'destination-unavailable-or-changed':!(s.quantity>0)?'quantity-unavailable-or-zero':'run-inactive-or-expired';const signature=JSON.stringify([reason,run?.stage,s.quantity]),prior=stockIgnoredEvidence.get(w.key);if(!prior||prior.signature!==signature||now()-prior.at>=60000){stockIgnoredEvidence.set(w.key,{signature,at:now()});if(stockIgnoredEvidence.size>64)stockIgnoredEvidence.delete(stockIgnoredEvidence.keys().next().value);emit('stock-ignored',{item:w.name,quantity:s.quantity,reason});}return;}
+  stockIgnoredEvidence.delete(w.key);run.stockAt=now();if(['waiting','hospitalize'].includes(run.stage)){run.stage=s.hospitalized===true?'heal':s.hospitalized===false?afterHeal():run.hospital?'heal':afterHeal();emit('stock-ready',{quantity:s.quantity});}persist();refresh();
  }
  function check(){
   if(!run)return;const s=getSnapshot();
