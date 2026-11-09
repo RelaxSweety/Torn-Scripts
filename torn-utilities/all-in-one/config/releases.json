@@ -1,5 +1,21 @@
 [
   {
+    "version": "0.5.42.69-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Purchase confirmation recovery": [
+        "Distinguish a stock row replaced by Torn confirmation from visible zero stock",
+        "For an exact item/quantity confirmation, retain immediately pre-Buy stock and verify current cash, tracked space and confirmation price",
+        "Cancel the matching question via No if real capacity/stock/funds validation fails, allowing normal recovery",
+        "Record confirmation capacity source and avoid redacting the capacity-ledger source label"
+      ],
+      "Validation": [
+        "Captured integrated desktop flow with verified 18-slot capacity and removed stock row",
+        "Missing row succeeds; visible stock zero, cash drop and increased confirmation price cancel without Yes"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.68-dev",
     "date": "2026-11-09",
     "changes": {

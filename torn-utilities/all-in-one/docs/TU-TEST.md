@@ -4,7 +4,7 @@ This updates **TU Testing and Diagnostics DEV**, previously v0.1.9-dev, to **v0.
 
 [Install/update TU Test](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/all-in-one/dist/tu-diagnostics-dev.user.js)
 
-Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.68-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
+Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.69-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
 
 ## Using it
 
@@ -139,3 +139,5 @@ DEV .65 diagnostics also report the companion hospital button label, presence, w
 Hospital evidence in TU Test 0.2.34 / TU DEV .67 includes configured versus armed warning seconds, whether rearming is needed, sound enable and selection, live shared volume, threshold state/time to threshold, alarm dispatch deadline and audio context support/state. Selected and carried hospitalization item counts and an explicit availability reason explain missing + Hosp? controls. These are read-only, explicitly named TU settings; arbitrary input values remain excluded. Settings snapshots accompany clicks, changes and function events and survive same-tab navigation. Threshold transitions and alarm attempts are distinct; audible output always remains unverified. On older .66, named UI settings can be read, but armed runtime evidence is unavailable until TU is updated. Update both rolling DEV and diagnostics scripts for complete evidence.
 
 TU Test 0.2.35 adds capacity source, confirmed freed slots and confirmed purchases to native-step events. DEV .68 setup and purchase testing should cover stale consumed-item labels, direct quantity entry, downward clamps and one remainder transaction, cash/stock limits, destruction credits and refresh/manual-change baseline invalidation.
+
+TU Test 0.2.36 / DEV .69 reports confirmation-capacity-check with desired quantity, free space and stock source (current visible stock versus confirmation row absent). Validate a native row replaced by confirmation and genuine zero stock/cash/price-change cancellation. The stock-source fallback is scoped to an already matched native item/quantity confirmation.

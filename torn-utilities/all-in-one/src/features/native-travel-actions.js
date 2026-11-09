@@ -20,13 +20,13 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
   if(candidates.length!==1)throw Error(candidates.length?'More than one native item matches this monitor; no purchase selected':'The monitored item could not be identified in the current foreign shop. No purchase was sent.');
   return candidates[0];
  }
- function capacityFor(row,run,stock,nativeMax){
+ function capacityFor(row,run,stock,nativeMax,priceOverride=null){
   const ledger=run.capacityLedger;
   const banner=travelBanner();
   if(!ledger?.valid)return {verified:false,reason:'capacity-baseline-unavailable',desired:nativeMax};
   const total=ledger.total,occupied=Math.max(0,ledger.initialOccupied-ledger.freed+ledger.purchased),free=Math.max(0,total-occupied);
   const currency=value=>{const match=String(value||'').match(/(-?)\$\s*(-?)([\d,]+(?:\.\d+)?)(?![\w,.])/);return match?((match[1]||match[2])?-1:1)*Number(match[3].replace(/,/g,'')):NaN;};
-  const price=currency(row.querySelector('[class*=tabletColD] [class*=displayPrice]')?.textContent||row.querySelector('[class*=tabletColD]')?.textContent);
+  const price=Number.isFinite(priceOverride)&&priceOverride>0?priceOverride:currency(row.querySelector('[class*=tabletColD] [class*=displayPrice]')?.textContent||row.querySelector('[class*=tabletColD]')?.textContent);
   const displayedCash=currency(document.getElementById('user-money')?.textContent);
   const cash=Number.isFinite(displayedCash)?displayedCash:currency(banner.match(/and have\s*(\$\s*-?[\d,]+(?:\.\d+)?)/i)?.[1]);
   if(!(price>0)||!Number.isFinite(cash))return {verified:false,reason:'funds-not-available',total,occupied,free,desired:Math.min(nativeMax,free,stock)};
@@ -167,7 +167,7 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
     if(capacity.verified&&capacity.desired<1)throw Error('No available capacity, affordable items or stock; no purchase was sent');
     if(target===null)target=capacity.verified?capacity.desired:nativeAmount;
     const wanted=Math.min(Number.isFinite(capacity.desired)?capacity.desired:nativeAmount,target-confirmedAmount);
-    onEvent({step:'capacity-check',verified:capacity.verified,capacityTotal:capacity.total,occupiedSlots:capacity.occupied,freeSlots:capacity.free,nativeMax:nativeAmount,desired:wanted,limitedBy:capacity.limitedBy||capacity.reason,freedSlots:run.capacityLedger?.freed||0,confirmedPurchases:run.capacityLedger?.purchased||0,source:capacity.verified?'confirmed-capacity-ledger':'native-max-fallback'});
+    onEvent({step:'capacity-check',verified:capacity.verified,capacityTotal:capacity.total,occupiedSlots:capacity.occupied,freeSlots:capacity.free,nativeMax:nativeAmount,desired:wanted,limitedBy:capacity.limitedBy||capacity.reason,freedSlots:run.capacityLedger?.freed||0,confirmedPurchases:run.capacityLedger?.purchased||0,source:capacity.verified?'capacity-ledger':'native-max-fallback'});
     if(!Number.isSafeInteger(wanted)||wanted<1){if(confirmedAmount)return outcome('Torn currently allows no additional quantity');throw Error('Torn has no available purchase quantity');}
     const prepared=new WeakSet();
     const prepare=element=>{if(Number(element.value.replace(/,/g,''))===wanted||prepared.has(element))return;const fresh=capacityFor(row,run,getSnapshot().quantity,Number(element.value));if(capacity.verified&&(!fresh.verified||fresh.desired<wanted))throw Error('Capacity, stock or funds changed while preparing quantity');prepared.add(element);const setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value')?.set;if(!setter)throw Error('Native quantity input cannot be updated');setter.call(element,String(wanted));element.dispatchEvent(new window.Event('input',{bubbles:true}));element.dispatchEvent(new window.Event('change',{bubbles:true}));onEvent({step:'quantity-prepared',amount:Number(element.value.replace(/,/g,'')),desired:wanted});};
@@ -182,7 +182,18 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
     const amount=Number(input.value.replace(/,/g,''));s=getSnapshot();const freshCapacity=capacityFor(row,run,s.quantity,amount);if(capacity.verified&&(!freshCapacity.verified||freshCapacity.desired<amount))throw Error('Available capacity, stock or funds changed before Buy');if(s.hospitalized!==false||amount>s.quantity)throw Error('Hospital or stock state changed before Buy');click(buy);
     const yes=await wait(()=>{const panel=scope()?.querySelector('#'+panelId),confirmation=panel?.querySelector('[class*=confirmPanel]');if(!shown(confirmation))return null;
      const strong=confirmation.querySelector('p strong');if(norm(strong?.textContent)!==norm(amount+'x '+run.watchName))throw Error('Purchase confirmation quantity/item mismatch');return one(buttons(confirmation,'Yes'),'purchase Yes confirmation');});
-    const confirmSnapshot=getSnapshot(),confirmStock=Number.isFinite(confirmSnapshot.quantity)?confirmSnapshot.quantity:s.quantity;const finalCapacity=capacityFor(row,run,confirmStock,amount);if(capacity.verified&&(!finalCapacity.verified||finalCapacity.desired<amount))throw Error('Capacity, stock or funds changed before confirmation');
+    const confirmSnapshot=getSnapshot();
+    // Torn replaces the monitored row with its exact item/quantity confirmation.
+    // Its absence is unknown stock, not a stock depletion. Use this transaction's
+    // immediately verified pre-Buy stock while continuing to check live cash/space.
+    const confirmStock=confirmSnapshot.stockVisible===false?s.quantity:Number.isFinite(confirmSnapshot.quantity)?confirmSnapshot.quantity:s.quantity;
+    const confirmPanel=scope()?.querySelector('#'+panelId+' [class*=confirmPanel]');const totalText=confirmPanel?.querySelectorAll('p strong')?.[1]?.textContent||'';const totalMatch=totalText.match(/\$\s*([\d,]+(?:\.\d+)?)/);const confirmedPrice=totalMatch?Number(totalMatch[1].replace(/,/g,''))/amount:capacity.price;
+    const finalCapacity=capacityFor(row,run,confirmStock,amount,confirmedPrice);
+    onEvent({step:'confirmation-capacity-check',verified:finalCapacity.verified,freeSlots:finalCapacity.free,desired:finalCapacity.desired,quantity:confirmStock,reason:confirmSnapshot.stockVisible===false?'confirmation row absent':'current-visible-stock'});
+    if(capacity.verified&&(!finalCapacity.verified||finalCapacity.desired<amount)){
+     const confirmation=scope()?.querySelector('#'+panelId+' [class*=confirmPanel]');const no=one(buttons(confirmation,'No'),'purchase No confirmation');if(no)click(no);
+     throw Error('Capacity, stock or funds changed before confirmation; purchase canceled');
+    }
     if(getSnapshot().hospitalized!==false)throw Error('Hospital state changed before confirmation');if(capacity.verified&&!Number.isFinite(run.capacityLedger.cashBeforePurchase))run.capacityLedger.cashBeforePurchase=capacity.cash;submitted=true;click(yes);
     await wait(()=>{const snapshot=getSnapshot(),currentReceipt=receipt(run);return Number.isFinite(priorCount)&&purchasedCount()!==priorCount&&purchasedCount()===(run.capacityLedger?.valid?run.capacityLedger.initialOccupied-run.capacityLedger.freed+run.capacityLedger.purchased+amount:priorCount+amount)||currentReceipt&&currentReceipt!==priorReceipt||round===0&&snapshot.purchaseProof&&snapshot.purchaseProof!==priorProof&&snapshot.purchaseItemKey===run.watchKey||inventory(run.watchName).length>=(fallbackBefore??((run.capacityLedger?.watchCount||0)+(run.capacityLedger?.purchased||0)))+amount;});
     if(run.capacityLedger?.valid){run.capacityLedger.purchased+=amount;run.capacityLedger.spent+=(capacity.price||0)*amount;}
