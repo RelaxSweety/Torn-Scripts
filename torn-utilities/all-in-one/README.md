@@ -1,6 +1,6 @@
 # Torn Utilities — single-script DEV
 
-Version **0.5.42.79-dev**, branch `dev/tu-all-in-one`. Install one complete userscript for desktop Tampermonkey or Torn PDA. This is a DEV release for manual acceptance; no production deployment is included.
+Version **0.5.42.80-dev**, branch `dev/tu-all-in-one`. Install one complete userscript for desktop Tampermonkey or Torn PDA. This is a DEV release for manual acceptance; no production deployment is included.
 
 [Install DEV](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/releases/dev/torn-utilities-dev.user.js) · [Installation and rollback](../INSTALLATION.md) · [Acceptance checklist](docs/DEV-ACCEPTANCE.md)
 
@@ -75,3 +75,5 @@ The temporary bundled recorder increases the DEV artifact to approximately 729 K
 Outbound flight readiness now recovers the destination from Torn’s visible Flight progress route after refresh and updates on focus/visibility changes. Reports include `snatchAndRun.readinessReason`; before-landing item use still requires confirmation and a fresh trip/player check.
 
 Destination landing alarms are optional under Alarm settings: choose lead seconds (default 60) and sound (default Chime), using the one master volume slider. A flashing landing banner appears once per outbound flight at the threshold. The native Flight progress timer drives a local countdown; no polling requests are added. Snatch and Run displays Dest ETA in seconds during outbound travel, independent of the alarm checkbox. Same-tab refresh retains the fired-flight marker. Close program stops alarms and Snatch and Run; Minimize leaves them active. Audio requires browser permission through a user interaction; locked/suspended pages cannot guarantee timely sound.
+
+Inventory, hospital and destination landing alarms now share the same Alarm settings group. Each has its own numeric duration or Alarm until muted option. Inventory and hospital mute buttons float above Torn while sounding; clicking the Landing soon banner (Click to Mute) removes it and stops its sound. Muting one channel leaves other alarms running. Audio is scheduled in bounded batches and stopped on tool exit.

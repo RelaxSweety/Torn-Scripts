@@ -1,5 +1,17 @@
 [
   {
+    "version": "0.5.42.80-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Alarm settings and muting": [
+        "Group inventory, hospital and landing alarm controls together under Alarm settings",
+        "Each alarm supports a duration in seconds or Alarm until muted",
+        "Show inventory and hospital mute controls while sounding; click Landing soon to mute and dismiss",
+        "Use bounded audio batches for long alarms, with independent channels and shared master volume"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.79-dev",
     "date": "2026-11-09",
     "changes": {

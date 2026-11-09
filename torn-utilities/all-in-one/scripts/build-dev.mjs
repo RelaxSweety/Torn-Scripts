@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import {createAlarmAudio} from '../src/features/alarm-audio.js';
 import {createLandingAlarm} from '../src/features/landing-alarm.js';
 import {createTravelDomDiagnostic} from '../src/diagnostics/travel-dom.js';
 import {createAcceptanceSession} from '../src/diagnostics/acceptance-session.js';
@@ -39,7 +40,7 @@ for(const tool of tools){
  }
  if(tool.id==='war-hit-organizer')source=source.replace(/"data:image\/webp;base64,[A-Za-z0-9+/=]+"/g,'manager.getLogo()');
 
- if(tool.id==='item-monitor')source='const createLandingAlarm='+createLandingAlarm.toString()+';\nconst TU_INTEGRATED_BUILD='+JSON.stringify(version)+';\nconst createTravelDomDiagnostic='+createTravelDomDiagnostic.toString()+';\nconst createAcceptanceSession='+createAcceptanceSession.toString()+';\nconst detectTestEnvironment='+detectTestEnvironment.toString()+';\n'+'const createHospitalClock='+createHospitalClock.toString()+';\n'+'const createNativeTravelActions='+createNativeTravelActions.toString()+';\n'+'const createTravelEnhancements='+createTravelEnhancements.toString()+';\n'+source;
+ if(tool.id==='item-monitor')source='const createAlarmAudio='+createAlarmAudio.toString()+';\nconst createLandingAlarm='+createLandingAlarm.toString()+';\nconst TU_INTEGRATED_BUILD='+JSON.stringify(version)+';\nconst createTravelDomDiagnostic='+createTravelDomDiagnostic.toString()+';\nconst createAcceptanceSession='+createAcceptanceSession.toString()+';\nconst detectTestEnvironment='+detectTestEnvironment.toString()+';\n'+'const createHospitalClock='+createHospitalClock.toString()+';\n'+'const createNativeTravelActions='+createNativeTravelActions.toString()+';\n'+'const createTravelEnhancements='+createTravelEnhancements.toString()+';\n'+source;
  if(tool.id==='chat-archiver')source='const createChatCaptureSupport='+createChatCaptureSupport.toString()+';\n'+source;
  // Each retained source runs only on first use. A private Window facade captures
  // its legacy registration internally and binds native Window methods correctly.
