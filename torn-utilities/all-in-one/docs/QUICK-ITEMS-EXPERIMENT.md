@@ -1,6 +1,6 @@
 # TU Direct Quick Items and travel-request test build
 
-Version: **0.5.42.81-quickitems-test.2**, based on **0.5.42.81-dev**. This has a separate userscript name, namespace and update URL. It does not replace the ordinary DEV artifact or represent a completed compliance clearance.
+Version: **0.5.42.81-quickitems-test.3**, based on **0.5.42.81-dev**. This has a separate userscript name, namespace and update URL. It does not replace the ordinary DEV artifact or represent a completed compliance clearance.
 
 Install: https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/releases/experimental/torn-utilities-quick-items-test.user.js
 
@@ -48,3 +48,7 @@ The first PDA report from test .1 contained a native DOM result showing a Blood 
 The export now includes `instrumentedAt`, `documentState`, `documentMatchesPage`, transport/control counters and `resourceEndpoints` from a metadata-only PerformanceObserver. Resource entries can reveal a route/timing when a cached or alternative request path bypasses the full hook, but cannot supply its POST body. They are not a substitute for full capture. Live PDA coverage is still to be verified.
 
 After updating, first record a short Travel Agency search/Add operation and generate a report. Check that native actions, requests or resource endpoints appear before relying on an entire-trip recording. This revision does not claim that the cause of the first report's blind spot is conclusively proven.
+
+## Test .3 recorder revision
+
+The test .2 PDA report confirmed live interception and identified `sid=travelData`, including `addSlotItem`, `inventory` and `searchItem`. Test .3 recognizes travelData without depending on a recent click. It decodes multipart field names with the same strict value exclusions. Multiple interceptor layers returning the same response object are coalesced and counted separately; different actual responses remain separate even for identical requests. This avoids treating duplicate observations as duplicate gameplay submissions. Normal DEV remains unchanged.
