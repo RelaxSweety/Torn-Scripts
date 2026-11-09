@@ -4,7 +4,7 @@ This updates **TU Testing and Diagnostics DEV**, previously v0.1.9-dev, to **v0.
 
 [Install/update TU Test](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/all-in-one/dist/tu-diagnostics-dev.user.js)
 
-Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.62-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
+Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.63-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
 
 ## Using it
 
@@ -129,3 +129,5 @@ TU Test 0.2.28 / checklist v18 covers the before-landing hospitalization confirm
 TU Test 0.2.29 / checklist v19 verifies explicit None hospitalization selection, already-hospitalized arming and no in-flight Hospitalize Me prompt without a selected item.
 
 TU Test 0.2.30 / checklist v20 covers the second-line hospital countdown while waiting, hospital versus flight timing, unknown/zero states, no gameplay at expiry, and removal when stock enables the next action.
+
+TU Test 0.2.31 targets 0.5.42.63. Every export now includes travelDom.snatchAndRun.hospitalClock with displayed/available flags, deadline and remaining seconds, source/reason, lookup status, profile state and whether profile until was present. Recording need not be started for this structured snapshot, and no raw profile payload or credentials are exported.

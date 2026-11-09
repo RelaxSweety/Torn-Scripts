@@ -1,5 +1,22 @@
 [
   {
+    "version": "0.5.42.63-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Hospital clock": [
+        "Fetch missing hospital deadline once when a hospitalized waiting intent is restored",
+        "Avoid repeated lookup attempts and duplicate reads when fresh arming data already contains clock evidence",
+        "Read hospital-specific native title metadata in addition to native deadlines and profile until"
+      ],
+      "Diagnostics": [
+        "Export clock display/availability, deadline/seconds, source, reason, lookup status and safe profile timing flags even with recording off"
+      ],
+      "Validation": [
+        "Restore a deadline-less hospital wait and recover via one read; unknown timing does not cause polling; structured export without recording"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.62-dev",
     "date": "2026-11-09",
     "changes": {

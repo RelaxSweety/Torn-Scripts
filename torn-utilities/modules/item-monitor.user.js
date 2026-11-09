@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.12.18-dev
+// @version      1.12.19-dev
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -160,7 +160,8 @@ function snatchSnapshot(watch=null){
   const value=text(el);if(w&&/you (?:have )?(?:bought|purchased)/i.test(value)&&norm(value).includes(norm(w.name))){if(!proofIds.has(el))proofIds.set(el,++nextProof);purchaseProof=proofIds.get(el)+':'+value;purchaseItemKey=w.key;break;}
  }
  if(nativeState?.purchaseProof){purchaseProof=nativeState.purchaseProof;purchaseItemKey=nativeState.purchaseItemKey;}
- return {ownerId,hospitalUntil:hospitalClock?.read()||snatchContext?.hospitalUntil||null,country:liveCountry()||snatchContext?.country||null,status,hospitalized:status==='Hospital'?true:status==='Abroad'?false:null,traveling:status==='Traveling',returning:!!nativeState?.returning||status==='Traveling'&&/\b(?:to torn|returning to torn|back to torn)\b/i.test(snatchContext?.description||''),quantity:row?foreignStock(row):foreignShopTables().length?0:NaN,purchaseProof,purchaseItemKey,quantityInput,maxControl:row?[...row.querySelectorAll('button,a,[role=button]')].find(e=>/^(max|maximum)$/i.test(text(e).trim())):null,maxQuantity:declaredMax,maxVerified:Number.isSafeInteger(declaredMax)&&declaredMax>0,
+ const hospitalUntil=hospitalClock?.read()||snatchContext?.hospitalUntil||null;
+ return {ownerId,hospitalUntil,hospitalClock:hospitalClock?.report(),country:liveCountry()||snatchContext?.country||null,status,hospitalized:status==='Hospital'?true:status==='Abroad'?false:null,traveling:status==='Traveling',returning:!!nativeState?.returning||status==='Traveling'&&/\b(?:to torn|returning to torn|back to torn)\b/i.test(snatchContext?.description||''),quantity:row?foreignStock(row):foreignShopTables().length?0:NaN,purchaseProof,purchaseItemKey,quantityInput,maxControl:row?[...row.querySelectorAll('button,a,[role=button]')].find(e=>/^(max|maximum)$/i.test(text(e).trim())):null,maxQuantity:declaredMax,maxVerified:Number.isSafeInteger(declaredMax)&&declaredMax>0,
  buyMatches:(control,key)=>!!row&&row.contains(control)&&w?.key===key&&/^(?:buy|purchase)(?:\s|$)/i.test(control.getAttribute('aria-label')||text(control)||control.value||''),
  medicalMatches:(control,medical)=>{const item=nativeRow(control);const id=item?.getAttribute('data-item-id')||item?.getAttribute('data-itemid');const uid=item?.getAttribute('data-item-uid');return !!item&&String(id)===String(medical.id)&&(!medical.uid||String(uid)===String(medical.uid))&&/^(?:use|take)(?:\s|$)/i.test(control.getAttribute('aria-label')||text(control)||control.value||'');},
  returnMatches:control=>/^(?:return|travel|fly)(?:\s+back)?\s+to\s+torn\b/i.test(control.getAttribute('aria-label')||text(control)||control.value||'')};
@@ -174,7 +175,7 @@ async function getSnatchContext({inventory=false}={}){
  const traveling=status==='Traveling',returning=traveling&&/\b(?:to|back to|returning to) torn\b/i.test(description+' '+route);
  if(traveling){country=Object.keys(travelAliases).find(code=>travelAliases[code].some(alias=>norm(description).includes(norm(alias))||new RegExp('(?:to|→)\\s*'+alias+'\\b','i').test(route)))||null;}
  if(!country&&!returning){try{const trip=await api.requestTravelInfo('travel');const destination=trip.travel?.destination;country=Object.keys(travelAliases).find(code=>travelAliases[code].some(alias=>norm(alias)===norm(destination)));}catch{}}
- snatchContext={ownerId:api.getPlayer()?.id,country,status,traveling,returning,description,hospitalUntil:hospitalClock?.read(profile.status)||null,checkedAt:Date.now()};
+ snatchContext={ownerId:api.getPlayer()?.id,country,status,traveling,returning,description,hospitalUntil:hospitalClock?.read(profile.status)||null,hospitalClock:hospitalClock?.report(),checkedAt:Date.now()};
  if(inventory){const d=await api.requestTravelInfo('inventory');const raw=Array.isArray(d.inventory)?d.inventory:d.inventory?.items||[];snatchContext.medicalItems=raw;snatchContext.inventoryItems=raw;snatchContext.inventorySource='medical-api';}
  enhancements?.check();return snatchContext;
 }
