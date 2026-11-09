@@ -1,6 +1,6 @@
 # TU Direct Quick Items and travel-request test build
 
-Version: **0.5.42.81-quickitems-test.3**, based on **0.5.42.81-dev**. This has a separate userscript name, namespace and update URL. It does not replace the ordinary DEV artifact or represent a completed compliance clearance.
+Version: **0.5.42.81-quickitems-test.4**, based on **0.5.42.81-dev**. This has a separate userscript name, namespace and update URL. It does not replace the ordinary DEV artifact or represent a completed compliance clearance.
 
 Install: https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/releases/experimental/torn-utilities-quick-items-test.user.js
 
@@ -52,3 +52,7 @@ After updating, first record a short Travel Agency search/Add operation and gene
 ## Test .3 recorder revision
 
 The test .2 PDA report confirmed live interception and identified `sid=travelData`, including `addSlotItem`, `inventory` and `searchItem`. Test .3 recognizes travelData without depending on a recent click. It decodes multipart field names with the same strict value exclusions. Multiple interceptor layers returning the same response object are coalesced and counted separately; different actual responses remain separate even for identical requests. This avoids treating duplicate observations as duplicate gameplay submissions. Normal DEV remains unchanged.
+
+## Test .4 body-capture revision
+
+The test .3 report captured packing Clear All, Add and inventory/search requests, but the Add body was missing. The recorder previously attempted Request.formData() and then cloned the original request again on failure; by that point the native fetch could have consumed it. Test .4 takes one text clone before pass-through and uses the bounded JSON/form/multipart parsers. Late body parsing is redirected to the retained observation when interceptor layers merge. Body capture state and alternative safe field shapes are explicit rather than treating every empty array as a genuinely empty request. XHR duplicate observations are associated with an open/send transaction rather than conflating separate uses of the same XHR object. No request is replayed or changed.
