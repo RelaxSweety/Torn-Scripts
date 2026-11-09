@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.78-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Flight readiness": [
+        "Recover destination and direction from the visible native flight route after refresh",
+        "Refresh readiness on focus and visibility changes; retain player and confirmation checks",
+        "Export the exact readiness blocking reason in diagnostics"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.77-dev",
     "date": "2026-11-09",
     "changes": {

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.12.32-dev
+// @version      1.12.33-dev
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -154,6 +154,15 @@ const liveCountry=()=>{
  const page=[document.title,document.querySelector('main')?.textContent||'',...document.querySelectorAll('h1,h2,[data-country]')].map(e=>typeof e==='string'?e:e.getAttribute('data-country')||text(e)).join(' ').toLowerCase();
  return Object.keys(travelAliases).find(code=>travelAliases[code].some(alias=>page.includes(alias)))||null;
 };
+// The visible flight route survives refresh even when the cached API context does not.
+function nativeFlightRoute(){
+ const progress=document.querySelector('#travel-root [aria-label="Flight progress"]');if(!progress)return null;
+ const route=(progress.textContent||'').replace(/\s+/g,' ').trim();
+ const returning=/^.+?\s+to\s+Torn\b/i.test(route),outgoing=/^Torn\s+to\s+/i.test(route);
+ if(!returning&&!outgoing)return null;
+ const country=Object.keys(travelAliases).find(code=>travelAliases[code].some(alias=>new RegExp('^'+(outgoing?'Torn\\s+to\\s+':'')+alias+'\\b','i').test(route)))||null;
+ return {country,returning,traveling:true,status:'Traveling',source:'native-flight-route'};
+}
 const nativeRow=control=>control?.closest('[data-item-id],[data-itemid],tr,[role=row],li,[class*=itemRow],[class*=row]');
 const rowMatches=(row,w)=>{
  const id=idOf(row);
@@ -181,9 +190,10 @@ function snatchSnapshot(watch=null){
  const quantityInput=row?.querySelector('input[type=number],input[name*=amount],input[name*=quantity]');
  const declaredMax=Number(quantityInput?.getAttribute('max'));
  const ownerId=host.TornUtilities?.getPlayer?.()?.id;
+ const flightRoute=nativeFlightRoute();
  const nativeStatus=document.querySelector('[data-user-status]')?.getAttribute('data-user-status');
  const nativeState=nativeActions?.enabled()?nativeActions.inspect(run):null;
- const status=nativeState?.traveling?'Traveling':nativeState?.released?'Abroad':nativeState?.hospitalized?'Hospital':document.querySelector('a[aria-label^="Hospital:"]')?'Hospital':liveCountry()?'Abroad':['Hospital','Abroad','Traveling'].includes(nativeStatus)?nativeStatus:snatchContext?.status;
+ const status=flightRoute?'Traveling':nativeState?.traveling?'Traveling':nativeState?.released?'Abroad':nativeState?.hospitalized?'Hospital':document.querySelector('a[aria-label^="Hospital:"]')?'Hospital':liveCountry()?'Abroad':['Hospital','Abroad','Traveling'].includes(nativeStatus)?nativeStatus:snatchContext?.status;
  let purchaseProof=null,purchaseItemKey=null;
  for(const el of document.querySelectorAll('[role=alert],[role=status],.success,[class*=success]')){
   if(el.closest('#tuim-panel,#tu-snatch-run,#tu-pda-panel')||!el.getClientRects().length)continue;
@@ -191,7 +201,7 @@ function snatchSnapshot(watch=null){
  }
  if(nativeState?.purchaseProof){purchaseProof=nativeState.purchaseProof;purchaseItemKey=nativeState.purchaseItemKey;}
  const hospitalUntil=hospitalClock?.read()||snatchContext?.hospitalUntil||null;
- return {ownerId,hospitalUntil,hospitalClock:hospitalClock?.report(),country:liveCountry()||snatchContext?.country||null,status,hospitalized:status==='Hospital'?true:status==='Abroad'?false:null,traveling:status==='Traveling',returning:!!nativeState?.returning||status==='Traveling'&&/\b(?:to torn|returning to torn|back to torn)\b/i.test(snatchContext?.description||''),stockVisible:!!row,quantity:row?foreignStock(row):foreignShopTables().length?0:NaN,purchaseProof,purchaseItemKey,quantityInput,maxControl:row?[...row.querySelectorAll('button,a,[role=button]')].find(e=>/^(max|maximum)$/i.test(text(e).trim())):null,maxQuantity:declaredMax,maxVerified:Number.isSafeInteger(declaredMax)&&declaredMax>0,
+ return {ownerId,hospitalUntil,hospitalClock:hospitalClock?.report(),country:flightRoute?flightRoute.country:liveCountry()||snatchContext?.country||null,status,hospitalized:status==='Hospital'?true:status==='Abroad'?false:null,traveling:!!flightRoute||status==='Traveling',returning:flightRoute?flightRoute.returning:!!nativeState?.returning||status==='Traveling'&&/\b(?:to torn|returning to torn|back to torn)\b/i.test(snatchContext?.description||''),stockVisible:!!row,quantity:row?foreignStock(row):foreignShopTables().length?0:NaN,purchaseProof,purchaseItemKey,quantityInput,maxControl:row?[...row.querySelectorAll('button,a,[role=button]')].find(e=>/^(max|maximum)$/i.test(text(e).trim())):null,maxQuantity:declaredMax,maxVerified:Number.isSafeInteger(declaredMax)&&declaredMax>0,
  buyMatches:(control,key)=>!!row&&row.contains(control)&&w?.key===key&&/^(?:buy|purchase)(?:\s|$)/i.test(control.getAttribute('aria-label')||text(control)||control.value||''),
  medicalMatches:(control,medical)=>{const item=nativeRow(control);const id=item?.getAttribute('data-item-id')||item?.getAttribute('data-itemid');const uid=item?.getAttribute('data-item-uid');return !!item&&String(id)===String(medical.id)&&(!medical.uid||String(uid)===String(medical.uid))&&/^(?:use|take)(?:\s|$)/i.test(control.getAttribute('aria-label')||text(control)||control.value||'');},
  returnMatches:control=>/^(?:return|travel|fly)(?:\s+back)?\s+to\s+torn\b/i.test(control.getAttribute('aria-label')||text(control)||control.value||'')};
@@ -972,6 +982,8 @@ function startRuntime(){
  runtimeObserver=new MutationObserver(records=>{if(document.hidden||!document.hasFocus()||!state.items.length||scanTimer!==null)return;if(records.every(record=>(record.target.nodeType===1?record.target:record.target.parentElement)?.closest('#tuim-menu,#tuim-panel,#tuim-catalog,#tuim-travel-window,#tuim-data-window,#tu-pda-panel,#tu-test-dev-panel,#tu-snatch-run')))return;scanTimer=setTimeout(()=>{scanTimer=null;if(runtimeAbort)scan()},400)});
  runtimeObserver.observe(document.documentElement,{childList:true,subtree:true,characterData:true});
  window.addEventListener('pageshow',scan,{signal:runtimeAbort.signal});
+ for(const event of ['focus','blur'])window.addEventListener(event,()=>enhancements?.check(),{signal:runtimeAbort.signal});
+ document.addEventListener('visibilitychange',()=>enhancements?.check(),{signal:runtimeAbort.signal});
  window.addEventListener('popstate',scan,{signal:runtimeAbort.signal});
 }
 function stopRuntime(){
