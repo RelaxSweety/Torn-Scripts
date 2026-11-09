@@ -3,7 +3,7 @@
 export function createNativeTravelActions({document,window,enabled=()=>false,now=()=>Date.now()}){
  const norm=v=>String(v||'').normalize('NFKC').replace(/\s+/g,' ').trim().toLowerCase();
  const label=e=>norm(e?.getAttribute('aria-label')||e?.textContent||e?.value);
- const shown=e=>!!e?.isConnected&&!e.disabled&&e.getAttribute('aria-disabled')!=='true'&&e.getClientRects().length>0&&window.getComputedStyle(e).visibility!=='hidden'&&!e.closest('#tuim-panel,#tu-snatch-run,#tu-pda-panel');
+ const shown=e=>!!e?.isConnected&&!e.disabled&&e.getAttribute('aria-disabled')!=='true'&&e.getClientRects().length>0&&window.getComputedStyle(e).visibility!=='hidden'&&!e.closest('#tuim-panel,#tu-snatch-run,#tu-snatch-extra-hosp,#tu-pda-panel');
  const one=(list,description)=>{const items=[...list].filter(shown);if(items.length>1)throw Error('Ambiguous '+description+'; no action selected');return items[0]||null;};
  const buttons=(root,text)=>[...(root?.querySelectorAll('button,a,input[type=button],input[type=submit]')||[])].filter(e=>label(e)===norm(text));
  const scope=()=>document.querySelector('#travel-root');
@@ -29,8 +29,8 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
   let occupied=slots.filter(slot=>{const b=slot.querySelector(':scope > button[aria-label]');return b&&!/^(empty|available|free|unused)\b/i.test(b.getAttribute('aria-label')||'');}).length;
   // A consumed medical slot can retain its old button while showing the result.
   // Ignore only that exact slot/button from this run's proven medical use.
-  const ghosts=[released,hospitalizedProof].filter(record=>same(record,run)&&record.opener?.isConnected&&record.opener.getAttribute('aria-label')===record.slotLabel);
-  occupied=Math.max(0,occupied-ghosts.length);
+  const ghosts=consumed.filter(record=>same(record,run)&&record.opener?.isConnected&&record.opener.getAttribute('aria-label')===record.slotLabel);
+  occupied=Math.max(0,occupied-new Set(ghosts.map(record=>record.opener)).size);
   const free=Math.max(0,total-occupied);
   const currency=value=>{const match=String(value||'').match(/(-?)\$\s*(-?)([\d,]+(?:\.\d+)?)(?![\w,.])/);return match?((match[1]||match[2])?-1:1)*Number(match[3].replace(/,/g,'')):NaN;};
   const price=currency(row.querySelector('[class*=tabletColD] [class*=displayPrice]')?.textContent||row.querySelector('[class*=tabletColD]')?.textContent);
@@ -41,6 +41,10 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
   return {verified:true,total,occupied,free,price,desired,affordableSlots:Math.min(free,affordable),limitedBy:desired===free?'space':desired===stock?'stock':'funds'};
  }
  let controller=null,released=null,purchased=null,booked=null,hospitalizedProof=null;
+ const consumed=[];
+ const isConsumed=e=>consumed.some(record=>record.opener===e&&e.getAttribute('aria-label')===record.slotLabel);
+ const availableItem=items=>{for(const item of items||[]){const opener=inventory(item.name).find(e=>!isConsumed(e)&&(!item.uid||String(e.closest('li')?.getAttribute('data-item-uid'))===String(item.uid)));if(opener)return {item,opener};}return null;};
+ function remember(run,slot){const opener=slot.querySelector(':scope > button[aria-label]');const record={...run,opener,slot,slotLabel:opener?.getAttribute('aria-label'),at:now()};if(opener&&!/^(empty|available|free|unused)\b/i.test(record.slotLabel||''))consumed.push(record);return record;}
  function cancel(){controller?.abort();controller=null;}
  function inspect(run){
   const hospital=document.querySelector('a[aria-label^="Hospital:"]');
@@ -48,7 +52,7 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
   const flight=!!scope()?.querySelector('[aria-label="Flight progress"]')||norm(scope()?.querySelector('h4')?.textContent)==='traveling';
   return {...(same(hospitalizedProof,run)&&!hospitalizedProof.healed&&!release&&now()-hospitalizedProof.at<120000?{hospitalized:true}:{}),released:!!release,purchaseProof:same(purchased,run)?purchased.proof:null,purchaseItemKey:same(purchased,run)?run.watchKey:null,traveling:!!(same(booked,run)||flight),returning:!!same(booked,run)};
  }
- async function execute(kind,{run,getSnapshot,guard,allowBeforeLanding=false,onEvent=()=>{}}){
+ async function execute(kind,{run,getSnapshot,guard,allowBeforeLanding=false,extendHospital=false,onEvent=()=>{}}){
   if(!enabled())throw Error('Native Tampermonkey/PDA controls unavailable');cancel();const current=new window.AbortController();controller=current;
   const signal=current.signal;let submitted=false;
   const ensure=()=>{if(signal.aborted||!guard()||document.hidden||!document.hasFocus())throw Error('Action canceled or page/player changed. Continue manually if Torn already accepted it.');};
@@ -65,22 +69,24 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
   try{
    ensure();if(!scope())throw Error('Open the native foreign travel page');
    if(kind==='hospitalize'){
-    if(!run.planHospitalize||!run.hospitalization?.name)throw Error('Select the planned hospitalization item first');
-    const eligible=state=>allowBeforeLanding?state.traveling===true&&!state.returning&&state.hospitalized!==true:!state.traveling&&state.hospitalized===false&&Number.isFinite(state.quantity)&&state.quantity<Math.max(1,Number(run.minimumQty)||1);
+    if((!extendHospital&&!run.planHospitalize)||!(run.hospitalizations?.length||run.hospitalization?.name))throw Error('Select the planned hospitalization item first');
+    const eligible=state=>extendHospital?state.hospitalized===true&&!state.returning&&!state.traveling:allowBeforeLanding?state.traveling===true&&!state.returning&&state.hospitalized!==true:!state.traveling&&state.hospitalized===false&&Number.isFinite(state.quantity)&&state.quantity<Math.max(1,Number(run.minimumQty)||1);
     const state=getSnapshot();if(!eligible(state))throw Error('Hospitalization state changed or before-landing confirmation is missing');
-    const item=run.hospitalization,opener=inventory(item.name).filter(e=>!item.uid||String(e.closest('li')?.getAttribute('data-item-uid'))===String(item.uid))[0];if(!opener)throw Error(allowBeforeLanding?'Torn is not exposing the selected item in the current flight inventory. Open its native inventory controls and retry; no item was used.':'Selected hospitalization item is not carried in the foreign inventory');const slot=opener.closest('li');
+    const selected=availableItem(run.hospitalizations?.length?run.hospitalizations:[run.hospitalization]);if(!selected)throw Error('No selected hospitalization item is carried in the visible inventory');const {item,opener}=selected,slot=opener.closest('li');
+    const previousUntil=getSnapshot().hospitalUntil||0;
     if(slot.querySelector('[class*=confirmQuestion]'))throw Error('Close the existing item confirmation first');if(opener.getAttribute('aria-expanded')!=='true')click(opener);
     const use=await wait(()=>one(buttons(slot,'Use'),'hospitalization Use control'));click(use);
     const yes=await wait(()=>{const q=slot.querySelector('[class*=confirmQuestion]');if(!q)return null;if(norm(q.querySelector('strong')?.textContent)!==norm(item.name)||!norm(q.textContent).includes('would you like to use'))throw Error('Hospitalization confirmation does not match the selected item');return one(buttons(q,'Yes'),'hospitalization Yes confirmation');});
     const fresh=getSnapshot();if(!eligible(fresh)){const no=one(buttons(slot.querySelector('[class*=confirmQuestion]'),'No'),'hospitalization No control');if(no)click(no);throw Error('Stock or hospital status changed; hospitalization was not submitted');}
-    submitted=true;click(yes);await wait(()=>getSnapshot().hospitalized===true||document.querySelector('a[aria-label^="Hospital:"]')||/you (?:are|have been) (?:now )?(?:in|sent to|put in|admitted to) (?:the )?hospital/i.test(slot.textContent));hospitalizedProof={...run,at:now(),opener:slot.querySelector(':scope > button[aria-label]'),slotLabel:slot.querySelector(':scope > button[aria-label]')?.getAttribute('aria-label')};released=null;return {hospitalized:true};
+    submitted=true;click(yes);await wait(()=>extendHospital?
+     (getSnapshot().hospitalUntil>previousUntil||/you (?:are|have been) (?:now )?(?:in|sent to|put in|admitted to) (?:the )?hospital|hospital(?:ization)? (?:time )?(?:increased|extended)/i.test(slot.textContent)&&!slot.querySelector('[class*=confirmQuestion]')):
+     getSnapshot().hospitalized===true||document.querySelector('a[aria-label^="Hospital:"]')||/you (?:are|have been) (?:now )?(?:in|sent to|put in|admitted to) (?:the )?hospital/i.test(slot.textContent));
+    hospitalizedProof=remember(run,slot);released=null;return {hospitalized:true};
    }
    if(kind==='heal'){
     if(!getSnapshot().hospitalized)throw Error('Hospital status is not confirmed');
-    const matches=inventory(run.medical?.name).filter(e=>!run.medical?.uid||String(e.closest('li')?.getAttribute('data-item-uid'))===String(run.medical.uid));
-    // Stackable medical items share a name; use the first matching visible slot.
-    const opener=matches[0];if(!opener)throw Error('Selected medical item is not present in the visible foreign inventory');
-    const slot=opener.closest('li'),selectedName=run.medical.name;
+    const selected=availableItem(run.medicals?.length?run.medicals:[run.medical]);if(!selected)throw Error('No selected healing item remains in the visible foreign inventory');
+    const {item,opener}=selected,slot=opener.closest('li'),selectedName=item.name,previousUntil=getSnapshot().hospitalUntil||0;
     const question=()=>slot.querySelector('[class*=confirmQuestion]');
     if(question())throw Error('Close the existing medical confirmation, then try Heal again');
     if(opener.getAttribute('aria-expanded')!=='true')click(opener);
@@ -88,14 +94,15 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
     const yes=await wait(()=>{const q=question();if(!q)return null;if(norm(q.querySelector('strong')?.textContent)!==norm(selectedName)||!norm(q.textContent).includes('would you like to use'))throw Error('Medical confirmation does not match the selected item');return one(buttons(q,'Yes'),'medical Yes confirmation');});
     if(!(getSnapshot().quantity>=Math.max(1,Number(run.minimumQty)||1)))throw Error('Monitored stock dropped before healing; no medical item was used');
     submitted=true;click(yes);
-    await wait(()=>slot.isConnected&&/you are out of the hospital!/i.test(slot.textContent));
-    const resultOpener=slot.querySelector(':scope > button[aria-label]');released={...run,opener:resultOpener,slot,slotLabel:resultOpener?.getAttribute('aria-label'),at:now(),hospital:document.querySelector('a[aria-label^="Hospital:"]')};released.hospitalLabel=released.hospital?.getAttribute('aria-label');
-    if(hospitalizedProof)hospitalizedProof={...hospitalizedProof,healed:true};return {hospitalReleased:true};
+    await wait(()=>slot.isConnected&&(/you are out of the hospital!/i.test(slot.textContent)||previousUntil>0&&getSnapshot().hospitalUntil>0&&getSnapshot().hospitalUntil<previousUntil));
+    const record=remember(run,slot),hospitalReleased=/you are out of the hospital!/i.test(slot.textContent)||getSnapshot().hospitalized===false;
+    if(hospitalReleased){released={...record,hospital:document.querySelector('a[aria-label^="Hospital:"]')};released.hospitalLabel=released.hospital?.getAttribute('aria-label');if(hospitalizedProof)hospitalizedProof={...hospitalizedProof,healed:true};}
+    return {hospitalReleased,medicalUsed:true};
    }
    if(kind==='destroy'){
     if(!run.destroyInventory||!run.destroyAccepted||run.destroyDone||!run.destroyItems?.length)throw Error('Inventory Destruction is not accepted for this armed run');
     const eligible=()=>{ensure();const state=getSnapshot();if(state.hospitalized!==false||!(state.quantity>=Math.max(1,Number(run.minimumQty)||1)))throw Error('Hospital release and available monitored stock are required before destroying items');};
-    const current=()=>{const panel=scope()?.querySelector('[class*=inventoryPanel]');if(!panel)throw Error('Foreign travel inventory is not visible');return [...panel.querySelectorAll('li[class*=inventorySlot] > button[aria-label]')].filter(e=>shown(e)&&! /^(empty|available|free|unused)\b/i.test(e.getAttribute('aria-label')||'')&&![released,hospitalizedProof].some(record=>same(record,run)&&e===record.opener&&e.getAttribute('aria-label')===record.slotLabel));};
+    const current=()=>{const panel=scope()?.querySelector('[class*=inventoryPanel]');if(!panel)throw Error('Foreign travel inventory is not visible');return [...panel.querySelectorAll('li[class*=inventorySlot] > button[aria-label]')].filter(e=>shown(e)&&! /^(empty|available|free|unused)\b/i.test(e.getAttribute('aria-label')||'')&&!isConsumed(e));};
     const counts=()=>{const result=new Map();for(const e of current())result.set(itemName(e),(result.get(itemName(e))||0)+1);return result;};
     eligible();let remaining=counts();const total=[...remaining.values()].reduce((a,b)=>a+b,0);if(total>100)throw Error('Unexpected travel inventory size; no destruction started');let destroyed=0;
     const approved=new Set(run.destroyItems.map(item=>norm(item.name)));
@@ -208,6 +215,6 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
    throw Error('Unknown native action');
   }catch(error){error.submitted=submitted;throw error;}finally{document.removeEventListener('visibilitychange',foreground);window.removeEventListener('blur',foreground);if(controller===current)controller=null;}
  }
- function listInventory(){const panel=scope()?.querySelector('[class*=inventoryPanel]');if(!panel)return null;return [...panel.querySelectorAll('li[class*=inventorySlot] > button[aria-label]')].filter(e=>e.isConnected&&! /^(empty|available|free|unused)\b/i.test(e.getAttribute('aria-label')||'')).map(e=>({name:(e.getAttribute('aria-label')||'').replace(/\s+slot\s+\d+$/i,''),id:Number(e.closest('li')?.getAttribute('data-item-id'))||null,uid:null,amount:1,source:'travel-dom'}));}
+ function listInventory(){const panel=scope()?.querySelector('[class*=inventoryPanel]');if(!panel)return null;return [...panel.querySelectorAll('li[class*=inventorySlot] > button[aria-label]')].filter(e=>e.isConnected&&!isConsumed(e)&&! /^(empty|available|free|unused)\b/i.test(e.getAttribute('aria-label')||'')).map(e=>({name:(e.getAttribute('aria-label')||'').replace(/\s+slot\s+\d+$/i,''),id:Number(e.closest('li')?.getAttribute('data-item-id'))||null,uid:null,amount:1,source:'travel-dom'}));}
  return {enabled,execute,cancel,inspect,resolveItem,capacityFor,listInventory};
 }

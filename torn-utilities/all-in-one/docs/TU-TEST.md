@@ -4,7 +4,7 @@ This updates **TU Testing and Diagnostics DEV**, previously v0.1.9-dev, to **v0.
 
 [Install/update TU Test](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/all-in-one/dist/tu-diagnostics-dev.user.js)
 
-Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.64-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
+Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.65-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
 
 ## Using it
 
@@ -132,4 +132,6 @@ TU Test 0.2.30 / checklist v20 covers the second-line hospital countdown while w
 
 TU Test 0.2.31 targets 0.5.42.63. Every export now includes travelDom.snatchAndRun.hospitalClock with displayed/available flags, deadline and remaining seconds, source/reason, lookup status, profile state and whether profile until was present. Recording need not be started for this structured snapshot, and no raw profile payload or credentials are exported.
 
-TU Test 0.2.32 / checklist v21 validates native-first purchase and at most one remainder transaction. Continuous Snatch monitoring captures purchase-confirmed, capacity-reconcile and reconcile-stopped native-step events with exact quantities. Verify 17 then 1 rather than repeated 17, and Return readiness after a confirmed initial purchase when reconciliation cannot complete.
+TU Test 0.2.32 / checklist v22 validates native-first purchase and at most one remainder transaction. Continuous Snatch monitoring captures purchase-confirmed, capacity-reconcile and reconcile-stopped native-step events with exact quantities. Verify 17 then 1 rather than repeated 17, and Return readiness after a confirmed initial purchase when reconciliation cannot complete.
+
+DEV .65 diagnostics also report the companion hospital button label, presence, warning state and blink period. Use the Snatch and Run monitor to capture extra hospitalization and partial-heal actions through their native confirmations. Verify both hosts with multiple item types, remaining copies, exhausted inventory, threshold crossing, audio volume/sound and refresh persistence.

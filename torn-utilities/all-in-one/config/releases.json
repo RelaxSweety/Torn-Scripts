@@ -1,5 +1,21 @@
 [
   {
+    "version": "0.5.42.65-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Hospital items and timer": [
+        "Select multiple healing and hospitalization item types; each trusted click uses one selected available carried item",
+        "Show + Hosp? and Hosp Time: MM:SS while hospitalized with selected hospitalization items remaining; otherwise show time on the waiting stock button",
+        "Configurable warning threshold, progressively faster blinking, independent optional hospital sound and volume",
+        "Extra hospitalization requires increased time or a new confirmed result; uncertain item use is never replayed automatically"
+      ],
+      "Validation": [
+        "Multi-selection persistence, item fallback, pending-click guard, partial healing, deadline warning reset and cleanup",
+        "Native-first purchase reconciliation remains covered on PC and PDA"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.64-dev",
     "date": "2026-11-09",
     "changes": {

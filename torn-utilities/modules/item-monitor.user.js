@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.12.20-dev
+// @version      1.12.21-dev
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -180,7 +180,15 @@ async function getSnatchContext({inventory=false}={}){
  enhancements?.check();return snatchContext;
 }
 const nativeActions=typeof createNativeTravelActions==='function'?createNativeTravelActions({document,window,enabled:()=>typeof GM_info!=='undefined'&&GM_info.scriptHandler==='Tampermonkey'||typeof host.flutter_inappwebview?.callHandler==='function'||typeof host.PDA_httpGet==='function'||typeof host.PDA_httpPost==='function'||/com\.manuito\.tornpda/i.test(navigator.userAgent)}):null;
-const enhancements=typeof createTravelEnhancements==='function'?createTravelEnhancements({document,window,executeAction:nativeActions,getItems:()=>state.items,getSetup:()=>state.cfg.snatchSetup||{},screenAlertEnabled:()=>!!state.cfg.screenAlert,storeSetup:value=>{state.cfg.snatchSetup=value;saveCfg();},getContext:getSnatchContext,getSnapshot:snatchSnapshot,getRows:filterRows,getFilterContainer:filterContainer,matchRow:rowMatches,filterEnabled:()=>!!state.cfg.monitoredOnly,onArmed:()=>{host.TUWindowNavigation?.minimize?.('tuim-panel');if(state.panel)state.panel.hidden=true;state.catalogWindow?.remove();state.catalogWindow=null;},onNotice:message=>{const el=document.getElementById('tuim-snatch-notice');if(el)el.textContent=message;},restoreRun:(()=>{try{return JSON.parse(sessionStorage.getItem('tu:snatch-run:v1')||'null')}catch{return null}})(),storeRun:value=>{if(value)sessionStorage.setItem('tu:snatch-run:v1',JSON.stringify(value));else sessionStorage.removeItem('tu:snatch-run:v1');}}):null;
+// Hospital alarm owns its audio nodes, so stock alarms cannot cancel it.
+const hospitalAudio=(()=>{
+ let audio=null,timer=null,nodes=[];
+ const unlock=()=>{try{const C=window.AudioContext||window.webkitAudioContext;if(C){audio=audio||new C();audio.resume?.()?.catch?.(()=>{});}}catch{}};
+ const stop=()=>{if(timer!==null)clearTimeout(timer);timer=null;for(const node of nodes){try{node.stop();}catch{}}nodes=[];};
+ const play=({volume=60,sound='beep'}={})=>{stop();unlock();if(!audio)return;try{const level=Math.max(0,Math.min(100,Number(volume)||0))/100;for(let n=0;n<8;n++){const osc=audio.createOscillator(),gain=audio.createGain(),at=audio.currentTime+n*.35;osc.type=sound==='siren'?'sawtooth':sound==='chime'?'sine':'square';osc.frequency.setValueAtTime(sound==='chime'?1046:850,at);if(sound==='siren')osc.frequency.linearRampToValueAtTime(1400,at+.22);gain.gain.setValueAtTime(level*.13,at);gain.gain.exponentialRampToValueAtTime(.0001,at+.25);osc.connect(gain);gain.connect(audio.destination);osc.onended=()=>{osc.disconnect();gain.disconnect();};osc.start(at);osc.stop(at+.28);nodes.push(osc);}timer=setTimeout(stop,3000);}catch{stop();}};
+ return {unlock,stop,play};
+})();
+const enhancements=typeof createTravelEnhancements==='function'?createTravelEnhancements({document,window,hospitalAudio,executeAction:nativeActions,getItems:()=>state.items,getSetup:()=>state.cfg.snatchSetup||{},screenAlertEnabled:()=>!!state.cfg.screenAlert,storeSetup:value=>{state.cfg.snatchSetup=value;saveCfg();},getContext:getSnatchContext,getSnapshot:snatchSnapshot,getRows:filterRows,getFilterContainer:filterContainer,matchRow:rowMatches,filterEnabled:()=>!!state.cfg.monitoredOnly,onArmed:()=>{host.TUWindowNavigation?.minimize?.('tuim-panel');if(state.panel)state.panel.hidden=true;state.catalogWindow?.remove();state.catalogWindow=null;},onNotice:message=>{const el=document.getElementById('tuim-snatch-notice');if(el)el.textContent=message;},restoreRun:(()=>{try{return JSON.parse(sessionStorage.getItem('tu:snatch-run:v1')||'null')}catch{return null}})(),storeRun:value=>{if(value)sessionStorage.setItem('tu:snatch-run:v1',JSON.stringify(value));else sessionStorage.removeItem('tu:snatch-run:v1');}}):null;
 function renderEnhancements(parent){
  const label=E('label',parent);label.className='tuim-monitored-toggle';const check=E('input',label);check.type='checkbox';check.id='tuim-monitored-only';check.checked=!!state.cfg.monitoredOnly;label.append(document.createTextNode('Show monitored items only'));check.onchange=()=>{state.cfg.monitoredOnly=check.checked;saveCfg();enhancements?.applyFilter();};
  const edgeLabel=E('label',parent);edgeLabel.className='tuim-monitored-toggle';const edge=E('input',edgeLabel);edge.type='checkbox';edge.id='tuim-screen-color-alert';edge.checked=!!state.cfg.screenAlert;edge.style.cssText='width:18px;height:18px;min-height:18px;flex:none';edgeLabel.append(document.createTextNode('Snatch and Run screen color alert'));edge.onchange=()=>{state.cfg.screenAlert=edge.checked;saveCfg();enhancements?.update();};
