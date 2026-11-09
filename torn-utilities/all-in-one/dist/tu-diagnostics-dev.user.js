@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Testing and Diagnostics DEV
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.2.42-dev
+// @version      0.2.43-dev
 // @description  Guided DEV acceptance, system information and sanitized travel DOM diagnostics
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -159,7 +159,7 @@
   const content=document.createElement('div');content.style.cssText='flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding-right:4px';panel.append(content);
  const button=(label,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=fn;b.style.cssText='font:600 12px Arial;color:#fff;background:#344d60;border:1px solid #7892a2;border-radius:5px;padding:8px;margin:3px;cursor:pointer';return b;};
  const text=(tag,value,parent=content)=>{const e=document.createElement(tag);e.textContent=value;parent.append(e);return e;};
- const notice=text('p','Target '+targetBuild+' · TU Test 0.2.42-dev. Record results only for the actual selected host. Automatic checks are read-only and do not prove gameplay or native bridge compatibility.');
+ const notice=text('p','Target '+targetBuild+' · TU Test 0.2.43-dev. Record results only for the actual selected host. Automatic checks are read-only and do not prove gameplay or native bridge compatibility.');
  text('p','Do not paste API keys, session tokens or room secrets into notes. This tool never registers keys, accepts/cancels agreements, creates rooms or modifies backend records.');
  text('h2','System and test host');
  const hostLabel=text('label','Actual test host: ');
@@ -232,6 +232,13 @@
   let data;try{data=cleanFunction(JSON.parse(event.detail));}catch{return;}if(!data)return;
   append({kind:'function-event',function:data,hospitalAlarm:snatchState().hospitalAlarm,sequence:++sequence,stage,at:new Date().toISOString(),host:clean(getMeta().host),installedBuild:clean(getMeta().installedBuild),path:window.location.pathname,html:'',truncated:false,nodes:0});
  }
+ function retainedRun(){
+  try{const raw=window.sessionStorage.getItem('tu:snatch-run:v1');if(!raw)return {available:false,reason:'No retained Snatch and Run session in this tab'};if(raw.length>64000)return {available:false,reason:'Retained session exceeds diagnostic limit'};const run=JSON.parse(raw);if(!run||typeof run!=='object')return {available:false,reason:'Retained session is unavailable'};
+   const ledger=run.capacityLedger&&typeof run.capacityLedger==='object'?run.capacityLedger:null,capacity={};
+   if(ledger){for(const key of ['total','initialOccupied','freed','purchased','spent','cashBeforePurchase','watchCount','at'])capacity[key]=Number.isFinite(ledger[key])?ledger[key]:null;capacity.valid=typeof ledger.valid==='boolean'?ledger.valid:null;capacity.reason=clean(ledger.reason||'');capacity.source=clean(ledger.source||'');const computed=capacity.initialOccupied!==null&&capacity.freed!==null&&capacity.purchased!==null?capacity.initialOccupied-capacity.freed+capacity.purchased:null;capacity.expectedOccupied=computed;capacity.expectedFree=computed!==null&&capacity.total!==null?Math.max(0,capacity.total-computed):null;}
+   return {available:true,stage:clean(run.stage),item:clean(run.watchName),hospitalizedConfirmed:!!run.hospitalizedConfirmed,purchaseConfirmed:!!run.purchaseConfirmed,destructionEnabled:!!run.destroyInventory,destructionAccepted:!!run.destroyAccepted,destructionDone:!!run.destroyDone,selectedDestructionItemTypes:Array.isArray(run.destroyItems)?Math.min(100,run.destroyItems.length):0,capacityLedger:ledger?capacity:null,limitation:'Retained state is not an action timeline and cannot prove unrecorded causes.'};
+  }catch{return {available:false,reason:'Retained Snatch and Run state could not be read'};}
+ }
  function snatchState(){const button=document.getElementById('tu-snatch-run');
   const numeric=value=>value!==undefined&&value!==null&&value!==''&&Number.isFinite(Number(value))?Number(value):null;
   // Read only named TU controls; never collect arbitrary input values.
@@ -296,7 +303,7 @@
   const key=event=>{if(event.key==='Escape'){event.preventDefault();finish();}};
   cancel=finish;for(const kind of ['pointerdown','mousedown','touchstart'])document.addEventListener(kind,blockStart,{capture:true,passive:false});for(const kind of ['pointerup','mouseup','touchend'])document.addEventListener(kind,end,{capture:true,passive:false});document.addEventListener('click',click,true);document.addEventListener('keydown',key,true);timer=window.setTimeout(finish,30000);
  }
- return {stages,markup,capture,pick,start,stop,resume(){if(resumeState.active)start(stages.includes(resumeState.stage)?resumeState.stage:stages[0]);},setStage(value){if(stages.includes(value)){stage=value;saveMonitoring();}},report:()=>({schemaVersion:5,readOnly:true,monitoring,stage,pageContext:pageContext(),pageDom:pageCaptures.map(c=>({...c})),snatchAndRun:snatchState(),droppedCaptures:dropped,captures:captures.map(c=>({...c})),limits:{maxPageFragments:64,maxPageHtmlCharacters:512000,maxCaptures:200,maxTotalHtmlCharacters:1000000,maxNodes:160,maxDepth:9,maxHtmlCharacters:16000},excluded:['arbitrary input values (only named TU hospital settings and shared volume are included)','URLs and query strings (only allowlisted travel route category retained)','cookies and credentials','network requests','full browser-page HTML (bounded native travel content fragments only)']}),clear(){stop();pageCaptures=[];pageSeen=new WeakMap();captures=[];dropped=0;sequence=0;try{window.sessionStorage.removeItem(storageKey);window.sessionStorage.removeItem(storageKey+':monitor');window.sessionStorage.removeItem(storageKey+':page');}catch{}onChange('DOM captures cleared.');}};
+ return {stages,markup,capture,pick,start,stop,resume(){if(resumeState.active)start(stages.includes(resumeState.stage)?resumeState.stage:stages[0]);},setStage(value){if(stages.includes(value)){stage=value;saveMonitoring();}},report:()=>({schemaVersion:5,readOnly:true,monitoring,stage,retainedSnatchRun:retainedRun(),pageContext:pageContext(),pageDom:pageCaptures.map(c=>({...c})),snatchAndRun:snatchState(),droppedCaptures:dropped,captures:captures.map(c=>({...c})),limits:{maxPageFragments:64,maxPageHtmlCharacters:512000,maxCaptures:200,maxTotalHtmlCharacters:1000000,maxNodes:160,maxDepth:9,maxHtmlCharacters:16000},excluded:['arbitrary input values (only named TU hospital settings and shared volume are included)','URLs and query strings (only allowlisted travel route category retained)','cookies and credentials','network requests','full browser-page HTML (bounded native travel content fragments only)']}),clear(){stop();pageCaptures=[];pageSeen=new WeakMap();captures=[];dropped=0;sequence=0;try{window.sessionStorage.removeItem(storageKey);window.sessionStorage.removeItem(storageKey+':monitor');window.sessionStorage.removeItem(storageKey+':page');}catch{}onChange('DOM captures cleared.');}};
 };
  const travelDiagnostic=createTravelDiagnostic({document,window,scrub:value=>session.scrub(value),storageKey:'tu:test:travel-dom:'+targetBuild+':v1',getMeta:()=>({host:platform,installedBuild:currentBuild()||'unavailable'}),onChange:message=>{travelNotice.textContent=message;}});
  for(const stage of travelDiagnostic.stages){const option=document.createElement('option');option.value=stage;option.textContent=stage;travelStage.append(option);}
@@ -413,10 +420,10 @@
  }
  function exportReport(){
   save();const reports={};for(const id of ['tampermonkey','pda'])reports[id]=createSession({targetBuild,checklistVersion:catalog.checklistVersion,tests,platform:id,initial:profiles[id]}).report();
-  const report={schemaVersion:2,toolVersion:'0.2.42-dev',targetBuild,installedBuild:currentBuild()||null,viewport:{width:window.innerWidth,height:window.innerHeight,devicePixelRatio:window.devicePixelRatio},checklistVersion:catalog.checklistVersion,detectedHost:detected,detectedEnvironment:Object.fromEntries(Object.entries(environment).map(([k,fields])=>[k,Object.fromEntries(Object.entries(fields).map(([name,value])=>[name,typeof value==='string'?session.scrub(value):value]))])),userAgent:session.scrub(navigator.userAgent),platforms:reports,acceptanceComplete:Object.values(reports).every(r=>r.platformReady),productionAuthorized:false,startup:launcherStartupReport(),travelDom:travelDiagnostic.report(),chatArchiver:chatMonitor.report()};
+  const report={schemaVersion:2,toolVersion:'0.2.43-dev',targetBuild,installedBuild:currentBuild()||null,viewport:{width:window.innerWidth,height:window.innerHeight,devicePixelRatio:window.devicePixelRatio},checklistVersion:catalog.checklistVersion,detectedHost:detected,detectedEnvironment:Object.fromEntries(Object.entries(environment).map(([k,fields])=>[k,Object.fromEntries(Object.entries(fields).map(([name,value])=>[name,typeof value==='string'?session.scrub(value):value]))])),userAgent:session.scrub(navigator.userAgent),platforms:reports,acceptanceComplete:Object.values(reports).every(r=>r.platformReady),productionAuthorized:false,startup:launcherStartupReport(),travelDom:travelDiagnostic.report(),chatArchiver:chatMonitor.report()};
   const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='tu-dev-acceptance-'+targetBuild+'-'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
  }
- text('h2','Export all diagnostics',actions);text('p','One JSON file includes all recorded checks for both hosts, system information, startup, travel/Snatch and Run recordings, and chat archiver monitoring. Export does not run tests that have not been performed.',actions);
+ text('h2','Export all diagnostics',actions);text('p','One JSON file includes all recorded checks for both hosts, system information, startup, travel/Snatch and Run recordings, and chat archiver monitoring. A safe summary of the retained Snatch and Run capacity ledger from this tab is included even if monitoring was off. Export does not run tests that have not been performed.',actions);
  actions.append(button('Export all diagnostics',exportReport),button('Reset selected host',()=>{
   if(!confirm('Clear results for this build and selected host? Export first to retain evidence.'))return;
   delete profiles[platform];loadSession();refreshFields();save();render();
