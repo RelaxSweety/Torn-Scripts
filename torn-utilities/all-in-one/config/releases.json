@@ -1,5 +1,19 @@
 [
   {
+    "version": "0.5.42.71-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Inventory Destruction selection reset": [
+        "Unchecking Inventory Destruction clears selected item types and warning acceptance immediately",
+        "Show Selected for destruction: No items selected after disabling or declining",
+        "Discard inactive saved selections when setup is reopened; re-enabling requires a fresh selection and acceptance"
+      ],
+      "Validation": [
+        "UI selection clearing, saved-state reset, setup reopen and existing heal/destruction/purchase flow tests"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.70-dev",
     "date": "2026-11-09",
     "changes": {
