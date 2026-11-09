@@ -46,7 +46,7 @@ for(const sandbox of [false,true]){
  assert.ok(!requests.some(u=>u.includes('modules.json')));checks++;
  w.document.querySelector('[data-tab="about"]').click();
  const button=text=>[...w.document.querySelectorAll('button')].find(b=>b.textContent===text);
- button('Version Notes').click();assert.ok(w.document.body.textContent.includes('0.5.42.74-dev'));checks++;
+ button('Version Notes').click();assert.ok(w.document.body.textContent.includes('0.5.42.75-dev'));checks++;
  button('← About').click();button('User Agreement').click();await tick();assert.ok(w.document.body.textContent.includes('Complete fixture agreement.'));checks++;
  for(const tool of tools){
   api.closeActiveModule();
@@ -99,7 +99,7 @@ for(const access of ['public','limited','full']){
   button('← Settings').click();card('Time Display');const select=w.document.querySelector('[aria-label="TU time display"]');select.value='tct';select.dispatchEvent(new w.Event('change'));assert.equal(w.localStorage.getItem('tu-time-display'),'tct');checks++;
   const panel=w.document.querySelector('#tu-pda-panel');panel.hidden=false;
   panel.querySelector('[title="Minimize"]').click();assert.equal(panel.hidden,true);checks++;
-  const launcher=w.document.querySelector('#tu-pda-launcher');const pointer=type=>{const e=new w.Event(type);Object.assign(e,{pointerId:1,pointerType:'touch',clientX:10,clientY:10});launcher.dispatchEvent(e)};pointer('pointerdown');pointer('pointerup');await tick();assert.equal(panel.hidden,false);checks++;
+  const launcher=w.document.querySelector('#tu-pda-launcher');const pointer=type=>{const e=new w.Event(type);Object.assign(e,{pointerId:1,pointerType:'touch',clientX:10,clientY:10});launcher.dispatchEvent(e)};pointer('pointerdown');pointer('pointerup');launcher.click();await tick();assert.equal(panel.hidden,false);checks++;
   button('← Settings').click();card('Diagnostics');button('Open Diagnostics').click();assert.ok(w.document.querySelector('#tu-diagnostics-window pre').textContent.includes('toolCount'));assert.ok(!w.document.querySelector('#tu-diagnostics-window pre').textContent.includes('abcdef0123456789'));checks+=2;
   panel.querySelector('[title="Exit"]').click();assert.equal(panel.hidden,true);assert.equal(errors.length,0);checks+=2;
  }finally{close()}

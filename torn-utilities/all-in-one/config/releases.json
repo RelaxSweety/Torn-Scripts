@@ -1,5 +1,20 @@
 [
   {
+    "version": "0.5.42.75-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Launcher touch isolation": [
+        "Open TU on normal button click, keeping the launcher present through pointer release",
+        "Contain pointer, mouse and touch events; suppress post-drag activation",
+        "Block duplicate clicks only inside the prior icon rectangle for 500 ms after pointer activation",
+        "Support keyboard activation and leave unrelated Torn controls usable"
+      ],
+      "Validation": [
+        "Underlying Torn home-link ghost click blocked, normal controls usable, drag and keyboard behaviour, guard expiry and existing launcher/navigation tests"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.74-dev",
     "date": "2026-11-09",
     "changes": {

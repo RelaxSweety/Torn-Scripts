@@ -66,7 +66,7 @@ let saved;
   assert.equal(b.requests.length,1);assert.equal(b.requests[0].path,'/api/auth/agreement');assert.equal(b.control.registers,0,'Metadata recheck does not register key again');
   b.w.document.querySelector('[data-tab="modules"]').click();
   // Showing the Manager through the launcher connects only its own window.
-  const launcher=b.w.document.querySelector('#tu-pda-launcher');for(const type of ['pointerdown','pointerup']){const e=new b.w.Event(type);Object.assign(e,{pointerId:1,pointerType:'touch',clientX:10,clientY:10});launcher.dispatchEvent(e);}await tick();
+  const launcher=b.w.document.querySelector('#tu-pda-launcher');for(const type of ['pointerdown','pointerup']){const e=new b.w.Event(type);Object.assign(e,{pointerId:1,pointerType:'touch',clientX:10,clientY:10});launcher.dispatchEvent(e);}launcher.click();await tick();
   assert.ok(b.watchers.some(w=>w.targets.has(b.w.document.querySelector('#tu-pda-panel'))));
   assert.ok(b.watchers.every(w=>![...w.targets.entries()].some(([target,options])=>target===b.w.document.body&&options.subtree)),'Manager never observes whole-page subtree');
   const panel=b.w.document.querySelector('#tu-pda-panel');panel.querySelector('[title="Exit"]').click();await tick();assert.ok(b.watchers.every(w=>w.targets.size===0),'Closing idle Manager disconnects its observations');

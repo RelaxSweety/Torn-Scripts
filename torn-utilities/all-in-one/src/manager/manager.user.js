@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities DEV (All-in-One)
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.74-dev
+// @version      0.5.42.75-dev
 // @description  Integrated TU development bundle for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -38,7 +38,7 @@
   if (pageWindow.__RELAX_TORN_UTILITIES_PDA__) return;
   pageWindow.__RELAX_TORN_UTILITIES_PDA__ = true;
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.5.42.74-dev';
+  const TU_VERSION='0.5.42.75-dev';
   const TU_LOGO='__TU_LOGO_DATA_URL__';
   // Bundled tool directory: no external catalog, cache, or refresh requests.
   const registry={schemaVersion:1,categories:[{"id":"business","name":"Business Tools","icon":"▥","order":10},{"id":"games","name":"Games","icon":"♜","order":20},{"id":"single-player","name":"Single Player","icon":"▣","order":21,"parent":"games"},{"id":"multiplayer","name":"Multiplayer","icon":"♟","order":22,"parent":"games"},{"id":"chat","name":"Chat Tools","icon":"◉","order":30},{"id":"other","name":"War Tools","icon":"⚙","order":40}],modules:[{"id":"flight-game","name":"Flight Game","category":"single-player","version":"0.12.8","description":"Standalone Flight Game arcade module, playable anytime"},{"id":"stick-fighter","name":"Stick Fighter","category":"single-player","version":"0.2.7","description":"Standalone Stick Fighter arcade module, playable anytime"},{"id":"chat-archiver","name":"Chat Archiver","category":"chat","version":"0.1.8","description":"Archive Torn chat conversations"},{"id":"tic-tac-toe","name":"Tic-Tac-Toe","category":"multiplayer","version":"0.6.5","description":"Two-player Tic-Tac-Toe with named winners, green winning line, rematches and head-to-head history"},{"id":"torn-four","name":"Torn Four","category":"multiplayer","version":"0.2.5","description":"Connect Four: two-player multiplayer with private room codes"},{"id":"torn-fleet","name":"Torn Fleet","category":"multiplayer","version":"0.2.5","description":"Battleship: fleet placement and turn-based naval combat"},{"id":"torn-snake","name":"Slithering Streets","category":"single-player","version":"0.2.14","description":"Single-player Snake with touch controls and local high scores"},{"id":"chaos-marbles","name":"Chaos Marbles","category":"multiplayer","version":"0.2.5","description":"Online 2\u20134 player marble race with private player sessions, Waiting for Chaos staging, and game history"},{"id":"item-monitor","name":"Travel Assistant and Item Monitor","category":"business","version":"1.10.31-dev","description":"Item Monitor and Travel Assistant with D1 stock reporting, source diagnostics and stock estimation"},{"id":"war-hit-organizer","name":"War Organizer","category":"other","version":"0.3.17-dev","description":"Compact war target board, reservation controls, timer and local development settings"}]};
@@ -587,7 +587,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.74-dev</span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.75-dev</span></footer>';
   document.body.appendChild(panel);
   const headerBrand=panel.querySelector('.tu-logo');if(headerBrand){headerBrand.textContent='';headerBrand.classList.add('tu-brand-emblem');headerBrand.setAttribute('role','img');headerBrand.setAttribute('aria-label','Torn Utilities');}
   const identityLine=document.createElement('p');
@@ -1136,25 +1136,39 @@
     launcher.style.top = clamp(y, 0, Math.max(0, innerHeight - Math.max(34,launcher.offsetHeight))) + 'px';
   };
   if (Number.isFinite(saved.x) && Number.isFinite(saved.y)) setPos(saved.x, saved.y);
-  let gesture = null;
+  let gesture = null,suppressLauncherClickUntil=0,launcherTapGuard=null,launcherTapGuardTimer=null;
+  const shieldLauncherTap=rect=>{
+    if(launcherTapGuard)window.removeEventListener('click',launcherTapGuard,true);
+    clearTimeout(launcherTapGuardTimer);
+    const until=Date.now()+500;
+    launcherTapGuard=event=>{if(Date.now()>until)return;if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)return;event.preventDefault();event.stopImmediatePropagation();};
+    window.addEventListener('click',launcherTapGuard,{capture:true,passive:false});
+    launcherTapGuardTimer=setTimeout(()=>{window.removeEventListener('click',launcherTapGuard,true);launcherTapGuard=null;launcherTapGuardTimer=null;},500);
+  };
+  // Keep the launcher mounted through pointer release; activate only on click.
+  for(const type of ['pointerdown','pointerup','pointermove','pointercancel','mousedown','mouseup','touchstart','touchend','touchcancel','dblclick'])launcher.addEventListener(type,event=>event.stopPropagation());
+  launcher.addEventListener('click',event=>{
+    event.preventDefault();event.stopImmediatePropagation();
+    if(Date.now()<suppressLauncherClickUntil||event.detail>1)return;
+    const rect=launcher.getBoundingClientRect();if(event.detail>0)shieldLauncherTap(rect);togglePanel();
+  });
   launcher.addEventListener('pointerdown', e => {
     if (e.button !== 0 && e.pointerType === 'mouse') return;
     gesture = {id:e.pointerId, sx:e.clientX, sy:e.clientY, x:launcher.offsetLeft, y:launcher.offsetTop, moved:false};
-    launcher.setPointerCapture(e.pointerId);
+    launcher.setPointerCapture?.(e.pointerId);
   });
   launcher.addEventListener('pointermove', e => {
     if (!gesture || gesture.id !== e.pointerId) return;
     const dx=e.clientX-gesture.sx, dy=e.clientY-gesture.sy;
     if (Math.hypot(dx,dy)>6) gesture.moved=true;
-    if (gesture.moved) setPos(gesture.x+dx,gesture.y+dy);
+    if (gesture.moved) {e.preventDefault();setPos(gesture.x+dx,gesture.y+dy);}
   });
   launcher.addEventListener('pointerup', e => {
     if (!gesture || gesture.id !== e.pointerId) return;
     const moved=gesture.moved; gesture=null;
-    if (moved) { saved.x=launcher.offsetLeft; saved.y=launcher.offsetTop; persist(); }
-    else { togglePanel(); }
+    if (moved) { suppressLauncherClickUntil=Date.now()+500;saved.x=launcher.offsetLeft; saved.y=launcher.offsetTop; persist(); }
   });
-  launcher.addEventListener('pointercancel', () => { gesture=null; });
+  launcher.addEventListener('pointercancel', () => { gesture=null;suppressLauncherClickUntil=Date.now()+500; });
   window.addEventListener('resize', () => {
     if (saved.x !== undefined) setPos(launcher.offsetLeft, launcher.offsetTop);
   });
