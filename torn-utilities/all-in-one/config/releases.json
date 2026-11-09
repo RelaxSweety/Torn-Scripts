@@ -1,5 +1,21 @@
 [
   {
+    "version": "0.5.42.57-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Snatch planning": [
+        "Replace hospital-status question with Planning to Hospitalize and separate healing/hospitalization inventory selections",
+        "Offer Hospitalize Me while waiting out of hospital; skip hospitalization when stock arrives before use",
+        "Recheck item, player/country, stock and native Use/Yes before hospitalization; wait for observed hospital status"
+      ],
+      "Selected destruction": [
+        "Require explicit selection and confirmation of item types before enabling destruction",
+        "Destroy only selected carried item types and preserve unselected inventory",
+        "Invalidate legacy broad destruction consents on restore"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.56-dev",
     "date": "2026-11-08",
     "changes": {

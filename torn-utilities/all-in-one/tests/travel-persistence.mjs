@@ -18,16 +18,16 @@ const button=(root,name)=>[...root.querySelectorAll('button')].find(e=>e.textCon
 let t=await boot();
 try{
  t.d.querySelector('[data-tab="modules"]').click();const card=name=>[...t.d.querySelectorAll('.tu-card')].find(c=>c.querySelector('strong')?.textContent===name).querySelector('button').click();card('Business Tools');card('Travel Assistant and Item Monitor');await pause();
- const panel=t.d.querySelector('#tuim-panel'),hospital=panel.querySelector('[aria-label="Are you hospitalized?"]');hospital.value='yes';hospital.dispatchEvent(new t.w.Event('change'));
+ const panel=t.d.querySelector('#tuim-panel'),hospital=panel.querySelector('[aria-label="Planning to Hospitalize?"]');hospital.value='yes';hospital.dispatchEvent(new t.w.Event('change'));
  const quantity=panel.querySelector('input[type=number]');quantity.value='7';quantity.dispatchEvent(new t.w.Event('input'));
  assert.equal(t.w.sessionStorage.getItem('tu:monitor:resume:v1'),'42');
  const saved=Object.fromEntries(['localStorage','sessionStorage'].map(store=>[store,Object.fromEntries(Object.keys(t.w[store]).map(k=>[k,t.w[store].getItem(k)]))]));t.close();t=await boot(saved);
  assert.equal(t.w.TornUtilities.isActive('item-monitor'),true,'Refresh resumes the previously active monitor');
  assert.equal(t.d.querySelector('#tuim-panel').hidden,true,'Refresh keeps the resumed monitor minimized');
- assert.equal(t.d.querySelector('[aria-label="Are you hospitalized?"]').value,'yes');assert.equal(JSON.parse(t.d.querySelector('[aria-label="Selected medical item"]').value).name,'Morphine');assert.ok(t.d.querySelector('#tuim-panel').textContent.includes('Current selection: Foreign / Fixture Flower'));assert.equal(t.d.querySelector('#tuim-panel input[type=number]').value,'7');
+ assert.equal(t.d.querySelector('[aria-label="Planning to Hospitalize?"]').value,'yes');assert.equal(JSON.parse(t.d.querySelector('[aria-label="Selected medical item"]').value).name,'Morphine');assert.ok(t.d.querySelector('#tuim-panel').textContent.includes('Current selection: Foreign / Fixture Flower'));assert.equal(t.d.querySelector('#tuim-panel input[type=number]').value,'7');
  assert.equal(JSON.parse(t.w.localStorage.getItem('tu-item-monitor-v1')).length,1);
  assert.equal(t.d.querySelector('#tu-snatch-run').hidden,true,'Restoring preferences does not arm gameplay');
- const hospitalAgain=t.d.querySelector('[aria-label="Are you hospitalized?"]');hospitalAgain.value='no';hospitalAgain.dispatchEvent(new t.w.Event('change'));button(t.d.querySelector('#tuim-panel'),'Arm Snatch and Run').click();await pause();const armed=t.w.sessionStorage.getItem('tu:snatch-run:v1');assert.ok(armed);
+ const hospitalAgain=t.d.querySelector('[aria-label="Planning to Hospitalize?"]');hospitalAgain.value='no';hospitalAgain.dispatchEvent(new t.w.Event('change'));button(t.d.querySelector('#tuim-panel'),'Arm Snatch and Run').click();await pause();const armed=t.w.sessionStorage.getItem('tu:snatch-run:v1');assert.ok(armed);
  const armedStorage=Object.fromEntries(['localStorage','sessionStorage'].map(store=>[store,Object.fromEntries(Object.keys(t.w[store]).map(k=>[k,t.w[store].getItem(k)]))]));t.close();t=await boot(armedStorage);assert.equal(t.w.TornUtilities.isActive('item-monitor'),true);assert.equal(JSON.parse(t.w.sessionStorage.getItem('tu:snatch-run:v1')).intentId,JSON.parse(armed).intentId,'Refresh preserves this exact armed intent');assert.equal(t.d.querySelector('#tu-snatch-run').hidden,false,'Waiting button returns after authorized refresh');
  t.w.TornUtilities.closeActiveModule();assert.equal(t.w.sessionStorage.getItem('tu:monitor:resume:v1'),null,'Explicit exit prevents automatic restart');
  assert.deepEqual(t.errors,[]);

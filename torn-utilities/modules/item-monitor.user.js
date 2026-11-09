@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.12.12-dev
+// @version      1.12.13-dev
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -152,14 +152,14 @@ function snatchSnapshot(watch=null){
  const ownerId=host.TornUtilities?.getPlayer?.()?.id;
  const nativeStatus=document.querySelector('[data-user-status]')?.getAttribute('data-user-status');
  const nativeState=nativeActions?.enabled()?nativeActions.inspect(run):null;
- const status=nativeState?.traveling?'Traveling':nativeState?.released?'Abroad':document.querySelector('a[aria-label^="Hospital:"]')?'Hospital':liveCountry()?'Abroad':['Hospital','Abroad','Traveling'].includes(nativeStatus)?nativeStatus:snatchContext?.status;
+ const status=nativeState?.traveling?'Traveling':nativeState?.released?'Abroad':nativeState?.hospitalized?'Hospital':document.querySelector('a[aria-label^="Hospital:"]')?'Hospital':liveCountry()?'Abroad':['Hospital','Abroad','Traveling'].includes(nativeStatus)?nativeStatus:snatchContext?.status;
  let purchaseProof=null,purchaseItemKey=null;
  for(const el of document.querySelectorAll('[role=alert],[role=status],.success,[class*=success]')){
   if(el.closest('#tuim-panel,#tu-snatch-run,#tu-pda-panel')||!el.getClientRects().length)continue;
   const value=text(el);if(w&&/you (?:have )?(?:bought|purchased)/i.test(value)&&norm(value).includes(norm(w.name))){if(!proofIds.has(el))proofIds.set(el,++nextProof);purchaseProof=proofIds.get(el)+':'+value;purchaseItemKey=w.key;break;}
  }
  if(nativeState?.purchaseProof){purchaseProof=nativeState.purchaseProof;purchaseItemKey=nativeState.purchaseItemKey;}
- return {ownerId,country:liveCountry()||snatchContext?.country||null,status,hospitalized:status==='Hospital'?true:status==='Abroad'?false:null,traveling:status==='Traveling',returning:!!nativeState?.returning||status==='Traveling'&&/\b(?:to torn|returning to torn|back to torn)\b/i.test(snatchContext?.description||''),quantity:row?foreignStock(row):NaN,purchaseProof,purchaseItemKey,quantityInput,maxControl:row?[...row.querySelectorAll('button,a,[role=button]')].find(e=>/^(max|maximum)$/i.test(text(e).trim())):null,maxQuantity:declaredMax,maxVerified:Number.isSafeInteger(declaredMax)&&declaredMax>0,
+ return {ownerId,country:liveCountry()||snatchContext?.country||null,status,hospitalized:status==='Hospital'?true:status==='Abroad'?false:null,traveling:status==='Traveling',returning:!!nativeState?.returning||status==='Traveling'&&/\b(?:to torn|returning to torn|back to torn)\b/i.test(snatchContext?.description||''),quantity:row?foreignStock(row):foreignShopTables().length?0:NaN,purchaseProof,purchaseItemKey,quantityInput,maxControl:row?[...row.querySelectorAll('button,a,[role=button]')].find(e=>/^(max|maximum)$/i.test(text(e).trim())):null,maxQuantity:declaredMax,maxVerified:Number.isSafeInteger(declaredMax)&&declaredMax>0,
  buyMatches:(control,key)=>!!row&&row.contains(control)&&w?.key===key&&/^(?:buy|purchase)(?:\s|$)/i.test(control.getAttribute('aria-label')||text(control)||control.value||''),
  medicalMatches:(control,medical)=>{const item=nativeRow(control);const id=item?.getAttribute('data-item-id')||item?.getAttribute('data-itemid');const uid=item?.getAttribute('data-item-uid');return !!item&&String(id)===String(medical.id)&&(!medical.uid||String(uid)===String(medical.uid))&&/^(?:use|take)(?:\s|$)/i.test(control.getAttribute('aria-label')||text(control)||control.value||'');},
  returnMatches:control=>/^(?:return|travel|fly)(?:\s+back)?\s+to\s+torn\b/i.test(control.getAttribute('aria-label')||text(control)||control.value||'')};
@@ -173,7 +173,7 @@ async function getSnatchContext({inventory=false}={}){
  if(traveling){country=Object.keys(travelAliases).find(code=>travelAliases[code].some(alias=>norm(description).includes(norm(alias))||new RegExp('(?:to|→)\\s*'+alias+'\\b','i').test(route)))||null;}
  if(!country&&!returning){try{const trip=await api.requestTravelInfo('travel');const destination=trip.travel?.destination;country=Object.keys(travelAliases).find(code=>travelAliases[code].some(alias=>norm(alias)===norm(destination)));}catch{}}
  snatchContext={ownerId:api.getPlayer()?.id,country,status,traveling,returning,description,checkedAt:Date.now()};
- if(inventory){const d=await api.requestTravelInfo('inventory');snatchContext.medicalItems=d.inventory?.items||[];}
+ if(inventory){const [d,all]=await Promise.all([api.requestTravelInfo('inventory'),api.requestTravelInfo('travelInventory')]);snatchContext.medicalItems=d.inventory?.items||[];snatchContext.inventoryItems=all.inventory?.items||[];const carried=nativeActions?.listInventory?.();if(carried){const names=new Set(carried.map(item=>norm(item.name)));snatchContext.inventoryItems=snatchContext.inventoryItems.filter(item=>names.has(norm(item.name)));snatchContext.medicalItems=snatchContext.medicalItems.filter(item=>names.has(norm(item.name)));}}
  enhancements?.check();return snatchContext;
 }
 const nativeActions=typeof createNativeTravelActions==='function'?createNativeTravelActions({document,window,enabled:()=>typeof GM_info!=='undefined'&&GM_info.scriptHandler==='Tampermonkey'||typeof host.flutter_inappwebview?.callHandler==='function'||typeof host.PDA_httpGet==='function'||typeof host.PDA_httpPost==='function'||/com\.manuito\.tornpda/i.test(navigator.userAgent)}):null;

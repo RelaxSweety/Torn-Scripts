@@ -29,8 +29,8 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
   let occupied=slots.filter(slot=>{const b=slot.querySelector(':scope > button[aria-label]');return b&&!/^(empty|available|free|unused)\b/i.test(b.getAttribute('aria-label')||'');}).length;
   // A consumed medical slot can retain its old button while showing the result.
   // Ignore only that exact slot/button from this run's proven medical use.
-  const ghost=same(released,run)&&released.opener?.isConnected&&released.opener.getAttribute('aria-label')===released.slotLabel;
-  if(ghost)occupied=Math.max(0,occupied-1);
+  const ghosts=[released,hospitalizedProof].filter(record=>same(record,run)&&record.opener?.isConnected&&record.opener.getAttribute('aria-label')===record.slotLabel);
+  occupied=Math.max(0,occupied-ghosts.length);
   const free=Math.max(0,total-occupied);
   const currency=value=>{const match=String(value||'').match(/(-?)\$\s*(-?)([\d,]+(?:\.\d+)?)(?![\w,.])/);return match?((match[1]||match[2])?-1:1)*Number(match[3].replace(/,/g,'')):NaN;};
   const price=currency(row.querySelector('[class*=tabletColD] [class*=displayPrice]')?.textContent||row.querySelector('[class*=tabletColD]')?.textContent);
@@ -40,13 +40,13 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
   const affordable=Math.max(0,Math.floor(cash/price)),desired=Math.max(0,Math.min(free,stock,affordable));
   return {verified:true,total,occupied,free,price,desired,affordableSlots:Math.min(free,affordable),limitedBy:desired===free?'space':desired===stock?'stock':'funds'};
  }
- let controller=null,released=null,purchased=null,booked=null;
+ let controller=null,released=null,purchased=null,booked=null,hospitalizedProof=null;
  function cancel(){controller?.abort();controller=null;}
  function inspect(run){
   const hospital=document.querySelector('a[aria-label^="Hospital:"]');
   const release=same(released,run)&&now()-released.at<120000&&(!hospital||hospital===released.hospital&&hospital.getAttribute('aria-label')===released.hospitalLabel);
   const flight=!!scope()?.querySelector('[aria-label="Flight progress"]')||norm(scope()?.querySelector('h4')?.textContent)==='traveling';
-  return {released:!!release,purchaseProof:same(purchased,run)?purchased.proof:null,purchaseItemKey:same(purchased,run)?run.watchKey:null,traveling:!!(same(booked,run)||flight),returning:!!same(booked,run)};
+  return {...(same(hospitalizedProof,run)&&!hospitalizedProof.healed&&!release&&now()-hospitalizedProof.at<120000?{hospitalized:true}:{}),released:!!release,purchaseProof:same(purchased,run)?purchased.proof:null,purchaseItemKey:same(purchased,run)?run.watchKey:null,traveling:!!(same(booked,run)||flight),returning:!!same(booked,run)};
  }
  async function execute(kind,{run,getSnapshot,guard,onEvent=()=>{}}){
   if(!enabled())throw Error('Native Tampermonkey/PDA controls unavailable');cancel();const current=new window.AbortController();controller=current;
@@ -64,6 +64,16 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
   document.addEventListener('visibilitychange',foreground);window.addEventListener('blur',foreground);
   try{
    ensure();if(!scope())throw Error('Open the native foreign travel page');
+   if(kind==='hospitalize'){
+    if(!run.planHospitalize||!run.hospitalization?.name)throw Error('Select the planned hospitalization item first');
+    const state=getSnapshot();if(state.hospitalized!==false||!Number.isFinite(state.quantity)||state.quantity>=Math.max(1,Number(run.minimumQty)||1))throw Error('Hospitalization is only available while out of hospital and waiting for stock');
+    const item=run.hospitalization,opener=inventory(item.name).filter(e=>!item.uid||String(e.closest('li')?.getAttribute('data-item-uid'))===String(item.uid))[0];if(!opener)throw Error('Selected hospitalization item is not carried in the foreign inventory');const slot=opener.closest('li');
+    if(slot.querySelector('[class*=confirmQuestion]'))throw Error('Close the existing item confirmation first');if(opener.getAttribute('aria-expanded')!=='true')click(opener);
+    const use=await wait(()=>one(buttons(slot,'Use'),'hospitalization Use control'));click(use);
+    const yes=await wait(()=>{const q=slot.querySelector('[class*=confirmQuestion]');if(!q)return null;if(norm(q.querySelector('strong')?.textContent)!==norm(item.name)||!norm(q.textContent).includes('would you like to use'))throw Error('Hospitalization confirmation does not match the selected item');return one(buttons(q,'Yes'),'hospitalization Yes confirmation');});
+    const fresh=getSnapshot();if(fresh.hospitalized!==false||!Number.isFinite(fresh.quantity)||fresh.quantity>=Math.max(1,Number(run.minimumQty)||1)){const no=one(buttons(slot.querySelector('[class*=confirmQuestion]'),'No'),'hospitalization No control');if(no)click(no);throw Error('Stock or hospital status changed; hospitalization was not submitted');}
+    submitted=true;click(yes);await wait(()=>getSnapshot().hospitalized===true||document.querySelector('a[aria-label^="Hospital:"]')||/you (?:are|have been) (?:now )?(?:in|sent to|put in|admitted to) (?:the )?hospital/i.test(slot.textContent));hospitalizedProof={...run,at:now(),opener:slot.querySelector(':scope > button[aria-label]'),slotLabel:slot.querySelector(':scope > button[aria-label]')?.getAttribute('aria-label')};released=null;return {hospitalized:true};
+   }
    if(kind==='heal'){
     if(!getSnapshot().hospitalized)throw Error('Hospital status is not confirmed');
     const matches=inventory(run.medical?.name).filter(e=>!run.medical?.uid||String(e.closest('li')?.getAttribute('data-item-uid'))===String(run.medical.uid));
@@ -79,15 +89,16 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
     submitted=true;click(yes);
     await wait(()=>slot.isConnected&&/you are out of the hospital!/i.test(slot.textContent));
     const resultOpener=slot.querySelector(':scope > button[aria-label]');released={...run,opener:resultOpener,slot,slotLabel:resultOpener?.getAttribute('aria-label'),at:now(),hospital:document.querySelector('a[aria-label^="Hospital:"]')};released.hospitalLabel=released.hospital?.getAttribute('aria-label');
-    return {hospitalReleased:true};
+    if(hospitalizedProof)hospitalizedProof={...hospitalizedProof,healed:true};return {hospitalReleased:true};
    }
    if(kind==='destroy'){
-    if(!run.destroyInventory||!run.destroyAccepted||run.destroyDone)throw Error('Inventory Destruction is not accepted for this armed run');
+    if(!run.destroyInventory||!run.destroyAccepted||run.destroyDone||!run.destroyItems?.length)throw Error('Inventory Destruction is not accepted for this armed run');
     const eligible=()=>{ensure();const state=getSnapshot();if(state.hospitalized!==false||!(state.quantity>=Math.max(1,Number(run.minimumQty)||1)))throw Error('Hospital release and available monitored stock are required before destroying items');};
-    const current=()=>{const panel=scope()?.querySelector('[class*=inventoryPanel]');if(!panel)throw Error('Foreign travel inventory is not visible');return [...panel.querySelectorAll('li[class*=inventorySlot] > button[aria-label]')].filter(e=>shown(e)&&! /^(empty|available|free|unused)\b/i.test(e.getAttribute('aria-label')||'')&&!(same(released,run)&&e===released.opener&&e.getAttribute('aria-label')===released.slotLabel));};
+    const current=()=>{const panel=scope()?.querySelector('[class*=inventoryPanel]');if(!panel)throw Error('Foreign travel inventory is not visible');return [...panel.querySelectorAll('li[class*=inventorySlot] > button[aria-label]')].filter(e=>shown(e)&&! /^(empty|available|free|unused)\b/i.test(e.getAttribute('aria-label')||'')&&![released,hospitalizedProof].some(record=>same(record,run)&&e===record.opener&&e.getAttribute('aria-label')===record.slotLabel));};
     const counts=()=>{const result=new Map();for(const e of current())result.set(itemName(e),(result.get(itemName(e))||0)+1);return result;};
     eligible();let remaining=counts();const total=[...remaining.values()].reduce((a,b)=>a+b,0);if(total>100)throw Error('Unexpected travel inventory size; no destruction started');let destroyed=0;
-    for(const name of [...remaining.keys()])while((remaining.get(name)||0)>0){
+    const approved=new Set(run.destroyItems.map(item=>norm(item.name)));
+    for(const name of [...remaining.keys()].filter(name=>approved.has(name)))while((remaining.get(name)||0)>0){
      eligible();const actual=counts();if(actual.size!==remaining.size||[...remaining].some(([key,n])=>actual.get(key)!==n))throw Error('Travel inventory changed during destruction; no further items selected');
      const opener=current().find(e=>itemName(e)===name);if(!opener)throw Error('Approved travel item is no longer present');const slot=opener.closest('li');
      if(slot.querySelector('[class*=confirmQuestion]'))throw Error('Close the existing inventory confirmation before destroying items');
@@ -100,7 +111,7 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
      if(result.close){click(result.close);await wait(()=>current().length<beforeCount);}
      const left=(remaining.get(name)||0)-1;if(left)remaining.set(name,left);else remaining.delete(name);destroyed++;onEvent({step:'inventory-item-destroyed',amount:destroyed,quantity:total});
     }
-    eligible();if(current().length)throw Error('Travel inventory did not finish clearing');return {inventoryDestroyed:true,amount:destroyed};
+    eligible();if(current().some(item=>approved.has(itemName(item))))throw Error('Selected travel inventory items did not finish clearing');return {inventoryDestroyed:true,amount:destroyed};
    }
    if(kind==='buy'){
     let s=getSnapshot();if(s.hospitalized!==false||!(s.quantity>0))throw Error('Confirm hospital release and current stock before buying');
@@ -181,5 +192,6 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
    throw Error('Unknown native action');
   }catch(error){error.submitted=submitted;throw error;}finally{document.removeEventListener('visibilitychange',foreground);window.removeEventListener('blur',foreground);if(controller===current)controller=null;}
  }
- return {enabled,execute,cancel,inspect,resolveItem,capacityFor};
+ function listInventory(){const panel=scope()?.querySelector('[class*=inventoryPanel]');if(!panel)return null;return [...panel.querySelectorAll('li[class*=inventorySlot] > button[aria-label]')].filter(e=>shown(e)&&! /^(empty|available|free|unused)\b/i.test(e.getAttribute('aria-label')||'')).map(e=>({name:(e.getAttribute('aria-label')||'').replace(/\s+slot\s+\d+$/i,'')}));}
+ return {enabled,execute,cancel,inspect,resolveItem,capacityFor,listInventory};
 }

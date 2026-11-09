@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "checklistVersion": "dev-acceptance-2026-11-08-v16",
+  "checklistVersion": "dev-acceptance-2026-11-09-v17",
   "tests": [
     {
       "id": "runtime.build",
@@ -582,7 +582,7 @@
       "id": "tool.item-monitor.function",
       "section": "tool.item-monitor",
       "label": "Travel Assistant and Item Monitor \u2014 functional test",
-      "instructions": "Select/cancel items, manage watches, trigger quantity/price alerts, verify alarms and persistence. Exercise Travel planning, live DEV reporting, predictions and failure recovery on representative Torn pages. Complete List location labels must show only foreign country names, e.g. Canada; Torn Item Market/Bazaar remains available. Country filtering and selecting a Foreign monitor must retain their original meaning. Validate screen color alert below the filter: red while armed/waiting, green flashing with stock, and removed on cancel/return or disabling it. Inventory Destruction is OFF by default, requires explicit red-warning acceptance, targets foreign travel slots only, and adds a separate Destroy Travel Inventory click after optional Heal. Use a disposable test inventory only when deliberately validating destruction; check exact Trash/Yes, per-item removal evidence, partial failures and no automatic retries.",
+      "instructions": "Select/cancel items, manage watches, trigger quantity/price alerts, verify alarms and persistence. Exercise Travel planning, live DEV reporting, predictions and failure recovery on representative Torn pages. Complete List location labels must show only foreign country names, e.g. Canada; Torn Item Market/Bazaar remains available. Country filtering and selecting a Foreign monitor must retain their original meaning. Validate screen color alert below the filter: red while armed/waiting, green flashing with stock, and removed on cancel/return or disabling it. Inventory Destruction is OFF by default, requires explicit red-warning acceptance, targets foreign travel slots only, and adds a separate Destroy Travel Inventory click after optional Heal. Use a disposable test inventory only when deliberately validating destruction; check exact Trash/Yes, per-item removal evidence, partial failures and no automatic retries. Planning to Hospitalize Yes requires healing and hospitalization selections. Test Hospitalize Me with no stock, native item Use/Yes, confirmed hospital status, then wait for stock and Heal. Stock already present must skip hospitalization. Destruction must list and confirm selected item types only, preserving unselected items. Legacy all-item consent must not re-enable destruction.",
       "kind": "manual",
       "critical": true,
       "platforms": [

@@ -4,7 +4,7 @@ This updates **TU Testing and Diagnostics DEV**, previously v0.1.9-dev, to **v0.
 
 [Install/update TU Test](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/all-in-one/dist/tu-diagnostics-dev.user.js)
 
-Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.56-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
+Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.57-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
 
 ## Using it
 
@@ -117,3 +117,5 @@ Native timestamp support reads explicit message attributes or full timestamps, p
 TU Test 0.2.23 targets 0.5.42.55. Chat exact timestamp counts include native createdAt metadata. Verify JSON/CSV exports preserve native message ID, UTC timestamp, Unix milliseconds and source torn-react-createdAt; identical messages must remain separate.
 
 TU Test 0.2.24 / checklist v16 adds screen-alert and Inventory Destruction validation. The continuous Snatch and Run monitor records destroy action starts, each native Trash/Yes, item removal counts and errors. Optional stage label Inventory Trash / Yes confirmation helps identify unsupported layouts. All evidence remains in Export all diagnostics.
+
+TU Test 0.2.25 / checklist v17 covers Planning to Hospitalize, selected healing/hospitalization items, stock arrival before Use, confirmed hospital wait and selected-only destruction. Use the Hospitalization item / Use / Yes confirmation label during continuous recording. Confirm that unselected items remain after destruction.
