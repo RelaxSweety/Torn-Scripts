@@ -1,5 +1,19 @@
 [
   {
+    "version": "0.5.42.79-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Destination landing alarm": [
+        "Optional outbound landing alarm with configurable seconds, Chime default and master volume",
+        "Flashing landing notification and Dest ETA seconds on Snatch and Run",
+        "Native flight timer with local countdown, same-tab alert deduplication and exit cleanup"
+      ],
+      "Exit confirmation": [
+        "When Snatch and Run is armed, Item Monitor Exit offers Close program or Minimize"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.78-dev",
     "date": "2026-11-09",
     "changes": {

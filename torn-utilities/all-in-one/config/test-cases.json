@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "checklistVersion": "dev-acceptance-2026-11-09-v25",
+  "checklistVersion": "dev-acceptance-2026-11-09-v26",
   "tests": [
     {
       "id": "runtime.build",
@@ -702,7 +702,7 @@
       "id": "item-monitor.embedded-diagnostics",
       "section": "tool.item-monitor",
       "label": "Item Monitor screen and embedded diagnostics",
-      "instructions": "Open Travel Assistant and Item Monitor. Confirm the menu has Open Travel Assistant and Open Item Monitor. Select Open Item Monitor: monitoring and Snatch and Run appear and diagnostic recording starts automatically. At the bottom, test Monitoring Deactivation, Diagnostic Monitor Activation and Report Generation. Confirm minimize, Back and same-tab refresh retain recording; explicit tool exit stops it. Export one report with native page DOM and action evidence without a separate test script.",
+      "instructions": "Open Travel Assistant and Item Monitor. Confirm the menu has Open Travel Assistant and Open Item Monitor. Select Open Item Monitor: monitoring and Snatch and Run appear and diagnostic recording starts automatically. At the bottom, test Monitoring Deactivation, Diagnostic Monitor Activation and Report Generation. Confirm minimize, Back and same-tab refresh retain recording; explicit tool exit stops it. Export one report with native page DOM and action evidence without a separate test script. In Alarm settings enable Destination landing alarm, choose lead seconds and Chime, and verify the master volume controls it. On an outbound flight confirm Dest ETA seconds, one audible and flashing visual alert at the threshold, no repeat after same-tab refresh, and no destination alarm on a return flight. While Snatch and Run is armed, Exit must offer Close program or Minimize; minimize preserves activity and Close program stops it.",
       "kind": "manual",
       "critical": true,
       "platforms": [

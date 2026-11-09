@@ -16,7 +16,7 @@ const t=await boot({sessionStorage:{'tu:snatch-run:v1':JSON.stringify(run)},loca
 try{
  const root=d.getElementById('travel-root');root.innerHTML='<h4>Traveling</h4><section aria-label="Flight progress">Torn to Japan. Remaining Flight Time - 01:00:34</section>';
  d.querySelector('[data-tab="modules"]').click();const card=name=>[...d.querySelectorAll('.tu-card')].find(c=>c.querySelector('strong')?.textContent===name).querySelector('button').click();card('Business Tools');card('Travel Assistant and Item Monitor');await new Promise(r=>setTimeout(r,60));
- const b=d.getElementById('tu-snatch-run');assert.equal(b.textContent,'Hospitalize Me');assert.equal(b.dataset.readinessReason,'ready');assert.equal(b.getAttribute('aria-disabled'),'false');
+ const b=d.getElementById('tu-snatch-run');assert.ok(b.textContent.startsWith('Hospitalize Me'));assert.ok(b.textContent.includes('Dest ETA: 3634 seconds'));assert.equal(b.dataset.readinessReason,'ready');assert.equal(b.getAttribute('aria-disabled'),'false');
  d.hasFocus=()=>false;w.dispatchEvent(new w.Event('blur'));assert.equal(b.dataset.readinessReason,'page-not-focused');d.hasFocus=()=>true;w.dispatchEvent(new w.Event('focus'));assert.equal(b.dataset.readinessReason,'ready');
  const route=root.querySelector('section');route.textContent='Torn to Canada. Remaining Flight Time - 01:00:00';w.dispatchEvent(new w.Event('focus'));assert.equal(b.dataset.readinessReason,'destination-unavailable-or-changed');
  route.textContent='Japan to Torn. Remaining Flight Time - 01:00:00';w.dispatchEvent(new w.Event('focus'));assert.equal(b.getAttribute('aria-disabled'),'true');
