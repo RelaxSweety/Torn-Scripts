@@ -4,7 +4,7 @@ This updates **TU Testing and Diagnostics DEV**, previously v0.1.9-dev, to **v0.
 
 [Install/update TU Test](https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/all-in-one/dist/tu-diagnostics-dev.user.js)
 
-Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.58-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
+Install alongside the integrated TU DEV userscript. The current checklist targets **0.5.42.59-dev**, contains **58 checks** and covers **10 tools**. Stock and Calculations is absent.
 
 ## Using it
 
@@ -121,3 +121,5 @@ TU Test 0.2.24 / checklist v16 adds screen-alert and Inventory Destruction valid
 TU Test 0.2.25 / checklist v17 covers Planning to Hospitalize, selected healing/hospitalization items, stock arrival before Use, confirmed hospital wait and selected-only destruction. Use the Hospitalization item / Use / Yes confirmation label during continuous recording. Confirm that unselected items remain after destruction.
 
 TU Test 0.2.26 targets 0.5.42.58. Verify Load inventory lists visible carried names/counts in both action selectors even when inventory endpoints fail, excludes empty/home items, and requires an explicit healing choice.
+
+TU Test 0.2.27 targets 0.5.42.59. Confirm the destruction warning automatically displays current inventory choices while explicit selection/acceptance remains required.

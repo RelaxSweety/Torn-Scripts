@@ -1,5 +1,19 @@
 [
   {
+    "version": "0.5.42.59-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Inventory Destruction": [
+        "Opening the red activation warning automatically populates the inventory selection list",
+        "No Load button is required; a Retry control appears only after a loading error",
+        "Explicit item selection and Accept remain required; closing the warning ignores pending results"
+      ],
+      "Validation": [
+        "Automatic list population, no initial Load action, consent/decline and existing Snatch options regressions"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.58-dev",
     "date": "2026-11-09",
     "changes": {
