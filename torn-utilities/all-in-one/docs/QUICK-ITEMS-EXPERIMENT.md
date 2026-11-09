@@ -66,3 +66,11 @@ Consumption and hospital release are reported separately. A removal flag require
 ## Test .6: uppercase travel slot identities
 
 Captures the observed `slots[].ID` separately from `slots[].item.ID`, with item names and identity-source annotation. Array position and armouryID are never substituted for slot/item identity. Nested IDs survive same-tab diagnostic restoration. Duplicate slot IDs remain unresolved, and direct foreign use stays disabled. Inspect with medical items present before and after normal Torn use, then export Report Generation to compare the request slotID with fresh inventory identities and consumption/release flags.
+
+## Test .7: direct travel blood bag pilot
+
+Open Direct Quick Items Test, inspect current travel inventory, select one A+ or AB+ blood bag, check the travel-item consent box, and click **Use selected travel blood bag (POST)**. Confirm the item use; the confirmation explicitly mentions use before landing when flight progress is present. Only these two traced item types are enabled.
+
+Each click fetches complete live inventory, matches the selected slot ID, item ID and name, then sends one `travelData/useItem` JSON POST with the current slotID. It checks the fresh inventory after the response. Slot IDs are reusable containers; a changed occupant blocks the request. No actionForm request, automatic retry, second item, purchase, destruction or travel is triggered. Uncertain outcomes retain a same-tab reload lock until the user checks Torn and clears it. Partial healing never advances a workflow; explicit release messages remain labeled as requiring a current status check.
+
+Export Report Generation after testing. The report includes travel consumption/release evidence and passive request captures. Ordinary DEV and the existing Snatch and Run action path remain unchanged.

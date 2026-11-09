@@ -8,7 +8,7 @@
     "validate": "npm run build && npm test",
     "build:diagnostics": "node scripts/build-diagnostics.mjs",
     "build:quick-items-test": "node scripts/build-quick-items-experiment.mjs",
-    "test:quick-items-test": "node tests/direct-quick-items.mjs && node tests/travel-request-capture.mjs && node tests/travel-inventory-inspector.mjs && node tests/quick-items-experiment.mjs"
+    "test:quick-items-test": "node tests/direct-quick-items.mjs && node tests/travel-request-capture.mjs && node tests/travel-inventory-inspector.mjs && node tests/direct-travel-items.mjs && node tests/quick-items-experiment.mjs"
   },
   "description": "Single-script Torn Utilities DEV build and validation",
   "devDependencies": {
