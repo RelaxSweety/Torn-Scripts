@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.12.31-dev
+// @version      1.12.32-dev
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -41,7 +41,12 @@ const saveCfg=()=>localStorage.setItem('tuac-settings',JSON.stringify(state.cfg)
 let embeddedDiagnostic=null,diagnosticStatus='Monitoring off';
 const diagnosticHost=()=>typeof host.flutter_inappwebview?.callHandler==='function'||typeof host.PDA_httpGet==='function'||/com\.manuito\.tornpda/i.test(navigator.userAgent)?'pda':typeof GM_info!=='undefined'&&GM_info.scriptHandler==='Tampermonkey'?'tampermonkey':'unknown';
 const diagnosticBuild=()=>typeof TU_INTEGRATED_BUILD==='string'?TU_INTEGRATED_BUILD:host.__TU_DEV_STARTUP__?.build||'unknown';
-function diagnosticNotice(value){diagnosticStatus=String(value);const status=document.getElementById('tuim-dev-diagnostic-status');if(status)status.textContent=diagnosticStatus;}
+function syncDiagnosticControls(){
+ const active=embeddedDiagnostic?.isMonitoring()===true,light=document.getElementById('tuim-dev-diagnostic-light');
+ if(light){light.style.background=active?'#35c759':'#e04444';light.setAttribute('aria-label',active?'Diagnostic monitoring active':'Diagnostic monitoring inactive');light.title=light.getAttribute('aria-label');}
+ for(const [id,disabled] of [['tuim-dev-diagnostic-start',active],['tuim-dev-diagnostic-stop',!active]]){const button=document.getElementById(id);if(button){button.disabled=disabled;button.style.opacity=disabled?'0.45':'1';button.style.filter=disabled?'grayscale(1)':'none';button.style.cursor=disabled?'not-allowed':'pointer';}}
+}
+function diagnosticNotice(value){diagnosticStatus=String(value);const status=document.getElementById('tuim-dev-diagnostic-status');if(status)status.textContent=diagnosticStatus;syncDiagnosticControls();}
 try{if(typeof createTravelDomDiagnostic==='function'&&typeof createAcceptanceSession==='function'){
  const session=createAcceptanceSession({targetBuild:diagnosticBuild(),checklistVersion:'embedded-item-monitor-dev',tests:[],platform:diagnosticHost()});
  embeddedDiagnostic=createTravelDomDiagnostic({document,window,scrub:session.scrub,storageKey:'tu:item-monitor:dev:diagnostics:v1',deferPersistence:true,prioritizeFunctions:true,getMeta:()=>({host:diagnosticHost(),installedBuild:diagnosticBuild()}),onChange:diagnosticNotice});
@@ -58,7 +63,7 @@ function diagnosticExport(){try{
 }catch{diagnosticNotice('Report generation failed. Retained recordings remain in this tab.');}}
 function renderEmbeddedDiagnostics(parent){
  if(!embeddedDiagnostic)return;const section=E('section',parent);section.id='tuim-dev-diagnostics';E('h3',section,'Temporary DEV Diagnostics');E('p',section,'Recording starts when Open Item Monitor is selected and continues while minimized, on Back, and across navigation in this tab. Stop it below or exit the tool. Reports include system information, action timing, confirmations, inventory calculations and bounded native page DOM. Credentials, chat and arbitrary input values are excluded.');
- const status=E('p',section,diagnosticStatus);status.id='tuim-dev-diagnostic-status';status.setAttribute('role','status');B(section,'Diagnostic Monitor Activation',diagnosticStart);B(section,'Monitoring Deactivation',diagnosticStop);B(section,'Report Generation',diagnosticExport);
+ const indicator=E('span',section);indicator.id='tuim-dev-diagnostic-light';indicator.setAttribute('role','img');indicator.style.cssText='display:inline-block;width:12px;height:12px;border-radius:50%;border:1px solid #aaa;vertical-align:middle;margin-right:8px';const status=E('p',section,diagnosticStatus);status.style.display='inline';status.id='tuim-dev-diagnostic-status';status.setAttribute('role','status');const start=B(section,'Diagnostic Monitor Activation',diagnosticStart);start.id='tuim-dev-diagnostic-start';const stop=B(section,'Monitoring Deactivation',diagnosticStop);stop.id='tuim-dev-diagnostic-stop';B(section,'Report Generation',diagnosticExport);syncDiagnosticControls();
 }
 function renderMenu(){
  const p=state.menu;if(!p)return;p.replaceChildren();const h=E('div',p);h.className='tuim-header';draggable(p,h);E('strong',h,'Travel Assistant and Item Monitor');tuModuleHeader(p,h,'tu-pda-panel');E('h3',p,'Travel Assistant');E('p',p,'Travel planning, foreign inventory reporting, and restock predictions');B(p,'Open Travel Assistant',travelUI);const divider=E('hr',p);divider.style.cssText='border:0;border-top:2px solid #cba953;margin:16px 0';E('h3',p,'Item Monitor');E('p',p,'Item monitoring, alarms, Snatch and Run, and temporary DEV diagnostics');B(p,'Open Item Monitor',()=>{state.lastView='monitor';sessionStorage.setItem('tu:item-monitor:view:v1','monitor');tuModuleOpen('tuim-panel');diagnosticStart();});

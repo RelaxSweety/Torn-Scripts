@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.77-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Diagnostic status controls": [
+        "Show a green diagnostic indicator while recording and red while stopped",
+        "Gray out and disable Activation while running and Deactivation while stopped",
+        "Synchronize controls after automatic start, manual stop/restart, rerender and same-tab resume"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.76-dev",
     "date": "2026-11-09",
     "changes": {
