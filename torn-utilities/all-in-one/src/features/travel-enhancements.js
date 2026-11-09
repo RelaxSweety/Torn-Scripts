@@ -90,7 +90,7 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   if(run.stage==='heal'&&s.hospitalized===false){run.stage=afterHeal();persist();}
   if(['buy','destroy'].includes(run.stage)&&s.hospitalized===true){if(run.medical){run.stage='heal';persist();}else{notice('Hospitalized: restore Travel Assistant and select a healing item, then re-arm.');}}
   if(run.stage==='heal-pending'&&s.hospitalized===false){clearStatusTimer();run.stage=afterHeal();persist();notice(run.stage==='destroy'?'Hospital release confirmed. Destroy Selected Items is ready with fresh stock.':'Hospital release confirmed. Return to the monitored shop and verify fresh stock before buying.');}
-  if(run.stage==='buy-pending'&&s.purchaseProof&&s.purchaseProof!==run.priorProof&&s.purchaseItemKey===run.watchKey){run.stage='return';run.purchaseConfirmed=true;persist();notice('Purchase confirmed. Return to Torn is ready.');}
+  if(!busy&&run.stage==='buy-pending'&&s.purchaseProof&&s.purchaseProof!==run.priorProof&&s.purchaseItemKey===run.watchKey){run.stage='return';run.purchaseConfirmed=true;persist();notice('Purchase confirmed. Return to Torn is ready.');}
   if(run.stage==='return-pending'&&s.traveling&&s.returning){clearStatusTimer();run.stage='complete';persist();notice('Return flight to Torn confirmed. Snatch and Run completed.');}
   refresh();
  }
@@ -122,7 +122,7 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
    if(kind==='destroy'&&result.inventoryDestroyed){run.destroyDone=true;run.stage='buy';}
    if(kind==='buy'&&result.purchaseConfirmed){run.stage='return';run.purchaseConfirmed=true;}
    if(kind==='return'&&result.returnBooked)run.stage='complete';
-   persist();emit('action-result',{action:kind,result:'confirmed',amount:result.amount||null});notice(kind==='hospitalize'?'Hospitalization confirmed. Waiting for available stock.':kind==='heal'?(run.stage==='destroy'?'Hospital release confirmed. Destroy Selected Items is ready.':'Hospital release confirmed. Purchase Max is ready.'):kind==='destroy'?'Selected items destroyed. Purchase Max is ready.':kind==='buy'?'Purchase confirmed. Return to Torn is ready.':'Return flight booked.');return true;
+   persist();emit('action-result',{action:kind,result:'confirmed',amount:result.amount||null});notice(result.reconcileWarning?'Purchased '+result.amount+' item(s). Reconciliation stopped: '+result.reconcileWarning+'. Return to Torn is ready.':kind==='hospitalize'?'Hospitalization confirmed. Waiting for available stock.':kind==='heal'?(run.stage==='destroy'?'Hospital release confirmed. Destroy Selected Items is ready.':'Hospital release confirmed. Purchase Max is ready.'):kind==='destroy'?'Selected items destroyed. Purchase Max is ready.':kind==='buy'?'Purchase confirmed. Return to Torn is ready.':'Return flight booked.');return true;
   }catch(error){if(run===expected){if(!error.submitted)run.stage=kind;else{statusAttempts=0;scheduleStatus();}persist();emit('action-error',{action:kind,message:error.message,submitted:!!error.submitted});notice(error.message);}return false;}
   finally{if(run===expected){busy=false;check();}}
  }

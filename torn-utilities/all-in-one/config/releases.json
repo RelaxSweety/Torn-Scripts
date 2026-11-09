@@ -1,5 +1,22 @@
 [
   {
+    "version": "0.5.42.64-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Purchase first, reconcile afterward": [
+        "Buy the quantity Torn currently allows before attempting to reconcile additional capacity",
+        "After confirmed purchase and observed inventory update, recheck space/cash/stock and permit one bounded remainder purchase",
+        "Never force an upward quantity correction or replay the initial purchase",
+        "Preserve the confirmed initial purchase and make Return ready if reconciliation cannot be verified; explain partial/uncertain reconciliation"
+      ],
+      "Validation": [
+        "Native shown 17 bought first, then only 1 more when verified",
+        "Stock/funds changing after first purchase, wrong follow-up confirmation and unconfirmed follow-up without retry",
+        "Captured PDA compact quantity panels: 17 first, a fresh panel for the 1-item remainder"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.63-dev",
     "date": "2026-11-09",
     "changes": {
