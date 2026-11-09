@@ -21,30 +21,44 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
   return candidates[0];
  }
  function capacityFor(row,run,stock,nativeMax){
-  const root=scope(),panel=root?.querySelector('[class*=inventoryPanel]');
-  const slots=[...(panel?.querySelectorAll('li[class*=inventorySlot]')||[])];
-  const banner=[...document.querySelectorAll('[class*=messageContent],.info-msg')].map(e=>e.textContent||'').find(t=>/you are in\s+.+?and have\s*\$/i.test(t))||'';
-  const total=Number(banner.match(/you have purchased\s*[\d,]+\s*\/\s*([\d,]+)/i)?.[1]?.replace(/,/g,'')||panel?.getAttribute('aria-label')?.match(/^inventory\s+(\d+)\s+items$/i)?.[1]);
-  if(!Number.isSafeInteger(total)||total<1||slots.length!==total)return {verified:false,reason:'capacity-not-available',desired:nativeMax};
-  let occupied=slots.filter(slot=>{const b=slot.querySelector(':scope > button[aria-label]');return b&&!/^(empty|available|free|unused)\b/i.test(b.getAttribute('aria-label')||'');}).length;
-  // A consumed medical slot can retain its old button while showing the result.
-  // Ignore only that exact slot/button from this run's proven medical use.
-  const ghosts=consumed.filter(record=>same(record,run)&&record.opener?.isConnected&&record.opener.getAttribute('aria-label')===record.slotLabel);
-  occupied=Math.max(0,occupied-new Set(ghosts.map(record=>record.opener)).size);
-  const free=Math.max(0,total-occupied);
+  const ledger=run.capacityLedger;
+  const banner=travelBanner();
+  if(!ledger?.valid)return {verified:false,reason:'capacity-baseline-unavailable',desired:nativeMax};
+  const total=ledger.total,occupied=Math.max(0,ledger.initialOccupied-ledger.freed+ledger.purchased),free=Math.max(0,total-occupied);
   const currency=value=>{const match=String(value||'').match(/(-?)\$\s*(-?)([\d,]+(?:\.\d+)?)(?![\w,.])/);return match?((match[1]||match[2])?-1:1)*Number(match[3].replace(/,/g,'')):NaN;};
   const price=currency(row.querySelector('[class*=tabletColD] [class*=displayPrice]')?.textContent||row.querySelector('[class*=tabletColD]')?.textContent);
   const displayedCash=currency(document.getElementById('user-money')?.textContent);
   const cash=Number.isFinite(displayedCash)?displayedCash:currency(banner.match(/and have\s*(\$\s*-?[\d,]+(?:\.\d+)?)/i)?.[1]);
   if(!(price>0)||!Number.isFinite(cash))return {verified:false,reason:'funds-not-available',total,occupied,free,desired:Math.min(nativeMax,free,stock)};
-  const affordable=Math.max(0,Math.floor(cash/price)),desired=Math.max(0,Math.min(free,stock,affordable));
-  return {verified:true,total,occupied,free,price,desired,affordableSlots:Math.min(free,affordable),limitedBy:desired===free?'space':desired===stock?'stock':'funds'};
+  const budget=Number.isFinite(ledger.cashBeforePurchase)?Math.max(0,ledger.cashBeforePurchase-(ledger.spent||0)):cash;const affordable=Math.max(0,Math.floor(Math.min(cash,budget)/price)),desired=Math.max(0,Math.min(free,stock,affordable));
+  return {verified:true,total,occupied,free,price,cash,desired,affordableSlots:Math.min(free,affordable),limitedBy:desired===free?'space':desired===stock?'stock':'funds'};
  }
  let controller=null,released=null,purchased=null,booked=null,hospitalizedProof=null;
  const consumed=[];
  const isConsumed=e=>consumed.some(record=>record.opener===e&&e.getAttribute('aria-label')===record.slotLabel);
  const availableItem=items=>{for(const item of items||[]){const opener=inventory(item.name).find(e=>!isConsumed(e)&&(!item.uid||String(e.closest('li')?.getAttribute('data-item-uid'))===String(item.uid)));if(opener)return {item,opener};}return null;};
- function remember(run,slot){const opener=slot.querySelector(':scope > button[aria-label]');const record={...run,opener,slot,slotLabel:opener?.getAttribute('aria-label'),at:now()};if(opener&&!/^(empty|available|free|unused)\b/i.test(record.slotLabel||''))consumed.push(record);return record;}
+ function remember(run,slot){creditFreed(run);const opener=slot.querySelector(':scope > button[aria-label]');const record={...run,opener,slot,slotLabel:opener?.getAttribute('aria-label'),at:now()};if(opener&&!/^(empty|available|free|unused)\b/i.test(record.slotLabel||''))consumed.push(record);return record;}
+ const travelBanner=()=>[...document.querySelectorAll('[class*=messageContent],.info-msg')].map(e=>e.textContent||'').find(t=>/you are in\s+.+?and have\s*\$/i.test(t))||'';
+ function inventorySummary(){
+  const panel=scope()?.querySelector('[class*=inventoryPanel]');if(!panel)return null;
+  const slots=[...panel.querySelectorAll('li[class*=inventorySlot]')],banner=travelBanner();
+  const declared=Number(banner.match(/you have purchased\s*[\d,]+\s*\/\s*([\d,]+)/i)?.[1]?.replace(/,/g,'')||panel.getAttribute('aria-label')?.match(/^inventory\s+(\d+)\s+items$/i)?.[1]);
+  const total=Number.isSafeInteger(declared)&&declared>0&&slots.length===declared?declared:null;
+  const groups=new Map();let occupied=0;for(const slot of slots){const e=slot.querySelector(':scope > button[aria-label]');if(!e||isConsumed(e)||/^(empty|available|free|unused)\b/i.test(e.getAttribute('aria-label')||''))continue;occupied++;const name=(e.getAttribute('aria-label')||'').replace(/\s+slot\s+\d+$/i,'');groups.set(name,(groups.get(name)||0)+1);}
+  return {verified:total!==null,total,occupied,free:total===null?null:Math.max(0,total-occupied),items:[...groups].map(([name,amount])=>({name,amount})),source:'travel-dom'};
+ }
+ let trackedRun=null;
+ const manualChange=event=>{if(event.isTrusted&&trackedRun?.capacityLedger&&event.target?.closest?.('#travel-root [class*=inventoryPanel],#travel-root [class*=stockTable],#travel-root form[id^="item-"]')){trackedRun.capacityLedger.valid=false;trackedRun.capacityLedger.reason='manual-inventory-or-shop-interaction';}};
+ function prepareRun(run){
+  if(trackedRun!==run){document.removeEventListener('click',manualChange,true);trackedRun=run;document.addEventListener('click',manualChange,true);}
+  if(run.capacityLedger?.valid)return run.capacityLedger;
+  const summary=inventorySummary();if(!summary?.verified)return null;
+  run.capacityLedger={valid:true,total:summary.total,initialOccupied:summary.occupied,freed:0,purchased:0,spent:0,watchCount:summary.items.filter(item=>norm(item.name)===norm(run.watchName)).reduce((n,item)=>n+item.amount,0),at:now(),source:'travel-dom-baseline'};return run.capacityLedger;
+ }
+ function forget(){document.removeEventListener('click',manualChange,true);trackedRun=null;}
+ function creditFreed(run){const ledger=run.capacityLedger;if(ledger?.valid)ledger.freed=Math.min(ledger.initialOccupied,ledger.freed+1);}
+ const purchasedCount=()=>Number(travelBanner().match(/you have purchased\s*([\d,]+)\s*\//i)?.[1]?.replace(/,/g,''));
+ const receipt=run=>[...document.querySelectorAll('[role=alert],[role=status],.success,[class*=success]')].filter(e=>shown(e)&&!e.closest('#tuim-panel,#tu-snatch-run')&&/you (?:have )?(?:bought|purchased)/i.test(e.textContent||'')&&norm(e.textContent).includes(norm(run.watchName))).map(e=>e.textContent.trim()).join('|');
  function cancel(){controller?.abort();controller=null;}
  function inspect(run){
   const hospital=document.querySelector('a[aria-label^="Hospital:"]');
@@ -55,7 +69,7 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
  async function execute(kind,{run,getSnapshot,guard,allowBeforeLanding=false,extendHospital=false,onEvent=()=>{}}){
   if(!enabled())throw Error('Native Tampermonkey/PDA controls unavailable');cancel();const current=new window.AbortController();controller=current;
   const signal=current.signal;let submitted=false;
-  const ensure=()=>{if(signal.aborted||!guard()||document.hidden||!document.hasFocus())throw Error('Action canceled or page/player changed. Continue manually if Torn already accepted it.');};
+  const ensure=()=>{if((kind!=='return'&&run.capacityLedger?.valid===false)||signal.aborted||!guard()||document.hidden||!document.hasFocus())throw Error('Action canceled or page/player changed. Continue manually if Torn already accepted it.');};
   const click=e=>{ensure();if(!shown(e))throw Error('Native action is no longer available');onEvent({step:'native-click',control:label(e).slice(0,220),controlId:e.id||'',panel:e.getAttribute('aria-controls')||''});e.click();};
   const wait=(read,timeout=4000)=>new Promise((resolve,reject)=>{
    let observer,timer,done=false;
@@ -67,7 +81,7 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
   const foreground=()=>{if(document.hidden||!document.hasFocus())current.abort();};
   document.addEventListener('visibilitychange',foreground);window.addEventListener('blur',foreground);
   try{
-   ensure();if(!scope())throw Error('Open the native foreign travel page');
+   if(kind!=='return')prepareRun(run);ensure();if(!scope())throw Error('Open the native foreign travel page');
    if(kind==='hospitalize'){
     if((!extendHospital&&!run.planHospitalize)||!(run.hospitalizations?.length||run.hospitalization?.name))throw Error('Select the planned hospitalization item first');
     const eligible=state=>extendHospital?state.hospitalized===true&&!state.returning&&!state.traveling:allowBeforeLanding?state.traveling===true&&!state.returning&&state.hospitalized!==true:!state.traveling&&state.hospitalized===false&&Number.isFinite(state.quantity)&&state.quantity<Math.max(1,Number(run.minimumQty)||1);
@@ -117,7 +131,7 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
      const beforeCount=[...remaining.values()].reduce((a,b)=>a+b,0);
      const result=await wait(()=>{if(current().length<beforeCount)return {removed:true};const close=one(slot.querySelectorAll('button[aria-label="Close"]'),'Trash result Close');return close&&/\b(trashed|destroyed|discarded)\b/i.test(slot.textContent)?{close}:null;});
      if(result.close){click(result.close);await wait(()=>current().length<beforeCount);}
-     const left=(remaining.get(name)||0)-1;if(left)remaining.set(name,left);else remaining.delete(name);destroyed++;onEvent({step:'inventory-item-destroyed',amount:destroyed,quantity:total});
+     const left=(remaining.get(name)||0)-1;if(left)remaining.set(name,left);else remaining.delete(name);creditFreed(run);destroyed++;onEvent({step:'inventory-item-destroyed',amount:destroyed,quantity:total});
     }
     eligible();if(current().some(item=>approved.has(itemName(item))))throw Error('Selected travel inventory items did not finish clearing');return {inventoryDestroyed:true,amount:destroyed};
    }
@@ -144,18 +158,16 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
     let input=one(container.querySelectorAll('input.input-money'),'visible native quantity input');
     const nativeMax=one(container.querySelectorAll('input.wai-btn[type=button]'),'native maximum control');
     const max=nativeMax||one(buttons(container,'MAX').filter(e=>e.matches('button[type=button]')),'quantity-panel MAX control');
-    if(!input||!max||nativeMax&&!/add the maximum amount/i.test(max.getAttribute('aria-label')||max.parentElement?.getAttribute('title')||''))throw Error('Native maximum/quantity controls are unavailable');
-    const before=inventory(run.watchName).length,priorProof=getSnapshot().purchaseProof||null;click(max);await new Promise(resolve=>window.setTimeout(resolve,32));ensure();
-    const nativeAmount=Number(input.value.replace(/,/g,''));
-    const capacity=capacityFor(row,run,getSnapshot().quantity,nativeAmount);
-    onEvent({step:'capacity-check',verified:capacity.verified,capacityTotal:capacity.total,occupiedSlots:capacity.occupied,freeSlots:capacity.free,nativeMax:nativeAmount,desired:capacity.desired,limitedBy:capacity.limitedBy||capacity.reason});
-    if(capacity.verified){
-     if(capacity.desired<1)throw Error('No available capacity, affordable items or stock; no purchase was sent');
-     // React may replace the quantity form after closing a medical result.
-     // Prepare each current input once; never retry a submitted purchase.
-    }
+    if(!input)throw Error('Native maximum/quantity controls are unavailable');
+    const fallbackBefore=capacityFor(row,run,getSnapshot().quantity,NaN).verified?null:inventory(run.watchName).length;
+    const priorProof=getSnapshot().purchaseProof||null,priorReceipt=receipt(run),priorCount=purchasedCount();
+    let capacity=capacityFor(row,run,getSnapshot().quantity,NaN),nativeAmount=null;
+    // Use the verified ledger directly. Max is only a fallback when capacity or funds are unavailable.
+    if(!capacity.verified){if(!max)throw Error('Native maximum fallback unavailable');click(max);await new Promise(resolve=>window.setTimeout(resolve,32));ensure();nativeAmount=Number(input.value.replace(/,/g,''));capacity=capacityFor(row,run,getSnapshot().quantity,nativeAmount);}
+    if(capacity.verified&&capacity.desired<1)throw Error('No available capacity, affordable items or stock; no purchase was sent');
     if(target===null)target=capacity.verified?capacity.desired:nativeAmount;
-    const wanted=Math.min(nativeAmount,Number.isFinite(capacity.desired)?capacity.desired:nativeAmount,target-confirmedAmount);
+    const wanted=Math.min(Number.isFinite(capacity.desired)?capacity.desired:nativeAmount,target-confirmedAmount);
+    onEvent({step:'capacity-check',verified:capacity.verified,capacityTotal:capacity.total,occupiedSlots:capacity.occupied,freeSlots:capacity.free,nativeMax:nativeAmount,desired:wanted,limitedBy:capacity.limitedBy||capacity.reason,freedSlots:run.capacityLedger?.freed||0,confirmedPurchases:run.capacityLedger?.purchased||0,source:capacity.verified?'confirmed-capacity-ledger':'native-max-fallback'});
     if(!Number.isSafeInteger(wanted)||wanted<1){if(confirmedAmount)return outcome('Torn currently allows no additional quantity');throw Error('Torn has no available purchase quantity');}
     const prepared=new WeakSet();
     const prepare=element=>{if(Number(element.value.replace(/,/g,''))===wanted||prepared.has(element))return;const fresh=capacityFor(row,run,getSnapshot().quantity,Number(element.value));if(capacity.verified&&(!fresh.verified||fresh.desired<wanted))throw Error('Capacity, stock or funds changed while preparing quantity');prepared.add(element);const setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value')?.set;if(!setter)throw Error('Native quantity input cannot be updated');setter.call(element,String(wanted));element.dispatchEvent(new window.Event('input',{bubbles:true}));element.dispatchEvent(new window.Event('change',{bubbles:true}));onEvent({step:'quantity-prepared',amount:Number(element.value.replace(/,/g,'')),desired:wanted});};
@@ -164,22 +176,23 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
     const buy=await wait(()=>{
      ({row}=resolveItem(run));container=compact?scope()?.querySelector('#'+panelId+' [class*=amountPanel]'):row;
      const current=one(container?.querySelectorAll('input.input-money')||[],'current quantity input');if(!current){readiness('input-unavailable',null);return null;}input=current;prepare(input);if(!input.isConnected)return null;
-     const amount=Number(input.value.replace(/,/g,''));const fresh=getSnapshot();if(!Number.isSafeInteger(amount)||amount<1||amount>fresh.quantity||amount!==wanted){readiness('quantity-not-ready',amount);return null;}
+     const amount=Number(input.value.replace(/,/g,''));const fresh=getSnapshot();if(!Number.isSafeInteger(amount)||amount<1||amount>fresh.quantity||amount>wanted){readiness('quantity-not-ready',amount);return null;}
+     if(amount<wanted)readiness('native-quantity-clamped',amount);
      return compact?one(buttons(container,'Buy'),'quantity-panel Buy control'):one([...row.querySelectorAll('button[aria-controls]')].filter(e=>e.getAttribute('aria-controls')===panelId&&label(e)==='buy'),'monitored Buy control');});
     const amount=Number(input.value.replace(/,/g,''));s=getSnapshot();const freshCapacity=capacityFor(row,run,s.quantity,amount);if(capacity.verified&&(!freshCapacity.verified||freshCapacity.desired<amount))throw Error('Available capacity, stock or funds changed before Buy');if(s.hospitalized!==false||amount>s.quantity)throw Error('Hospital or stock state changed before Buy');click(buy);
     const yes=await wait(()=>{const panel=scope()?.querySelector('#'+panelId),confirmation=panel?.querySelector('[class*=confirmPanel]');if(!shown(confirmation))return null;
      const strong=confirmation.querySelector('p strong');if(norm(strong?.textContent)!==norm(amount+'x '+run.watchName))throw Error('Purchase confirmation quantity/item mismatch');return one(buttons(confirmation,'Yes'),'purchase Yes confirmation');});
     const confirmSnapshot=getSnapshot(),confirmStock=Number.isFinite(confirmSnapshot.quantity)?confirmSnapshot.quantity:s.quantity;const finalCapacity=capacityFor(row,run,confirmStock,amount);if(capacity.verified&&(!finalCapacity.verified||finalCapacity.desired<amount))throw Error('Capacity, stock or funds changed before confirmation');
-    if(getSnapshot().hospitalized!==false)throw Error('Hospital state changed before confirmation');submitted=true;click(yes);
-    await wait(()=>{const snapshot=getSnapshot();return inventory(run.watchName).length>=before+amount||round===0&&snapshot.purchaseProof&&snapshot.purchaseProof!==priorProof&&snapshot.purchaseItemKey===run.watchKey;});
+    if(getSnapshot().hospitalized!==false)throw Error('Hospital state changed before confirmation');if(capacity.verified&&!Number.isFinite(run.capacityLedger.cashBeforePurchase))run.capacityLedger.cashBeforePurchase=capacity.cash;submitted=true;click(yes);
+    await wait(()=>{const snapshot=getSnapshot(),currentReceipt=receipt(run);return Number.isFinite(priorCount)&&purchasedCount()!==priorCount&&purchasedCount()===(run.capacityLedger?.valid?run.capacityLedger.initialOccupied-run.capacityLedger.freed+run.capacityLedger.purchased+amount:priorCount+amount)||currentReceipt&&currentReceipt!==priorReceipt||round===0&&snapshot.purchaseProof&&snapshot.purchaseProof!==priorProof&&snapshot.purchaseItemKey===run.watchKey||inventory(run.watchName).length>=(fallbackBefore??((run.capacityLedger?.watchCount||0)+(run.capacityLedger?.purchased||0)))+amount;});
+    if(run.capacityLedger?.valid){run.capacityLedger.purchased+=amount;run.capacityLedger.spent+=(capacity.price||0)*amount;}
     confirmedAmount+=amount;purchased={...run,proof:'native:'+(run.intentId||run.expiresAt)+':'+id+':'+round+':'+confirmedAmount};
     onEvent({step:'purchase-confirmed',amount,quantity:confirmedAmount,desired:target});
     if(round===1&&confirmedAmount<target)return outcome('The native quantity remains below the original maximum; reconciliation limit reached');
     if(round===1||!capacity.verified||confirmedAmount>=target)return outcome();
-    // A receipt alone is not enough to authorize more items: wait for actual inventory to settle.
-    try{await wait(()=>inventory(run.watchName).length>=before+amount,800);}catch{return outcome('Purchase confirmed; inventory has not settled, so no additional purchase was attempted');}
+    // The confirmed first transaction updates the ledger; stale inventory labels do not block the remainder.
     onEvent({step:'capacity-reconcile',amount:confirmedAmount,desired:target-confirmedAmount});
-    }catch(error){if(confirmedAmount){onEvent({step:'reconcile-stopped',message:error.message,submitted:!!error.submitted,amount:confirmedAmount});return outcome(error.message);}throw error;}}
+    }catch(error){if(submitted&&run.capacityLedger){run.capacityLedger.valid=false;run.capacityLedger.reason='unconfirmed-remainder';}if(confirmedAmount){onEvent({step:'reconcile-stopped',message:error.message,submitted:!!error.submitted,amount:confirmedAmount});return outcome(error.message);}throw error;}}
     return outcome();
    }
    if(kind==='return'){
@@ -213,8 +226,8 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
     return {returnBooked:true};
    }
    throw Error('Unknown native action');
-  }catch(error){error.submitted=submitted;throw error;}finally{document.removeEventListener('visibilitychange',foreground);window.removeEventListener('blur',foreground);if(controller===current)controller=null;}
+  }catch(error){if(submitted&&run.capacityLedger){run.capacityLedger.valid=false;run.capacityLedger.reason='unconfirmed-submitted-action';}error.submitted=submitted;throw error;}finally{document.removeEventListener('visibilitychange',foreground);window.removeEventListener('blur',foreground);if(controller===current)controller=null;}
  }
  function listInventory(){const panel=scope()?.querySelector('[class*=inventoryPanel]');if(!panel)return null;return [...panel.querySelectorAll('li[class*=inventorySlot] > button[aria-label]')].filter(e=>e.isConnected&&!isConsumed(e)&&! /^(empty|available|free|unused)\b/i.test(e.getAttribute('aria-label')||'')).map(e=>({name:(e.getAttribute('aria-label')||'').replace(/\s+slot\s+\d+$/i,''),id:Number(e.closest('li')?.getAttribute('data-item-id'))||null,uid:null,amount:1,source:'travel-dom'}));}
- return {enabled,execute,cancel,inspect,resolveItem,capacityFor,listInventory};
+ return {enabled,execute,cancel,forget,prepareRun,inventorySummary,inspect,resolveItem,capacityFor,listInventory};
 }

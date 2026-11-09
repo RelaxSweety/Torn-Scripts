@@ -1,5 +1,22 @@
 [
   {
+    "version": "0.5.42.68-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Inventory and maximum purchases": [
+        "Show total, occupied and free travel slots with per-item counts and heal/hospitalization/destruction annotations",
+        "Establish inventory baseline when arming or before the first inventory action; credit each confirmed consumed/destroyed item once",
+        "Enter maximum affordable in-stock quantity from tracked free space directly, without clicking native Max when verified",
+        "Accept a native downward clamp and permit one remainder purchase using confirmed transaction evidence, without waiting for all inventory labels to refresh",
+        "Invalidate tracked capacity on refresh, manual inventory/shop interactions or uncertain submitted actions; bound reconciliation and preserve confirmed purchases"
+      ],
+      "Validation": [
+        "Direct maximum and native-clamped 17+1, stale Morphine label with receipt/banner confirmation, funds/stock limits and changes, uncertain remainder without replay",
+        "Setup overview annotations and baseline invalidation; PC/PDA captured native panels"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.67-dev",
     "date": "2026-11-09",
     "changes": {
