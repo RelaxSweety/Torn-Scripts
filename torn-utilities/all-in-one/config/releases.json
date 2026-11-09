@@ -1,5 +1,20 @@
 [
   {
+    "version": "0.5.42.61-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Arming without another hospitalization item": [
+        "Add None \u2014 already used / skip hospitalization to the hospitalization selector",
+        "Allow arming with a healing item but no hospitalization item, including during flight or delayed status updates",
+        "None disables the Hospitalize Me step and any before-landing use prompt",
+        "Wait for available stock and observed hospital status before Heal or subsequent steps"
+      ],
+      "Validation": [
+        "Explicit UI None, already-hospitalized arming, waiting-stock progression and in-flight no-item guard"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.60-dev",
     "date": "2026-11-09",
     "changes": {
