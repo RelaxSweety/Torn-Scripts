@@ -1,8 +1,8 @@
 {
   "baseBuild": "0.5.42.81-dev",
-  "version": "0.5.42.81-quickitems-test.4",
+  "version": "0.5.42.81-quickitems-test.5",
   "name": "Torn Utilities EXPERIMENTAL - Direct Quick Items",
   "namespace": "https://github.com/RelaxSweety/Torn-Scripts/experimental/quick-items",
   "url": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/releases/experimental/torn-utilities-quick-items-test.user.js",
-  "itemMonitorVersion": "1.12.36-quickitems-test.4"
+  "itemMonitorVersion": "1.12.36-quickitems-test.5"
 }

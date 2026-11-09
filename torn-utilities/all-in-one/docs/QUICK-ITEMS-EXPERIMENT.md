@@ -56,3 +56,9 @@ The test .2 PDA report confirmed live interception and identified `sid=travelDat
 ## Test .4 body-capture revision
 
 The test .3 report captured packing Clear All, Add and inventory/search requests, but the Add body was missing. The recorder previously attempted Request.formData() and then cloned the original request again on failure; by that point the native fetch could have consumed it. Test .4 takes one text clone before pass-through and uses the bounded JSON/form/multipart parsers. Late body parsing is redirected to the retained observation when interceptor layers merge. Body capture state and alternative safe field shapes are explicit rather than treating every empty array as a genuinely empty request. XHR duplicate observations are associated with an open/send transaction rather than conflating separate uses of the same XHR object. No request is replayed or changed.
+
+## Test .5: travel inventory evidence
+
+Open Direct Quick Items Test and select **Inspect current travel inventory (GET only)** before and after using a travel item through Torn normally. Keep diagnostics active, then use Item Monitor → Report Generation. The capture includes bounded inventory field structure, explicit slot/item identity candidates, native inventory labels and typed success/itemRemoved/useAnother flags. Generic IDs and array positions are not interpreted as slot identities. Duplicate identities remain unresolved.
+
+Consumption and hospital release are reported separately. A removal flag requires inventory verification; an explicit release message requires current status verification. These are evidence labels, not authorization to advance Snatch and Run. Direct foreign item use remains disabled pending a live report establishing the schema and response semantics. No direct purchase, destruction or travel requests were added. Ordinary DEV remains unchanged.
