@@ -1,5 +1,7 @@
 # Implementation queue
 
+Client release update: **0.5.42.85-dev** is now the release being published. The revised agreement draft is approved and remains held for implementation; active agreement 1.2 is unchanged. Earlier source-preparation entries below are historical planning records and do not establish whether a service deployment occurred. Current service status must be verified separately.
+
 Current consolidated status: [change implementation checklist](CHANGE-IMPLEMENTATION-CHECKLIST.md).
 
 ## Approved agreement 1.3 — queued, explicitly not implemented
@@ -8,7 +10,7 @@ The user approved [this exact agreement draft](../agreements/drafts/1.3-approved
 
 SHA-256 of approved draft: `ca2902b5cb38dd69ebdcd2c6cd8b0e7aa816796ccd339e81668df31a199e9d25`.
 
-A separate [revised review draft](../agreements/drafts/1.3-revised-review-draft.md) now incorporates the prepared storage/session/reporting changes. Wrapped [PDF](../agreements/drafts/1.3-revised-review-draft.pdf) and [HTML](../agreements/drafts/1.3-revised-review-draft.html) review copies are available. This revision is pending review; the exact previously approved draft is preserved and no agreement is activated.
+A separate [revised review draft](../agreements/drafts/1.3-revised-review-draft.md) now incorporates the prepared storage/session/reporting changes. Wrapped [PDF](../agreements/drafts/1.3-revised-review-draft.pdf) and [HTML](../agreements/drafts/1.3-revised-review-draft.html) review copies are available. This revision is approved and held for implementation; the exact previously approved draft is preserved and no agreement is activated.
 
 Current active checked-in agreement remains 1.2 / number 3. The draft proposes 1.3 / number 4; check availability before eventual publication. Approval of the draft does not fill its private-support-contact placeholder or establish deployed retention/logging controls or the external YATA terms URL. Preserve the approval; resolve these publication details during implementation without treating the entire draft as unapproved again.
 

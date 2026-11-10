@@ -1,6 +1,6 @@
 # TU change implementation checklist
 
-**Published DEV client:** 0.5.42.84-dev. **Prepared client:** 0.5.42.85-dev, unpublished. **Worker:** source prepared; not deployed. **Agreement:** active 1.2; approved 1.3 remains explicitly held and unchanged. Production is outside this batch.
+**Current DEV client release:** 0.5.42.85-dev. **Agreement:** active 1.2; revised 1.3 approved and held. This checklist retains the earlier preparation and rollout plan; its historical deployment assumptions are not evidence of live service state.
 
 A checked box means the stated preparation or test is complete. It does not mean a prepared change is live. This checklist uses the Torn rules/API text already pasted into the conversation; no repeat submission is required.
 

@@ -1,12 +1,23 @@
 [
   {
+    "version": "0.5.42.85-dev",
+    "date": "2026-11-09",
+    "securityBundle": true,
+    "changes": {
+      "Improvements": [
+        "Improve stock-report delivery and preserve queued reports during interruptions",
+        "Improve session handling and credential protection",
+        "General compatibility and reliability fixes"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.84-dev",
     "date": "2026-11-09",
     "changes": {
-      "API key storage isolation": [
-        "Use verified userscript-manager storage for credentials where available and migrate legacy browser copies after write verification",
-        "Keep PDA/origin fallback explicit and avoid placing private saved keys in page inputs until a trusted reveal",
-        "Preserve active agreement 1.2; approved agreement 1.3 remains queued"
+      "Credential protection": [
+        "Improve saved-key storage and privacy controls on supported hosts",
+        "Keep saved-key selection and removal behavior consistent"
       ]
     }
   },
@@ -14,11 +25,9 @@
     "version": "0.5.42.83-dev",
     "date": "2026-11-09",
     "changes": {
-      "Torn API request safeguards": [
-        "Share a conservative client API budget across TU keys and transports",
-        "Suspend invalid, disabled or paused keys until explicit successful verification",
-        "Apply API cooldowns without retrying requests or changing website gameplay actions",
-        "Agreement 1.3 approved and queued separately; active agreement remains unchanged"
+      "API reliability": [
+        "Improve API request handling and recovery from rejected keys",
+        "Reduce unnecessary requests during normal use"
       ]
     }
   },
