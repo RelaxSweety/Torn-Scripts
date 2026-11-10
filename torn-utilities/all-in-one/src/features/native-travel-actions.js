@@ -146,10 +146,15 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
    if(kind==='buy'){
     let confirmedAmount=0,target=null;
     const outcome=warning=>({purchaseConfirmed:true,amount:confirmedAmount,...(warning?{reconcileWarning:warning}:{})});
-    // At most an initial purchase and one capacity reconciliation. Never replay a submitted quantity.
-    for(let round=0;round<2;round++){try{
+    // Initial purchase plus five confirmed remainder attempts. Each native control still yields to a user gesture.
+    for(let round=0;round<6;round++){try{
     submitted=false;
-    let s=getSnapshot();if(s.hospitalized!==false||!(s.quantity>0))throw Error('Confirm hospital release and current stock before buying');
+    let s=getSnapshot();
+    // A purchase receipt can precede Torn restoring the shop row. Missing is unknown,
+    // not sold out. Only the remainder path waits; the first purchase stays immediate.
+    if(round>0&&s.stockVisible===false){onEvent({step:'remainder-state-wait',attempt:round,reason:'shop-row-pending'});await wait(()=>{const fresh=getSnapshot();return fresh.stockVisible!==false&&Number.isFinite(fresh.quantity)?fresh:null;});s=getSnapshot();}
+    if(s.hospitalized!==false)throw Error('Confirm hospital release before buying');
+    if(!(s.quantity>0))throw Error('Current stock is unavailable or exhausted');
     if(same(released,run)){const close=one([...(released.slot?.querySelectorAll('button[aria-label="Close"]')||[])],'medical result Close');if(close){click(close);await new Promise(resolve=>window.setTimeout(resolve,32));ensure();}}
     let {id,row}=resolveItem(run);
     const panelId='item-'+id+'-buyPanel';
@@ -168,7 +173,7 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
     const max=nativeMax||one(buttons(container,'MAX').filter(e=>e.matches('button[type=button]')),'quantity-panel MAX control');
     if(!input)throw Error('Native maximum/quantity controls are unavailable');
     const fallbackBefore=capacityFor(row,run,getSnapshot().quantity,NaN).verified?null:inventory(run.watchName).length;
-    const priorProof=getSnapshot().purchaseProof||null,priorReceipt=receipt(run),priorCount=purchasedCount();
+    const priorProof=getSnapshot().purchaseProof||null,priorReceipt=receipt(run),priorCount=purchasedCount(),priorOccupied=run.capacityLedger?.valid?run.capacityLedger.initialOccupied-run.capacityLedger.freed+run.capacityLedger.purchased:priorCount;
     let capacity=capacityFor(row,run,getSnapshot().quantity,NaN),nativeAmount=null;
     // Use the verified ledger directly. Max is only a fallback when capacity or funds are unavailable.
     if(!capacity.verified){if(!max)throw Error('Native maximum fallback unavailable');click(max);await new Promise(resolve=>window.setTimeout(resolve,32));ensure();nativeAmount=Number(input.value.replace(/,/g,''));capacity=capacityFor(row,run,getSnapshot().quantity,nativeAmount);}
@@ -203,14 +208,17 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
      throw Error('Capacity, stock or funds changed before confirmation; purchase canceled');
     }
     if(getSnapshot().hospitalized!==false)throw Error('Hospital state changed before confirmation');if(capacity.verified&&!Number.isFinite(run.capacityLedger.cashBeforePurchase))run.capacityLedger.cashBeforePurchase=capacity.cash;submitted=true;click(yes);
-    await wait(()=>{const snapshot=getSnapshot(),currentReceipt=receipt(run);return Number.isFinite(priorCount)&&purchasedCount()!==priorCount&&purchasedCount()===(run.capacityLedger?.valid?run.capacityLedger.initialOccupied-run.capacityLedger.freed+run.capacityLedger.purchased+amount:priorCount+amount)||currentReceipt&&currentReceipt!==priorReceipt||round===0&&snapshot.purchaseProof&&snapshot.purchaseProof!==priorProof&&snapshot.purchaseItemKey===run.watchKey||inventory(run.watchName).length>=(fallbackBefore??((run.capacityLedger?.watchCount||0)+(run.capacityLedger?.purchased||0)))+amount;});
-    if(run.capacityLedger?.valid){run.capacityLedger.purchased+=amount;run.capacityLedger.spent+=(capacity.price||0)*amount;}
-    confirmedAmount+=amount;purchased={...run,proof:'native:'+(run.intentId||run.expiresAt)+':'+id+':'+round+':'+confirmedAmount};
-    onEvent({step:'purchase-confirmed',amount,quantity:confirmedAmount,desired:target});
-    if(round===1&&confirmedAmount<target)return outcome('The native quantity remains below the original maximum; reconciliation limit reached');
-    if(round===1||!capacity.verified||confirmedAmount>=target)return outcome();
+    await wait(()=>{const snapshot=getSnapshot(),currentReceipt=receipt(run);return Number.isFinite(priorOccupied)&&purchasedCount()!==priorCount&&purchasedCount()>priorOccupied&&purchasedCount()<=priorOccupied+amount||currentReceipt&&currentReceipt!==priorReceipt||round===0&&snapshot.purchaseProof&&snapshot.purchaseProof!==priorProof&&snapshot.purchaseItemKey===run.watchKey||inventory(run.watchName).length>=(fallbackBefore??((run.capacityLedger?.watchCount||0)+(run.capacityLedger?.purchased||0)))+amount;});
+    const liveReceipt=receipt(run),receiptQuantity=liveReceipt!==priorReceipt?Number(liveReceipt.match(/\b(?:bought|purchased)\s+([\d,]+)\b/i)?.[1]?.replace(/,/g,'')):NaN;
+    const countDelta=purchasedCount()!==priorCount?purchasedCount()-priorOccupied:NaN;
+    const actual=[receiptQuantity,countDelta].find(value=>Number.isSafeInteger(value)&&value>0&&value<=amount)??amount;
+    if(run.capacityLedger?.valid){run.capacityLedger.purchased+=actual;run.capacityLedger.spent+=(capacity.price||0)*actual;}
+    confirmedAmount+=actual;purchased={...run,proof:'native:'+(run.intentId||run.expiresAt)+':'+id+':'+round+':'+confirmedAmount};
+    onEvent({step:'purchase-confirmed',amount:actual,quantity:confirmedAmount,desired:target});
+    if(round===5&&confirmedAmount<target)return outcome('Five remainder attempts completed; inventory is not full');
+    if(round===5||!capacity.verified||confirmedAmount>=target)return outcome();
     // The confirmed first transaction updates the ledger; stale inventory labels do not block the remainder.
-    onEvent({step:'capacity-reconcile',amount:confirmedAmount,desired:target-confirmedAmount});
+    onEvent({step:'capacity-reconcile',amount:confirmedAmount,desired:target-confirmedAmount,attempt:round+1,maxAttempts:5});
     }catch(error){if(submitted&&run.capacityLedger){run.capacityLedger.valid=false;run.capacityLedger.reason='unconfirmed-remainder';}if(confirmedAmount){onEvent({step:'reconcile-stopped',message:error.message,submitted:!!error.submitted,amount:confirmedAmount});return outcome(error.message);}throw error;}}
     return outcome();
    }

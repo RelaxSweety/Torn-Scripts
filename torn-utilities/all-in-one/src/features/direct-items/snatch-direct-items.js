@@ -26,8 +26,16 @@ export function createSnatchDirectItems({native,getPilot,getProfile,window,now=(
    if(result.result!=='consumption-confirmed'){const error=Error(result.text||'Direct item use was blocked: '+result.result);error.submitted=result.result==='uncertain';if(error.submitted)proof={ownerId:run.ownerId,intentId:run.intentId,watchKey:run.watchKey,uncertain:true,at:now()};throw error;}
    consumed=true;
    // Credit each confirmed request once; the server slot ID can later be reused.
-   if(run.capacityLedger?.valid)run.capacityLedger.freed=Math.min(run.capacityLedger.initialOccupied,run.capacityLedger.freed+1);
-   onEvent({step:'direct-item-consumed',action:kind,itemId:result.itemId,slotId:result.slotId});
+   if(run.capacityLedger?.valid){
+    const ledger=run.capacityLedger;ledger.freed=Math.min(ledger.initialOccupied,ledger.freed+1);
+    const capacity=result.inventoryCapacity;
+    if(capacity?.total===ledger.total&&Number.isSafeInteger(capacity.occupied)){
+     const freed=ledger.initialOccupied+(ledger.purchased||0)-capacity.occupied;
+     if(Number.isSafeInteger(freed)&&freed>=0&&freed<=ledger.initialOccupied){ledger.freed=freed;onEvent({step:'direct-capacity-confirmed',capacityTotal:ledger.total,occupiedSlots:capacity.occupied,freeSlots:ledger.total-capacity.occupied,freedSlots:freed,verified:true});}
+     else{ledger.valid=false;ledger.reason='fresh-inventory-ledger-conflict';}
+    }
+   }
+   onEvent({step:'direct-item-consumed',action:kind,itemId:result.itemId,slotId:result.slotId,reason:result.evidence?.hospitalization||'unconfirmed',remainingSeconds:result.evidence?.hospitalSeconds});
    proof={ownerId:run.ownerId,intentId:run.intentId,watchKey:run.watchKey,uncertain:true,consumed:true,kind,priorUntil:run.extensionPriorUntil||0,extendHospital:!!options.extendHospital,at:now()};
    if(!ensure())throw Error('Run changed after item consumption. No subsequent action was sent.');
    // The live action response is newer than the cached profile selection.
@@ -37,6 +45,12 @@ export function createSnatchDirectItems({native,getPilot,getProfile,window,now=(
     lastStatus={at:now(),state:'Abroad',action:kind,source:'torn-use-response'};
     onEvent({step:'direct-item-status',action:kind,status:'Abroad',source:'torn-use-response'});
     return {medicalUsed:true,hospitalReleased:true,statusSource:'torn-use-response'};
+   }
+   if(kind==='hospitalize'&&result.evidence?.hospitalization==='explicit-hospital-message'){
+    const until=Number(result.evidence.hospitalSeconds)>0?now()+result.evidence.hospitalSeconds*1000:null;
+    proof={...proof,uncertain:false,hospitalized:true,released:false,hospitalUntil:until,hospitalSource:'torn-use-response',hospitalConfirmedAt:now(),at:now()};
+    lastStatus={at:now(),state:'Hospital',action:kind,source:'torn-use-response'};onEvent({step:'direct-item-status',action:kind,status:'Hospital',source:'torn-use-response'});
+    return {hospitalized:true,statusSource:'torn-use-response'};
    }
    let timer;const profile=await Promise.race([getProfile(),new Promise((_,reject)=>{timer=window.setTimeout(()=>reject(Error('Hospital status verification timed out')),12000);})]).finally(()=>window.clearTimeout(timer));
    if(!ensure())throw Error('Run changed during hospital status verification.');
@@ -64,6 +78,7 @@ export function createSnatchDirectItems({native,getPilot,getProfile,window,now=(
   if(!proof?.consumed)return;
   const status=(payload?.profile||payload)?.status,state=status?.state;
   if(!['Hospital','Abroad'].includes(state))return;
+  if(proof.hospitalSource==='torn-use-response'&&now()-proof.hospitalConfirmedAt<30000&&state!=='Hospital')return;
   if(state==='Hospital'&&proof.releaseSource==='torn-use-response'&&now()-proof.releaseConfirmedAt<30000){lastStatus={at:now(),state,action:proof.kind,effectiveState:'Abroad',source:'torn-use-response',profileConflict:true};return;}
   proof={...proof,uncertain:false,hospitalized:state==='Hospital',released:state==='Abroad',hospitalUntil:state==='Hospital'&&Number.isFinite(status.until)?status.until*1000:null,at:now()};
   lastStatus={at:now(),state,action:proof.kind,reconciled:true};

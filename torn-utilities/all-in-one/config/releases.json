@@ -1,5 +1,20 @@
 [
   {
+    "version": "0.5.42.87-dev",
+    "date": "2026-11-10",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Improve inventory filling after item use with up to five remainder attempts",
+        "Improve TU icon and Item Monitor opening reliability",
+        "Improve in-flight hospital status verification"
+      ],
+      "Improvements": [
+        "Add Clear Logs and reset diagnostic history after updates"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.86-dev",
     "date": "2026-11-09",
     "securityBundle": true,

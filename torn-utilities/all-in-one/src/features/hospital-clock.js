@@ -4,7 +4,7 @@ export function createHospitalClock({document,now=()=>Date.now()}){
  const deadline=value=>{const n=Number(value);if(Number.isFinite(n)&&n>=1e9)return n<1e12?n*1000:n;if(typeof value==='string'&&/^\d{4}-\d\d-\d\dT.+(?:Z|[+-]\d\d:\d\d)$/.test(value)){const parsed=Date.parse(value);if(Number.isFinite(parsed))return parsed;}return null;};
  function read(status){
   if(status){profileState=['Hospital','Abroad','Traveling','Okay'].includes(status.state)?status.state:'other';profileUntilPresent=status.until!==undefined&&status.until!==null;profileUntil=status.state==='Hospital'?deadline(status.until):null;}
-  const hospital=document.querySelector('a[aria-label^="Hospital:"],[data-hospital-until]');
+  const hospital=[...document.querySelectorAll('a[aria-label^="Hospital:"],[data-hospital-until]')].find(el=>!el.closest('#tu-snatch-run,#tu-snatch-extra-hosp,#tuim-panel,#tu-pda-panel'));
   const finish=(until,source,reason='')=>{diagnostic={source,until:until||null,nativeHospitalPresent:!!hospital,profileState,profileUntilPresent,reason};return until;};
   if(hospital){
    for(const el of [hospital,...hospital.querySelectorAll('[data-hospital-until],[data-until],[data-time],[datetime]')])for(const attr of ['data-hospital-until','data-until','data-time','datetime']){const value=deadline(el.getAttribute(attr));if(value)return finish(value,'native-deadline');}

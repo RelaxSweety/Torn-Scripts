@@ -22,7 +22,7 @@ const marker='const TU_INTEGRATED_BUILD='+JSON.stringify(cfg.version)+';';
 if(output.split(marker).length!==2)throw Error('Item Monitor integration marker mismatch');
 output=output.replace(marker,'const createSteppedNativeActions='+createSteppedNativeActions.toString()+';\nconst createSnatchDirectItems='+createSnatchDirectItems.toString()+';\nconst createTravelRequestCapture='+createTravelRequestCapture.toString()+';\nconst createDirectQuickItems='+createDirectQuickItems.toString()+';\n'+marker);
 const factoryMarker='/* Integrated tool: item-monitor (';const factoryStart=output.indexOf(factoryMarker);const factoryBody=output.indexOf('(()=>{',factoryStart)+'(()=>{'.length;if(factoryStart<0)throw Error('Item Monitor factory missing');output=output.slice(0,factoryBody)+'\nconst quickItemCapturePage=typeof unsafeWindow!==\'undefined\'?unsafeWindow:window;'+output.slice(factoryBody);
-const menu="B(p,'Open Item Monitor',()=>{state.lastView='monitor';sessionStorage.setItem('tu:item-monitor:view:v1','monitor');tuModuleOpen('tuim-panel');diagnosticStart();});";
+const menu="B(p,'Open Item Monitor',openItemMonitor);";
 if(!output.includes(menu))throw Error('Menu integration changed');
 output=output.replace(menu,menu+"E('h3',p,'Experimental Direct Requests');E('p',p,'Experimental Snatch blood bag actions use direct requests with fresh slot and hospital status checks.');B(p,'Open Direct Quick Items Test',()=>{diagnosticStart();quickItemTest.open();});");
 output=output.replace('const hospitalUntil=hospitalClock?.read()||snatchContext?.hospitalUntil||null;', 'const hospitalUntil=nativeState?.released?null:nativeState?.hospitalUntil||hospitalClock?.read()||snatchContext?.hospitalUntil||null;');
@@ -80,8 +80,9 @@ for(const [from,to] of [
  ['return nativeAct(kind);','return nativeAct(kind,{event});']
 ]){if(!output.includes(from))throw Error('Trusted event integration changed: '+from);output=output.replace(from,to);}
 output=output.replace('function renderMenu(){',"const quickItemTest=createDirectQuickItems({window,document,fetchImpl:fetch,capturePage:quickItemCapturePage,isAuthorized:()=>host.TornUtilities?.isAuthorized?.()===true,build:TU_INTEGRATED_BUILD});\nfunction renderMenu(){");
-output=output.replace('productionAuthorized:false,evidenceBuilds,stockMonitor:', 'productionAuthorized:false,quickItemExperiment:{...quickItemTest.report(),snatchDirectItems:nativeActions.report()},evidenceBuilds,stockMonitor:');
+output=output.replace('productionAuthorized:false,uiEvents:(host.__TU_UI_DIAGNOSTICS__||[]).map(entry=>({...entry})),evidenceBuilds,stockMonitor:', 'productionAuthorized:false,quickItemExperiment:{...quickItemTest.report(),snatchDirectItems:nativeActions.report()},uiEvents:(host.__TU_UI_DIAGNOSTICS__||[]).map(entry=>({...entry})),evidenceBuilds,stockMonitor:');
 output=output.replace("function diagnosticStart(){try{embeddedDiagnostic?.start('Workflow (continuous)');","function diagnosticStart(){try{quickItemTest.captureStart();embeddedDiagnostic?.start('Workflow (continuous)');");
+output=output.replace('function diagnosticClear(){', 'function diagnosticClear(){quickItemTest.clearLogs();');
 output=output.replace('function diagnosticStop(){try{embeddedDiagnostic?.stop();','function diagnosticStop(){try{quickItemTest.captureStop();embeddedDiagnostic?.stop();');
 output=output.replace('embeddedDiagnostic?.resume();if(embeddedDiagnostic?.isMonitoring())stockDiagnostic?.start();','embeddedDiagnostic?.resume();if(embeddedDiagnostic?.isMonitoring()){stockDiagnostic?.start();quickItemTest.captureStart();}');
 output=output.replace('function stopRuntime(){','function stopRuntime(){\n quickItemTest.stop();');
