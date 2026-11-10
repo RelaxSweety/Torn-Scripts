@@ -1,3 +1,4 @@
+import {compactPresentation} from './compact-presentation.mjs';
 import {renderAgreementMarkdown} from '../src/features/agreement-renderer.js';
 import {createApiDisclosure} from '../src/features/api-disclosure.js';
 import {secureCandidateManager,secureCandidateReporting} from './integrate-security-candidate.mjs';
@@ -25,22 +26,24 @@ const root=path.resolve(base,'../..');
 const read=p=>fs.readFileSync(path.join(base,p),'utf8');
 const tools=JSON.parse(read('config/tools.json'));
 const releases=JSON.parse(read('config/releases.json'));
-const previewArgument=process.argv.find(arg=>arg.startsWith('--preview-security-candidate=')||arg.startsWith('--preview-foreign-submission-auth='));
+const previewArgument=process.argv.find(arg=>arg.startsWith('--preview-security-candidate=')||arg.startsWith('--preview-foreign-submission-auth=')||arg.startsWith('--preview-compact-ui='));
 const previewPath=previewArgument?.slice(previewArgument.indexOf('=')+1);
 const preparedIntegration=!!previewArgument||releases[0].securityBundle===true;
 if(previewArgument&&(!previewPath||!path.resolve(previewPath).startsWith('/tmp/')))throw Error('Preview output must be under /tmp');
-const version=previewArgument?releases[0].version.replace(/(\d+)-dev$/,(_,patch)=>String(Number(patch)+1)+'-dev'):releases[0].version;
+const version=previewArgument&&!previewArgument.startsWith('--preview-compact-ui=')?releases[0].version.replace(/(\d+)-dev$/,(_,patch)=>String(Number(patch)+1)+'-dev'):releases[0].version;
 const logoData='data:image/webp;base64,'+fs.readFileSync(path.join(root,'torn-utilities/assets/tu-logo-128.webp')).toString('base64');
 const disclosure=JSON.parse(read('../agreements/dev/current.json')).content.match(/^## 2\.[\s\S]*?(?=^## 3\.)/m);
 if(!disclosure)throw Error('Published disclosure tables are missing');
 const disclosureText=disclosure[0]+'\n## 3.';
 let manager=read('src/manager/manager.user.js').replaceAll('__TU_LOGO_DATA_URL__',logoData);
+if(previewArgument?.startsWith('--preview-compact-ui='))manager=manager.replace('// @name         Torn Utilities DEV (All-in-One)','// @name         Torn Utilities DEV Compact Preview').replace('// @namespace    https://github.com/RelaxSweety/Torn-Scripts','// @namespace    https://github.com/RelaxSweety/Torn-Scripts/compact-preview');
 if(previewArgument)manager=manager.replaceAll(releases[0].version,version).replace(/^\/\/ @updateURL.*$/m,'// @updateURL    none').replace(/^\/\/ @downloadURL.*$/m,'// @downloadURL  none');
 if(preparedIntegration)manager=secureCandidateManager(manager);
 manager=manager.replace("  'use strict';","  'use strict';\nconst renderAgreementMarkdown="+renderAgreementMarkdown.toString()+";\nconst createApiDisclosure="+createApiDisclosure.toString()+";\nconst TU_API_DISCLOSURE_TEXT="+JSON.stringify(disclosureText)+";\nconst createTornApiGovernor="+createTornApiGovernor.toString()+";\nconst createCredentialStore="+createCredentialStore.toString()+";");
 const registry=/const registry=\{schemaVersion:1,categories:(\[.*?\]),modules:\[.*?\]\};/;
 if(!registry.test(manager))throw Error('Manager tool directory missing');
 manager=manager.replace(registry,(_,categories)=>`const registry={schemaVersion:1,categories:${categories},modules:${JSON.stringify(tools.map(({source,...t})=>t))}};\nconst TU_RELEASES=${JSON.stringify(releases)};`);
+manager=compactPresentation(manager).replace('__TU_COMPACT_UI_CSS__',read('src/ui/compact.css'));
 let output=manager+'\n';
 const transport=preparedIntegration?`function authorize(url,options,context){const foreign=${authorizeForeignSubmission.toString()};const rooms=${authorizeToolRequest.toString()};return rooms(url,foreign(url,options,context),context);}`:authorizeToolRequest.toString();
 for(const tool of tools){
@@ -61,6 +64,7 @@ for(const tool of tools){
  if(tool.id==='item-monitor'&&preparedIntegration)source=secureCandidateReporting(source);
  if(tool.id==='item-monitor')source='const createStockMonitorDiagnostic='+createStockMonitorDiagnostic.toString()+';\nconst createAlarmAudio='+createAlarmAudio.toString()+';\nconst createLandingAlarm='+createLandingAlarm.toString()+';\nconst TU_INTEGRATED_BUILD='+JSON.stringify(version)+';\nconst createTravelDomDiagnostic='+createTravelDomDiagnostic.toString()+';\nconst createAcceptanceSession='+createAcceptanceSession.toString()+';\nconst detectTestEnvironment='+detectTestEnvironment.toString()+';\n'+'const createHospitalClock='+createHospitalClock.toString()+';\n'+'const createNativeTravelActions='+createNativeTravelActions.toString()+';\n'+'const createTravelEnhancements='+createTravelEnhancements.toString()+';\n'+source;
  if(tool.id==='chat-archiver')source='const createChatCaptureSupport='+createChatCaptureSupport.toString()+';\n'+source;
+ source=compactPresentation(source);
  // Each retained source runs only on first use. A private Window facade captures
  // its legacy registration internally and binds native Window methods correctly.
  // GM_info reflects the tool's version rather than the enclosing TU version.
@@ -107,6 +111,6 @@ for(const marker of ['tu-multiplayer-server.tuserver.workers.dev','alerts-calcul
 if(!output.startsWith('// ==UserScript==')||!output.includes('// @version      '+version))throw Error('Release metadata mismatch');
 if(tools.length!==10||new Set(tools.map(t=>t.id)).size!==10)throw Error('Expected exactly 10 tools');
 fs.mkdirSync(path.join(root,'torn-utilities/releases/dev'),{recursive:true});
-if(previewArgument){fs.writeFileSync(path.resolve(previewPath),output);console.log('Unpublished security candidate: '+previewPath);process.exit(0);}
+if(previewArgument){fs.writeFileSync(path.resolve(previewPath),output);console.log('Unpublished DEV preview: '+previewPath);process.exit(0);}
 for(const p of ['dist/tu-integrated-staging-dev.user.js',`../releases/dev/torn-utilities-${version}.user.js`,'../releases/dev/torn-utilities-dev.user.js']){const target=path.join(base,p);if(process.argv.includes('--check')){if(fs.readFileSync(target,'utf8')!==output)throw Error('Stale generated release: '+p);}else fs.writeFileSync(target,output);}
 console.log(`Built ${version}: ${tools.length} tools; ${Buffer.byteLength(output)} bytes`);

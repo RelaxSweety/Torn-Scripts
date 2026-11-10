@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import {compactPresentation} from '../scripts/compact-presentation.mjs';
+const baseline=`const capacity=18,delay=12000;const css='body{font:20px/1.4 system-ui;padding:12px;margin:16px 4px;gap:8px;width:440px;height:76px;left:12px;border:1px solid #123}';const style={fontSize:"16px",marginTop:"8px"};element.style.padding="12px";`;
+const compact=compactPresentation(baseline);
+new vm.Script(compact);assert.equal(compactPresentation(compact),compact,'Repeated builds cannot compound reductions');
+for(const value of ['font:15px/1.4','padding:9px','margin:12px 3px','gap:6px','fontSize:"12px"','marginTop:"6px"','element.style.padding="9px"'])assert.ok(compact.includes(value),value);
+for(const value of ['capacity=18','delay=12000','width:440px','height:76px','left:12px','border:1px solid #123'])assert.ok(compact.includes(value),value);
+assert.ok(compactPresentation("const css='font-size:12px'").includes('font-size:11px'),'Minimum readable size');
+const code=fs.readFileSync(new URL('../dist/tu-integrated-staging-dev.user.js',import.meta.url),'utf8'),css=fs.readFileSync(new URL('../src/ui/compact.css',import.meta.url),'utf8');
+assert.ok(code.includes(css),'Shared header stylesheet is emitted exactly once');assert.equal(code.split('/* Shared compact headers.').length-1,1);assert.ok(!code.includes('__TU_COMPACT_UI_CSS__'));
+assert.ok(!/\bzoom\s*:|transform:\s*scale\(/.test(css),'No viewport scaling or transformed hitboxes');
+assert.ok(css.includes('pointer:coarse')&&css.includes('min-height:44px'),'Mobile touch exception');
+for(const marker of ['[aria-label=Back]','[aria-label=Minimize]','.tu-close','#tca-header','#tpfg-title','#sff-min','who-header','.tuim-travel-header'])assert.ok(css.includes(marker),marker);
+console.log('Compact presentation passed: single baseline conversion, 75% spacing/type, readable minima, unchanged geometry/calculation values, shared headers, existing controls and touch exceptions');

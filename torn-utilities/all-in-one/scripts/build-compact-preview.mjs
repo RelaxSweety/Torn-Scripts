@@ -1,0 +1,12 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+const base=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const preview='/tmp/tu-compact-preview.user.js';
+execFileSync(process.execPath,[path.join(base,'scripts/build-dev.mjs'),'--preview-compact-ui='+preview],{cwd:base,stdio:'inherit'});
+const output=path.resolve(base,'../releases/dev/compact-preview');fs.mkdirSync(output,{recursive:true});
+const code=fs.readFileSync(preview,'utf8');
+if(!code.includes('// @updateURL    none')||!code.includes('/compact-preview'))throw Error('Preview isolation metadata missing');
+for(const platform of ['pda','tampermonkey'])fs.writeFileSync(path.join(output,'torn-utilities-compact-'+platform+'.user.js'),code);
+console.log('Built isolated PDA and Tampermonkey review packages (same universal bundle; automatic updates disabled).');

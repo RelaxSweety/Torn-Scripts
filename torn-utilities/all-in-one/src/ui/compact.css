@@ -1,0 +1,61 @@
+/* Shared compact headers. Existing DOM, controls, assets and window geometry stay intact. */
+#tu-pda-panel header{display:flex;align-items:center;gap:6px;padding:1px 6px;min-height:37.125px;flex-wrap:nowrap}
+#tu-pda-panel header>.tu-logo{order:0;flex:0 0 28px!important;width:28px!important;height:28px!important;min-width:28px!important;min-height:28px!important;max-width:28px!important;max-height:28px!important}
+#tu-pda-panel header>div{order:1;flex:1;min-width:0}
+#tu-pda-panel header h2{font-size:16.5px;line-height:1;margin:0}
+#tu-pda-panel header p{font-size:11px;line-height:1.05;margin:0!important;overflow-wrap:anywhere}
+#tu-pda-panel header .tu-player-identity{font-size:11px!important}
+#tu-pda-panel header>.tu-nav-control,#tu-pda-panel header>.tu-close{flex:0 0 24px;width:24px;height:24px;min-width:24px;min-height:24px;margin:0;padding:0;border-radius:4px;border:1px solid #806a3e;background:#252a2e;color:#f1ce72;font:18px/1 system-ui}
+#tu-pda-panel header>[aria-label=Back]{order:2;margin-left:auto}
+#tu-pda-panel header>[aria-label=Minimize]{order:3}
+#tu-pda-panel header>.tu-close{order:4}
+#tu-pda-panel .tu-card>div{min-width:0}
+#tu-pda-panel .tu-card strong{overflow-wrap:anywhere}
+#tu-pda-panel .tu-card button{flex-shrink:0;min-height:24px;font-size:11px}
+/* Standard form/button minima are reduced from 36/40 px, not game geometry. */
+#tu-pda-panel button,#tu-pda-module-host :is(button,input,select,textarea){font-size:inherit;font-family:inherit}
+:is(#tuim-panel,#tuim-menu)>button,:is(#tuim-panel,#tuim-menu) :is(section,.tuim-entry)>button{min-height:27px!important}
+:is(#tuim-travel-window,#tuim-data-window)>button{min-height:24px!important}
+:is(#tuim-panel,#tuim-menu) :is(input:not([type=checkbox]):not([type=radio]),select){min-height:30px}
+/* Existing module header types, including modules mounted without a named root. */
+:is(#tuim-panel,#tuim-menu,#tuim-catalog) .tuim-header,
+:is(#tuim-travel-window,#tuim-data-window) .tuim-travel-header,
+#tu-who-panel header.who-header,#tca-header,
+#tu-pda-module-host>:is(section,div)>div:has(>strong):has(>button[title^="Minimize"]),
+#tpfg-title,#tpfg-stick-fighter>div>div:has(>#sff-min){display:flex;align-items:center;gap:6px;min-height:28.5px!important;height:auto!important;padding:2px 0!important;margin-bottom:9px;flex-wrap:nowrap;box-sizing:border-box}
+:is(#tuim-panel,#tuim-menu,#tuim-catalog) .tuim-header{margin-top:0;top:0}
+:is(#tuim-travel-window,#tuim-data-window) .tuim-travel-header{top:0}
+:is(.tuim-header,.tuim-travel-header) :is(strong,h3),#tu-who-panel .who-heading{flex:1;min-width:0;font-size:13.5px!important;line-height:1.15!important;overflow-wrap:anywhere;margin:0!important}
+:is(.tuim-header,.tuim-travel-header) [data-tu-nav-controls]{flex:none;display:flex;align-items:center;gap:4.5px!important;margin-left:auto!important}
+:is(#tuim-panel,#tuim-menu,#tuim-catalog,#tuim-travel-window,#tuim-data-window) :is(.tuim-header,.tuim-travel-header) .tu-brand-emblem[data-tu-brand-emblem],#tu-who-panel header.who-header .who-logo{order:-1;flex:0 0 24px!important;width:24px!important;height:24px!important;min-width:24px!important;min-height:24px!important;max-width:24px!important;max-height:24px!important;object-fit:contain}
+:is(.tuim-header,.tuim-travel-header) [data-tu-nav-controls] button,#tu-who-panel header.who-header .who-icon,
+#tca-header button,#tu-pda-module-host>:is(section,div)>div:has(>strong)>button[title^="Minimize"],#tpfg-title button,#sff-min{flex:0 0 24px!important;width:24px!important;min-width:24px!important;max-width:none!important;height:24px!important;min-height:24px!important;padding:0!important;margin:0!important;font-size:16px!important;line-height:1!important}
+#tu-who-panel header.who-header{padding-inline:6.75px!important}
+#tca-header{padding-inline:6px!important}
+/* Already-short legacy headers stop at a 24 px control/readability floor. */
+#tu-pda-module-host>:is(section,div)>div:has(>strong):has(>button[title^="Minimize"]),#tca-header,#tpfg-title,#tpfg-stick-fighter>div>div:has(>#sff-min){min-height:24px!important;padding-block:0!important;margin-bottom:7.5px}
+/* Keyboard focus is kept visible at the smaller visual sizes. */
+:is(#tu-pda-panel,#tuim-menu,#tuim-panel,#tuim-travel-window,#tuim-data-window,#tu-who-panel,#tu-pda-module-host) :is(button,a,input,select):focus-visible{outline:2px solid #f1ce72;outline-offset:2px}
+/* Physical touch controls and readable inputs take priority over exact reduction.
+   Board/canvas geometry is deliberately excluded. */
+@media (pointer:coarse){
+ #tu-pda-panel header{min-height:47px;gap:4px}
+ #tu-pda-panel header>.tu-nav-control,#tu-pda-panel header>.tu-close{flex-basis:44px;width:44px;height:44px;min-width:44px;min-height:44px}
+ #tu-pda-panel :is(nav button,.tu-card button,.tu-content>button){min-height:44px}
+ :is(#tuim-panel,#tuim-menu,#tuim-travel-window,#tuim-data-window){font-size:12px}
+ :is(.tuim-header,.tuim-travel-header),#tu-who-panel header.who-header,#tca-header,#tpfg-title,#tpfg-stick-fighter>div>div:has(>#sff-min){min-height:48px!important}
+ :is(.tuim-header,.tuim-travel-header) [data-tu-nav-controls] button,#tu-who-panel header.who-header .who-icon,#tca-header button,#tpfg-title button,#sff-min,
+ #tu-pda-module-host>:is(section,div)>div:has(>strong)>button[title^="Minimize"]{flex-basis:44px!important;width:44px!important;height:44px!important;min-width:44px!important;min-height:44px!important}
+ :is(#tuim-panel,#tuim-menu)>button,:is(#tuim-panel,#tuim-menu) :is(section,.tuim-entry)>button{min-height:44px!important}
+ :is(#tu-pda-panel,#tuim-panel,#tuim-menu,#tuim-travel-window,#tuim-data-window,#tu-who-panel,#tca-panel,#tu-pda-module-host) :is(input:not([type=checkbox]):not([type=radio]),select){min-height:44px!important;font-size:16px}
+ :is(#tuim-panel,#tuim-menu) label:has(>input[type=checkbox]){min-height:44px}
+}
+@media(max-width:380px){
+ #tu-pda-panel header{column-gap:3px}
+ #tu-pda-panel header>.tu-logo{flex-basis:24px!important;width:24px!important;height:24px!important;min-width:24px!important;min-height:24px!important}
+ #tu-pda-panel .tu-card{flex-wrap:wrap}
+ #tu-pda-panel .tu-card>.tu-symbol{flex-shrink:0}
+ #tu-pda-panel .tu-card>.tu-status{margin-left:auto}
+}
+
+#tpfg-stick-fighter>div>div:has(>#sff-min){font-size:12px}

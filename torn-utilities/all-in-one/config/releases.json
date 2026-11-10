@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.88-dev",
+    "date": "2026-11-10",
+    "securityBundle": true,
+    "changes": {
+      "Improvements": [
+        "Compact Manager and integrated tool typography, spacing and headers",
+        "Keep window controls visible and usable on narrow screens"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.87-dev",
     "date": "2026-11-10",
     "securityBundle": true,
