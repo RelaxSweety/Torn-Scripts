@@ -16,6 +16,10 @@ Implemented a shared TU client request budget across keys, persistent suspension
 
 Validation: full DEV regression suite and targeted API governor tests passed. See [scope and limitations](../all-in-one/docs/API-REQUEST-GOVERNOR.md). This client safeguard does not control unrelated applications or replace server-side/IP-level management.
 
+## Completed next issue — client credential storage isolation (.84)
+
+Implemented verified userscript-private credential migration and storage, private-mode masked DOM handling, failure-safe migration and explicit PDA fallback. See [scope and remaining limits](../all-in-one/docs/CREDENTIAL-STORAGE.md). The active agreement remains unchanged. Before eventual agreement publication, review an amendment to the approved draft storage section to reflect these new modes; preserve the exact approved draft until then.
+
 ## Remaining audit work (not started in this change)
 
-Credential-storage isolation and operational key/log protection; current Torn scripting-rule/approval verification and the inherited Chat Archiver questions; backend-wide request/retention/access verification. Agreement UI/publication work stays queued under the explicit hold above.
+Operational backend key/log protection and remaining PDA/session/callable-API exposures; current Torn scripting-rule/approval verification and the inherited Chat Archiver questions; backend-wide request/retention/access verification. Agreement UI/publication work stays queued under the explicit hold above.

@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {JSDOM} from 'jsdom';
+import {createCredentialStore} from '../src/adapters/credential-store.js';
+const VAULT='tu:identity:public-only-key:v1',RING='tu:identity:saved-keys:v1',WHO='tu:who:limited-api-key:v1',EXTRAS='tu:api:additional-keys:v1',PRIVATE='tu:credentials:private:v1',A='aaaaaaaaaaaaaaaa',B='bbbbbbbbbbbbbbbb',C='cccccccccccccccc',D='dddddddddddddddd';
+const w=new JSDOM('',{url:'https://www.torn.com'}).window,gm=new Map([[VAULT,'GMV2_'+JSON.stringify(A)]]);
+const opts={window:w,handler:'Tampermonkey',getValue:(key,fallback)=>gm.has(key)?gm.get(key):fallback,setValue:(key,value)=>gm.set(key,value),deleteValue:key=>gm.delete(key)};
+try{
+ w.localStorage.setItem(VAULT,B);w.localStorage.setItem(RING,JSON.stringify([{key:C,level:'Limited Access',playerId:'42'}]));w.localStorage.setItem(WHO,D);w.localStorage.setItem(EXTRAS,JSON.stringify([{key:A}]));
+ const store=createCredentialStore(opts);assert.equal(store.mode,'userscript-private');assert.equal(store.get(VAULT),B);assert.equal(store.get(WHO),D);assert.deepEqual(new Set(JSON.parse(store.get(RING)).map(e=>e.key)),new Set([A,B,C,D]));for(const key of [VAULT,RING,WHO,EXTRAS])assert.equal(w.localStorage.getItem(key),null);assert.equal(gm.has(VAULT),false);assert.ok(gm.get(PRIVATE).includes(B));assert.ok(!JSON.stringify(Object.fromEntries(Object.entries(w.localStorage))).includes(B));
+ const revision=w.localStorage.getItem(store.revisionKey);store.set(RING,store.get(RING));assert.equal(w.localStorage.getItem(store.revisionKey),revision,'Metadata writes cannot trigger login-change ping-pong across tabs');store.set(VAULT,C);assert.notEqual(w.localStorage.getItem(store.revisionKey),revision);const restored=createCredentialStore(opts);assert.equal(restored.get(VAULT),C);restored.remove(VAULT);assert.equal(createCredentialStore(opts).get(VAULT),null,'Removed login cannot resurrect from legacy GM storage');assert.equal(restored.status().encrypted,false);
+ w.localStorage.setItem(VAULT,A);const before=w.localStorage.getItem(VAULT);const failure=createCredentialStore({...opts,getValue:(key,fallback)=>key===PRIVATE?null:fallback,setValue(){throw Error('Storage failed');}});assert.equal(failure.mode,'private-unavailable');assert.equal(w.localStorage.getItem(VAULT),before,'Failed private write never purges origin data');assert.throws(()=>failure.set(VAULT,B));assert.equal(w.localStorage.getItem(VAULT),A,'Failure never silently writes a new raw key to origin');
+ const pda=createCredentialStore({...opts,pda:true});assert.equal(pda.mode,'origin-local');pda.set(VAULT,B);assert.equal(w.localStorage.getItem(VAULT),B);assert.equal(pda.status().isolated,false);
+ const unsupported=createCredentialStore({...opts,handler:'Unknown'});assert.equal(unsupported.mode,'origin-local');
+}finally{w.close();}
+console.log('Credential store passed: verified private migration, legacy/role/ring preservation, reload/removal, no raw origin keys, failure safety and explicit PDA fallback');

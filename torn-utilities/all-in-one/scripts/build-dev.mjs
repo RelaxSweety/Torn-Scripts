@@ -1,3 +1,4 @@
+import {createCredentialStore} from '../src/adapters/credential-store.js';
 import {createTornApiGovernor} from '../src/adapters/torn-api-governor.js';
 import {integrateDirectItems} from './integrate-direct-items.mjs';
 import fs from 'node:fs';
@@ -23,7 +24,7 @@ const releases=JSON.parse(read('config/releases.json'));
 const version=releases[0].version;
 const logoData='data:image/webp;base64,'+fs.readFileSync(path.join(root,'torn-utilities/assets/tu-logo-128.webp')).toString('base64');
 let manager=read('src/manager/manager.user.js').replaceAll('__TU_LOGO_DATA_URL__',logoData);
-manager=manager.replace("  'use strict';","  'use strict';\nconst createTornApiGovernor="+createTornApiGovernor.toString()+";");
+manager=manager.replace("  'use strict';","  'use strict';\nconst createTornApiGovernor="+createTornApiGovernor.toString()+";\nconst createCredentialStore="+createCredentialStore.toString()+";");
 const registry=/const registry=\{schemaVersion:1,categories:(\[.*?\]),modules:\[.*?\]\};/;
 if(!registry.test(manager))throw Error('Manager tool directory missing');
 manager=manager.replace(registry,(_,categories)=>`const registry={schemaVersion:1,categories:${categories},modules:${JSON.stringify(tools.map(({source,...t})=>t))}};\nconst TU_RELEASES=${JSON.stringify(releases)};`);

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities DEV (All-in-One)
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.83-dev
+// @version      0.5.42.84-dev
 // @description  Integrated TU development bundle for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -42,7 +42,7 @@
   const rawManagerFetch=window.fetch.bind(window);
   const fetch=(input,options)=>apiGovernor.fetch(input,options,rawManagerFetch);
   const managerHttp=rawManagerHttp?details=>apiGovernor.request(details,rawManagerHttp):null;
-  const TU_VERSION='0.5.42.83-dev';
+  const TU_VERSION='0.5.42.84-dev';
   const TU_LOGO='__TU_LOGO_DATA_URL__';
   // Bundled tool directory: no external catalog, cache, or refresh requests.
   const registry={schemaVersion:1,categories:[{"id":"business","name":"Business Tools","icon":"▥","order":10},{"id":"games","name":"Games","icon":"♜","order":20},{"id":"single-player","name":"Single Player","icon":"▣","order":21,"parent":"games"},{"id":"multiplayer","name":"Multiplayer","icon":"♟","order":22,"parent":"games"},{"id":"chat","name":"Chat Tools","icon":"◉","order":30},{"id":"other","name":"War Tools","icon":"⚙","order":40}],modules:[{"id":"flight-game","name":"Flight Game","category":"single-player","version":"0.12.8","description":"Standalone Flight Game arcade module, playable anytime"},{"id":"stick-fighter","name":"Stick Fighter","category":"single-player","version":"0.2.7","description":"Standalone Stick Fighter arcade module, playable anytime"},{"id":"chat-archiver","name":"Chat Archiver","category":"chat","version":"0.1.8","description":"Archive Torn chat conversations"},{"id":"tic-tac-toe","name":"Tic-Tac-Toe","category":"multiplayer","version":"0.6.5","description":"Two-player Tic-Tac-Toe with named winners, green winning line, rematches and head-to-head history"},{"id":"torn-four","name":"Torn Four","category":"multiplayer","version":"0.2.5","description":"Connect Four: two-player multiplayer with private room codes"},{"id":"torn-fleet","name":"Torn Fleet","category":"multiplayer","version":"0.2.5","description":"Battleship: fleet placement and turn-based naval combat"},{"id":"torn-snake","name":"Slithering Streets","category":"single-player","version":"0.2.14","description":"Single-player Snake with touch controls and local high scores"},{"id":"chaos-marbles","name":"Chaos Marbles","category":"multiplayer","version":"0.2.5","description":"Online 2\u20134 player marble race with private player sessions, Waiting for Chaos staging, and game history"},{"id":"item-monitor","name":"Travel Assistant and Item Monitor","category":"business","version":"1.10.31-dev","description":"Item Monitor and Travel Assistant with D1 stock reporting, source diagnostics and stock estimation"},{"id":"war-hit-organizer","name":"War Organizer","category":"other","version":"0.3.17-dev","description":"Compact war target board, reservation controls, timer and local development settings"}]};
@@ -112,28 +112,30 @@
     }
     return pending.length;
   }
-  // Public Only key stored locally on this device; no passphrase or GM grants.
+  // Credentials use private userscript storage where the verified host supports it.
   const VAULT='tu:identity:public-only-key:v1',VAULT_CLEARED='tu:identity:login-cleared:v1';
   const LOGIN_ACCESS_KEY='tu:identity:login-access-level:v1';
   const AUTH_CACHE='tu:dev:authorization-cache:v1',IDENTITY_CACHE='tu:dev:identity-cache:v1',AGREEMENT_CACHE='tu:dev:agreement-content:v1';
   const AUTH_TTL=5*60*1000,IDENTITY_TTL=30*60*1000,AGREEMENT_TTL=24*60*60*1000;
+  const credentials=createCredentialStore({window,handler:typeof GM_info==='undefined'?'':GM_info.scriptHandler||'',pda:!!nativeBridge||typeof pageWindow.PDA_httpGet==='function',getValue:typeof GM_getValue==='function'?GM_getValue:null,setValue:typeof GM_setValue==='function'?GM_setValue:null,deleteValue:typeof GM_deleteValue==='function'?GM_deleteValue:null});
+  const readCredential=name=>{try{return credentials.get(name);}catch{return null;}};
   const readCache=key=>{try{return JSON.parse(sessionStorage.getItem(key)||'null')}catch{return null}};
   const fresh=(entry,ttl)=>entry&&Number.isFinite(entry.checkedAt)&&entry.checkedAt<=Date.now()&&Date.now()-entry.checkedAt<ttl;
   const clearAuthorizationCache=()=>{sessionStorage.removeItem(AUTH_CACHE);};
 
   const loginAccessLabel=()=>readStoredKeys().find(entry=>entry.key===readSavedKey())?.level||'Access level unverified';
   const normalizeKey=v=>{if(typeof v!=='string')return '';let x=v.trim();for(let i=0;i<3;i++){if(x.startsWith('GMV2_')){x=x.slice(5);continue;}if(x.startsWith('"')&&x.endsWith('"')){try{const y=JSON.parse(x);if(typeof y==='string'){x=y.trim();continue}}catch{}}break;}return /^[A-Za-z0-9]{16}$/.test(x)?x:'';};
-  const readSavedKey=()=>{let v='';try{v=localStorage.getItem(VAULT)||''}catch{}let key=normalizeKey(v);if(key){if(key!==v)try{localStorage.setItem(VAULT,key)}catch{}return key;}if(localStorage.getItem(VAULT_CLEARED)==='1')return '';try{key=normalizeKey(typeof GM_getValue==='function'?GM_getValue(VAULT,''):'');if(key){try{localStorage.setItem(VAULT,key)}catch{}return key}}catch{}return ''};
-  const saveKey=key=>{clearAuthorizationCache();sessionStorage.removeItem(IDENTITY_CACHE);localStorage.setItem(SAVED_KEYS,JSON.stringify(readStoredKeys()));let stored=false;try{localStorage.setItem(VAULT,key);stored=true}catch(_){}try{if(typeof GM_setValue==='function'){GM_setValue(VAULT,key);stored=true}}catch(_){}if(!stored)throw Error('No persistent key storage available');localStorage.removeItem(VAULT_CLEARED)};
-  const removeSavedKey=()=>{clearAuthorizationCache();sessionStorage.removeItem(IDENTITY_CACHE);localStorage.setItem(VAULT_CLEARED,'1');try{localStorage.removeItem(LOGIN_ACCESS_KEY)}catch(_){}try{localStorage.removeItem(VAULT)}catch(_){}try{if(typeof GM_deleteValue==='function')GM_deleteValue(VAULT);else if(typeof GM_setValue==='function')GM_setValue(VAULT,'')}catch(_){}};
+  const readSavedKey=()=>{let value='';try{value=readCredential(VAULT)||'';}catch{return '';}let key=normalizeKey(value);if(key)return key;if(credentials.mode!=='origin-local'||readCredential(VAULT_CLEARED)==='1')return '';try{return normalizeKey(typeof GM_getValue==='function'?GM_getValue(VAULT,''):'');}catch{return '';}};
+  const saveKey=key=>{clearAuthorizationCache();sessionStorage.removeItem(IDENTITY_CACHE);credentials.set(SAVED_KEYS,JSON.stringify(readStoredKeys()));credentials.set(VAULT,key);credentials.remove(VAULT_CLEARED);};
+  const removeSavedKey=()=>{clearAuthorizationCache();sessionStorage.removeItem(IDENTITY_CACHE);credentials.set(VAULT_CLEARED,'1');localStorage.setItem(VAULT_CLEARED,'1');localStorage.removeItem(LOGIN_ACCESS_KEY);credentials.remove(VAULT);if(credentials.mode==='origin-local')try{if(typeof GM_deleteValue==='function')GM_deleteValue(VAULT);else if(typeof GM_setValue==='function')GM_setValue(VAULT,'');}catch{}};
   const SAVED_KEYS='tu:identity:saved-keys:v1',WHO_KEY='tu:who:limited-api-key:v1',EXTRA_KEYS='tu:api:additional-keys:v1';
-  const readExtras=()=>{try{const list=JSON.parse(localStorage.getItem(EXTRA_KEYS)||'[]');return Array.isArray(list)?list.filter(x=>normalizeKey(x?.key)):[]}catch{return []}};
+  const readExtras=()=>{try{const list=JSON.parse(readCredential(EXTRA_KEYS)||'[]');return Array.isArray(list)?list.filter(x=>normalizeKey(x?.key)):[]}catch{return []}};
   function readStoredKeys(){
-    let records=[];try{const data=JSON.parse(localStorage.getItem(SAVED_KEYS)||'[]');if(Array.isArray(data))records=data}catch{}
+    let records=[];try{const data=JSON.parse(readCredential(SAVED_KEYS)||'[]');if(Array.isArray(data))records=data}catch{}
     const keys=new Map();
     for(const entry of records){const key=normalizeKey(entry?.key);if(key&&!keys.has(key))keys.set(key,{key,level:['Public Only','Limited Access'].includes(entry.level)?entry.level:null,playerId:/^[1-9][0-9]*$/.test(String(entry.playerId||''))?String(entry.playerId):null,verifiedAt:typeof entry.verifiedAt==='string'?entry.verifiedAt:null});}
     // Recover every legacy key without treating stale role labels as verified access.
-    for(const value of [readSavedKey(),localStorage.getItem(WHO_KEY),...readExtras().map(e=>e.key)]){const key=normalizeKey(value);if(key&&!keys.has(key))keys.set(key,{key,level:null,playerId:null,verifiedAt:null});}
+    for(const value of [readSavedKey(),readCredential(WHO_KEY),...readExtras().map(e=>e.key)]){const key=normalizeKey(value);if(key&&!keys.has(key))keys.set(key,{key,level:null,playerId:null,verifiedAt:null});}
     return [...keys.values()];
   }
   function rememberVerifiedKey(key,level,playerId){
@@ -142,15 +144,15 @@
     const previous=entries.findIndex(e=>e.key===key);
     Object.assign(entry,{level,playerId:/^[1-9][0-9]*$/.test(String(playerId||''))?String(playerId):entry.playerId||null,verifiedAt:new Date().toISOString()});
     if(previous<0)entries.push(entry);else entries[previous]=entry;
-    localStorage.setItem(SAVED_KEYS,JSON.stringify(entries));
+    credentials.set(SAVED_KEYS,JSON.stringify(entries));
     return entry;
   }
   function forgetStoredKey(key){
     const remaining=readStoredKeys().filter(e=>e.key!==key);
     if(readSavedKey()===key)removeSavedKey();
-    if(normalizeKey(localStorage.getItem(WHO_KEY))===key)localStorage.removeItem(WHO_KEY);
-    localStorage.setItem(EXTRA_KEYS,JSON.stringify(readExtras().filter(e=>normalizeKey(e.key)!==key)));
-    localStorage.setItem(SAVED_KEYS,JSON.stringify(remaining));
+    if(normalizeKey(readCredential(WHO_KEY))===key)credentials.remove(WHO_KEY);
+    credentials.set(EXTRA_KEYS,JSON.stringify(readExtras().filter(e=>normalizeKey(e.key)!==key)));
+    credentials.set(SAVED_KEYS,JSON.stringify(remaining));
   }
   function checkedKeyInfo(data){
     if(data?.error)throw Error('Torn rejected key');
@@ -200,7 +202,7 @@
         const checked=checkedKeyInfo(data);rememberVerifiedKey(key,checked.level,checked.playerId);
         if(key===readSavedKey())localStorage.setItem(LOGIN_ACCESS_KEY,checked.level==='Limited Access'?'limited':'public');
         playerInfo={id:String(id),name:null,factionId:Number.isSafeInteger(faction)&&faction>0?faction:null,factionName:null,profileUrl:'https://www.torn.com/profiles.php?XID='+id,updatedAt:Date.now()};
-        const warKey=readStoredKeys().find(entry=>entry.key===normalizeKey(localStorage.getItem(WHO_KEY)));if(warKey?.playerId&&warKey.playerId!==String(id))localStorage.removeItem(WHO_KEY);
+        const warKey=readStoredKeys().find(entry=>entry.key===normalizeKey(readCredential(WHO_KEY)));if(warKey?.playerId&&warKey.playerId!==String(id))credentials.remove(WHO_KEY);
         cacheIdentity();identityStatus='Verified by Torn API';pageWindow.dispatchEvent(new CustomEvent('tu-player-updated',{detail:{...playerInfo}}));void enrichIdentity(key,generation);return true;
       }catch(e){if(generation===authGeneration){playerInfo=null;identityStatus='Verification failed: '+e.message;}return false;}
       finally{identityBusy=null;}
@@ -279,7 +281,7 @@
     async requestWhoTorn(path){
       if(!await ensureAuthorization())throw Error('TU Manager authentication required');
       if(typeof path!=='string'||!(/^(?:\/v2\/faction(?:\/|\?|$)|\/v2\/user\/[0-9]+\/profile(?:\?|$))/.test(path)))throw Error('Unsupported WHO API path');
-      const key=normalizeKey(localStorage.getItem('tu:who:limited-api-key:v1')||'')||(localStorage.getItem(LOGIN_ACCESS_KEY)==='limited'?readSavedKey():'');
+      const key=normalizeKey(readCredential('tu:who:limited-api-key:v1')||'')||(localStorage.getItem(LOGIN_ACCESS_KEY)==='limited'?readSavedKey():'');
       const keyEntry=readStoredKeys().find(entry=>entry.key===key);
       if(!key||keyEntry?.level!=='Limited Access'||!playerInfo?.id||keyEntry.playerId!==playerInfo.id)throw Error('Recheck and select a Limited Access key for the current TU player in Settings > API Keys');
       const url='https://api.torn.com'+path;
@@ -598,7 +600,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.83-dev</span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.84-dev</span></footer>';
   document.body.appendChild(panel);
   const headerBrand=panel.querySelector('.tu-logo');if(headerBrand){headerBrand.textContent='';headerBrand.classList.add('tu-brand-emblem');headerBrand.setAttribute('role','img');headerBrand.setAttribute('aria-label','Torn Utilities');}
   const identityLine=document.createElement('p');
@@ -671,7 +673,7 @@
     const dialog=document.createElement('section');dialog.style.cssText='background:#182026;color:#eee;border:2px solid #cba953;border-radius:12px;width:min(96vw,580px);max-height:calc(100dvh - 110px);height:min(780px,calc(100dvh - 110px));display:flex;flex-direction:column;overflow:hidden;padding:0;font:14px/1.5 system-ui;box-sizing:border-box;min-height:0';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');
     const h=document.createElement('h2');h.textContent='TU Terms and Information Use Agreement';h.style.cssText='display:block;position:static;margin:0 0 18px;padding:0;color:#f3f6f8;font:700 21px/1.35 system-ui';dialog.append(h);appendTerms(dialog);
     const keyInfo=document.createElement('p');keyInfo.textContent='Torn Public Only or Limited Access API key: enter your key below to verify identity and accept the current published agreement. Never enter a Full Access key.';dialog.append(keyInfo);
-    const key=document.createElement('input');key.type='password';key.autocomplete='off';key.maxLength=16;if(typeof selectedKey==='string')key.value=selectedKey;key.placeholder=readSavedKey()?'API key already saved':'16-character Public Only or Limited Access key';key.style.cssText='flex:1;min-width:0;box-sizing:border-box;padding:10px';const keyRow=document.createElement('div');keyRow.style.cssText='display:flex;align-items:center;gap:8px;width:100%';const revealKey=makeButton('Show',()=>{const visible=key.type==='text';key.type=visible?'password':'text';revealKey.textContent=visible?'Show':'Hide';revealKey.setAttribute('aria-pressed',String(!visible));});revealKey.type='button';revealKey.setAttribute('aria-label','Show or hide agreement API key');revealKey.setAttribute('aria-pressed','false');keyRow.append(key,revealKey);dialog.append(keyRow);
+    const key=document.createElement('input');key.type='password';key.autocomplete='off';key.maxLength=16;if(typeof selectedKey==='string'&&credentials.mode!=='userscript-private')key.value=selectedKey;key.placeholder=readSavedKey()?'API key already saved':'16-character Public Only or Limited Access key';key.style.cssText='flex:1;min-width:0;box-sizing:border-box;padding:10px';const keyRow=document.createElement('div');keyRow.style.cssText='display:flex;align-items:center;gap:8px;width:100%';const revealKey=makeButton('Show',()=>{const visible=key.type==='text';key.type=visible?'password':'text';revealKey.textContent=visible?'Show':'Hide';revealKey.setAttribute('aria-pressed',String(!visible));});revealKey.type='button';revealKey.setAttribute('aria-label','Show or hide agreement API key');revealKey.setAttribute('aria-pressed','false');keyRow.append(key,revealKey);dialog.append(keyRow);
     const checkLabel=document.createElement('label');checkLabel.style.cssText='display:flex;gap:10px;margin:15px 0';const check=document.createElement('input');check.type='checkbox';checkLabel.append(check,document.createTextNode('I have reviewed and agree to the Terms of Use and Information Use Agreement.'));dialog.append(checkLabel);
     const status=document.createElement('p');status.setAttribute('role','status');dialog.append(status);
     const buttons=document.createElement('div');buttons.style.cssText='display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap';
@@ -680,7 +682,7 @@
       if(!check.checked)return;
       if(!currentDevAgreement){status.textContent='Current agreement has not loaded. Please wait or reopen the agreement.';return;}
       const supplied=key.value.trim();if(supplied&&!/^[a-zA-Z0-9]{16}$/.test(supplied)){status.textContent='Enter a valid 16-character Public Only or Limited Access key';return;}
-      const selected=supplied||readSavedKey();if(!/^[A-Za-z0-9]{16}$/.test(selected)){status.textContent='A 16-character Public Only or Limited Access key is required';return;}accept.disabled=true;try{status.textContent='Registering and recording development agreement…';const accepted=await devAccept(selected,scriptPlatform());if(supplied)saveKey(supplied);rememberAuthorization(accepted);await updatePlayer(selected);}catch(error){status.textContent='Development agreement failed: '+(error.message==='Torn verification failed'?'Torn could not verify this key. Registration requires a valid Public Only or Limited Access key; Full Access and invalid keys are not supported.':error.message);accept.disabled=false;return;}
+      const selected=supplied||normalizeKey(selectedKey)||readSavedKey();if(!/^[A-Za-z0-9]{16}$/.test(selected)){status.textContent='A 16-character Public Only or Limited Access key is required';return;}accept.disabled=true;try{status.textContent='Registering and recording development agreement…';const accepted=await devAccept(selected,scriptPlatform());if(supplied)saveKey(supplied);rememberAuthorization(accepted);await updatePlayer(selected);}catch(error){status.textContent='Development agreement failed: '+(error.message==='Torn verification failed'?'Torn could not verify this key. Registration requires a valid Public Only or Limited Access key; Full Access and invalid keys are not supported.':error.message);accept.disabled=false;return;}
       localStorage.setItem(TU_TERMS_KEY,TU_TERMS_VERSION);publishAuthorization(true);overlay.remove();render('modules');
     });
     buttons.append(decline,accept);dialog.append(buttons);overlay.append(dialog);document.body.append(overlay);observeTUWindows();
@@ -729,6 +731,7 @@
     currentTab=tab;
     panel.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===tab)));
     content.replaceChildren();
+    if(credentials.mode==='private-unavailable'){const warning=document.createElement('p');warning.setAttribute('role','alert');warning.textContent=credentials.status().error;warning.style.cssText='padding:12px;border:2px solid #ec8585;color:#ec8585';content.append(warning);}
     if(tab==='modules'){
       if(viewModule){
         const m=registry.modules.find(x=>x.id===viewModule);
@@ -815,7 +818,7 @@
       return;
       }
       if(settingsPage==='api'){
-        const note=document.createElement('p');note.textContent='Save Public Only or Limited Access keys individually. Adding a key preserves the current TU login. Use a saved key explicitly to switch login or select the Limited key for War Organizer. Keys are stored locally without encryption; keep them private.';content.append(note);
+        const note=document.createElement('p');note.textContent='Save Public Only or Limited Access keys individually. Adding a key preserves the current TU login. Use a saved key explicitly to switch login or select the Limited key for War Organizer. '+(credentials.mode==='userscript-private'?'Saved keys use userscript-manager storage and are removed from Torn-origin credential storage. This is storage isolation, not encryption. Revealing a full key places it in the page input where page scripts may read it.':credentials.mode==='private-unavailable'?credentials.status().error:'This environment uses unencrypted Torn-origin storage. Other scripts on Torn may be able to read saved keys.');content.append(note);
         const form=document.createElement('form');form.autocomplete='off';
         const input=document.createElement('input');input.type='password';input.maxLength=16;input.autocomplete='off';input.placeholder='16-character Torn API key';input.style.cssText='width:100%;box-sizing:border-box;padding:9px';
         const status=document.createElement('p');status.setAttribute('role','status');status.textContent=identityStatus;
@@ -843,14 +846,14 @@
           const summary=document.createElement('p');summary.textContent=keys.length+' saved API key(s)';savedKeys.append(summary);if(!viewing)return;
           for(const [index,entry] of keys.entries()){
             const row=document.createElement('div');row.dataset.tuKeyEntry=String(index);row.style.cssText='padding:9px 0;border-top:1px solid #555';
-            const roles=[entry.key===readSavedKey()?'TU login':null,entry.key===normalizeKey(localStorage.getItem(WHO_KEY))?'War Organizer':null].filter(Boolean);
+            const roles=[entry.key===readSavedKey()?'TU login':null,entry.key===normalizeKey(readCredential(WHO_KEY))?'War Organizer':null].filter(Boolean);
             const label=document.createElement('strong');label.textContent=(entry.level||'Access level unverified')+(roles.length?' ('+roles.join(', ')+')':'');row.append(label);
             const owner=document.createElement('small');owner.textContent=entry.playerId?' · Player '+entry.playerId:' · Recheck legacy key to verify its access level';row.append(owner);
-            const field=document.createElement('input');field.type='password';field.readOnly=true;field.value=entry.key;field.style.cssText='display:block;width:100%;box-sizing:border-box;padding:8px;margin:6px 0';row.append(field);
-            row.append(makeButton('Show / Hide',()=>{field.type=field.type==='password'?'text':'password'}));
+            const field=document.createElement('input');field.type='password';field.readOnly=true;field.value=credentials.mode==='userscript-private'?'':entry.key;field.placeholder='Key ending in '+entry.key.slice(-4);field.style.cssText='display:block;width:100%;box-sizing:border-box;padding:8px;margin:6px 0';row.append(field);
+            row.append(makeButton('Show / Hide',event=>{if(credentials.mode==='userscript-private'){if(!event?.isTrusted)return;const reveal=field.type==='password';field.value=reveal?entry.key:'';field.type=reveal?'text':'password';}else field.type=field.type==='password'?'text':'password';}));
             row.append(makeButton('Recheck access level',guarded(async()=>{try{await verifyEntry(entry.key);status.textContent='Saved key access level verified by Torn';renderSaved();}catch{status.textContent='Key could not be verified. It remains saved until you remove it.'}})));
             if(entry.key!==readSavedKey())row.append(makeButton('Use for TU login',guarded(()=>useForLogin(entry.key))));
-            if(entry.level==='Limited Access'&&entry.key!==normalizeKey(localStorage.getItem(WHO_KEY)))row.append(makeButton('Use for War Organizer',guarded(async()=>{try{const checked=await verifyEntry(entry.key);if(checked.level!=='Limited Access'||checked.playerId!==getPlayer()?.id)throw Error('Use a Limited key belonging to the current TU player');localStorage.setItem(WHO_KEY,entry.key);status.textContent='Limited key selected for War Organizer';renderSaved();}catch{status.textContent='Select a valid Limited key belonging to the current TU player.'}})));
+            if(entry.level==='Limited Access'&&entry.key!==normalizeKey(readCredential(WHO_KEY)))row.append(makeButton('Use for War Organizer',guarded(async()=>{try{const checked=await verifyEntry(entry.key);if(checked.level!=='Limited Access'||checked.playerId!==getPlayer()?.id)throw Error('Use a Limited key belonging to the current TU player');credentials.set(WHO_KEY,entry.key);status.textContent='Limited key selected for War Organizer';renderSaved();}catch{status.textContent='Select a valid Limited key belonging to the current TU player.'}})));
             row.append(makeButton('Remove',guarded(async()=>{
               if(!confirm('Remove only this saved API key? Other saved keys will be retained.'))return;
               const activeKey=entry.key===readSavedKey();
@@ -954,9 +957,9 @@
   document.addEventListener('visibilitychange',resumeAuthorization);
   window.addEventListener('pageshow',resumeAuthorization);
   window.addEventListener('storage',event=>{
-    if(![VAULT,TU_TERMS_KEY,VAULT_CLEARED].includes(event.key))return;
+    if(![VAULT,TU_TERMS_KEY,VAULT_CLEARED,credentials.revisionKey].includes(event.key))return;
     clearAuthorizationCache();
-    if(event.key===VAULT||event.key===VAULT_CLEARED){sessionStorage.removeItem(IDENTITY_CACHE);sessionStorage.removeItem(DEV_SESSION_KEY);automaticIdentityAttempted=false;}
+    if(event.key===VAULT||event.key===VAULT_CLEARED||event.key===credentials.revisionKey){sessionStorage.removeItem(IDENTITY_CACHE);sessionStorage.removeItem(DEV_SESSION_KEY);automaticIdentityAttempted=false;}
     if(!readSavedKey()||!localStorage.getItem(TU_TERMS_KEY))publishAuthorization(false);
     else void restoreDevSession({force:true});
   });
