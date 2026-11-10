@@ -24,6 +24,12 @@ Implemented verified userscript-private credential migration and storage, privat
 
 Worker source now bounds registration body reads, validates exact 16-character keys, separates Torn rate limits/outages from rejected credentials, and excludes arbitrary exception text from public errors and application failure logs. Regression fixtures verify header-only keys and hashed session-token database writes. See [backend scope and validation](../all-in-one/docs/BACKEND-CREDENTIAL-SAFETY.md). These changes are not deployed; the live backend and operational logging/access/retention settings remain unverified. No client release or agreement change is included.
 
+## Prepared next issue — shared backend registration budget (deployment held)
+
+Added a Durable Object reservation budget before registration contacts Torn: at most 500 registrations globally, 10 per key and 20 per client IP in a rolling 70-second window, reserving two Torn reads per registration. Missing/unavailable limiter fails closed. Only SHA-256 key/IP fingerprints enter short-lived limiter state; expiry alarms prune them. Unit fixtures cover concurrent limits, restarts, rolling expiry, unavailable/denied limiter behavior and unauthenticated private-route rejection. See [deployment requirements and limits](../all-in-one/docs/BACKEND-REGISTRATION-BUDGET.md).
+
+The DEV Worker binding/migration is prepared only. Verify existing remote migration history and runtime behavior before an authorized deployment. No deployment, active agreement change, or client release is included.
+
 ## Remaining audit work
 
 Operational backend key/log protection and remaining PDA/session/callable-API exposures; current Torn scripting-rule/approval verification and the inherited Chat Archiver questions; backend-wide request/retention/access verification. Agreement UI/publication work stays queued under the explicit hold above.

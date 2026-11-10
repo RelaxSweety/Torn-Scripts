@@ -29,6 +29,10 @@
       {
         "name": "MARBLES",
         "class_name": "MarbleRoom"
+      },
+      {
+        "name": "REGISTRATION_BUDGET",
+        "class_name": "RegistrationBudget"
       }
     ]
   },
@@ -36,5 +40,13 @@
     "crons": [
       "* * * * *"
     ]
-  }
+  },
+  "migrations": [
+    {
+      "tag": "registration-budget-v1",
+      "new_sqlite_classes": [
+        "RegistrationBudget"
+      ]
+    }
+  ]
 }

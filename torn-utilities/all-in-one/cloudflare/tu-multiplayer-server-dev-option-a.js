@@ -1,3 +1,4 @@
+import { RegistrationBudget } from './registration-budget.js';
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
@@ -143,6 +144,21 @@ async function handleAuth(req, env, url) {
     body.api_key = body.api_key.trim();
     if (!/^[A-Za-z0-9]{16}$/.test(body.api_key)) return respond({ error: "Invalid registration request: API key must contain exactly 16 letters or digits" }, 400);
     if(body.requested_access!==undefined&&!['public','limited'].includes(body.requested_access))return respond({error:'Unsupported requested access'},400);
+    // No unbudgeted fallback: a missing/unavailable binding must not contact Torn.
+    try {
+      if (!env.REGISTRATION_BUDGET) throw Error('Missing registration budget');
+      const stub = env.REGISTRATION_BUDGET.get(env.REGISTRATION_BUDGET.idFromName('registration-global-v1'));
+      const reservation = await stub.fetch(new Request('https://budget.internal/reserve', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ keyHash: await digest('key:' + body.api_key), ipHash: await digest('ip:' + (req.headers.get('cf-connecting-ip') || 'unknown')) })
+      }));
+      if (reservation.status === 429) {
+        const response = respond({ error: 'Registration rate-limited; try again later', code: 'REGISTRATION_RATE_LIMIT', retry_after_seconds: 70 }, 429);
+        response.headers.set('retry-after', '70');
+        return response;
+      }
+      if (!reservation.ok || (await reservation.json()).allowed !== true) throw Error('Registration budget unavailable');
+    } catch { return respond({ error: 'Registration temporarily unavailable', code: 'REGISTRATION_BUDGET_UNAVAILABLE' }, 503); }
     let identity;
     try{const verificationKey=body.api_key;delete body.api_key;identity=await tornIdentity(verificationKey);}
     catch(error){
@@ -946,6 +962,7 @@ var index_default = { async scheduled(event, env, ctx) {
   try{return await routeWorkerRequest(req,env);}catch{console.warn('TU_REQUEST_FAILED');return respond({error:'Service unavailable',code:'INTERNAL_ERROR'},503);}
 } };
 export {
+  RegistrationBudget,
   ArcadeRoom,
   GameRoom,
   MarbleRoom,
