@@ -1,6 +1,6 @@
 # TU change implementation checklist
 
-**Current DEV client release:** 0.5.42.85-dev. **Agreement:** active 1.2; revised 1.3 approved and held. This checklist retains the earlier preparation and rollout plan; its historical deployment assumptions are not evidence of live service state.
+**Current DEV client release:** 0.5.42.86-dev. **Agreement:** 1.3 / number 4, published from the approved revision. This checklist retains the earlier preparation and rollout plan; historical deployment assumptions are not evidence of live service state.
 
 A checked box means the stated preparation or test is complete. It does not mean a prepared change is live. This checklist uses the Torn rules/API text already pasted into the conversation; no repeat submission is required.
 
@@ -46,25 +46,25 @@ These require the actual Cloudflare account/configuration; local tests cannot es
 - [ ] Verify outbound/IP-wide API usage coordination and account-wide usage with other tools. TU's own budgets do not control unrelated apps or prove Cloudflare egress isolation.
 - [ ] Validate supported real PDA/userscript-manager versions, private-storage behavior and reload/session recovery. Device tests must identify the installed build before assessing a diagnostic report.
 
-## 4. Agreement hold — separate authorization required
+## 4. Agreement publication
 
-**Do not perform these while the existing hold remains.** The user explicitly approved the draft and instructed that it not yet be implemented; that approval is preserved.
-
-- [ ] Review the [separate storage amendment](AGREEMENT-STORAGE-AMENDMENT-REVIEW.md) covering private storage, PDA fallback, session records and authenticated reporting; do not silently rewrite the approved file.
-- [ ] Confirm the private support contact and applicable YATA/source-data terms. Establish actual provider/retention facts for the disclosure.
-- [ ] When implementation is authorized, confirm an available agreement number/effective date and mount the table visibly at every key-entry surface. Test decline, accept, cancellation, reacceptance, version changes and all optional-reporting defaults.
-- [ ] Publish the agreement only when authorized and ready. Updating the active manifest can synchronize the Worker registry; it is not a harmless bookkeeping change.
+- [x] Publish the approved revised agreement as 1.3 / number 4 after explicit implementation authorization.
+- [x] Preserve the approved review copies and archive the earlier agreement text.
+- [x] Display the disclosure tables at agreement and saved-key entry, with wrapped text and safe links.
+- [x] Block acceptance until the document has rendered and explicit consent is provided; record acceptance on the service.
+- [x] Test old-version rejection, loading/decline, idempotent acceptance, cancellation and immutable history.
+- [x] Verify mobile and desktop layouts without horizontal overflow.
 
 ## 5. Ordered DEV rollout
 
 The client and Worker must be coordinated. Deploying authenticated stock writes while .84 users still report anonymously will reject their uploads.
 
-1. [ ] Complete the operational/compatibility gates and resolve the agreement/disclosure release decision under the explicit hold. Retain exact evidence for any scripting approval relied on; use [the review brief](SCRIPTING-REVIEW-BRIEF.md) for unsettled behavior, especially Chat Archiver. No staff message has been sent.
+1. [ ] Complete the operational/compatibility gates and resolve the agreement/disclosure release decision for this publication. Retain exact evidence for any scripting approval relied on; use [the review brief](SCRIPTING-REVIEW-BRIEF.md) for unsettled behavior, especially Chat Archiver. No staff message has been sent.
 2. [ ] Approve a DEV-only release/deployment window and capture current Worker/client versions, configuration and recoverable database backups.
 3. [ ] Promote the tested client integration: add the next release entry with `securityBundle: true`, update Manager metadata/TU_VERSION, build standard client and TU Test artifacts, run the full suite and review the diff. Do not overwrite immutable .84 files.
 4. [ ] Publish the versioned client and rolling DEV files. Verify the raw GitHub metadata and PDA update path show the intended new version; have testers reload and verify their installed build.
 5. [ ] Confirm reporting requests include the TU bearer header and queues drain against the intended server. Do not drop pending batches simply to clear an error.
-6. [ ] Apply only the reviewed DEV Worker binding/migration changes and deploy the prepared Worker after client compatibility is established. Production and the agreement are not included unless separately authorized.
+6. [ ] Apply only the reviewed DEV Worker binding/migration changes and deploy the prepared Worker after client compatibility is established. Production is not included.
 7. [ ] Smoke-test registration, expired/revoked sessions, module/admin denials, rate limits/Retry-After, reporting receipts, both inventory states, hospital/heal/destruction/purchase/departure steps, alarms, diagnostics and cancellation/reload on supported devices. Perform real consumptive actions only as intentionally chosen by the tester.
 8. [ ] Recreate legacy Arcade/Marble rooms lacking verified seat IDs. Test valid/invalid room ownership and concurrent joins. Explain that separately installed scripts cannot use the candidate's removed privileged page API.
 9. [ ] Confirm no regression in purchase quantity, cash/stock caps, freed slots, partial-purchase choice or informational auto-advancement. Check diagnostic installed-build and evidence-build fields match the actual run.
@@ -82,4 +82,4 @@ The client and Worker must be coordinated. Deploying authenticated stock writes 
 
 The pasted API rules require truthful disclosure, protected keys/data, minimal reads, limits and compliance with separate scripting rules. POST is still an action: it is not a compliance exemption. The user-reported Quick Items approval does not, by itself, certify all TU behaviors. The separate [rules assessment](TORN-RULES-ASSESSMENT.md) records those distinctions without requiring the rules to be pasted again.
 
-PDA origin storage, typed/revealed DOM values, potentially retained manager backups/orphaned session records, provider/operator controls and truth of user-submitted stock remain explicit limitations. The code does not claim to eliminate them. No live deployment, agreement change, automatic message sending or production action was performed in this preparation batch.
+PDA origin storage, typed/revealed DOM values, potentially retained manager backups/orphaned session records, provider/operator controls and truth of user-submitted stock remain explicit limitations. The code does not claim to eliminate them. Agreement publication is recorded above. No automatic message sending or production action is part of it.

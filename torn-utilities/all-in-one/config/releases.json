@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.86-dev",
+    "date": "2026-11-09",
+    "securityBundle": true,
+    "changes": {
+      "Improvements": [
+        "Update the user agreement and data-use disclosures",
+        "Improve text wrapping, tables and links in agreement and API-key screens"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.85-dev",
     "date": "2026-11-09",
     "securityBundle": true,

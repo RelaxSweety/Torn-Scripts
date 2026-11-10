@@ -1,16 +1,10 @@
-// Prepared disclosure component. Not mounted until the agreement implementation hold is lifted.
-export function createApiDisclosure({document,storageMode='origin-local'}) {
- const privateStorage=storageMode==='userscript-private';
- const storage=privateStorage?'Unencrypted userscript-manager storage until removed; platform backups may retain copies.':'Unencrypted Torn-origin browser storage until removed; same-origin scripts may read it.';
- const rows=[
-  ['TU verification and access','Identity, permissions, agreement events, session/audit records: no automatic remote deletion period specified.','Torn, TU operators and Cloudflare.','Account verification, access control, agreement records and abuse investigation.',storage+' Selected key is sent to TU over HTTPS, then to Torn; raw keys are not written to TU application database bindings. Operational provider logs require separate verification.','Public Only or Limited Access; key/info and user/basic.'],
-  ['Travel, inventory and War Organizer reads','Settings and caches in the browser until cleared/replaced.','You and Torn; separate sharing requires its disclosed recipients.','Gameplay planning and competitive information: travel, stock monitoring, player/faction information.',storage+' Selected feature key is sent to Torn for enabled reads.','Public profile/catalog; verified Limited Access for private travel/inventory/cooldown and selected faction/player reads.'],
-  ['Optional stock reporting and feedback','Bounded local queue/history; remote records have no specified automatic deletion period. Limiter fingerprints expire from active counters after 60 seconds; deletion depends on alarm execution.','TU operators, Cloudflare; submitted stock observations and derived information can be public.','Community stock history, restock estimates and travel planning; gameplay information and competitive advantage.','No raw API key in stock payloads. The prepared authenticated client sends a TU session token to TU.','Visible-page observations require no Torn API read; TU access requires registration and agreement.'],
-  ['Multiplayer and diagnostics','Game/session records and locally exported reports; no remote game-record retention period specified.','Game participants and TU hosting/operators; exported diagnostics go only to recipients chosen by the user.','Gameplay, troubleshooting and development testing.','Do not include keys/session tokens in reports. Tokens are not API keys; store and protect them separately.','No additional Torn API access for the game actions themselves.']
- ];
- const section=document.createElement('section');section.setAttribute('aria-label','API key and data use disclosure');
- const title=document.createElement('h3');title.textContent='API key and data use';section.append(title);
- const table=document.createElement('table'),head=document.createElement('thead'),tr=document.createElement('tr');
- for(const label of ['Feature','Data storage','Data sharing','Purpose of use','Key storage and sharing','Required access/selections']){const cell=document.createElement('th');cell.scope='col';cell.textContent=label;tr.append(cell);}head.append(tr);table.append(head);
- const body=document.createElement('tbody');for(const row of rows){const line=document.createElement('tr');for(const value of row){const cell=document.createElement('td');cell.textContent=value;line.append(cell);}body.append(line);}table.append(body);section.append(table);return section;
+import {renderAgreementMarkdown} from './agreement-renderer.js';
+// Use the published disclosure wording, with an immediate storage-mode notice.
+export function createApiDisclosure({document,storageMode='origin-local',content}) {
+ const match=String(content||'').match(/^## 2\.[\s\S]*?(?=^## 3\.)/m);
+ if(!match||!match[0].includes('| Disclosure |'))throw Error('Agreement disclosure tables are unavailable');
+ const section=document.createElement('section');section.dataset.tuKeyDisclosure='true';section.setAttribute('aria-label','API key and data use disclosure');section.style.cssText='min-width:0;max-width:100%;overflow-wrap:anywhere;white-space:normal;';
+ const notice=document.createElement('p');notice.style.cssText='font:400 14px/1.6 system-ui;white-space:normal;overflow-wrap:anywhere;';
+ notice.textContent=storageMode==='userscript-private'?'This host uses unencrypted userscript-manager storage for saved credentials. Typing or revealing a key places it in the page input.':storageMode==='private-unavailable'?'Private credential storage is unavailable. TU will not silently fall back to origin storage.':'This host uses unencrypted Torn-origin storage. Other scripts on Torn may read saved keys or session credentials.';
+ section.append(notice,renderAgreementMarkdown({document,markdown:match[0]}));return section;
 }

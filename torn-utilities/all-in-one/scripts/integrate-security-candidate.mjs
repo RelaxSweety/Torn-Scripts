@@ -10,7 +10,7 @@ export function secureCandidateManager(source){
  source=source.replace("const devToken=()=>sessionStorage.getItem(DEV_SESSION_KEY)||'';","const devToken=()=>sessionTokens.get();");
  source=source.replaceAll('sessionStorage.removeItem(DEV_SESSION_KEY)','sessionTokens.clear()');
  source=source.replaceAll('sessionStorage.setItem(DEV_SESSION_KEY,registration.token)','sessionTokens.set(registration.token)').replaceAll('sessionStorage.setItem(DEV_SESSION_KEY,token)','sessionTokens.set(token)');
- source=source.replace('JSON.stringify({token,checkedAt:Date.now(),agreement:currentDevAgreement,accepted:true})','JSON.stringify({sessionMarker:sessionTokens.marker(),checkedAt:Date.now(),agreement:currentDevAgreement,accepted:true})');
+ source=source.replace('JSON.stringify({token,build:TU_VERSION,checkedAt:Date.now(),agreement:currentDevAgreement,accepted:true})','JSON.stringify({sessionMarker:sessionTokens.marker(),build:TU_VERSION,checkedAt:Date.now(),agreement:currentDevAgreement,accepted:true})');
  source=source.replace('cached.token===devToken()', 'cached.sessionMarker===sessionTokens.marker()');
  source=source.replace('cached?.token===devToken()', 'cached?.sessionMarker===sessionTokens.marker()').replace('JSON.stringify({token:devToken(),checkedAt:', 'JSON.stringify({sessionMarker:sessionTokens.marker(),checkedAt:').replace('...identity,token:registration.token', '...identity,sessionMarker:sessionTokens.marker()');
  const expose="  Object.defineProperty(pageWindow, 'TornUtilities', {value:api, configurable:false, writable:false});";

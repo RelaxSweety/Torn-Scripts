@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities DEV (All-in-One)
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.85-dev
+// @version      0.5.42.86-dev
 // @description  Integrated TU development bundle for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -42,7 +42,7 @@
   const rawManagerFetch=window.fetch.bind(window);
   const fetch=(input,options)=>apiGovernor.fetch(input,options,rawManagerFetch);
   const managerHttp=rawManagerHttp?details=>apiGovernor.request(details,rawManagerHttp):null;
-  const TU_VERSION='0.5.42.85-dev';
+  const TU_VERSION='0.5.42.86-dev';
   const TU_LOGO='__TU_LOGO_DATA_URL__';
   // Bundled tool directory: no external catalog, cache, or refresh requests.
   const registry={schemaVersion:1,categories:[{"id":"business","name":"Business Tools","icon":"▥","order":10},{"id":"games","name":"Games","icon":"♜","order":20},{"id":"single-player","name":"Single Player","icon":"▣","order":21,"parent":"games"},{"id":"multiplayer","name":"Multiplayer","icon":"♟","order":22,"parent":"games"},{"id":"chat","name":"Chat Tools","icon":"◉","order":30},{"id":"other","name":"War Tools","icon":"⚙","order":40}],modules:[{"id":"flight-game","name":"Flight Game","category":"single-player","version":"0.12.8","description":"Standalone Flight Game arcade module, playable anytime"},{"id":"stick-fighter","name":"Stick Fighter","category":"single-player","version":"0.2.7","description":"Standalone Stick Fighter arcade module, playable anytime"},{"id":"chat-archiver","name":"Chat Archiver","category":"chat","version":"0.1.8","description":"Archive Torn chat conversations"},{"id":"tic-tac-toe","name":"Tic-Tac-Toe","category":"multiplayer","version":"0.6.5","description":"Two-player Tic-Tac-Toe with named winners, green winning line, rematches and head-to-head history"},{"id":"torn-four","name":"Torn Four","category":"multiplayer","version":"0.2.5","description":"Connect Four: two-player multiplayer with private room codes"},{"id":"torn-fleet","name":"Torn Fleet","category":"multiplayer","version":"0.2.5","description":"Battleship: fleet placement and turn-based naval combat"},{"id":"torn-snake","name":"Slithering Streets","category":"single-player","version":"0.2.14","description":"Single-player Snake with touch controls and local high scores"},{"id":"chaos-marbles","name":"Chaos Marbles","category":"multiplayer","version":"0.2.5","description":"Online 2\u20134 player marble race with private player sessions, Waiting for Chaos staging, and game history"},{"id":"item-monitor","name":"Travel Assistant and Item Monitor","category":"business","version":"1.10.31-dev","description":"Item Monitor and Travel Assistant with D1 stock reporting, source diagnostics and stock estimation"},{"id":"war-hit-organizer","name":"War Organizer","category":"other","version":"0.3.17-dev","description":"Compact war target board, reservation controls, timer and local development settings"}]};
@@ -330,11 +330,11 @@
     applyAgreementMetadata(status.agreement);
     if(status.accepted!==true)throw Error('Current agreement requires acceptance');
     localStorage.setItem(TU_TERMS_KEY,TU_TERMS_VERSION);
-    sessionStorage.setItem(AUTH_CACHE,JSON.stringify({token,checkedAt:Date.now(),agreement:currentDevAgreement,accepted:true}));
+    sessionStorage.setItem(AUTH_CACHE,JSON.stringify({token,build:TU_VERSION,checkedAt:Date.now(),agreement:currentDevAgreement,accepted:true}));
   }
   function freshAuthorization(){
     const cached=readCache(AUTH_CACHE);
-    return fresh(cached,AUTH_TTL)&&cached.token===devToken()&&cached.accepted===true&&cached.agreement?.agreement_version===localStorage.getItem(TU_TERMS_KEY)?cached:null;
+    return fresh(cached,AUTH_TTL)&&cached.build===TU_VERSION&&cached.token===devToken()&&cached.accepted===true&&cached.agreement?.agreement_version===localStorage.getItem(TU_TERMS_KEY)?cached:null;
   }
   let agreementLoad=null;
   async function loadDevAgreement({force=false}={}){
@@ -600,7 +600,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.85-dev</span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.86-dev</span></footer>';
   document.body.appendChild(panel);
   const headerBrand=panel.querySelector('.tu-logo');if(headerBrand){headerBrand.textContent='';headerBrand.classList.add('tu-brand-emblem');headerBrand.setAttribute('role','img');headerBrand.setAttribute('aria-label','Torn Utilities');}
   const identityLine=document.createElement('p');
@@ -640,7 +640,7 @@
     const btn=makeButton('← '+back.label,back.action);btn.style.marginLeft='0';btn.style.flex='0 0 auto';bar.append(btn);
     const h=document.createElement('h3');h.textContent=label;h.style.cssText='margin:0;font-size:18px;min-width:0;overflow-wrap:anywhere';bar.append(h);content.append(bar);
   };
-  function appendTerms(target){
+  function appendTerms(target,{onReady=()=>{}}={}){
     const version=document.createElement('small');
     version.style.cssText='display:block;margin:0 0 20px;color:#c5d0d8;font:500 12px/1.5 system-ui';
     version.textContent='Loading current agreement…';target.append(version);
@@ -648,21 +648,8 @@
     const renderPublished=()=>{
       body.replaceChildren();
       version.textContent='Agreement version '+TU_TERMS_VERSION+' · Number '+currentDevAgreement.agreement_number+' · '+currentDevAgreement.agreement_date;
-      // Render only recognized Markdown headings and paragraphs using safe text nodes.
-      // Never assign published agreement content to innerHTML.
-      const sections=currentDevAgreementContent.replace(/\r\n?/g,'\n').split(/\n\s*\n/);
-      for(const block of sections){
-        const lines=block.split('\n');
-        for(const line of lines){
-          const heading=/^(#{1,3})\s+(.+)$/.exec(line);
-          const element=document.createElement(heading?(heading[1].length===1?'h2':'h3'):'p');
-          element.textContent=heading?heading[2]:line;
-          element.style.cssText=heading
-            ?'display:block!important;position:static!important;margin:18px 0 10px!important;padding:0!important;font:700 '+(heading[1].length===1?'19':'16')+'px/1.45 system-ui!important;color:#f3f6f8!important;white-space:normal!important;'
-            :'display:block!important;position:static!important;margin:0 0 12px!important;padding:0!important;font:400 14px/1.65 system-ui!important;color:#e3e8ec!important;white-space:normal!important;overflow-wrap:anywhere!important;';
-          body.append(element);
-        }
-      }
+      body.append(renderAgreementMarkdown({document,markdown:currentDevAgreementContent}));
+      onReady({...currentDevAgreement,content:currentDevAgreementContent});
     };
     loadDevAgreement().then(renderPublished).catch(error=>{version.textContent='Agreement unavailable';body.textContent='Unable to load current terms: '+error.message+'. Retry by reopening the agreement.';});
   }
@@ -671,20 +658,23 @@
     const existing=document.getElementById('tu-agreement-overlay');if(existing){if(typeof selectedKey==='string'){const field=existing.querySelector('input[type=password],input[type=text]');if(field)field.value=selectedKey;}existing.hidden=false;existing.style.display='flex';tuNav.minimized=false;tuNav.exited=false;launcher.hidden=true;return;}
     const overlay=document.createElement('div');overlay.id='tu-agreement-overlay';overlay.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#000d;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;overflow:hidden';
     const dialog=document.createElement('section');dialog.style.cssText='background:#182026;color:#eee;border:2px solid #cba953;border-radius:12px;width:min(96vw,580px);max-height:calc(100dvh - 110px);height:min(780px,calc(100dvh - 110px));display:flex;flex-direction:column;overflow:hidden;padding:0;font:14px/1.5 system-ui;box-sizing:border-box;min-height:0';dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');
-    const h=document.createElement('h2');h.textContent='TU Terms and Information Use Agreement';h.style.cssText='display:block;position:static;margin:0 0 18px;padding:0;color:#f3f6f8;font:700 21px/1.35 system-ui';dialog.append(h);appendTerms(dialog);
+    let displayedAgreement=null;
+    const h=document.createElement('h2');h.textContent='TU Terms and Information Use Agreement';h.style.cssText='display:block;position:static;margin:0 0 18px;padding:0;color:#f3f6f8;font:700 21px/1.35 system-ui';dialog.append(h);appendTerms(dialog,{onReady:agreement=>{displayedAgreement=agreement;check.checked=false;check.disabled=false;accept.disabled=false;}});
     const keyInfo=document.createElement('p');keyInfo.textContent='Torn Public Only or Limited Access API key: enter your key below to verify identity and accept the current published agreement. Never enter a Full Access key.';dialog.append(keyInfo);
+    const storageNotice=document.createElement('p');storageNotice.dataset.tuKeyStorage='true';storageNotice.textContent=credentials.mode==='userscript-private'?'Saved credentials use unencrypted userscript-manager storage. A typed or revealed key is present in the page input.':credentials.mode==='private-unavailable'?'Private credential storage is unavailable; no insecure fallback will be used.':'Saved credentials use unencrypted Torn-origin storage; other page scripts may read them.';dialog.append(storageNotice);
     const key=document.createElement('input');key.type='password';key.autocomplete='off';key.maxLength=16;if(typeof selectedKey==='string'&&credentials.mode!=='userscript-private')key.value=selectedKey;key.placeholder=readSavedKey()?'API key already saved':'16-character Public Only or Limited Access key';key.style.cssText='flex:1;min-width:0;box-sizing:border-box;padding:10px';const keyRow=document.createElement('div');keyRow.style.cssText='display:flex;align-items:center;gap:8px;width:100%';const revealKey=makeButton('Show',()=>{const visible=key.type==='text';key.type=visible?'password':'text';revealKey.textContent=visible?'Show':'Hide';revealKey.setAttribute('aria-pressed',String(!visible));});revealKey.type='button';revealKey.setAttribute('aria-label','Show or hide agreement API key');revealKey.setAttribute('aria-pressed','false');keyRow.append(key,revealKey);dialog.append(keyRow);
-    const checkLabel=document.createElement('label');checkLabel.style.cssText='display:flex;gap:10px;margin:15px 0';const check=document.createElement('input');check.type='checkbox';checkLabel.append(check,document.createTextNode('I have reviewed and agree to the Terms of Use and Information Use Agreement.'));dialog.append(checkLabel);
+    const checkLabel=document.createElement('label');checkLabel.style.cssText='display:flex;gap:10px;margin:15px 0';const check=document.createElement('input');check.type='checkbox';check.disabled=true;checkLabel.append(check,document.createTextNode('I have reviewed and agree to the Terms of Use and Information Use Agreement.'));dialog.append(checkLabel);
     const status=document.createElement('p');status.setAttribute('role','status');dialog.append(status);
     const buttons=document.createElement('div');buttons.style.cssText='display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap';
     const decline=makeButton('Decline / Info only',()=>{overlay.remove();render('about')});
     const accept=makeButton('I Agree — Continue',async()=>{
       if(!check.checked)return;
-      if(!currentDevAgreement){status.textContent='Current agreement has not loaded. Please wait or reopen the agreement.';return;}
+      if(!displayedAgreement||!currentDevAgreement||displayedAgreement.content!==currentDevAgreementContent||['agreement_version','agreement_number','agreement_date'].some(field=>displayedAgreement[field]!==currentDevAgreement[field])){check.checked=false;status.textContent='Load and review the current agreement before accepting. Reopen it if the version has changed.';return;}
       const supplied=key.value.trim();if(supplied&&!/^[a-zA-Z0-9]{16}$/.test(supplied)){status.textContent='Enter a valid 16-character Public Only or Limited Access key';return;}
       const selected=supplied||normalizeKey(selectedKey)||readSavedKey();if(!/^[A-Za-z0-9]{16}$/.test(selected)){status.textContent='A 16-character Public Only or Limited Access key is required';return;}accept.disabled=true;try{status.textContent='Registering and recording development agreement…';const accepted=await devAccept(selected,scriptPlatform());if(supplied)saveKey(supplied);rememberAuthorization(accepted);await updatePlayer(selected);}catch(error){status.textContent='Development agreement failed: '+(error.message==='Torn verification failed'?'Torn could not verify this key. Registration requires a valid Public Only or Limited Access key; Full Access and invalid keys are not supported.':error.message);accept.disabled=false;return;}
       localStorage.setItem(TU_TERMS_KEY,TU_TERMS_VERSION);publishAuthorization(true);overlay.remove();render('modules');
     });
+    accept.disabled=true;
     buttons.append(decline,accept);dialog.append(buttons);overlay.append(dialog);document.body.append(overlay);observeTUWindows();
     // Minimize the consent dialog without accepting; the user may visit Torn to retrieve an API key.
     const minimizeAgreement=()=>{overlay.hidden=true;overlay.style.display='none';tuNav.minimized=true;tuNav.exited=false;panel.hidden=true;launcher.hidden=false;observeTUWindows();};
@@ -819,6 +809,7 @@
       }
       if(settingsPage==='api'){
         const note=document.createElement('p');note.textContent='Save Public Only or Limited Access keys individually. Adding a key preserves the current TU login. Use a saved key explicitly to switch login or select the Limited key for War Organizer. '+(credentials.mode==='userscript-private'?'Saved keys use userscript-manager storage and are removed from Torn-origin credential storage. This is storage isolation, not encryption. Revealing a full key places it in the page input where page scripts may read it.':credentials.mode==='private-unavailable'?credentials.status().error:'This environment uses unencrypted Torn-origin storage. Other scripts on Torn may be able to read saved keys.');content.append(note);
+        const disclosure=createApiDisclosure({document,storageMode:credentials.mode,content:TU_API_DISCLOSURE_TEXT});content.append(disclosure);
         const form=document.createElement('form');form.autocomplete='off';
         const input=document.createElement('input');input.type='password';input.maxLength=16;input.autocomplete='off';input.placeholder='16-character Torn API key';input.style.cssText='width:100%;box-sizing:border-box;padding:9px';
         const status=document.createElement('p');status.setAttribute('role','status');status.textContent=identityStatus;

@@ -4,6 +4,8 @@
 
 Current published manifest: [current.json](./current.json). This file contains the agreement metadata and exact Markdown text as JSON. Only authorized TU personnel/agents should modify it. Protect the publication branch with repository permissions and review rules.
 
+Current publication: **1.3 / number 4**. [Readable agreement](./1.3.md). Previous text is preserved in `history/1.2.json`.
+
 ## Publish a new version
 
 1. Edit `current.json` on `dev/tu-all-in-one`. Increment both `agreement_version` and monotonically increasing `agreement_number`, set the effective `agreement_date` (YYYY-MM-DD), and update the matching Version / Agreement number / Effective date lines in `content`.
@@ -21,3 +23,7 @@ The updated worker code must be deployed **once** to `tu-multiplayer-server-dev`
 If GitHub is unavailable or publishes invalid data, agreement verification fails closed with 503; the Worker does not silently accept an outdated agreement. A published agreement number is immutable and cannot be reused for different text. GitHub repository controls are therefore critical.
 
 **Security limitation:** This implementation trusts the configured GitHub branch and HTTPS; it does not cryptographically sign releases. A compromised authorized publisher could alter the manifest. Use branch protection and limited write access. The worker fetches at request time with a 60-second edge cache, not a scheduled polling job.
+
+## Agreement display
+
+DEV .86 renders wrapped paragraphs, feature disclosure tables, lists and HTTPS links using safe DOM nodes. The complete agreement must be displayed before consent is enabled. Key-entry disclosures are also shown on the saved-key screen. New versions require explicit renewed acceptance; neither publication nor a client update accepts on behalf of users.
