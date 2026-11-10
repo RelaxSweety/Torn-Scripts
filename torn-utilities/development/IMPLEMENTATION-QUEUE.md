@@ -20,6 +20,10 @@ Validation: full DEV regression suite and targeted API governor tests passed. Se
 
 Implemented verified userscript-private credential migration and storage, private-mode masked DOM handling, failure-safe migration and explicit PDA fallback. See [scope and remaining limits](../all-in-one/docs/CREDENTIAL-STORAGE.md). The active agreement remains unchanged. Before eventual agreement publication, review an amendment to the approved draft storage section to reflect these new modes; preserve the exact approved draft until then.
 
-## Remaining audit work (not started in this change)
+## Prepared next issue — backend credential/error handling (deployment held)
+
+Worker source now bounds registration body reads, validates exact 16-character keys, separates Torn rate limits/outages from rejected credentials, and excludes arbitrary exception text from public errors and application failure logs. Regression fixtures verify header-only keys and hashed session-token database writes. See [backend scope and validation](../all-in-one/docs/BACKEND-CREDENTIAL-SAFETY.md). These changes are not deployed; the live backend and operational logging/access/retention settings remain unverified. No client release or agreement change is included.
+
+## Remaining audit work
 
 Operational backend key/log protection and remaining PDA/session/callable-API exposures; current Torn scripting-rule/approval verification and the inherited Chat Archiver questions; backend-wide request/retention/access verification. Agreement UI/publication work stays queued under the explicit hold above.

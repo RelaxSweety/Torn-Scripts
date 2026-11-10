@@ -10,38 +10,38 @@ var digest = /* @__PURE__ */ __name(async (value) => Array.from(new Uint8Array(a
 var now = /* @__PURE__ */ __name(() => Math.floor(Date.now() / 1e3), "now");
 var validPlatform = /* @__PURE__ */ __name((v) => v === "pda" || v === "tampermonkey", "validPlatform");
 async function limitedJson(req) {
-  const declared = Number(req.headers.get("content-length") || 0);
-  if (declared > 2048) return null;
-  const text = await req.text();
-  if (new TextEncoder().encode(text).length > 2048) return null;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
+  const length=req.headers.get('content-length');
+  if(length!==null&&(!Number.isSafeInteger(Number(length))||Number(length)<0||Number(length)>2048))return null;
+  const reader=req.body?.getReader();if(!reader)return null;
+  const chunks=[];let total=0;
+  try{
+    while(true){const {done,value}=await reader.read();if(done)break;total+=value.byteLength;if(total>2048){try{await reader.cancel();}catch{}return null;}chunks.push(value);}
+    const bytes=new Uint8Array(total);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
+    return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
+  }catch{return null;}finally{reader.releaseLock();}
 }
 __name(limitedJson, "limitedJson");
+function verificationFailure(code,status,tornErrorCode){return Object.assign(Error('Torn verification failed'),{code,status,...(Number.isSafeInteger(tornErrorCode)?{tornErrorCode}:{})});}
+async function verificationRead(url,key,signal){
+  const response=await fetch(url,{headers:{Authorization:'ApiKey '+key,Accept:'application/json'},signal});
+  if(response.status===429)throw verificationFailure('TORN_RATE_LIMIT',429);
+  if(!response.ok)throw verificationFailure([401,403].includes(response.status)?'TORN_KEY_REJECTED':'TORN_UNAVAILABLE',[401,403].includes(response.status)?401:503);
+  const data=await response.json();
+  if(data?.error){const code=Number(data.error.code);if([5,8,14].includes(code))throw verificationFailure('TORN_RATE_LIMIT',429,code);if([1,2,10,13,18].includes(code))throw verificationFailure('TORN_KEY_REJECTED',401,code);throw verificationFailure('TORN_UNAVAILABLE',503,code);}
+  return data;
+}
 async function tornIdentity(key) {
-  const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 8e3);
-  try {
-    const response = await fetch("https://api.torn.com/v2/key/info", { headers: { "Authorization": "ApiKey " + key, "Accept": "application/json" }, signal: controller.signal });
-    if (!response.ok) return null;
-    const data = await response.json();
-    if (data?.error) return null;
-    const id = Number(data?.info?.user?.id);
-    if (!Number.isSafeInteger(id) || id <= 0) return null;
-    const access = data?.info?.access?.type ?? data?.info?.access;
-    if (access !== "Public Only" && access !== "Limited Access") return null;
-    const accessLevel = access === "Public Only" ? "public" : "limited";
-    const userResponse = await fetch("https://api.torn.com/v2/user/basic", { headers: { "Authorization": "ApiKey " + key, "Accept": "application/json" }, signal: controller.signal });
-    if (!userResponse.ok) return null;
-    const user = await userResponse.json();
-    const profile = user?.profile ?? user;
-    if (user?.error || Number(profile?.id) !== id || typeof profile?.name !== "string" || !/^[A-Za-z0-9_-]{2,32}$/.test(profile.name)) return null;
-    return { id, username: profile.name, accessLevel };
-  } finally {
-    clearTimeout(timeout);
-  }
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),8000);
+  try{
+    const data=await verificationRead('https://api.torn.com/v2/key/info',key,controller.signal);
+    const id=Number(data?.info?.user?.id);
+    if(!Number.isSafeInteger(id)||id<=0)throw verificationFailure('TORN_IDENTITY_INVALID',503);
+    const access=data?.info?.access?.type??data?.info?.access;
+    if(access!=='Public Only'&&access!=='Limited Access')throw verificationFailure('TORN_ACCESS_REJECTED',403);
+    const user=await verificationRead('https://api.torn.com/v2/user/basic',key,controller.signal),profile=user?.profile??user;
+    if(Number(profile?.id)!==id||typeof profile?.name!=='string'||!/^[_A-Za-z0-9-]{2,32}$/.test(profile.name))throw verificationFailure('TORN_IDENTITY_INVALID',503);
+    return {id,username:profile.name,accessLevel:access==='Public Only'?'public':'limited'};
+  }finally{clearTimeout(timeout);}
 }
 __name(tornIdentity, "tornIdentity");
 async function audit(db, type, actor, target) {
@@ -94,7 +94,7 @@ async function publishedAgreement(env) {
       stored_excerpt: stored.slice(Math.max(0, firstDifference - 45), firstDifference + 65),
       github_excerpt: incoming.slice(Math.max(0, firstDifference - 45), firstDifference + 65)
     };
-    throw Error("AGREEMENT_DIAGNOSTIC:" + JSON.stringify(detail));
+    throw Object.assign(Error('Agreement publication conflict'),{code:'AGREEMENT_CONFLICT',publicDetail:detail});
   }
   const current = await db.prepare("SELECT agreement_number FROM tu_agreement_registry WHERE is_current=1 LIMIT 1").first();
   if (current && current.agreement_number > a.agreement_number) throw Error("Agreement rollback refused");
@@ -130,9 +130,8 @@ async function handleAuth(req, env, url) {
     try {
       return respond(await publishedAgreement(env));
     } catch (error) {
-      const message = String(error?.message || error);
-      if (message.startsWith("AGREEMENT_DIAGNOSTIC:")) return respond(JSON.parse(message.slice("AGREEMENT_DIAGNOSTIC:".length)), 409);
-      return respond({ error: "Published agreement unavailable", detail: message.slice(0, 200) }, 503);
+      if(error?.code==='AGREEMENT_CONFLICT'&&error.publicDetail)return respond(error.publicDetail,409);
+      return respond({error:'Published agreement unavailable',code:'AGREEMENT_UNAVAILABLE'},503);
     }
   }
   const db = env.TU_USERS_DB;
@@ -140,16 +139,18 @@ async function handleAuth(req, env, url) {
   if (path === "/api/auth/register") {
     if (req.method !== "POST") return respond({ error: "Method not allowed" }, 405);
     const body = await limitedJson(req);
-    if (!body || !validPlatform(body.platform) || typeof body.api_key !== "string") return respond({ error: "Invalid registration request: missing API key or unsupported platform" }, 400);
+    if (!body || Array.isArray(body) || Object.keys(body).some(key=>!["api_key","platform","requested_access"].includes(key)) || !validPlatform(body.platform) || typeof body.api_key !== "string") return respond({ error: "Invalid registration request: missing API key or unsupported platform" }, 400);
     body.api_key = body.api_key.trim();
-    if (!/^[A-Za-z0-9]{16,128}$/.test(body.api_key)) return respond({ error: "Invalid registration request: API key must contain 16\u2013128 letters or digits (check for spaces or pasted URL)" }, 400);
+    if (!/^[A-Za-z0-9]{16}$/.test(body.api_key)) return respond({ error: "Invalid registration request: API key must contain exactly 16 letters or digits" }, 400);
+    if(body.requested_access!==undefined&&!['public','limited'].includes(body.requested_access))return respond({error:'Unsupported requested access'},400);
     let identity;
-    try {
-      identity = await tornIdentity(body.api_key);
-    } catch {
-      return respond({ error: "Torn verification unavailable" }, 503);
+    try{const verificationKey=body.api_key;delete body.api_key;identity=await tornIdentity(verificationKey);}
+    catch(error){
+      const allowed=['TORN_RATE_LIMIT','TORN_KEY_REJECTED','TORN_ACCESS_REJECTED','TORN_IDENTITY_INVALID','TORN_UNAVAILABLE'];
+      const code=allowed.includes(error?.code)?error.code:'TORN_UNAVAILABLE';
+      const status=code==='TORN_RATE_LIMIT'?429:code==='TORN_KEY_REJECTED'?401:code==='TORN_ACCESS_REJECTED'?403:503;
+      const response=respond({error:status===429?'Torn verification rate-limited':status===401?'Torn verification failed':status===403?'Unsupported Torn API key access':'Torn verification unavailable',code,...(Number.isSafeInteger(error?.tornErrorCode)?{torn_error_code:error.tornErrorCode}:{}),...(status===429?{retry_after_seconds:60}:{})},status);if(status===429)response.headers.set('retry-after','60');return response;
     }
-    if (!identity) return respond({ error: "Torn verification failed" }, 401);
     if (body.requested_access !== void 0 && body.requested_access !== identity.accessLevel) return respond({ error: "Requested access does not match verified Torn API key" }, 400);
     const t = now();
     try {
@@ -546,8 +547,8 @@ async function collectForeignStock(env) {
     if (!body || typeof body !== "object" || !body.stocks || typeof body.stocks !== "object") throw new Error("Invalid YATA stock response");
   } catch (e) {
     await db.prepare(`INSERT INTO foreign_provider_health(provider,last_attempt_at,last_error,consecutive_failures,updated_at)
-  VALUES('yata',?,?,1,?) ON CONFLICT(provider) DO UPDATE SET last_attempt_at=excluded.last_attempt_at,last_error=excluded.last_error,consecutive_failures=foreign_provider_health.consecutive_failures+1,updated_at=excluded.updated_at`).bind(now2, String(e).slice(0, 400), now2).run();
-    throw e;
+  VALUES('yata',?,?,1,?) ON CONFLICT(provider) DO UPDATE SET last_attempt_at=excluded.last_attempt_at,last_error=excluded.last_error,consecutive_failures=foreign_provider_health.consecutive_failures+1,updated_at=excluded.updated_at`).bind(now2, "Provider collection failed", now2).run();
+    throw Error("Provider collection failed");
   }
   let inserted = 0, events = 0, latest = 0;
   for (const [country, data] of Object.entries(body.stocks)) {
@@ -895,9 +896,7 @@ var MarbleRoom = class {
     return json({ error: "Not found" }, 404);
   }
 };
-var index_default = { async scheduled(event, env, ctx) {
-  ctx.waitUntil(collectForeignStock(env));
-}, async fetch(req, env) {
+async function routeWorkerRequest(req,env){
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers });
   const url = new URL(req.url);
   if (url.pathname.startsWith("/api/auth/")) return handleAuth(req, env, url);
@@ -940,6 +939,11 @@ var index_default = { async scheduled(event, env, ctx) {
   if (!m) return json({ error: "Not found" }, 404);
   const stub = env.GAME.get(env.GAME.idFromName(m[1]));
   return stub.fetch(new Request(url.origin + "/rooms/" + m[1] + "/" + m[2], req));
+}
+var index_default = { async scheduled(event, env, ctx) {
+  ctx.waitUntil(collectForeignStock(env).catch(()=>{console.warn('TU_FOREIGN_COLLECTION_FAILED');}));
+}, async fetch(req, env) {
+  try{return await routeWorkerRequest(req,env);}catch{console.warn('TU_REQUEST_FAILED');return respond({error:'Service unavailable',code:'INTERNAL_ERROR'},503);}
 } };
 export {
   ArcadeRoom,
