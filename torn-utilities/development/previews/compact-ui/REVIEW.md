@@ -17,12 +17,12 @@ All dimensions below are CSS pixels from the real Chromium fixture. Touch layout
 
 | Layout | Manager before → after | Travel/Item menu header before → after |
 |---|---:|---:|
-| Desktop 1280 × 900 | 99.00 → 42.59 | 76.00 → 29.00 |
-| Mobile portrait 390 × 844 | 135.00 → 54.14 | 118.56 → 49.00 |
-| Mobile landscape 844 × 390 | 99.00 → 47.00 | 76.00 → 49.00 |
-| Narrow portrait 320 × 740 | 182.00 → 65.69 | 212.12 → 51.55 |
+| Desktop 1280 × 900 | 99.00 → 56.33 | 76.00 → 29.00 |
+| Mobile portrait 390 × 844 | 135.00 → 56.33 | 118.56 → 49.00 |
+| Mobile landscape 844 × 390 | 99.00 → 56.33 | 76.00 → 49.00 |
+| Narrow portrait 320 × 740 | 182.00 → 67.88 | 212.12 → 51.55 |
 
-The desktop Travel/Item header is **38.2% of its original height**, close to the 37.5% target. The Manager is **43.0%** on desktop: its three required text lines impose a readable-height floor. It is **40.1%** in mobile portrait. Exact 62.5% reduction is intentionally not forced where it would clip text or reduce usable controls.
+The desktop Travel/Item header is **38.2% of its original height**, close to the 37.5% target. The Manager retains a readable-height floor because its title, subtitle, player and faction now occupy four fixed lines. Its exact height is listed above. Exact 62.5% reduction is intentionally not forced where it would clip text or reduce usable controls.
 
 | Styling value | Baseline | Compact |
 |---|---:|---:|
@@ -62,7 +62,7 @@ Already-short 32–47 px legacy headers stop at a 24 px control floor (plus nece
 
 - `all-in-one/src/ui/compact.css`: one shared compact header/control stylesheet, responsive wrapping, visible focus and touch exceptions.
 - `all-in-one/scripts/compact-presentation.mjs`: build-time conversion of CSS typography, padding, margins and gaps from original source baselines. Applies once; no runtime layout scanner, zoom or transformed hitboxes. Font values have an 11 px minimum. Geometry, timeouts and calculation values are excluded.
-- `all-in-one/src/manager/manager.user.js`: stylesheet insertion point and local DEV version. The existing Back, Minimize and Exit handlers are retained. CSS moves all existing controls right and makes Minimize visibly styled. One presentation-only DOM insertion places Minimize before Exit so keyboard order matches the visible Back/Minimize/Exit order.
+- `all-in-one/src/manager/manager.user.js`: stylesheet insertion point and local DEV version. The existing Back, Minimize and Exit handlers are retained. CSS moves all existing controls right and makes Minimize visibly styled. Presentation-only DOM placement keeps keyboard Back/Minimize/Exit order consistent.
 - `all-in-one/scripts/build-dev.mjs`: apply presentation conversion to the active Manager and every tool from the registry; isolated preview build support.
 - `all-in-one/scripts/build-compact-preview.mjs`: package the existing universal bundle for PDA and Tampermonkey review with updates disabled.
 - `all-in-one/config/releases.json`, `package.json`: local DEV release notes, build command and compact validation.
@@ -73,7 +73,7 @@ No functional module rewrite or navigation rearrangement. Tools/Settings/About, 
 
 ## Validation
 
-- Full `npm run validate`: build and all functional regression suites.
+- Full `npm run validate`: build and all functional regression suites. The follow-up identity-line formatting also passed saved-key, launcher and browser line-position checks.
 - Compact tests: one-pass conversion, readable minima, unchanged geometry/calculation literals, shared stylesheet emitted once, existing controls and touch floors.
 - Real Chromium: 1280 × 900 desktop, 390 × 844 touch portrait, 844 × 390 touch landscape and 320 × 740 narrow touch portrait.
 - Before/after screenshots for Manager, tool menu, Travel Assistant and Item Monitor at every size; desktop screenshots and opening/closing for all other active tools.
@@ -86,7 +86,7 @@ No functional module rewrite or navigation rearrangement. Tools/Settings/About, 
 - Chromium desktop/mobile emulation and PDA bridge fixtures were exercised. Physical Android/iOS Torn PDA, Safari/WebKit, and live Torn API/gameplay were not tested here.
 - Touch controls remain at least 44 px. Touch form text stays at 16 px where needed to avoid iOS focus zoom. Checkbox marks retain their existing geometry; associated labels supply larger targets.
 - Labels/body text stop at readable minimums, and long titles/identities wrap. Therefore exact percentage reductions are not forced for every element.
-- The Manager is taller than the strict desktop 37.5% target because all three required dynamic text lines are retained. Already-short legacy headers have the control floor described above.
+- The Manager is taller than the strict desktop 37.5% target because the title, subtitle and separate dynamic player/faction lines are retained. Already-short legacy headers have the control floor described above.
 - CSS uses the same modern selector family already used by TU (`:is`, `:has`). Older embedded engines without those selectors require device-specific follow-up.
 - Fixture data is mocked. Screenshots show the actual implemented interface, not a generated visual design. No real inventory was used, purchased or destroyed.
 

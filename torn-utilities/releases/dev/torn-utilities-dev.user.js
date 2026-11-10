@@ -843,7 +843,7 @@ const TU_RELEASES=[{"version":"0.5.42.88-dev","date":"2026-11-10","securityBundl
 #tu-pda-panel header>div{order:1;flex:1;min-width:0}
 #tu-pda-panel header h2{font-size:16.5px;line-height:1;margin:0}
 #tu-pda-panel header p{font-size:11px;line-height:1.05;margin:0!important;overflow-wrap:anywhere}
-#tu-pda-panel header .tu-player-identity{font-size:11px!important}
+#tu-pda-panel header .tu-player-identity{font-size:11px!important;white-space:pre-line;line-height:1.15}
 #tu-pda-panel header>.tu-nav-control,#tu-pda-panel header>.tu-close{flex:0 0 24px;width:24px;height:24px;min-width:24px;min-height:24px;margin:0;padding:0;border-radius:4px;border:1px solid #806a3e;background:#252a2e;color:#f1ce72;font:18px/1 system-ui}
 #tu-pda-panel header>[aria-label=Back]{order:2;margin-left:auto}
 #tu-pda-panel header>[aria-label=Minimize]{order:3}
@@ -922,7 +922,7 @@ const TU_RELEASES=[{"version":"0.5.42.88-dev","date":"2026-11-10","securityBundl
   panel.querySelector('header h2').parentElement.appendChild(identityLine);
   const refreshIdentity=()=>{
     const player=getPlayer();
-    identityLine.textContent=player?.id?(player.name||'Verified player')+' ['+player.id+']'+(player.factionId?' · '+(player.factionName||'Faction')+' ['+player.factionId+']':''):(identityStatus.startsWith('Verifying')?'Verifying saved player…':'Player not identified');
+    identityLine.textContent=player?.id?(player.name||'Verified player')+' ['+player.id+']'+(player.factionId?'\n'+(player.factionName||'Faction')+' ['+player.factionId+']':''):(identityStatus.startsWith('Verifying')?'Verifying saved player…':'Player not identified');
   };
   refreshIdentity();
   pageWindow.addEventListener('tu-player-updated',refreshIdentity);

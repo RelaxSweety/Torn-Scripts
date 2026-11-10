@@ -35,7 +35,8 @@ with sync_playwright() as p:
     open_business(page);row={'layout':layout,'variant':variant,'viewport':[width,height],'manager':page.locator('#tu-pda-panel').evaluate(metrics)}
     if variant=='after':
      assert not row['manager']['horizontalOverflow'],row
-     identity=page.locator('.tu-player-identity').inner_text();assert identity=='RelaxSweety [4539436] · Chaos Cartel [51855]',identity
+     identity=page.locator('.tu-player-identity').inner_text();assert identity=='RelaxSweety [4539436]\nChaos Cartel [51855]',identity
+     assert page.locator('.tu-player-identity').evaluate('''e=>{const n=e.firstChild,i=n.textContent.indexOf('\\n'),player=document.createRange(),faction=document.createRange();player.setStart(n,0);player.setEnd(n,i);faction.setStart(n,i+1);faction.setEnd(n,n.length);return faction.getBoundingClientRect().top>player.getBoundingClientRect().top+8;}'''),'Faction is below the player'
      controls=row['manager']['controls'];assert len(controls)==3 and controls[0]['x']<controls[1]['x']<controls[2]['x'],'Back, Minimize, Exit ordered right'
      if touch:assert all(c['width']>=44 and c['height']>=44 for c in controls),controls
      page.get_by_role('button',name='Minimize',exact=True).click();assert not page.locator('#tu-pda-panel').is_visible();page.locator('#tu-pda-launcher').click();assert page.locator('#tu-pda-panel').is_visible()

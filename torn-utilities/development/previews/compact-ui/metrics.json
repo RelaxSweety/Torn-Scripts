@@ -166,7 +166,7 @@
       900
     ],
     "manager": {
-      "headerHeight": 42.59375,
+      "headerHeight": 56.328125,
       "panelWidth": 1203.21875,
       "bodyFont": "11px",
       "headerPadding": "1px 6px",
@@ -448,7 +448,7 @@
       844
     ],
     "manager": {
-      "headerHeight": 54.140625,
+      "headerHeight": 56.328125,
       "panelWidth": 366.625,
       "bodyFont": "11px",
       "headerPadding": "1px 6px",
@@ -690,7 +690,7 @@
       390
     ],
     "manager": {
-      "headerHeight": 47,
+      "headerHeight": 56.328125,
       "panelWidth": 793.375,
       "bodyFont": "11px",
       "headerPadding": "1px 6px",
@@ -932,7 +932,7 @@
       740
     ],
     "manager": {
-      "headerHeight": 65.6875,
+      "headerHeight": 67.875,
       "panelWidth": 300.8125,
       "bodyFont": "11px",
       "headerPadding": "1px 6px",

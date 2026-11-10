@@ -616,7 +616,7 @@ __TU_COMPACT_UI_CSS__
   panel.querySelector('header h2').parentElement.appendChild(identityLine);
   const refreshIdentity=()=>{
     const player=getPlayer();
-    identityLine.textContent=player?.id?(player.name||'Verified player')+' ['+player.id+']'+(player.factionId?' · '+(player.factionName||'Faction')+' ['+player.factionId+']':''):(identityStatus.startsWith('Verifying')?'Verifying saved player…':'Player not identified');
+    identityLine.textContent=player?.id?(player.name||'Verified player')+' ['+player.id+']'+(player.factionId?'\n'+(player.factionName||'Faction')+' ['+player.factionId+']':''):(identityStatus.startsWith('Verifying')?'Verifying saved player…':'Player not identified');
   };
   refreshIdentity();
   pageWindow.addEventListener('tu-player-updated',refreshIdentity);

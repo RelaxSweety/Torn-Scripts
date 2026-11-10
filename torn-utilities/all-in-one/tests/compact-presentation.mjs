@@ -11,6 +11,7 @@ assert.ok(compactPresentation("const css='font-size:12px'").includes('font-size:
 const code=fs.readFileSync(new URL('../dist/tu-integrated-staging-dev.user.js',import.meta.url),'utf8'),css=fs.readFileSync(new URL('../src/ui/compact.css',import.meta.url),'utf8');
 assert.ok(code.includes(css),'Shared header stylesheet is emitted exactly once');assert.equal(code.split('/* Shared compact headers.').length-1,1);assert.ok(!code.includes('__TU_COMPACT_UI_CSS__'));
 assert.ok(!/\bzoom\s*:|transform:\s*scale\(/.test(css),'No viewport scaling or transformed hitboxes');
+assert.ok(css.includes('white-space:pre-line'),'Faction line break is displayed consistently');
 assert.ok(css.includes('pointer:coarse')&&css.includes('min-height:44px'),'Mobile touch exception');
 for(const marker of ['[aria-label=Back]','[aria-label=Minimize]','.tu-close','#tca-header','#tpfg-title','#sff-min','who-header','.tuim-travel-header'])assert.ok(css.includes(marker),marker);
 console.log('Compact presentation passed: single baseline conversion, 75% spacing/type, readable minima, unchanged geometry/calculation values, shared headers, existing controls and touch exceptions');
