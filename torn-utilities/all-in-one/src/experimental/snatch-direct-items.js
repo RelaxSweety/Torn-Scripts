@@ -9,8 +9,15 @@ export function createSnatchDirectItems({native,getPilot,getProfile,window,now=(
   if(!options.event?.isTrusted||active||pilot.report().unconfirmedAttempt)throw Error('A fresh user click and a resolved prior attempt are required.');
   const {run,getSnapshot,guard,onEvent=()=>{}}=options;
   const eligible=()=>{if(!guard()||run.capacityLedger?.valid===false)return false;const s=getSnapshot();if(kind==='heal')return s.hospitalized===true&&!s.traveling&&s.quantity>=Math.max(1,Number(run.minimumQty)||1);return options.extendHospital?s.hospitalized===true&&!s.traveling&&!s.returning:options.allowBeforeLanding?s.traveling===true&&!s.returning:s.hospitalized===false&&!s.traveling&&Number.isFinite(s.quantity)&&s.quantity<Math.max(1,Number(run.minimumQty)||1);};
+  if(!guard())throw Error('The armed run or player changed; no item was used.');
+  // Refresh/navigation deliberately invalidates the old baseline. Rebuild from
+  // visible inventory before consulting it, just as the native adapter does.
+  const priorReason=run.capacityLedger?.valid===false?run.capacityLedger.reason||'invalid-baseline':null;
+  native.prepareRun?.(run);
+  if(priorReason)onEvent({step:'direct-capacity-rebuild',reason:priorReason,verified:run.capacityLedger?.valid===true,total:run.capacityLedger?.total??null,occupied:run.capacityLedger?.initialOccupied??null});
+  if(run.capacityLedger?.valid===false)throw Error('Current travel inventory capacity could not be verified. Load inventory or re-arm before using an item.');
   if(!eligible())throw Error('Hospital, stock or travel state no longer permits this item use.');
-  native.prepareRun?.(run);lastStatus=null;active=true;const ticket=++generation;let consumed=false;
+  lastStatus=null;active=true;const ticket=++generation;let consumed=false;
   const ensure=()=>ticket===generation&&guard();
   try{
    const selected=kind==='heal'?(run.medicals?.length?run.medicals:[run.medical]):(run.hospitalizations?.length?run.hospitalizations:[run.hospitalization]);
