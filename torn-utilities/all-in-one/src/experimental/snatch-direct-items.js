@@ -39,9 +39,12 @@ export function createSnatchDirectItems({native,getPilot,getProfile,window,now=(
     proof={...proof,uncertain:false,hospitalized:state==='Hospital',released:state==='Abroad',hospitalUntil:state==='Hospital'&&Number.isFinite(status.until)?status.until*1000:null,at:now()};
     return {medicalUsed:true,hospitalReleased:state==='Abroad'};
    }
+   if(kind==='hospitalize'&&state==='Abroad'){
+    proof={...proof,uncertain:false,hospitalized:false,released:true,hospitalUntil:null,at:now()};
+    return {medicalUsed:true,hospitalized:false,hospitalizationNotApplied:true};
+   }
    if(kind==='hospitalize'&&state==='Hospital'){
-    if(options.extendHospital&&!(Number(status.until)*1000>Number(run.extensionPriorUntil||0)))throw Error('Hospital extension is not confirmed by the current deadline.');
-    proof={...proof,uncertain:false,hospitalized:true,released:false,hospitalUntil:Number.isFinite(status.until)?status.until*1000:null,at:now()};return {hospitalized:true};
+    proof={...proof,uncertain:false,hospitalized:true,released:false,hospitalUntil:Number.isFinite(status.until)?status.until*1000:null,at:now()};return {hospitalized:true,extensionUnchanged:!!options.extendHospital&&!(Number(status.until)*1000>Number(run.extensionPriorUntil||0))};
    }
    throw Error('Item was consumed, but hospital status is not confirmed. No further task was started.');
   }catch(error){if(consumed||error.submitted){error.submitted=true;if(run.capacityLedger&&!consumed){run.capacityLedger.valid=false;run.capacityLedger.reason='unconfirmed-direct-item';}}throw error;}
@@ -50,11 +53,11 @@ export function createSnatchDirectItems({native,getPilot,getProfile,window,now=(
  function observeProfile(payload){
   // Existing status reconciliation can recover a consumed item after a transient read failure.
   // Never clear an uncertain use outcome using hospital status alone.
-  if(!proof?.consumed||!proof.uncertain)return;
+  if(!proof?.consumed)return;
   const status=(payload?.profile||payload)?.status,state=status?.state;
-  if(!['Hospital','Abroad'].includes(state)||proof.kind==='hospitalize'&&(state!=='Hospital'||proof.extendHospital&&!(Number(status.until)*1000>proof.priorUntil)))return;
+  if(!['Hospital','Abroad'].includes(state))return;
   proof={...proof,uncertain:false,hospitalized:state==='Hospital',released:state==='Abroad',hospitalUntil:state==='Hospital'&&Number.isFinite(status.until)?status.until*1000:null,at:now()};
   lastStatus={at:now(),state,action:proof.kind,reconciled:true};
  }
- return {...native,execute,cancel,observeProfile,forget(){cancel();proof=null;lastStatus=null;native.forget?.();},inspect(run){const base=native.inspect(run);if(!same(run))return base;if(proof.uncertain)return {...base,released:false,hospitalized:true,directItemUncertain:true};if(now()-proof.at>120000)return {...base,released:false,hospitalized:true,directItemUncertain:true};return {...base,released:proof.released,hospitalized:proof.hospitalized,hospitalUntil:proof.hospitalUntil,directItemConsumed:!!proof.consumed,directItemUncertain:false};},listInventory(){const pilot=getPilot(),inspection=pilot?.report().travelInspection;if(!inspection)return native.listInventory();return inspection.mappings.map(item=>({id:item.itemId,name:item.name,amount:1,source:'travel-direct-inventory'}));},report:()=>({active,lastStatus,proof:proof?{uncertain:proof.uncertain,hospitalized:proof.hospitalized,released:proof.released,at:proof.at}:null})};
+ return {...native,execute,cancel,observeProfile,forget(){cancel();proof=null;lastStatus=null;native.forget?.();},inspect(run){const base=native.inspect(run);if(!same(run))return base;if(proof.uncertain)return {...base,released:false,hospitalized:true,directItemUncertain:true};if(now()-proof.at>120000)return {...base,released:false,hospitalized:true,directItemUncertain:true};return {...base,released:proof.released,hospitalized:proof.hospitalized,hospitalUntil:proof.hospitalUntil,directItemConsumed:!!proof.consumed,directItemUncertain:false};},listInventory(){const pilot=getPilot(),inspection=pilot?.report().travelInspection;if(!inspection)return native.listInventory();return inspection.mappings.map(item=>({id:item.itemId,name:item.name,amount:1,source:'travel-direct-inventory'}));},report:()=>({active,lastStatus,proof:proof?{uncertain:proof.uncertain,hospitalized:proof.hospitalized,released:proof.released,consumed:!!proof.consumed,action:proof.kind||null,at:proof.at}:null})};
 }

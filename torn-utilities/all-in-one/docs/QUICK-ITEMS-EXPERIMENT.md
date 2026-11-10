@@ -96,3 +96,7 @@ Native purchase, destruction and return flows pause before every additional Torn
 ## Test .11: restored-run capacity preflight
 
 After refresh/navigation the saved capacity ledger is intentionally invalidated. The direct adapter now rebuilds it from current visible travel inventory before testing eligibility, matching the native adapter order. If rebuilding cannot verify capacity, the action remains blocked with a specific explanation. Reports record the rebuild reason and verification result. A current player/run guard and unresolved-attempt lock are checked first. This fixes the .10 case where Hospitalize Me appeared ready but rejected a restored run until rearming.
+
+## Test .12: resolve known hospitalization outcomes
+
+The .10 report confirmed AB+ consumption followed by profile state Abroad. That known status previously left the workflow on Confirming hospitalization. A consumed item followed by Abroad now automatically resolves to Waiting for available stock with an explanation that hospitalization was not confirmed; it never uses another bag automatically. Existing read-only reconciliation also resolves this case. A Hospital result with an unchanged extension deadline reports that no extension is confirmed while continuing to monitor the existing hospitalization. Later profile reads update known consumed-item status. Unknown responses and uncertain consumption remain blocked. Includes the .11 restored-capacity fix.
