@@ -86,3 +86,9 @@ Test hospitalization during flight and abroad, + Hosp? with a remaining bag, par
 ## Test .9: visible arming feedback
 
 The reported .8 attempt was made before departure at Torn Travel Agency. Existing arming requires a confirmed outbound flight or foreign location. Setup can be completed at the agency, but depart first and then Arm. Arming failures now appear in a prominent live alert beside the Arm button and scroll into view. The button is disabled while its context lookup runs and restored afterward. No arming eligibility or gameplay action was added.
+
+## Test .10: active-button execution without popups
+
+The active Snatch button executes the selected action without a before-landing confirmation popup. Direct A+/AB+ use remains one click per bag with fresh inventory and hospital-status checks. The separate direct pilot likewise uses its consent checkbox and active button without an additional popup.
+
+Native purchase, destruction and return flows pause before every additional Torn control click. The Snatch button displays the next action (for example Confirm purchase, Destroy selected item, Book return flight, or Continue to return flight); each fresh trusted click performs that step. Reconciliation purchases and every additional destroyed item also require subsequent clicks. Pending hydration/result checks temporarily block additional clicks. Canceling stops suspended chains; synthetic clicks cannot resume them. Existing destruction setup acceptance remains required. Ordinary DEV remains unchanged.

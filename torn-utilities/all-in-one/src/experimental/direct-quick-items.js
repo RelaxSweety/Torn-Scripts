@@ -51,8 +51,6 @@ export function createDirectQuickItems({window,document,fetchImpl,isAuthorized=(
   let expected=workflow?null:travelInspection?.mappings.find(row=>row.slotId===String(selection));
   // Pilot scope is limited to the two blood bag types validated in native traces.
   if(!workflow&&(!expected||!['732','736'].includes(expected.itemId)||!/^\d{1,15}$/.test(expected.slotId))||!token())return {result:'invalid-item'};
-  const flying=!!document.querySelector('[aria-label="Flight progress"]');
-  if(!workflow&&!window.confirm('Use '+expected.name+' from travel inventory?'+(flying?' You are still flying; confirm you want to use this item before landing.':'')))return {result:'cancelled'};
   busy=true;travelOutcome=null;controller=new window.AbortController();const active=controller,started=now();let posted=false;
   const abort=()=>active.abort(),timer=window.setTimeout(abort,timeoutMs);window.addEventListener('pagehide',abort,{once:true});renderState();
   try{

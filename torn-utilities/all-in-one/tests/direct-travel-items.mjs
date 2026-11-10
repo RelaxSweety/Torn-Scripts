@@ -2,14 +2,13 @@ import assert from 'node:assert/strict';
 import {JSDOM} from 'jsdom';
 import {createDirectQuickItems} from '../src/experimental/direct-quick-items.js';
 const w=new JSDOM('<div id="travel-root"><section aria-label="Flight progress"></section></div>',{url:'https://www.torn.com/page.php?sid=travel',pretendToBeVisual:true}).window;
-w.document.hasFocus=()=>true;w.document.cookie='rfc_v=PRIVATE_RFC; path=/';let confirmed=true;w.confirm=()=>confirmed;
+w.document.hasFocus=()=>true;w.document.cookie='rfc_v=PRIVATE_RFC; path=/';w.confirm=()=>{throw Error('Item-use click must execute without another popup');};
 const inventory=item=>({maxBaseSlots:2,maxSpecialSlots:0,slots:[{ID:123,item:item?{ID:item,name:item===732?'Blood Bag : A+':'Jaguar Plushie'}:null},{ID:124,item:null}]});
 let calls=[],current=inventory(732),reply={success:true,itemRemoved:true,useAnother:false,message:'You are still in hospital.'},failPost=false,afterFailure=false;
 const api=createDirectQuickItems({window:w,document:w.document,isAuthorized:()=>true,fetchImpl:async(url,options)=>{const step=new URL(url).searchParams.get('step');calls.push({step,...options});if(step==='useItem'){if(failPost)throw Error();current=inventory(null);return {ok:true,text:async()=>JSON.stringify(reply)};}if(afterFailure&&calls.some(c=>c.step==='useItem'))throw Error();return {ok:true,text:async()=>JSON.stringify(current)};}});
 try{
  await api.inspectTravel({isTrusted:true});calls=[];
  assert.equal((await api.useTravel({isTrusted:false},'123',true)).result,'blocked');assert.equal((await api.useTravel({isTrusted:true},'123',false)).result,'blocked');assert.equal(calls.length,0);
- confirmed=false;assert.equal((await api.useTravel({isTrusted:true},'123',true)).result,'cancelled');assert.equal(calls.length,0);confirmed=true;
  current=inventory(258);assert.equal((await api.useTravel({isTrusted:true},'123',true)).result,'slot-changed');assert.deepEqual(calls.map(c=>c.step),['inventory'],'Reused slot cannot consume another item');
  current=inventory(732);calls=[];const pending=api.useTravel({isTrusted:true},'123',true);assert.equal((await api.useTravel({isTrusted:true},'123',true)).result,'blocked');const result=await pending;
  assert.equal(result.result,'consumption-confirmed');assert.equal(result.hospitalRelease,'still-hospitalized','Consumption cannot imply release');assert.deepEqual(calls.map(c=>c.step),['inventory','useItem','inventory']);assert.equal(calls[1].method,'POST');assert.deepEqual(JSON.parse(calls[1].body),{slotID:123});assert.equal(api.report().unconfirmedAttempt,false);assert.ok(!JSON.stringify(api.report()).includes('PRIVATE_RFC'));
