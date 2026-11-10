@@ -34,9 +34,11 @@ The DEV Worker binding/migration is prepared only. Verify existing remote migrat
 
 Authorization fixtures now cover expired/revoked sessions, account status, agreement/permission denial, administrator rejection and session ownership. Found and fixed caller-controlled Tic-Tac-Toe player identity: room creation/join now uses the verified server session, and room tokens require the corresponding authenticated player. No client protocol change is required. See [scope and compatibility](../all-in-one/docs/BACKEND-AUTHORIZATION.md). Worker deployment remains held; DEV client and agreement are unchanged.
 
-## Next identified issue — foreign submission authorization
+## Prepared next issue — foreign submission authorization and payload bounds (deployment held)
 
-The checked-in router sends `/api/foreign/observations` and `/api/foreign/feedback` directly to their write handlers without a session/module authorization gate. Review the intended public-crowdsourcing policy, payload bounds and submission abuse protection; any authenticated submission change also needs compatible client transport. This finding is about source, not a verified live exploit. No change to those routes is included in the multiplayer patch.
+The Worker source now requires active Item Monitor authorization and current agreement acceptance for observation/feedback writes. Observation and feedback bodies are stream-bounded, and feedback projection storage uses only defined fields. Client compatibility is prepared in an unpublished builder preview covering PDA POST, GM and fetch; default `.84` artifacts remain byte-for-byte unchanged. End-to-end preview tests confirm authenticated queued stock delivery. See [coordinated rollout and limits](../all-in-one/docs/FOREIGN-SUBMISSION-AUTHORIZATION.md).
+
+Do not deploy this Worker without the compatible client rollout: current published `.84` stock reports do not carry the new session header. No Worker deployment or client publication is included here. Next review: per-account/global submission write-rate limits and data-integrity safeguards; authorization alone does not prove an observation is accurate. Other multiplayer seat ownership and administrator mutation races remain audit work.
 
 ## Remaining audit work
 

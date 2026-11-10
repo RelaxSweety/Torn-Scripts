@@ -10,13 +10,13 @@ var respond = /* @__PURE__ */ __name((data, status = 200) => new Response(JSON.s
 var digest = /* @__PURE__ */ __name(async (value) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))).map((x) => x.toString(16).padStart(2, "0")).join(""), "digest");
 var now = /* @__PURE__ */ __name(() => Math.floor(Date.now() / 1e3), "now");
 var validPlatform = /* @__PURE__ */ __name((v) => v === "pda" || v === "tampermonkey", "validPlatform");
-async function limitedJson(req) {
+async function limitedJson(req, maxBytes = 2048) {
   const length=req.headers.get('content-length');
-  if(length!==null&&(!Number.isSafeInteger(Number(length))||Number(length)<0||Number(length)>2048))return null;
+  if(length!==null&&(!Number.isSafeInteger(Number(length))||Number(length)<0||Number(length)>maxBytes))return null;
   const reader=req.body?.getReader();if(!reader)return null;
   const chunks=[];let total=0;
   try{
-    while(true){const {done,value}=await reader.read();if(done)break;total+=value.byteLength;if(total>2048){try{await reader.cancel();}catch{}return null;}chunks.push(value);}
+    while(true){const {done,value}=await reader.read();if(done)break;total+=value.byteLength;if(total>maxBytes){try{await reader.cancel();}catch{}return null;}chunks.push(value);}
     const bytes=new Uint8Array(total);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
     return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
   }catch{return null;}finally{reader.releaseLock();}
@@ -330,12 +330,8 @@ async function submitForeignSnapshot(req, env) {
   if (!env.FOREIGN_DB) return reply({ error: "Database unavailable" }, 503);
   const size = Number(req.headers.get("content-length") || 0);
   if (size > 16e3) return reply({ error: "Payload too large" }, 413);
-  let data;
-  try {
-    data = await req.json();
-  } catch {
-    return reply({ error: "Invalid JSON" }, 400);
-  }
+  const data = await limitedJson(req, 16000);
+  if (!data || Array.isArray(data)) return reply({ error: 'Invalid or oversized JSON' }, 400);
   const country = String(data?.country || "").toLowerCase(), observed = Number(data?.observed_at), items = data?.items;
   const now2 = Math.floor(Date.now() / 1e3);
   if (!countries.has(country) || !Number.isSafeInteger(observed) || observed > now2 + 300 || observed < now2 - 90 * 86400 || !Array.isArray(items) || items.length < 1 || items.length > 50) return reply({ error: "Invalid observation" }, 400);
@@ -530,18 +526,14 @@ var integer = /* @__PURE__ */ __name((n) => Number.isSafeInteger(n) && n >= 0, "
 async function submitTravelFeedback(req, env) {
   if (req.method !== "POST") return reply2({ error: "Method not allowed" }, 405);
   if (!env.FOREIGN_DB) return reply2({ error: "Database unavailable" }, 503);
-  let b;
-  try {
-    b = await req.json();
-  } catch {
-    return reply2({ error: "Invalid JSON" }, 400);
-  }
+  const b = await limitedJson(req, 8192);
+  if (!b || Array.isArray(b)) return reply2({ error: 'Invalid or oversized JSON' }, 400);
   const p = b?.projection || {}, o = b?.outcome || {};
   if (!/^[0-9a-f-]{36}$/i.test(String(b.report_id || "")) || !countries3.has(p.country) || !integer(p.item_id) || p.item_id === 0 || !integer(p.captured_at) || !integer(p.predicted_arrival) || !integer(p.forecast_start) || !integer(p.forecast_end) || !["yes", "no", "not_checked"].includes(o.available) || !["yes", "no", "unsure"].includes(o.restocked) || o.restocked === "yes" && (!integer(o.restock_time) || !["exact", "approximate"].includes(o.time_accuracy)) || !integer(o.checked_at) || o.checked_at < p.captured_at || o.checked_at > Date.now() / 1e3 + 300 || o.quantity != null && (!integer(o.quantity) || o.quantity > 1e7) || p.captured_at > Date.now() / 1e3 + 300 || Date.now() / 1e3 - p.captured_at > 30 * 86400) return reply2({ error: "Invalid feedback fields" }, 400);
   try {
     const db = env.FOREIGN_DB;
     await db.prepare("CREATE TABLE IF NOT EXISTS foreign_travel_feedback (report_id TEXT PRIMARY KEY,country TEXT NOT NULL,item_id INTEGER NOT NULL,captured_at INTEGER NOT NULL,checked_at INTEGER NOT NULL,available TEXT NOT NULL,restocked TEXT NOT NULL,restock_time INTEGER,time_accuracy TEXT,projection_json TEXT NOT NULL,quantity INTEGER,created_at INTEGER NOT NULL)").run();
-    const result = await db.prepare("INSERT OR IGNORE INTO foreign_travel_feedback (report_id,country,item_id,captured_at,checked_at,available,restocked,restock_time,time_accuracy,projection_json,quantity,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)").bind(b.report_id, p.country, p.item_id, p.captured_at, o.checked_at, o.available, o.restocked, o.restocked === "yes" ? o.restock_time : null, o.restocked === "yes" ? o.time_accuracy : null, JSON.stringify(p).slice(0, 4e3), o.quantity ?? null, Math.floor(Date.now() / 1e3)).run();
+    const result = await db.prepare("INSERT OR IGNORE INTO foreign_travel_feedback (report_id,country,item_id,captured_at,checked_at,available,restocked,restock_time,time_accuracy,projection_json,quantity,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)").bind(b.report_id, p.country, p.item_id, p.captured_at, o.checked_at, o.available, o.restocked, o.restocked === "yes" ? o.restock_time : null, o.restocked === "yes" ? o.time_accuracy : null, JSON.stringify({country:p.country,item_id:p.item_id,captured_at:p.captured_at,predicted_arrival:p.predicted_arrival,forecast_start:p.forecast_start,forecast_end:p.forecast_end}), o.quantity ?? null, Math.floor(Date.now() / 1e3)).run();
     return reply2({ ok: true, duplicate: !result.meta?.changes }, result.meta?.changes ? 201 : 200);
   } catch {
     return reply2({ error: "Feedback storage unavailable" }, 503);
@@ -602,6 +594,7 @@ __name(foreignStatus, "foreignStatus");
 
 // src/index.js
 var protectedModules = [
+  { pattern: /^\/api\/foreign\/(observations|feedback)$/, id: "item-monitor" },
   { pattern: new RegExp("^/api/marbles(?:/|$)"), id: "chaos-marbles" },
   { pattern: new RegExp("^/api/connect(?:/|$)"), id: "torn-four" },
   { pattern: new RegExp("^/api/battleship(?:/|$)"), id: "torn-fleet" },
