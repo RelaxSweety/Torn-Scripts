@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities DEV (All-in-One)
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.82-dev
+// @version      0.5.42.83-dev
 // @description  Integrated TU development bundle for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -24,7 +24,7 @@
   // the page window so separately installed @grant none modules can register.
   const pageWindow=typeof unsafeWindow!=='undefined'?unsafeWindow:window;
   const nativeBridge=pageWindow.flutter_inappwebview||window.flutter_inappwebview;
-  const managerHttp=typeof nativeBridge?.callHandler==='function'?details=>{
+  const rawManagerHttp=typeof nativeBridge?.callHandler==='function'?details=>{
     let settled=false;const finish=(error,response)=>{if(settled)return;settled=true;clearTimeout(timer);if(error)details.onerror?.({error:'PDA native request failed'});else details.onload?.(response);};
     const timer=setTimeout(()=>{if(settled)return;settled=true;details.ontimeout?.();},details.timeout||20000);
     const method=String(details.method||'GET').toUpperCase();
@@ -38,7 +38,11 @@
   if (pageWindow.__RELAX_TORN_UTILITIES_PDA__) return;
   pageWindow.__RELAX_TORN_UTILITIES_PDA__ = true;
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.5.42.82-dev';
+  const apiGovernor=createTornApiGovernor({window});
+  const rawManagerFetch=window.fetch.bind(window);
+  const fetch=(input,options)=>apiGovernor.fetch(input,options,rawManagerFetch);
+  const managerHttp=rawManagerHttp?details=>apiGovernor.request(details,rawManagerHttp):null;
+  const TU_VERSION='0.5.42.83-dev';
   const TU_LOGO='__TU_LOGO_DATA_URL__';
   // Bundled tool directory: no external catalog, cache, or refresh requests.
   const registry={schemaVersion:1,categories:[{"id":"business","name":"Business Tools","icon":"▥","order":10},{"id":"games","name":"Games","icon":"♜","order":20},{"id":"single-player","name":"Single Player","icon":"▣","order":21,"parent":"games"},{"id":"multiplayer","name":"Multiplayer","icon":"♟","order":22,"parent":"games"},{"id":"chat","name":"Chat Tools","icon":"◉","order":30},{"id":"other","name":"War Tools","icon":"⚙","order":40}],modules:[{"id":"flight-game","name":"Flight Game","category":"single-player","version":"0.12.8","description":"Standalone Flight Game arcade module, playable anytime"},{"id":"stick-fighter","name":"Stick Fighter","category":"single-player","version":"0.2.7","description":"Standalone Stick Fighter arcade module, playable anytime"},{"id":"chat-archiver","name":"Chat Archiver","category":"chat","version":"0.1.8","description":"Archive Torn chat conversations"},{"id":"tic-tac-toe","name":"Tic-Tac-Toe","category":"multiplayer","version":"0.6.5","description":"Two-player Tic-Tac-Toe with named winners, green winning line, rematches and head-to-head history"},{"id":"torn-four","name":"Torn Four","category":"multiplayer","version":"0.2.5","description":"Connect Four: two-player multiplayer with private room codes"},{"id":"torn-fleet","name":"Torn Fleet","category":"multiplayer","version":"0.2.5","description":"Battleship: fleet placement and turn-based naval combat"},{"id":"torn-snake","name":"Slithering Streets","category":"single-player","version":"0.2.14","description":"Single-player Snake with touch controls and local high scores"},{"id":"chaos-marbles","name":"Chaos Marbles","category":"multiplayer","version":"0.2.5","description":"Online 2\u20134 player marble race with private player sessions, Waiting for Chaos staging, and game history"},{"id":"item-monitor","name":"Travel Assistant and Item Monitor","category":"business","version":"1.10.31-dev","description":"Item Monitor and Travel Assistant with D1 stock reporting, source diagnostics and stock estimation"},{"id":"war-hit-organizer","name":"War Organizer","category":"other","version":"0.3.17-dev","description":"Compact war target board, reservation controls, timer and local development settings"}]};
@@ -161,13 +165,13 @@
   let automaticIdentityAttempted=false;
   const openProfileHelp=()=>{panel.hidden=false;render('settings');syncLauncher();};
   const clearPlayer=()=>{authGeneration++;playerInfo=null;identityStatus='No verified session';pageWindow.dispatchEvent(new CustomEvent('tu-player-updated',{detail:null}));};
-  const requestIdentity=key=>new Promise((resolve,reject)=>{
+  const requestIdentity=(key,{revalidate=false}={})=>new Promise((resolve,reject)=>{
     const url='https://api.torn.com/v2/key/info';
-    if(typeof managerHttp==='function')managerHttp({method:'GET',url,timeout:12000,headers:{Authorization:'ApiKey '+key,Accept:'application/json'},onload:r=>{try{if(r.status<200||r.status>=300)throw Error('HTTP '+r.status);resolve(JSON.parse(r.responseText));}catch(e){reject(e)}},onerror:()=>reject(Error('Network error')),ontimeout:()=>reject(Error('Timeout'))});
-    else{const c=new AbortController(),t=setTimeout(()=>c.abort(),12000);fetch(url,{headers:{Authorization:'ApiKey '+key,Accept:'application/json'},signal:c.signal,cache:'no-store'}).then(async r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(resolve,reject).finally(()=>clearTimeout(t));}
+    if(typeof managerHttp==='function')managerHttp({method:'GET',url,tuApiRevalidate:revalidate,timeout:12000,headers:{Authorization:'ApiKey '+key,Accept:'application/json'},onload:r=>{try{if(r.status<200||r.status>=300)throw Error('HTTP '+r.status);resolve(JSON.parse(r.responseText));}catch(e){reject(e)}},onerror:e=>reject(Object.assign(Error(e?.error||'Network error'),{code:e?.code,retryAfterMs:e?.retryAfterMs})),ontimeout:()=>reject(Error('Timeout'))});
+    else{const c=new AbortController(),t=setTimeout(()=>c.abort(),12000);fetch(url,{tuApiRevalidate:revalidate,headers:{Authorization:'ApiKey '+key,Accept:'application/json'},signal:c.signal,cache:'no-store'}).then(async r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(resolve,reject).finally(()=>clearTimeout(t));}
   });
   const requestPublicJson=(url,key)=>new Promise((resolve,reject)=>{
-    if(typeof managerHttp==='function')managerHttp({method:'GET',url,timeout:12000,headers:{Authorization:'ApiKey '+key,Accept:'application/json'},onload:r=>{try{if(r.status<200||r.status>=300)throw Error('HTTP '+r.status);const data=JSON.parse(r.responseText);if(data.error)throw Error(data.error.error||'API error');resolve(data)}catch(e){reject(e)}},onerror:()=>reject(Error('Network error')),ontimeout:()=>reject(Error('Timeout'))});
+    if(typeof managerHttp==='function')managerHttp({method:'GET',url,timeout:12000,headers:{Authorization:'ApiKey '+key,Accept:'application/json'},onload:r=>{try{if(r.status<200||r.status>=300)throw Error('HTTP '+r.status);const data=JSON.parse(r.responseText);if(data.error)throw Error(data.error.error||'API error');resolve(data)}catch(e){reject(e)}},onerror:e=>reject(Object.assign(Error(e?.error||'Network error'),{code:e?.code,retryAfterMs:e?.retryAfterMs})),ontimeout:()=>reject(Error('Timeout'))});
     else fetch(url,{headers:{Authorization:'ApiKey '+key,Accept:'application/json'},cache:'no-store'}).then(async r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(resolve,reject);
   });
   async function enrichIdentity(key,generation){
@@ -241,6 +245,10 @@
     },
     handleBackendAuthorizationFailure:()=>{clearAuthorizationCache();publishAuthorization(false);void restoreDevSession({force:true});},
     storage,
+    fetchWithApiBudget:(url,options,transport)=>apiGovernor.fetch(url,options,transport),
+    requestWithApiBudget:(details,transport)=>apiGovernor.request(details,transport),
+    apiRequestWithBudget:(url,options,send)=>apiGovernor.run(url,options,send),
+    apiBudgetStatus:()=>apiGovernor.snapshot(),
     getLogo:()=>TU_LOGO,
     getPlayer,
     async requestTorn(path,{format='json'}={}){
@@ -249,7 +257,7 @@
       const key=readSavedKey();if(!key)throw Error('Set Public Only API key in TU Manager Settings');
       const url='https://api.torn.com'+path;
       const raw=await new Promise((resolve,reject)=>{
-        if(typeof managerHttp==='function')managerHttp({method:'GET',url,timeout:30000,headers:{Authorization:'ApiKey '+key,Accept:format==='text'?'text/csv,application/json':'application/json'},onload:r=>r.status>=200&&r.status<300?resolve(r.responseText):reject(Error('HTTP '+r.status)),onerror:()=>reject(Error('Network error')),ontimeout:()=>reject(Error('Timeout'))});
+        if(typeof managerHttp==='function')managerHttp({method:'GET',url,timeout:30000,headers:{Authorization:'ApiKey '+key,Accept:format==='text'?'text/csv,application/json':'application/json'},onload:r=>r.status>=200&&r.status<300?resolve(r.responseText):reject(Error('HTTP '+r.status)),onerror:e=>reject(Object.assign(Error(e?.error||'Network error'),{code:e?.code,retryAfterMs:e?.retryAfterMs})),ontimeout:()=>reject(Error('Timeout'))});
         else fetch(url,{headers:{Authorization:'ApiKey '+key},cache:'no-store'}).then(r=>r.ok?r.text():Promise.reject(Error('HTTP '+r.status))).then(resolve,reject);
       });
       if(format==='text')return raw;
@@ -264,7 +272,7 @@
       if(!entry?.playerId||entry.playerId!==getPlayer()?.id)throw Error('Verify the current player before loading travel data');
       const url='https://api.torn.com'+paths[kind];
       const response=await new Promise((resolve,reject)=>{
-        if(managerHttp)managerHttp({method:'GET',url,headers:{Authorization:'ApiKey '+key,Accept:'application/json'},timeout:12000,onload:r=>{try{if(r.status<200||r.status>=300)throw Error('Torn API HTTP '+r.status);const d=JSON.parse(r.responseText);if(d.error)throw Error('Torn rejected the travel data request');resolve(d);}catch(error){reject(error)}},onerror:()=>reject(Error('Travel data network failure')),ontimeout:()=>reject(Error('Travel data timeout'))});
+        if(managerHttp)managerHttp({method:'GET',url,headers:{Authorization:'ApiKey '+key,Accept:'application/json'},timeout:12000,onload:r=>{try{if(r.status<200||r.status>=300)throw Error('Torn API HTTP '+r.status);const d=JSON.parse(r.responseText);if(d.error)throw Error('Torn rejected the travel data request');resolve(d);}catch(error){reject(error)}},onerror:e=>reject(Object.assign(Error(e?.error||'Travel data network failure'),{code:e?.code,retryAfterMs:e?.retryAfterMs})),ontimeout:()=>reject(Error('Travel data timeout'))});
         else fetch(url,{headers:{Authorization:'ApiKey '+key},cache:'no-store'}).then(async r=>{if(!r.ok)throw Error('Torn API HTTP '+r.status);const d=await r.json();if(d.error)throw Error('Torn rejected the travel data request');return d;}).then(resolve,reject);
       });return response;
     },
@@ -276,7 +284,7 @@
       if(!key||keyEntry?.level!=='Limited Access'||!playerInfo?.id||keyEntry.playerId!==playerInfo.id)throw Error('Recheck and select a Limited Access key for the current TU player in Settings > API Keys');
       const url='https://api.torn.com'+path;
       const data=await new Promise((resolve,reject)=>{
-        if(typeof managerHttp==='function')managerHttp({method:'GET',url,timeout:20000,headers:{Authorization:'ApiKey '+key,Accept:'application/json'},onload:r=>{try{if(r.status<200||r.status>=300)throw Error('HTTP '+r.status);resolve(JSON.parse(r.responseText))}catch(e){reject(e)}},onerror:()=>reject(Error('Network error')),ontimeout:()=>reject(Error('Timeout'))});
+        if(typeof managerHttp==='function')managerHttp({method:'GET',url,timeout:20000,headers:{Authorization:'ApiKey '+key,Accept:'application/json'},onload:r=>{try{if(r.status<200||r.status>=300)throw Error('HTTP '+r.status);resolve(JSON.parse(r.responseText))}catch(e){reject(e)}},onerror:e=>reject(Object.assign(Error(e?.error||'Network error'),{code:e?.code,retryAfterMs:e?.retryAfterMs})),ontimeout:()=>reject(Error('Timeout'))});
         else fetch(url,{headers:{Authorization:'ApiKey '+key,Accept:'application/json'},cache:'no-store'}).then(async r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(resolve,reject);
       });
       if(data?.error)throw Error(data.error.error||'Torn API error');
@@ -355,6 +363,8 @@
   }
   function resetDevAuthFailure(){devAuthIssue='';devRenewalBlocked=false;}
   async function devRequest(path,method='GET',body,token=devToken()){
+    // The current registration service performs up to two Torn API reads.
+    if(path==='/api/auth/register'&&body?.api_key)await apiGovernor.reserveVerification(body.api_key);
     const url=DEV_BASE+path;
     const headers={...(method!=='GET'?{'content-type':'application/json'}:{}),...(token?{authorization:'Bearer '+token}:{})};
     const payload=body?JSON.stringify(body):undefined;
@@ -389,7 +399,7 @@
       const renewed=await renewDevSession();
       return devRequest(path,method,body,renewed);
     }
-    if(!response.ok){if([401,403].includes(response.status)&&token&&token===devToken()){clearAuthorizationCache();publishAuthorization(false);}const error=Error(result.error||('Development server HTTP '+response.status));error.status=response.status;throw error;}
+    if(!response.ok){if(path==='/api/auth/register'&&body?.api_key&&[401,403].includes(response.status))await apiGovernor.suspendVerification(body.api_key);if([401,403].includes(response.status)&&token&&token===devToken()){clearAuthorizationCache();publishAuthorization(false);}const error=Error(result.error||('Development server HTTP '+response.status));error.status=response.status;throw error;}
     return result;
   }
   // Renew expired sessions using the user's saved Public Only key. Never accept terms automatically.
@@ -450,6 +460,7 @@
     return authorized();
   }
   async function devAccept(key,platform){
+    if(apiGovernor.isKeySuspended(key))await requestIdentity(key,{revalidate:true});
     const registration=await devRequest('/api/auth/register','POST',{api_key:key,platform},'');
     if(!registration.token)throw Error('Registration returned no session');
     const token=registration.token;
@@ -587,7 +598,7 @@
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.82-dev</span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.83-dev</span></footer>';
   document.body.appendChild(panel);
   const headerBrand=panel.querySelector('.tu-logo');if(headerBrand){headerBrand.textContent='';headerBrand.classList.add('tu-brand-emblem');headerBrand.setAttribute('role','img');headerBrand.setAttribute('aria-label','Torn Utilities');}
   const identityLine=document.createElement('p');
@@ -813,7 +824,7 @@
         const savedKeys=document.createElement('div');savedKeys.style.cssText='margin:10px 0';let viewing=true,keyOperation=false;
         const guarded=action=>async()=>{if(keyOperation)return;keyOperation=true;try{await action()}finally{keyOperation=false;}};
         const reportError=()=>{status.textContent='Operation failed. Check the key, network connection and DEV session, then retry.'};
-        async function verifyEntry(key){const data=await requestIdentity(key),info=checkedKeyInfo(data);rememberVerifiedKey(key,info.level,info.playerId);if(key===readSavedKey())localStorage.setItem(LOGIN_ACCESS_KEY,info.level==='Limited Access'?'limited':'public');return {data,...info};}
+        async function verifyEntry(key){const data=await requestIdentity(key,{revalidate:true}),info=checkedKeyInfo(data);rememberVerifiedKey(key,info.level,info.playerId);if(key===readSavedKey())localStorage.setItem(LOGIN_ACCESS_KEY,info.level==='Limited Access'?'limited':'public');return {data,...info};}
         async function useForLogin(key){
           try{
             const checked=await verifyEntry(key);

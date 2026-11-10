@@ -1,5 +1,17 @@
 [
   {
+    "version": "0.5.42.83-dev",
+    "date": "2026-11-09",
+    "changes": {
+      "Torn API request safeguards": [
+        "Share a conservative client API budget across TU keys and transports",
+        "Suspend invalid, disabled or paused keys until explicit successful verification",
+        "Apply API cooldowns without retrying requests or changing website gameplay actions",
+        "Agreement 1.3 approved and queued separately; active agreement remains unchanged"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.82-dev",
     "date": "2026-11-09",
     "changes": {
