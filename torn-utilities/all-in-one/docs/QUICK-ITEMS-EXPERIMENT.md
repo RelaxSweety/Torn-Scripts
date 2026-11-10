@@ -100,3 +100,9 @@ After refresh/navigation the saved capacity ledger is intentionally invalidated.
 ## Test .12: resolve known hospitalization outcomes
 
 The .10 report confirmed AB+ consumption followed by profile state Abroad. That known status previously left the workflow on Confirming hospitalization. A consumed item followed by Abroad now automatically resolves to Waiting for available stock with an explanation that hospitalization was not confirmed; it never uses another bag automatically. Existing read-only reconciliation also resolves this case. A Hospital result with an unchanged extension deadline reports that no extension is confirmed while continuing to monitor the existing hospitalization. Later profile reads update known consumed-item status. Unknown responses and uncertain consumption remain blocked. Includes the .11 restored-capacity fix.
+
+## Test .13: fresh heal release evidence and purchase wording
+
+The .12 report showed an explicit live hospital-release response and confirmed bag removal, followed by a conflicting Hospital profile result. Explicit release plus verified consumption now advances healing automatically without waiting for a profile read. Partial heals still require status verification. A contradictory Hospital profile result during the next 30 seconds is recorded as a conflict rather than overwriting the fresh release evidence; later status changes are still accepted. Old hospital deadlines are cleared after confirmed release.
+
+Review purchase is renamed Buy selected quantity. This step clicks Torn's actual BUY button in the quantity panel; Confirm purchase then clicks Torn's Yes control. Neither is an informational acknowledgement. Inventory checks, result parsing and status messages require no user click.

@@ -30,6 +30,14 @@ export function createSnatchDirectItems({native,getPilot,getProfile,window,now=(
    onEvent({step:'direct-item-consumed',action:kind,itemId:result.itemId,slotId:result.slotId});
    proof={ownerId:run.ownerId,intentId:run.intentId,watchKey:run.watchKey,uncertain:true,consumed:true,kind,priorUntil:run.extensionPriorUntil||0,extendHospital:!!options.extendHospital,at:now()};
    if(!ensure())throw Error('Run changed after item consumption. No subsequent action was sent.');
+   // The live action response is newer than the cached profile selection.
+   // Only explicit release plus verified consumption qualifies; partial heals do not.
+   if(kind==='heal'&&result.hospitalRelease==='explicit-release-message-needs-status-check'){
+    proof={...proof,uncertain:false,hospitalized:false,released:true,hospitalUntil:null,releaseSource:'torn-use-response',releaseConfirmedAt:now(),at:now()};
+    lastStatus={at:now(),state:'Abroad',action:kind,source:'torn-use-response'};
+    onEvent({step:'direct-item-status',action:kind,status:'Abroad',source:'torn-use-response'});
+    return {medicalUsed:true,hospitalReleased:true,statusSource:'torn-use-response'};
+   }
    let timer;const profile=await Promise.race([getProfile(),new Promise((_,reject)=>{timer=window.setTimeout(()=>reject(Error('Hospital status verification timed out')),12000);})]).finally(()=>window.clearTimeout(timer));
    if(!ensure())throw Error('Run changed during hospital status verification.');
    const status=(profile?.profile||profile)?.status,state=status?.state;
@@ -56,8 +64,9 @@ export function createSnatchDirectItems({native,getPilot,getProfile,window,now=(
   if(!proof?.consumed)return;
   const status=(payload?.profile||payload)?.status,state=status?.state;
   if(!['Hospital','Abroad'].includes(state))return;
+  if(state==='Hospital'&&proof.releaseSource==='torn-use-response'&&now()-proof.releaseConfirmedAt<30000){lastStatus={at:now(),state,action:proof.kind,effectiveState:'Abroad',source:'torn-use-response',profileConflict:true};return;}
   proof={...proof,uncertain:false,hospitalized:state==='Hospital',released:state==='Abroad',hospitalUntil:state==='Hospital'&&Number.isFinite(status.until)?status.until*1000:null,at:now()};
   lastStatus={at:now(),state,action:proof.kind,reconciled:true};
  }
- return {...native,execute,cancel,observeProfile,forget(){cancel();proof=null;lastStatus=null;native.forget?.();},inspect(run){const base=native.inspect(run);if(!same(run))return base;if(proof.uncertain)return {...base,released:false,hospitalized:true,directItemUncertain:true};if(now()-proof.at>120000)return {...base,released:false,hospitalized:true,directItemUncertain:true};return {...base,released:proof.released,hospitalized:proof.hospitalized,hospitalUntil:proof.hospitalUntil,directItemConsumed:!!proof.consumed,directItemUncertain:false};},listInventory(){const pilot=getPilot(),inspection=pilot?.report().travelInspection;if(!inspection)return native.listInventory();return inspection.mappings.map(item=>({id:item.itemId,name:item.name,amount:1,source:'travel-direct-inventory'}));},report:()=>({active,lastStatus,proof:proof?{uncertain:proof.uncertain,hospitalized:proof.hospitalized,released:proof.released,consumed:!!proof.consumed,action:proof.kind||null,at:proof.at}:null})};
+ return {...native,execute,cancel,observeProfile,forget(){cancel();proof=null;lastStatus=null;native.forget?.();},inspect(run){const base=native.inspect(run);if(!same(run))return base;if(proof.uncertain)return {...base,released:false,hospitalized:true,directItemUncertain:true};if(now()-proof.at>120000)return {...base,released:false,hospitalized:true,directItemUncertain:true};return {...base,released:proof.released,hospitalized:proof.hospitalized,hospitalUntil:proof.hospitalUntil,directItemConsumed:!!proof.consumed,directItemUncertain:false};},listInventory(){const pilot=getPilot(),inspection=pilot?.report().travelInspection;if(!inspection)return native.listInventory();return inspection.mappings.map(item=>({id:item.itemId,name:item.name,amount:1,source:'travel-direct-inventory'}));},report:()=>({active,lastStatus,proof:proof?{uncertain:proof.uncertain,hospitalized:proof.hospitalized,released:proof.released,consumed:!!proof.consumed,action:proof.kind||null,source:proof.releaseSource||'profile',at:proof.at}:null})};
 }
