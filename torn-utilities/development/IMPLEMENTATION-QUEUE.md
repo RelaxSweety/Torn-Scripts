@@ -30,6 +30,14 @@ Added a Durable Object reservation budget before registration contacts Torn: at 
 
 The DEV Worker binding/migration is prepared only. Verify existing remote migration history and runtime behavior before an authorized deployment. No deployment, active agreement change, or client release is included.
 
+## Prepared next issue — session-bound multiplayer identity (deployment held)
+
+Authorization fixtures now cover expired/revoked sessions, account status, agreement/permission denial, administrator rejection and session ownership. Found and fixed caller-controlled Tic-Tac-Toe player identity: room creation/join now uses the verified server session, and room tokens require the corresponding authenticated player. No client protocol change is required. See [scope and compatibility](../all-in-one/docs/BACKEND-AUTHORIZATION.md). Worker deployment remains held; DEV client and agreement are unchanged.
+
+## Next identified issue — foreign submission authorization
+
+The checked-in router sends `/api/foreign/observations` and `/api/foreign/feedback` directly to their write handlers without a session/module authorization gate. Review the intended public-crowdsourcing policy, payload bounds and submission abuse protection; any authenticated submission change also needs compatible client transport. This finding is about source, not a verified live exploit. No change to those routes is included in the multiplayer patch.
+
 ## Remaining audit work
 
 Operational backend key/log protection and remaining PDA/session/callable-API exposures; current Torn scripting-rule/approval verification and the inherited Chat Archiver questions; backend-wide request/retention/access verification. Agreement UI/publication work stays queued under the explicit hold above.

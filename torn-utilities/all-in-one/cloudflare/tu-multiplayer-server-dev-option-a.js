@@ -125,7 +125,7 @@ async function agreementEvent(db, playerId, type, requestId, reason, agreement) 
   return { unchanged: false, event: recorded };
 }
 __name(agreementEvent, "agreementEvent");
-async function handleAuth(req, env, url) {
+async function handleAuth(req, env, url, authorizationContext = null) {
   const path = url.pathname;
   if (path === "/api/auth/agreement/current" && req.method === "GET") {
     try {
@@ -289,6 +289,7 @@ async function handleAuth(req, env, url) {
       if (!currentAgreement(await latestAgreement(env.FOREIGN_DB, session.torn_id), (await publishedAgreement(env)).agreement)) return respond({ allowed: false, reason: "Current agreement not accepted" }, 403);
       const permission = await db.prepare("SELECT allowed FROM tu_module_permissions WHERE torn_id=? AND module_id=?").bind(session.torn_id, moduleId).first();
       const allowed = session.role === "admin" || permission?.allowed === 1;
+      if (allowed && authorizationContext) authorizationContext.player = { id: String(session.torn_id), name: session.username };
       return respond({ allowed, module_id: moduleId, reason: allowed ? "Authorized" : "Module permission not granted" }, allowed ? 200 : 403);
     }
     if (path === "/api/auth/sessions") {
@@ -606,9 +607,9 @@ var protectedModules = [
   { pattern: new RegExp("^/api/battleship(?:/|$)"), id: "torn-fleet" },
   { pattern: new RegExp("^/api/rooms(?:/|$)"), id: "tic-tac-toe" }
 ];
-async function requireModuleAccess(req, env, moduleId) {
+async function requireModuleAccess(req, env, moduleId, authorizationContext) {
   const checkUrl = new URL("/api/auth/module-access?module_id=" + encodeURIComponent(moduleId), req.url);
-  const result = await handleAuth(new Request(checkUrl, { method: "GET", headers: { authorization: req.headers.get("authorization") || "" } }), env, checkUrl);
+  const result = await handleAuth(new Request(checkUrl, { method: "GET", headers: { authorization: req.headers.get("authorization") || "" } }), env, checkUrl, authorizationContext);
   if (result.status === 200) return null;
   return json({ error: "Module access denied", module_id: moduleId, authorization_status: result.status }, result.status);
 }
@@ -625,14 +626,10 @@ function outcome(b) {
 }
 __name(outcome, "outcome");
 var publicState = /* @__PURE__ */ __name((g) => ({ room: g.room, board: g.board, turn: g.turn, winner: g.winner, ready: !!g.players.O, version: g.version, names: g.names || { X: "Player X", O: "Player O" }, moves: g.moves || 0, round: g.round || 1, rematch: g.rematch || { X: false, O: false } }), "publicState");
+// Set only by the outer authenticated router; never derive identity from caller JSON.
 var playerName = /* @__PURE__ */ __name(async (req) => {
-  try {
-    const b = await req.json();
-    const name = String(b.name || "").trim(), id = String(b.playerId || "");
-    return /^[A-Za-z0-9_-]{2,32}$/.test(name) && /^\d{1,12}$/.test(id) ? { name, id } : null;
-  } catch {
-    return null;
-  }
+  const name = req.headers.get('x-tu-verified-name') || '', id = req.headers.get('x-tu-verified-id') || '';
+  return /^[A-Za-z0-9_-]{2,32}$/.test(name) && /^\d{1,12}$/.test(id) ? { name, id } : null;
 }, "playerName");
 var GameRoom = class {
   static {
@@ -667,7 +664,8 @@ var GameRoom = class {
     }
     const secret = req.headers.get("x-tu-room-token") || "";
     const symbol = secret && (g.players.X === secret ? "X" : g.players.O === secret ? "O" : null);
-    if (!symbol) return json({ error: "Unauthorized" }, 401);
+    const actor = await playerName(req);
+    if (!symbol || !actor || g.ids?.[symbol] !== actor.id) return json({ error: "Unauthorized" }, 401);
     if (req.method === "GET" && url.pathname.endsWith("/state")) return json({ symbol, game: publicState(g) });
     if (req.method === "POST" && url.pathname.endsWith("/rematch")) {
       if (!g.players.O) return json({ error: "Waiting for opponent" }, 409);
@@ -918,8 +916,14 @@ async function routeWorkerRequest(req,env){
   if (url.pathname.startsWith("/api/auth/")) return handleAuth(req, env, url);
   const protectedModule = protectedModules.find((p) => p.pattern.test(url.pathname));
   if (protectedModule) {
-    const denied = await requireModuleAccess(req, env, protectedModule.id);
+    const authorizationContext = {};
+    const denied = await requireModuleAccess(req, env, protectedModule.id, authorizationContext);
     if (denied) return denied;
+    if (!authorizationContext.player) return respond({ error: 'Verified identity unavailable' }, 503);
+    const trustedHeaders = new Headers(req.headers);
+    trustedHeaders.set('x-tu-verified-id', authorizationContext.player.id);
+    trustedHeaders.set('x-tu-verified-name', authorizationContext.player.name);
+    req = new Request(req, { headers: trustedHeaders });
   }
   if (url.pathname === "/api/foreign/observations") return submitForeignSnapshot(req, env);
   if (url.pathname === "/api/foreign/feedback") return submitTravelFeedback(req, env);
