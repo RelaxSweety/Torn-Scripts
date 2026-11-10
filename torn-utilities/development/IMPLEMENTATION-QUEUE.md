@@ -8,6 +8,8 @@ The user approved [this exact agreement draft](../agreements/drafts/1.3-approved
 
 SHA-256 of approved draft: `ca2902b5cb38dd69ebdcd2c6cd8b0e7aa816796ccd339e81668df31a199e9d25`.
 
+A separate [revised review draft](../agreements/drafts/1.3-revised-review-draft.md) now incorporates the prepared storage/session/reporting changes. Wrapped [PDF](../agreements/drafts/1.3-revised-review-draft.pdf) and [HTML](../agreements/drafts/1.3-revised-review-draft.html) review copies are available. This revision is pending review; the exact previously approved draft is preserved and no agreement is activated.
+
 Current active checked-in agreement remains 1.2 / number 3. The draft proposes 1.3 / number 4; check availability before eventual publication. Approval of the draft does not fill its private-support-contact placeholder or establish deployed retention/logging controls or the external YATA terms URL. Preserve the approval; resolve these publication details during implementation without treating the entire draft as unapproved again.
 
 Required eventual work: finish the private contact/external terms details; verify operational claims; render the disclosure table at every key-entry surface; verify opt-in and key/data behavior; test renewed acceptance; then publish to DEV only when authorized. Never publish merely by updating the active manifest as a bookkeeping step.
