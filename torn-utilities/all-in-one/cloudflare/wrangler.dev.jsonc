@@ -33,6 +33,10 @@
       {
         "name": "REGISTRATION_BUDGET",
         "class_name": "RegistrationBudget"
+      },
+      {
+        "name": "SUBMISSION_BUDGET",
+        "class_name": "SubmissionBudget"
       }
     ]
   },
@@ -46,6 +50,12 @@
       "tag": "registration-budget-v1",
       "new_sqlite_classes": [
         "RegistrationBudget"
+      ]
+    },
+    {
+      "tag": "submission-budget-v1",
+      "new_sqlite_classes": [
+        "SubmissionBudget"
       ]
     }
   ]

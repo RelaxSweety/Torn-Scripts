@@ -12,7 +12,7 @@ A prepared client adapter adds the TU bearer session only to these exact DEV sub
 
 ## Unpublished client validation
 
-Run `npm run test:foreign-submissions` to generate a preview under `/tmp` and test actual integrated queued reporting with simulated PDA POST, GM and fetch. The preview has a distinct version suffix and automatic updates disabled. It is a test artifact, not a release or installation recommendation. No rolling or immutable published release is written.
+Run `npm run test:foreign-submissions` to generate a preview under `/tmp` and test actual integrated queued reporting with simulated PDA POST, GM and fetch. The preview uses the next DEV version (.85 for this batch) and automatic updates disabled. It is a test artifact, not a release or installation recommendation. No rolling or immutable published release is written.
 
 Normal `node scripts/build-dev.mjs --check` still verifies the original .84 artifacts byte for byte. The preview-only integration must be promoted into a separately versioned client release before rollout. `npm run test:backend-safety` checks successful authorized writes, unauthorized rejection, streamed body cancellation and feedback field minimization in controlled database fixtures. These tests do not establish live Cloudflare/PDA app behavior.
 
@@ -20,4 +20,6 @@ Normal `node scripts/build-dev.mjs --check` still verifies the original .84 arti
 
 Current published .84 clients lack authenticated submission headers. Deploying this Worker source alone would reject their queued submissions. Plan and validate a compatible client-first rollout/version requirement before any separately authorized Worker deployment. Do not introduce an anonymous-write fallback to conceal that incompatibility. No migration of historical observations or newly stored player identities is included.
 
-Authorization does not prevent a permitted account from fabricating data or flooding write handlers. Per-account/global submission rate limits, historical-data validation, operator controls and retention still require separate work. Public stock read endpoints remain public; authentication changes here apply to writes. No claim is made that these routes are already secured in the live deployment.
+Authorization does not prevent a permitted account from fabricating data or flooding write handlers. Per-account/IP/global submission rate limits and ambiguous-time filtering are now prepared in the security candidate; independent truth verification, operator controls and retention remain separate operational work. Public stock read endpoints remain public; authentication changes here apply to writes. No claim is made that these routes are already secured in the live deployment.
+
+The consolidated candidate also hardens sessions, upload cooldown/receipts and multiplayer/admin handling; see [current security scope](SECURITY-CANDIDATE.md).

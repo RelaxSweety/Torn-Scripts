@@ -1,0 +1,20 @@
+# TU assessment against the rules text supplied in this chat
+
+Primary reference: the user's pasted Torn API documentation (including the attached `Pasted text.txt`, 17,500 bytes). This is the assessment basis; the user is not being asked to paste it again. The retrieved API page was a secondary cross-check, not a replacement for the supplied text.
+
+| Supplied requirement | Assessment and implementation evidence |
+| --- | --- |
+| Never request Torn passwords; identify users from their API key | Registration uses key/info and user/basic, accepts a key and platform, and rejects unknown registration fields. Verified identity is used instead of caller-provided game identity. |
+| Protect keys and obtained information | .84 private key storage plus candidate private sessions/capabilities reduce exposure. Backend source hashes stored session tokens and excludes raw keys from DB bindings/errors. PDA origin storage, revealed DOM values, provider logs, backups and operator access remain explicit limits; confidentiality is not declared fully verified. |
+| Retrieve only required information | Candidate API paths are narrowly scoped; enabled travel reads have explicit selections and Limited Access checks. Caches and client budgets reduce unnecessary reads. No Full Access registration. |
+| Clearly show storage, sharing, purpose, key handling and access at key entry | The approved draft and new inert table component are prepared. Live UI publication is deliberately incomplete under the user's agreement hold; it must not be marked compliant merely because a draft exists. |
+| Use keys only for described purposes; disclose integrations | Distinguish Torn verification/API reads, TU stock/game services, Cloudflare/GitHub, and backend YATA data collection. No raw registration key is sent to YATA. Applicable provider/source conditions, contact and operational retention still need completion before agreement publication. |
+| 100 requests/minute/user across keys; 5,000/minute/service IP; stop invalid/disabled keys | Client governor reserves a shared TU browser budget and suspends rejected keys. Worker registration separately reserves both potential reads with global/key/IP limits; rate failures differ from invalid credentials. Unrelated tools, other account keys and shared Cloudflare outbound IP traffic are not controlled or proven by TU. |
+| No advertising/charging exceptions without contacting Torn | No new advertising, donation, payment or monetization flow is introduced in this change. This is not an audit of external commercial arrangements. |
+| All services must also comply with Torn scripting rules | The supplied API text explicitly references separate scripting rules. It does not spell out approval for all website actions. The user's reported Quick Items approval is relevant evidence for that pattern, not blanket approval of every TU feature. |
+
+Snatch and Run's website POSTs are gameplay actions using the signed-in website session, not writes through the read-only public API. Changing a simulated click into a POST is not, by itself, proof of compliance. Tests enforce a fresh trusted gesture per gameplay step, no automatic replay of uncertain item use, verified travel slot mapping, response reconciliation and automatic informational checks. The separate review brief records the exact behavior to compare with any additional scripting wording/approval already available.
+
+Chat Archiver's automatic history scrolling and React/tooltip-derived message metadata are a distinct inherited behavior. Do not certify it based on the API text or on Quick Items approval. No speculative feature removal or new claim of Torn certification is made here.
+
+Conclusion: technical safeguards and test evidence are prepared, with important client safeguards already in .84. The full release cannot be certified unconditionally while disclosure publication is held and operational/feature-scope evidence remains unverified. The checklist separates completed code from those remaining gates.

@@ -1,5 +1,7 @@
 # Implementation queue
 
+Current consolidated status: [change implementation checklist](CHANGE-IMPLEMENTATION-CHECKLIST.md).
+
 ## Approved agreement 1.3 — queued, explicitly not implemented
 
 The user approved [this exact agreement draft](../agreements/drafts/1.3-approved-not-active.md) in this conversation and explicitly instructed that it not yet be implemented. Do not edit the active agreement manifest, serve this text as current, trigger renewed acceptance, or deploy agreement changes until the user authorizes implementation.
@@ -38,8 +40,16 @@ Authorization fixtures now cover expired/revoked sessions, account status, agree
 
 The Worker source now requires active Item Monitor authorization and current agreement acceptance for observation/feedback writes. Observation and feedback bodies are stream-bounded, and feedback projection storage uses only defined fields. Client compatibility is prepared in an unpublished builder preview covering PDA POST, GM and fetch; default `.84` artifacts remain byte-for-byte unchanged. End-to-end preview tests confirm authenticated queued stock delivery. See [coordinated rollout and limits](../all-in-one/docs/FOREIGN-SUBMISSION-AUTHORIZATION.md).
 
-Do not deploy this Worker without the compatible client rollout: current published `.84` stock reports do not carry the new session header. No Worker deployment or client publication is included here. Next review: per-account/global submission write-rate limits and data-integrity safeguards; authorization alone does not prove an observation is accurate. Other multiplayer seat ownership and administrator mutation races remain audit work.
+Do not deploy this Worker without the compatible client rollout: current published `.84` stock reports do not carry the new session header. No Worker deployment or client publication is included here.
 
-## Remaining audit work
+## Completed remaining code preparation — unpublished .85 security candidate
 
-Operational backend key/log protection and remaining PDA/session/callable-API exposures; current Torn scripting-rule/approval verification and the inherited Chat Archiver questions; backend-wide request/retention/access verification. Agreement UI/publication work stays queued under the explicit hold above.
+Prepared shared foreign-write limits, strict stock values/conflict filtering, all multiplayer seat ownership and serialized mutations, atomic guarded administrator writes, concurrent registration restriction checks, private session-token storage/cache-marker migration, a private integrated capability bridge, narrow API paths, and enforced stock-upload cooldown/receipt validation. The disclosure table component is prepared but not mounted under the agreement hold. See [security candidate scope](../all-in-one/docs/SECURITY-CANDIDATE.md).
+
+The standard .84 build remains unchanged. The .85 candidate can be built under /tmp; `securityBundle: true` is prepared for eventual versioned promotion, not enabled on the .84 release entry. Full suite, isolated candidate build, SQLite tests and local Cloudflare validation are recorded in the checklist/evidence report.
+
+## Remaining release/operational gates
+
+No further generic “next issue” loop is needed for this preparation batch. Execute the checklist in order when authorized: inspect remote migration history and Cloudflare access/log/retention controls; confirm supported host behavior and compatibility; promote the client before enabling authenticated Worker writes; perform DEV smoke tests/monitoring and rollback checks. Recreate legacy multiplayer rooms lacking verified IDs.
+
+Agreement UI/publication stays explicitly held. Review the separate storage/disclosure amendment, private contact, YATA/source conditions and final metadata before eventual implementation. Use the rules text already supplied in this conversation; retain the distinction between its API requirements and any separate scripting approval scope. No blanket compliance certification or production change is claimed.

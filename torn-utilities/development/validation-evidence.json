@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "status": "prepared-not-deployed",
+  "generatedAtUtc": "2026-11-10T02:31:11.395946+00:00",
+  "generatedAtDenver": "2026-11-09T19:31:11.395946-07:00",
+  "versions": {
+    "publishedClient": "0.5.42.84-dev",
+    "unpublishedCandidate": "0.5.42.85-dev",
+    "activeAgreement": "1.2",
+    "approvedAgreement": "1.3",
+    "agreementImplementationHeld": true
+  },
+  "rulesReference": {
+    "basis": "User-supplied API documentation pasted in this conversation and uploaded Pasted text.txt",
+    "suppliedFileBytes": 17500,
+    "suppliedFileSha256": "dfbaadc5c5c7e816fa2f43bec492512fe991cab1591efa38511e9ddedb60d706",
+    "interpretation": "API ToS requirements assessed directly; the text also references separate scripting rules. No blanket feature certification or independent staff approval verification."
+  },
+  "validation": [
+    {
+      "check": "Published baseline build/diagnostics checks plus npm test",
+      "result": "pass",
+      "exitCode": 0,
+      "logSha256": "9317743e217c181f29b28249d819925e0c8572bbb4b059bb606a152beb6f05ee"
+    },
+    {
+      "check": "Isolated normal .85 build plus full npm test",
+      "result": "pass",
+      "exitCode": 0,
+      "logSha256": "ef91c505bc1541fbc2994a827676fadead0abb98388577de02b61990de9cda35"
+    },
+    {
+      "check": "Wrangler 4.159.0 deploy --dry-run",
+      "result": "pass",
+      "deployed": false,
+      "logSha256": "3f45f9cb00407b737684f5f643d2288db905d7491de88a9ef2401554a7eff2d7"
+    },
+    {
+      "check": "Miniflare 5.20261109.0-beta/workerd local SQLite Durable Objects and D1 smoke",
+      "result": "pass",
+      "remoteChanges": false,
+      "logSha256": "7d532babb870b0c28d44822ed176b03fbf96ef09a1a7742befaad92b5316656f"
+    }
+  ],
+  "artifactSha256": {
+    "publishedImmutable84": "f5c393f715df525b99254a82c9a03e434a0c53004eabd46dafd95a277a567ec6",
+    "unpublished85Preview": "e262a9e16e306f15108cfd9f9d9e79db4c75fdc957c7f4ad27c05cd33c70872a",
+    "isolatedNormal85Build": "5417a7f84be32ad38f2a69f17d0464e5d728555dcda4e17c5390d288159c91b9",
+    "approvedUnchangedDraft": "ca2902b5cb38dd69ebdcd2c6cd8b0e7aa816796ccd339e81668df31a199e9d25",
+    "activeAgreementManifest": "2cadce96a94f8466d5ae15087291e01c85316f5a3bf668a21acf14ca2b764837",
+    "workerDryRunBundle": "66987d1a60ea3d80f226bf531b3af52b1b5e87f17470e84ed3af4b3f19ad779a"
+  },
+  "preparedSourceSha256": {
+    "cloudflare/tu-multiplayer-server-dev-option-a.js": "cc0c95a7460de7baa47a300b575ec7cfddc26695c4124365ab831384f7cc5608",
+    "cloudflare/registration-budget.js": "799a4c9060ce2c09d782417eaab7b9b67ce56790ac2eafa45cc7dcd50803fb9f",
+    "cloudflare/submission-budget.js": "5177f996a4f687154402dfe194ae0b84fda4387844c1f5294cbc1108577f061d",
+    "cloudflare/wrangler.dev.jsonc": "f95bacccc819ee0276ac0d94ac31f402e2a0adb966b5094651ad3f2b4cd7015d",
+    "scripts/build-dev.mjs": "26225bdb08a218b56fc8427a69b0c1717718379047f24c647984d5dbf3efbbec",
+    "scripts/integrate-security-candidate.mjs": "601e47cca7d97c4b8e4a66cac410d81874e214ec997ecbfeaeeea787695171ce",
+    "src/adapters/session-token-store.js": "58e78958725a0fa92a39f1ee2cadd558b17e818c60579414e1f4a9e15a200f39",
+    "src/adapters/scoped-api-path.js": "e016cddee7ffafbbeb24d8ac43d27938b25d1f68ba1e769104b15785a11e9d01",
+    "src/adapters/submission-delivery.js": "43bb8f0867b8a095773361df3edbcd6f7b8bd4b0a411a92b6b7ec860f7a49e09",
+    "src/adapters/foreign-submission.js": "bc782baa0b848c5bdef174f007821232104c0140b8dff32de0ecbaef3e5e717d",
+    "src/features/api-disclosure.js": "e2cef0cbe2faed79c6a1430673cb9b03ad617a5d1831a2ca06529189ad28cd02"
+  },
+  "operationalLimits": [
+    "No configured Cloudflare connector or credential environment variables were available; remote account/migration/log/access/retention state was not inspected.",
+    "No real Torn consumptive actions or actual PDA-device smoke tests performed.",
+    "Client publication, Worker deployment and approved-agreement implementation were not performed.",
+    "Alarm expiry cleanup has deterministic unit tests; local runtime confirms scheduling but does not establish live alarm execution."
+  ]
+}

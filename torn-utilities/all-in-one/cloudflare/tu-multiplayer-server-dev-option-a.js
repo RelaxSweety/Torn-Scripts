@@ -1,3 +1,4 @@
+import { SubmissionBudget } from './submission-budget.js';
 import { RegistrationBudget } from './registration-budget.js';
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
@@ -14,12 +15,14 @@ async function limitedJson(req, maxBytes = 2048) {
   const length=req.headers.get('content-length');
   if(length!==null&&(!Number.isSafeInteger(Number(length))||Number(length)<0||Number(length)>maxBytes))return null;
   const reader=req.body?.getReader();if(!reader)return null;
-  const chunks=[];let total=0;
+  const chunks=[];let total=0,timedOut=false;
+  const deadline=setTimeout(()=>{timedOut=true;void reader.cancel().catch(()=>{});},5000);
   try{
     while(true){const {done,value}=await reader.read();if(done)break;total+=value.byteLength;if(total>maxBytes){try{await reader.cancel();}catch{}return null;}chunks.push(value);}
+    if(timedOut)return null;
     const bytes=new Uint8Array(total);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
     return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
-  }catch{return null;}finally{reader.releaseLock();}
+  }catch{return null;}finally{clearTimeout(deadline);reader.releaseLock();}
 }
 __name(limitedJson, "limitedJson");
 function verificationFailure(code,status,tornErrorCode){return Object.assign(Error('Torn verification failed'),{code,status,...(Number.isSafeInteger(tornErrorCode)?{tornErrorCode}:{})});}
@@ -174,7 +177,8 @@ async function handleAuth(req, env, url, authorizationContext = null) {
       if (previous?.account_status === "suspended" || previous?.account_status === "revoked") return respond({ error: "Account restricted" }, 403);
       await db.prepare("INSERT INTO tu_users(torn_id,username,account_status,verified_at,created_at,updated_at) VALUES(?,?,'pending',?,?,?) ON CONFLICT(torn_id) DO UPDATE SET username=excluded.username,verified_at=excluded.verified_at,updated_at=excluded.updated_at").bind(identity.id, identity.username, t, t, t).run();
       const secret = crypto.randomUUID() + "." + crypto.randomUUID(), hash2 = await digest(secret), id = crypto.randomUUID(), expiry = t + 86400;
-      await db.prepare("INSERT INTO tu_sessions(id,torn_id,token_hash,platform,created_at,expires_at) VALUES(?,?,?,?,?,?)").bind(id, identity.id, hash2, body.platform, t, expiry).run();
+      const created = await db.prepare("INSERT INTO tu_sessions(id,torn_id,token_hash,platform,created_at,expires_at) SELECT ?,torn_id,?,?,?,? FROM tu_users WHERE torn_id=? AND account_status NOT IN ('suspended','revoked')").bind(id, hash2, body.platform, t, expiry, identity.id).run();
+      if (!created.meta?.changes) return respond({error:'Account restricted'},403);
       await audit(db, "auth.register", identity.id, identity.id);
       return respond({ token: secret, expires_at: expiry, verified: true, accessLevel: identity.accessLevel, playerId: identity.id, player: { torn_id: identity.id, username: identity.username, account_status: previous?.account_status || "pending" } }, 201);
     } catch {
@@ -209,6 +213,7 @@ async function handleAuth(req, env, url, authorizationContext = null) {
       const existing = await ledger.prepare("SELECT player_id,event_type FROM tu_agreement_events WHERE request_id=?").bind(body.request_id).first();
       if (existing) {
         if (existing.player_id !== session.torn_id || existing.event_type !== body.action) return respond({ error: "Request ID conflict" }, 409);
+        if (body.action === 'cancelled') await db.prepare("UPDATE tu_sessions SET revoked_at=? WHERE torn_id=? AND revoked_at IS NULL").bind(now(),session.torn_id).run();
         return respond({ ok: true, unchanged: true, agreement: AGREEMENT });
       }
       let outcome2;
@@ -239,7 +244,7 @@ async function handleAuth(req, env, url, authorizationContext = null) {
       const body = await limitedJson(req);
       const target = Number(body?.torn_id);
       if (!Number.isSafeInteger(target) || target <= 0) return respond({ error: "Invalid Torn ID" }, 400);
-      const result = await db.prepare("UPDATE tu_users SET account_status='active',updated_at=? WHERE torn_id=? AND account_status='pending' AND role='user'").bind(now(), target).run();
+      const result = await db.prepare("UPDATE tu_users SET account_status='active',updated_at=? WHERE torn_id=? AND account_status='pending' AND role='user' AND EXISTS(SELECT 1 FROM tu_users actor WHERE actor.torn_id=? AND actor.role='admin' AND actor.account_status='active')").bind(now(), target, session.torn_id).run();
       if (!result.meta?.changes) return respond({ error: "No pending user found" }, 404);
       await audit(db, "auth.approve", session.torn_id, target);
       return respond({ ok: true, torn_id: target, account_status: "active" });
@@ -262,8 +267,10 @@ async function handleAuth(req, env, url, authorizationContext = null) {
       if (user.account_status === "revoked" && status !== "revoked") return respond({ error: "Revoked accounts cannot be reactivated" }, 409);
       if (user.account_status === "pending" && status === "active") return respond({ error: "Approve pending accounts through the approval endpoint" }, 409);
       if (user.account_status === status) return respond({ ok: true, torn_id: target, account_status: status, unchanged: true });
-      await db.prepare("UPDATE tu_users SET account_status=?,updated_at=? WHERE torn_id=? AND role='user'").bind(status, now(), target).run();
-      if (status !== "active") await db.prepare("UPDATE tu_sessions SET revoked_at=? WHERE torn_id=? AND revoked_at IS NULL").bind(now(), target).run();
+      const writes = [db.prepare("UPDATE tu_users SET account_status=?,updated_at=? WHERE torn_id=? AND role='user' AND account_status=? AND EXISTS(SELECT 1 FROM tu_users actor WHERE actor.torn_id=? AND actor.role='admin' AND actor.account_status='active')").bind(status, now(), target, user.account_status, session.torn_id)];
+      if (status !== 'active') writes.push(db.prepare("UPDATE tu_sessions SET revoked_at=? WHERE torn_id=? AND revoked_at IS NULL AND EXISTS(SELECT 1 FROM tu_users target WHERE target.torn_id=? AND target.role='user' AND target.account_status=?) AND EXISTS(SELECT 1 FROM tu_users actor WHERE actor.torn_id=? AND actor.role='admin' AND actor.account_status='active')").bind(now(),target,target,status,session.torn_id));
+      const [changed] = await db.batch(writes);
+      if (!changed.meta?.changes) return respond({error:'Account changed; refresh before retrying'},409);
       await audit(db, "auth.status." + status, session.torn_id, target);
       return respond({ ok: true, torn_id: target, account_status: status });
     }
@@ -276,7 +283,8 @@ async function handleAuth(req, env, url, authorizationContext = null) {
       const user = await db.prepare("SELECT role FROM tu_users WHERE torn_id=?").bind(target).first();
       if (!user) return respond({ error: "User not found" }, 404);
       if (user.role === "admin") return respond({ error: "Cannot change administrator permissions" }, 403);
-      await db.prepare("INSERT INTO tu_module_permissions(torn_id,module_id,allowed,updated_at,updated_by) VALUES(?,?,?,?,?) ON CONFLICT(torn_id,module_id) DO UPDATE SET allowed=excluded.allowed,updated_at=excluded.updated_at,updated_by=excluded.updated_by").bind(target, moduleId, allowed ? 1 : 0, now(), session.torn_id).run();
+      const changed = await db.prepare("INSERT INTO tu_module_permissions(torn_id,module_id,allowed,updated_at,updated_by) SELECT torn_id,?,?,?,? FROM tu_users WHERE torn_id=? AND role='user' AND EXISTS(SELECT 1 FROM tu_users actor WHERE actor.torn_id=? AND actor.role='admin' AND actor.account_status='active') ON CONFLICT(torn_id,module_id) DO UPDATE SET allowed=excluded.allowed,updated_at=excluded.updated_at,updated_by=excluded.updated_by WHERE EXISTS(SELECT 1 FROM tu_users target WHERE target.torn_id=? AND target.role='user')").bind(moduleId, allowed ? 1 : 0, now(), session.torn_id, target, session.torn_id, target).run();
+      if (!changed.meta?.changes) return respond({error:'Account changed; refresh before retrying'},409);
       await audit(db, "auth.permission." + (allowed ? "allow" : "deny"), session.torn_id, target);
       return respond({ ok: true, torn_id: target, module_id: moduleId, allowed });
     }
@@ -332,12 +340,12 @@ async function submitForeignSnapshot(req, env) {
   if (size > 16e3) return reply({ error: "Payload too large" }, 413);
   const data = await limitedJson(req, 16000);
   if (!data || Array.isArray(data)) return reply({ error: 'Invalid or oversized JSON' }, 400);
-  const country = String(data?.country || "").toLowerCase(), observed = Number(data?.observed_at), items = data?.items;
+  const country = String(data?.country || "").toLowerCase(), observed = data?.observed_at, items = data?.items;
   const now2 = Math.floor(Date.now() / 1e3);
   if (!countries.has(country) || !Number.isSafeInteger(observed) || observed > now2 + 300 || observed < now2 - 90 * 86400 || !Array.isArray(items) || items.length < 1 || items.length > 50) return reply({ error: "Invalid observation" }, 400);
   const seen = /* @__PURE__ */ new Set(), rows = [];
   for (const item of items) {
-    const id = Number(item?.item_id), quantity = Number(item?.quantity), price = item?.unit_price == null ? null : Number(item.unit_price);
+    const id = item?.item_id, quantity = item?.quantity, price = item?.unit_price == null ? null : item.unit_price;
     if (!Number.isSafeInteger(id) || id <= 0 || seen.has(id) || !Number.isSafeInteger(quantity) || quantity < 0 || quantity > 1e9 || price !== null && (!Number.isSafeInteger(price) || price < 0 || price > 1e9)) return reply({ error: "Invalid item" }, 400);
     seen.add(id);
     rows.push({ id, quantity, price });
@@ -380,7 +388,7 @@ function estimateRestock(events, now2 = Math.floor(Date.now() / 1e3), leadSecond
 }
 __name(estimateRestock, "estimateRestock");
 async function directSeries(db, country, id, limit = 500) {
-  const { results } = await db.prepare("SELECT observed_bucket AS source_observed_at,quantity,unit_price,received_at AS collected_at,source AS provider FROM foreign_direct_observations WHERE country=? AND item_id=? ORDER BY observed_bucket DESC LIMIT ?").bind(country, id, limit).all();
+  const { results } = await db.prepare("SELECT observed_bucket AS source_observed_at,MIN(quantity) AS quantity,MAX(unit_price) AS unit_price,MAX(received_at) AS collected_at,MIN(source) AS provider FROM foreign_direct_observations WHERE country=? AND item_id=? GROUP BY observed_bucket HAVING COUNT(DISTINCT quantity)=1 ORDER BY observed_bucket DESC LIMIT ?").bind(country, id, limit).all();
   return results.reverse();
 }
 __name(directSeries, "directSeries");
@@ -411,7 +419,7 @@ async function foreignOverview(env) {
      (SELECT COUNT(*) FROM foreign_restock_events e WHERE e.country=o.country AND e.item_id=o.item_id) AS restock_occurrences
    FROM foreign_stock_observations o
    GROUP BY o.country,o.item_id ORDER BY o.country,o.item_id`).all();
-    const { results: directGroups } = await db.prepare("SELECT country,item_id,COUNT(*) AS observations,MAX(observed_bucket) AS latest_observed_at FROM foreign_direct_observations GROUP BY country,item_id").all();
+    const { results: directGroups } = await db.prepare("SELECT country,item_id,COUNT(*) AS observations,MAX(observed_bucket) AS latest_observed_at FROM (SELECT country,item_id,observed_bucket FROM foreign_direct_observations GROUP BY country,item_id,observed_bucket HAVING COUNT(DISTINCT quantity)=1) GROUP BY country,item_id").all();
     const directMap = new Map(directGroups.map((x) => [x.country + ":" + x.item_id, x]));
     const combined = new Map(rows.map((x) => [x.country + ":" + x.item_id, { ...x, yata_observations: x.observations, direct_observations: 0 }]));
     for (const d of directGroups) {
@@ -422,7 +430,7 @@ async function foreignOverview(env) {
       entry.observations += d.observations;
       if (d.latest_observed_at > entry.latest_observed_at) {
         entry.latest_observed_at = d.latest_observed_at;
-        const latest = await db.prepare("SELECT quantity FROM foreign_direct_observations WHERE country=? AND item_id=? ORDER BY observed_bucket DESC LIMIT 1").bind(d.country, d.item_id).first();
+        const latest = await db.prepare("SELECT MIN(quantity) AS quantity FROM foreign_direct_observations WHERE country=? AND item_id=? GROUP BY observed_bucket HAVING COUNT(DISTINCT quantity)=1 ORDER BY observed_bucket DESC LIMIT 1").bind(d.country, d.item_id).first();
         entry.latest_quantity = latest?.quantity ?? entry.latest_quantity;
       }
     }
@@ -624,6 +632,7 @@ var playerName = /* @__PURE__ */ __name(async (req) => {
   const name = req.headers.get('x-tu-verified-name') || '', id = req.headers.get('x-tu-verified-id') || '';
   return /^[A-Za-z0-9_-]{2,32}$/.test(name) && /^\d{1,12}$/.test(id) ? { name, id } : null;
 }, "playerName");
+async function readRoomJson(req) { const body=await limitedJson(req);if(!body||typeof body!=='object'||Array.isArray(body))throw Error('Invalid room JSON');return body; }
 var GameRoom = class {
   static {
     __name(this, "GameRoom");
@@ -631,7 +640,8 @@ var GameRoom = class {
   constructor(state) {
     this.state = state;
   }
-  async fetch(req) {
+  fetch(req) { return this.state.blockConcurrencyWhile(() => this.handleRequest(req)); }
+  async handleRequest(req) {
     const url = new URL(req.url), room = url.pathname.split("/")[2], g = await this.state.storage.get("game");
     if (req.method === "POST" && url.pathname.endsWith("/create")) {
       if (g) return json({ error: "Room exists" }, 409);
@@ -680,7 +690,7 @@ var GameRoom = class {
     if (req.method === "POST" && url.pathname.endsWith("/move")) {
       let body;
       try {
-        body = await req.json();
+        body = await readRoomJson(req);
       } catch {
         return json({ error: "Invalid JSON" }, 400);
       }
@@ -747,34 +757,43 @@ var ArcadeRoom = class {
   constructor(state) {
     this.state = state;
   }
-  async fetch(req) {
+  fetch(req) { return this.state.blockConcurrencyWhile(() => this.handleRequest(req)); }
+  async handleRequest(req) {
     const url = new URL(req.url), parts = url.pathname.split("/"), room = parts[2], kind = parts[3], action = parts[4];
     let g = await this.state.storage.get("game");
     if (action === "create" && req.method === "POST") {
       if (g) return json({ error: "Room exists" }, 409);
+      const identity = await playerName(req);
+      if (!identity) return json({error:'Verified identity required'},401);
       const secret2 = token();
-      g = { room, kind, board: newBoard(kind), players: { X: secret2, O: null }, turn: "X", winner: null, moves: 0, ships: { X: null, O: null }, shots: { X: [], O: [] } };
+      g = { ids:{X:identity.id,O:null}, room, kind, board: newBoard(kind), players: { X: secret2, O: null }, turn: "X", winner: null, moves: 0, ships: { X: null, O: null }, shots: { X: [], O: [] } };
       await this.state.storage.put("game", g);
       return json({ room, token: secret2, symbol: "X", game: safeState(g, "X") }, 201);
     }
     if (!g || g.kind !== kind) return json({ error: "Room not found" }, 404);
     if (action === "join" && req.method === "POST") {
       if (g.players.O) return json({ error: "Room full" }, 409);
+      const identity = await playerName(req);
+      if (!identity) return json({error:'Verified identity required'},401);
+      if (!g.ids?.X) return json({error:'Recreate this legacy room'},409);
+      if (g.ids.X === identity.id) return json({error:'Cannot join your own room'},409);
       const secret2 = token();
+      g.ids.O = identity.id;
       g.players.O = secret2;
       await this.state.storage.put("game", g);
       return json({ room, token: secret2, symbol: "O", game: safeState(g, "O") });
     }
     const secret = req.headers.get("x-tu-room-token") || "";
     const symbol = secret && (g.players.X === secret ? "X" : g.players.O === secret ? "O" : null);
-    if (!symbol) return json({ error: "Unauthorized" }, 401);
+    const actor = await playerName(req);
+    if (!symbol || !actor || g.ids?.[symbol] !== actor.id) return json({ error: "Unauthorized" }, 401);
     if (action === "state" && req.method === "GET") return json({ symbol, game: safeState(g, symbol) });
     if (action === "move" && req.method === "POST") {
       if (!g.players.O) return json({ error: "Waiting for opponent" }, 409);
       if (g.winner) return json({ error: "Game finished" }, 409);
       let body;
       try {
-        body = await req.json();
+        body = await readRoomJson(req);
       } catch {
         return json({ error: "Invalid JSON" }, 400);
       }
@@ -830,20 +849,23 @@ var MarbleRoom = class {
   constructor(state) {
     this.state = state;
   }
-  async fetch(req) {
+  fetch(req) { return this.state.blockConcurrencyWhile(() => this.handleRequest(req)); }
+  async handleRequest(req) {
     const parts = new URL(req.url).pathname.split("/"), room = parts[2], action = parts[3];
     let g = await this.state.storage.get("game");
     if (action === "create" && req.method === "POST") {
       if (g) return json({ error: "Room exists" }, 409);
       let b = {};
       try {
-        b = await req.json();
+        b = await readRoomJson(req);
       } catch {
       }
       const count = b.count;
       if (!Number.isInteger(count) || count < 2 || count > 4) return json({ error: "Choose 2\u20134 players" }, 400);
+      const identity = await playerName(req);
+      if (!identity) return json({error:'Verified identity required'},401);
       const secret2 = token();
-      g = { room, count, players: [secret2, ...Array(count - 1).fill(null)], turn: 0, marbles: Array.from({ length: count }, () => [-1, -1, -1]), roll: null, rolls: 0, moves: 0, winner: null };
+      g = { ids:[identity.id,...Array(count-1).fill(null)], room, count, players: [secret2, ...Array(count - 1).fill(null)], turn: 0, marbles: Array.from({ length: count }, () => [-1, -1, -1]), roll: null, rolls: 0, moves: 0, winner: null };
       await this.state.storage.put("game", g);
       return json({ room, token: secret2, player: 0, game: marblePublic(g) }, 201);
     }
@@ -851,13 +873,19 @@ var MarbleRoom = class {
     if (action === "join" && req.method === "POST") {
       const p2 = g.players.indexOf(null);
       if (p2 < 0) return json({ error: "Room full" }, 409);
+      const identity = await playerName(req);
+      if (!identity) return json({error:'Verified identity required'},401);
+      if (!Array.isArray(g.ids)) return json({error:'Recreate this legacy room'},409);
+      if (g.ids.includes(identity.id)) return json({error:'Cannot join your own room'},409);
       const secret2 = token();
+      g.ids[p2] = identity.id;
       g.players[p2] = secret2;
       await this.state.storage.put("game", g);
       return json({ room, token: secret2, player: p2, game: marblePublic(g) });
     }
     const secret = req.headers.get("x-tu-room-token") || "", p = g.players.indexOf(secret);
-    if (!secret || p < 0) return json({ error: "Unauthorized" }, 401);
+    const actor = await playerName(req);
+    if (!secret || p < 0 || !actor || g.ids?.[p] !== actor.id) return json({ error: "Unauthorized" }, 401);
     if (action === "state" && req.method === "GET") return json({ player: p, game: marblePublic(g) });
     if (req.method === "POST" && (action === "roll" || action === "move")) {
       if (!g.players.every(Boolean)) return json({ error: "Waiting for players" }, 409);
@@ -875,7 +903,7 @@ var MarbleRoom = class {
       } else {
         let b;
         try {
-          b = await req.json();
+          b = await readRoomJson(req);
         } catch {
           return json({ error: "Invalid JSON" }, 400);
         }
@@ -917,6 +945,21 @@ async function routeWorkerRequest(req,env){
     trustedHeaders.set('x-tu-verified-id', authorizationContext.player.id);
     trustedHeaders.set('x-tu-verified-name', authorizationContext.player.name);
     req = new Request(req, { headers: trustedHeaders });
+  }
+  if (req.method === 'POST' && /^\/api\/foreign\/(observations|feedback)$/.test(url.pathname)) {
+    try {
+      if (!env.SUBMISSION_BUDGET) throw Error('Missing submission budget');
+      const stub = env.SUBMISSION_BUDGET.get(env.SUBMISSION_BUDGET.idFromName('foreign-writes-global-v1'));
+      const reservation = await stub.fetch(new Request('https://budget.internal/reserve', {
+        method:'POST', headers:{'content-type':'application/json'},
+        body:JSON.stringify({keyHash:await digest('player:'+req.headers.get('x-tu-verified-id')),ipHash:await digest('ip:'+(req.headers.get('cf-connecting-ip')||'unknown'))})
+      }));
+      if (reservation.status === 429) {
+        const response=respond({error:'Submission rate-limited',code:'SUBMISSION_RATE_LIMIT',retry_after_seconds:60},429);
+        response.headers.set('retry-after','60');return response;
+      }
+      if (!reservation.ok || (await reservation.json()).allowed !== true) throw Error('Submission budget unavailable');
+    } catch { return respond({error:'Submission temporarily unavailable',code:'SUBMISSION_BUDGET_UNAVAILABLE'},503); }
   }
   if (url.pathname === "/api/foreign/observations") return submitForeignSnapshot(req, env);
   if (url.pathname === "/api/foreign/feedback") return submitTravelFeedback(req, env);
@@ -960,6 +1003,7 @@ var index_default = { async scheduled(event, env, ctx) {
 } };
 export {
   RegistrationBudget,
+  SubmissionBudget,
   ArcadeRoom,
   GameRoom,
   MarbleRoom,

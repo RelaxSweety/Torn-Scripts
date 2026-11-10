@@ -22,8 +22,8 @@ const userDB={prepare(sql){return {values:[],bind(...values){this.values=values;
 const foreignWrites=[];
 const ledger={prepare(sql){return {values:[],bind(...values){this.values=values;return this;},async first(){assert.ok(sql.includes('FROM tu_agreement_events'));assert.equal(this.values[0],actor);return accepted?{event_type:'accepted',...publication.agreement}:null;},async run(){foreignWrites.push({sql,values:this.values});return {meta:{changes:1}};}};},async batch(statements){foreignWrites.push(...statements);return [];}};
 const rooms=new Map();
-const gameBinding={idFromName:name=>name,get(name){if(!rooms.has(name)){const data=new Map();rooms.set(name,new GameRoom({storage:{async get(key){return structuredClone(data.get(key));},async put(key,value){data.set(key,structuredClone(value));}}}));}return {async fetch(req){forwarded.push({id:req.headers.get('x-tu-verified-id'),name:req.headers.get('x-tu-verified-name')});return rooms.get(name).fetch(req);}};}};
-const env={TU_USERS_DB:userDB,FOREIGN_DB:ledger,GAME:gameBinding};
+const gameBinding={idFromName:name=>name,get(name){if(!rooms.has(name)){const data=new Map();rooms.set(name,new GameRoom({blockConcurrencyWhile:fn=>fn(),storage:{async get(key){return structuredClone(data.get(key));},async put(key,value){data.set(key,structuredClone(value));}}}));}return {async fetch(req){forwarded.push({id:req.headers.get('x-tu-verified-id'),name:req.headers.get('x-tu-verified-name')});return rooms.get(name).fetch(req);}};}};
+const env={TU_USERS_DB:userDB,FOREIGN_DB:ledger,GAME:gameBinding,SUBMISSION_BUDGET:{idFromName:x=>x,get:()=>({fetch:async()=>Response.json({allowed:true})})}};
 function request(path,method='GET',body,extra={}){return new Request('https://tu.example'+path,{method,headers:{authorization:'Bearer '+bearer,...extra},...(body===undefined?{}:{body:JSON.stringify(body)})});}
 async function run(path,method='GET',body,extra){return worker.fetch(request(path,method,body,extra),env);}
 try{
@@ -35,12 +35,18 @@ try{
  accepted=false;assert.equal((await run('/api/rooms','POST',{})).status,403);accepted=true;
  dbUnavailable=true;const unavailable=await run('/api/rooms','POST',{});assert.equal(unavailable.status,503);assert.ok(!(await unavailable.text()).includes('PRIVATE_DB_ERROR'));dbUnavailable=false;
  assert.equal(forwarded.length,0,'Rejected authorization never reaches a game object');
+ const normalBudget=env.SUBMISSION_BUDGET,originalForeignCount=foreignWrites.length;
+ for(const [budget,expected] of [[undefined,503],[{idFromName:x=>x,get:()=>({fetch:async()=>Response.json({allowed:false},{status:429})})},429]]){
+  env.SUBMISSION_BUDGET=budget;const result=await run('/api/foreign/observations','POST',{});assert.equal(result.status,expected);if(expected===429)assert.equal(result.headers.get('retry-after'),'60');assert.equal(foreignWrites.length,originalForeignCount);
+ }
+ env.SUBMISSION_BUDGET=normalBudget;
  const stamp=Math.floor(Date.now()/1000),observation={country:'can',observed_at:stamp,items:[{item_id:206,quantity:10,unit_price:500}]};
  assert.equal((await worker.fetch(new Request('https://tu.example/api/foreign/observations',{method:'POST',body:JSON.stringify(observation)}),env)).status,401);
  permission=0;assert.equal((await run('/api/foreign/observations','POST',observation)).status,403);permission=1;
  accepted=false;assert.equal((await run('/api/foreign/feedback','POST',{})).status,403);accepted=true;
  assert.equal(foreignWrites.length,0,'Unauthorized submissions cannot write');
  assert.equal((await run('/api/foreign/observations','POST',observation)).status,201);
+ for(const value of [null,'0',false])assert.equal((await run('/api/foreign/observations','POST',{...observation,items:[{item_id:206,quantity:value}]})).status,400);
  const feedback={report_id:'55555555-5555-4555-8555-555555555555',projection:{country:'can',item_id:206,captured_at:stamp,predicted_arrival:stamp+60,forecast_start:stamp,forecast_end:stamp+120,unexpectedSecret:'DO_NOT_STORE'},outcome:{available:'yes',restocked:'no',checked_at:stamp,quantity:10}};
  assert.equal((await run('/api/foreign/feedback','POST',feedback)).status,201);
  assert.ok(!JSON.stringify(foreignWrites).includes('DO_NOT_STORE'));

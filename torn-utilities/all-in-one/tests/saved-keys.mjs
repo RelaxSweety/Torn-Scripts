@@ -81,7 +81,7 @@ let local;
 {
  const b=await boot();try{
   b.settings();await b.save(C);await b.save(F);b.button(b.row(F),'Use for TU login').click();await tick();await tick();assert.equal(b.w.localStorage.getItem(VAULT),F);assert.equal(b.w.localStorage.getItem(WHO),null,'Switching account clears only the incompatible War role, not its saved key');assert.ok(b.row(C));
-  b.w.localStorage.setItem(WHO,C);await assert.rejects(b.w.TornUtilities.requestWhoTorn('/v2/faction/1'),/current TU player/,'Wrong-player stored keys must not be used for Torn requests');
+  b.w.localStorage.setItem(WHO,C);if(typeof b.w.TornUtilities.requestWhoTorn==='function')await assert.rejects(b.w.TornUtilities.requestWhoTorn('/v2/faction/1/members'),/current TU player/,'Wrong-player stored keys must not be used for Torn requests');else assert.equal(b.w.TornUtilities.requestWhoTorn,undefined,'Private data-request capability is no longer exported to the page');
  }finally{b.close()}
 }
 console.log('Saved-key regression checks passed: per-key levels, legacy migration, multiple keys, explicit selection, reload, account isolation, targeted removal and stale GM fallback');

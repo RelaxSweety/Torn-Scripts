@@ -1,3 +1,4 @@
+import {secureCandidateManager,secureCandidateReporting} from './integrate-security-candidate.mjs';
 import {authorizeForeignSubmission} from '../src/adapters/foreign-submission.js';
 import {createCredentialStore} from '../src/adapters/credential-store.js';
 import {createTornApiGovernor} from '../src/adapters/torn-api-governor.js';
@@ -22,19 +23,21 @@ const root=path.resolve(base,'../..');
 const read=p=>fs.readFileSync(path.join(base,p),'utf8');
 const tools=JSON.parse(read('config/tools.json'));
 const releases=JSON.parse(read('config/releases.json'));
-const previewArgument=process.argv.find(arg=>arg.startsWith('--preview-foreign-submission-auth='));
-const previewPath=previewArgument?.slice('--preview-foreign-submission-auth='.length);
+const previewArgument=process.argv.find(arg=>arg.startsWith('--preview-security-candidate=')||arg.startsWith('--preview-foreign-submission-auth='));
+const previewPath=previewArgument?.slice(previewArgument.indexOf('=')+1);
+const preparedIntegration=!!previewArgument||releases[0].securityBundle===true;
 if(previewArgument&&(!previewPath||!path.resolve(previewPath).startsWith('/tmp/')))throw Error('Preview output must be under /tmp');
-const version=releases[0].version+(previewArgument?'-foreign-auth-preview':'');
+const version=previewArgument?releases[0].version.replace(/(\d+)-dev$/,(_,patch)=>String(Number(patch)+1)+'-dev'):releases[0].version;
 const logoData='data:image/webp;base64,'+fs.readFileSync(path.join(root,'torn-utilities/assets/tu-logo-128.webp')).toString('base64');
 let manager=read('src/manager/manager.user.js').replaceAll('__TU_LOGO_DATA_URL__',logoData);
 if(previewArgument)manager=manager.replaceAll(releases[0].version,version).replace(/^\/\/ @updateURL.*$/m,'// @updateURL    none').replace(/^\/\/ @downloadURL.*$/m,'// @downloadURL  none');
+if(preparedIntegration)manager=secureCandidateManager(manager);
 manager=manager.replace("  'use strict';","  'use strict';\nconst createTornApiGovernor="+createTornApiGovernor.toString()+";\nconst createCredentialStore="+createCredentialStore.toString()+";");
 const registry=/const registry=\{schemaVersion:1,categories:(\[.*?\]),modules:\[.*?\]\};/;
 if(!registry.test(manager))throw Error('Manager tool directory missing');
 manager=manager.replace(registry,(_,categories)=>`const registry={schemaVersion:1,categories:${categories},modules:${JSON.stringify(tools.map(({source,...t})=>t))}};\nconst TU_RELEASES=${JSON.stringify(releases)};`);
 let output=manager+'\n';
-const transport=previewArgument?`function authorize(url,options,context){const foreign=${authorizeForeignSubmission.toString()};const rooms=${authorizeToolRequest.toString()};return rooms(url,foreign(url,options,context),context);}`:authorizeToolRequest.toString();
+const transport=preparedIntegration?`function authorize(url,options,context){const foreign=${authorizeForeignSubmission.toString()};const rooms=${authorizeToolRequest.toString()};return rooms(url,foreign(url,options,context),context);}`:authorizeToolRequest.toString();
 for(const tool of tools){
  const filename=path.join(root,tool.source);
  let source=fs.readFileSync(filename,'utf8').replace(/^\/\/ ==UserScript==[\s\S]*?^\/\/ ==\/UserScript==\s*/m,'');
@@ -50,6 +53,7 @@ for(const tool of tools){
  }
  if(tool.id==='war-hit-organizer')source=source.replace(/"data:image\/webp;base64,[A-Za-z0-9+/=]+"/g,'manager.getLogo()');
 
+ if(tool.id==='item-monitor'&&preparedIntegration)source=secureCandidateReporting(source);
  if(tool.id==='item-monitor')source='const createStockMonitorDiagnostic='+createStockMonitorDiagnostic.toString()+';\nconst createAlarmAudio='+createAlarmAudio.toString()+';\nconst createLandingAlarm='+createLandingAlarm.toString()+';\nconst TU_INTEGRATED_BUILD='+JSON.stringify(version)+';\nconst createTravelDomDiagnostic='+createTravelDomDiagnostic.toString()+';\nconst createAcceptanceSession='+createAcceptanceSession.toString()+';\nconst detectTestEnvironment='+detectTestEnvironment.toString()+';\n'+'const createHospitalClock='+createHospitalClock.toString()+';\n'+'const createNativeTravelActions='+createNativeTravelActions.toString()+';\n'+'const createTravelEnhancements='+createTravelEnhancements.toString()+';\n'+source;
  if(tool.id==='chat-archiver')source='const createChatCaptureSupport='+createChatCaptureSupport.toString()+';\n'+source;
  // Each retained source runs only on first use. A private Window facade captures
@@ -77,7 +81,13 @@ ${body}
  if(document.body)start();else document.addEventListener('DOMContentLoaded',start,{once:true});
 })();
 `;
-if(previewArgument){
+if(preparedIntegration){
+ if(!output.includes(' const start=()=>{'))throw Error('Candidate bootstrap integration changed');
+ output=output.replace(' const start=()=>{', `  let tuPrivateManager;
+  const tuPrepareBackend=${transport};
+  const start=()=>{`);
+ output=output.replaceAll("manager=(typeof unsafeWindow!=='undefined'?unsafeWindow:window).TornUtilities;",'manager=tuPrivateManager;');
+ output=output.replaceAll("const prepare=(url,options)=>authorize(url,options,{authorized:manager.isAuthorized(),token:sessionStorage.getItem('tu:dev:auth:session:v1')});",'const prepare=(url,options)=>manager.prepareBackendRequest(url,options);');
  output=output.replaceAll("const nativePDAGet=typeof PDA_httpGet==='function'?PDA_httpGet:null;", "const nativePDAGet=typeof PDA_httpGet==='function'?PDA_httpGet:null;const nativePDAPost=typeof PDA_httpPost==='function'?PDA_httpPost:null;");
  output=output.replaceAll('function load(){const fetch=',"function load(){const PDA_httpPost=nativePDAPost?(url,body,headers)=>nativePDAPost(url,body,prepare(url,{method:'POST',headers}).headers):undefined;const fetch=");
 }
@@ -92,6 +102,6 @@ for(const marker of ['tu-multiplayer-server.tuserver.workers.dev','alerts-calcul
 if(!output.startsWith('// ==UserScript==')||!output.includes('// @version      '+version))throw Error('Release metadata mismatch');
 if(tools.length!==10||new Set(tools.map(t=>t.id)).size!==10)throw Error('Expected exactly 10 tools');
 fs.mkdirSync(path.join(root,'torn-utilities/releases/dev'),{recursive:true});
-if(previewArgument){fs.writeFileSync(path.resolve(previewPath),output);console.log('Unpublished foreign-auth preview: '+previewPath);process.exit(0);}
+if(previewArgument){fs.writeFileSync(path.resolve(previewPath),output);console.log('Unpublished security candidate: '+previewPath);process.exit(0);}
 for(const p of ['dist/tu-integrated-staging-dev.user.js',`../releases/dev/torn-utilities-${version}.user.js`,'../releases/dev/torn-utilities-dev.user.js']){const target=path.join(base,p);if(process.argv.includes('--check')){if(fs.readFileSync(target,'utf8')!==output)throw Error('Stale generated release: '+p);}else fs.writeFileSync(target,output);}
 console.log(`Built ${version}: ${tools.length} tools; ${Buffer.byteLength(output)} bytes`);

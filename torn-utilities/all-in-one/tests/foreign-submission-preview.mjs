@@ -3,13 +3,16 @@ import fs from 'node:fs';
 import {JSDOM} from 'jsdom';
 const preview=process.argv[2]||'/tmp/tu-foreign-auth-preview.user.js';
 const code=fs.readFileSync(preview,'utf8');
-assert.ok(code.includes('-foreign-auth-preview'));assert.match(code,/\/\/ @updateURL\s+none/);
-for(const transport of ['pda','gm','fetch']){
+const current=JSON.parse(fs.readFileSync(new URL('../config/releases.json',import.meta.url)))[0].version;
+const expected=current.replace(/(\d+)-dev$/,(_,patch)=>String(Number(patch)+1)+'-dev');
+assert.ok(code.includes('// @version      '+expected));assert.match(code,/\/\/ @updateURL\s+none/);
+for(const transport of ['pda','gm','fetch','private-gm']){
  const dom=new JSDOM('<body><main>Torn</main></body>',{url:'https://www.torn.com/travelagency.php',runScripts:'outside-only',pretendToBeVisual:true});
  const w=dom.window,d=w.document,timers=[],posts=[],errors=[];
  w.setInterval=(fn,ms)=>{timers.push({fn,ms});return timers.length;};w.clearInterval=()=>{};
  d.hasFocus=()=>true;w.HTMLElement.prototype.getClientRects=function(){return this.hidden?[]:[{}];};w.HTMLElement.prototype.setPointerCapture=()=>{};w.alert=()=>{};w.confirm=()=>true;w.matchMedia=()=>({matches:false,addListener(){},removeListener(){}});
  w.addEventListener('error',e=>{errors.push(e.error);e.preventDefault();});
+ if(transport==='private-gm'){const privateValues=new Map();w.GM_info={scriptHandler:'Tampermonkey'};w.GM_getValue=(k,f)=>privateValues.has(k)?privateValues.get(k):f;w.GM_setValue=(k,v)=>privateValues.set(k,v);w.GM_deleteValue=k=>privateValues.delete(k);}
  w.localStorage.setItem('tu:identity:public-only-key:v1','abcdef0123456789');w.localStorage.setItem('tu:agreement:accepted','fixture-v1');w.sessionStorage.setItem('tu:dev:auth:session:v1','fixture-token');
  w.localStorage.setItem('tuim-stock-reporting-v1','yes');w.localStorage.setItem('tuim-stock-upload-queue-v1',JSON.stringify([{country:'can',observed_at:Math.floor(Date.now()/1000),items:[{item_id:206,quantity:10,unit_price:500}]}]));
  function reply(url){
@@ -27,8 +30,11 @@ for(const transport of ['pda','gm','fetch']){
   w.eval(code);await pause();d.querySelector('[data-tab="modules"]').click();
   for(const name of ['Business Tools','Travel Assistant and Item Monitor'])[...d.querySelectorAll('.tu-card')].find(card=>card.querySelector('strong')?.textContent===name).querySelector('button').click();
   await pause();for(const timer of timers.filter(timer=>timer.ms===15000))timer.fn();await pause();
-  assert.equal(posts.length,1,transport+' drains one queued batch');assert.equal(posts[0].transport,transport);assert.equal(posts[0].headers.Authorization,'Bearer fixture-token');
+  assert.equal(posts.length,1,transport+' drains one queued batch');assert.equal(posts[0].transport,transport==='private-gm'?'gm':transport);assert.equal(posts[0].headers.Authorization,'Bearer fixture-token');
   assert.equal(JSON.parse(w.localStorage.getItem('tuim-stock-upload-queue-v1')).length,0);assert.deepEqual(errors,[]);
+  for(const method of ['requestTravelInfo','requestWhoTorn','requestTorn','prepareBackendRequest','fetchWithApiBudget','handleBackendAuthorizationFailure'])assert.equal(w.TornUtilities[method],undefined,'Page API must not expose privileged '+method);
+  if(transport==='private-gm'){assert.equal(w.sessionStorage.getItem('tu:dev:auth:session:v1'),null);assert.ok(!JSON.stringify(Object.values(w.sessionStorage)).includes('fixture-token'));}
+
  }finally{w.TornUtilities?.closeActiveModule();w.close();}
 }
 console.log('Unpublished preview passed: real integrated Item Monitor authenticates queued stock reporting through PDA POST, GM and fetch; default release untouched');
