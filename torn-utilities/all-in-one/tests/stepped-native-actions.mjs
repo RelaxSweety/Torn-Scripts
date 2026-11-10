@@ -11,7 +11,7 @@ await assert.rejects(adapter.execute('buy',{...options,event:{isTrusted:false}})
 assert.equal((await adapter.execute('buy',options)).nextLabel,'Continue to return flight');assert.deepEqual(calls,['Buy','Yes']);
 assert.equal((await adapter.execute('buy',options)).purchaseConfirmed,true);assert.deepEqual(calls,['Buy','Yes','Continue']);assert.equal(adapter.isStepping(),false);
 await adapter.execute('buy',options);adapter.cancel();await new Promise(resolve=>setTimeout(resolve,0));assert.equal(calls.length,4,'Cancellation cannot resume later native clicks');assert.equal(canceled,1);
-const code=fs.readFileSync(new URL('../dist/tu-quick-items-test.user.js',import.meta.url),'utf8');
+const code=fs.readFileSync(new URL(process.argv.includes('--primary')?'../dist/tu-integrated-staging-dev.user.js':'../dist/tu-quick-items-test.user.js',import.meta.url),'utf8');
 const factory=name=>{const marker='const '+name+'=',start=code.indexOf(marker)+marker.length,end=code.indexOf('\n};',start)+2;return vm.runInNewContext('('+code.slice(start,end)+')');};
 assert.ok(!code.includes("window.confirm('Hospitalize before landing?"));
 // Exercise the actual transformed native return flow: three separate trusted clicks.

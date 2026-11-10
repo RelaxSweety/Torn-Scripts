@@ -20,6 +20,7 @@ export function createTravelDomDiagnostic({document,window,scrub,storageKey,getM
  const cleanFunction=value=>{
   if(!value||typeof value!=='object')return null;const allowed=['event','stage','item','action','step','control','controlId','panel','message','result','reason','limitedBy','sound','source','lastOccurrenceAt'];
   const data=Object.fromEntries(allowed.filter(k=>typeof value[k]==='string').map(k=>[k,clean(value[k])]));
+  if(['manual-purchase','depart-now'].includes(value.choice))data.choice=value.choice;
   for(const k of ['amount','quantity','x','y','capacityTotal','occupiedSlots','freeSlots','nativeMax','desired','remainingSeconds','threshold','volume','selectedCount','carriedCount','freedSlots','confirmedPurchases','repeatCount'])if(Number.isFinite(value[k]))data[k]=value[k];for(const k of ['submitted','hospital','verified','enabled'])if(typeof value[k]==='boolean')data[k]=value[k];
   return data.event?data:null;
  };

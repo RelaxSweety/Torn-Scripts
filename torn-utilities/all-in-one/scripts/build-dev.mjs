@@ -1,3 +1,4 @@
+import {integrateDirectItems} from './integrate-direct-items.mjs';
 import fs from 'node:fs';
 import {createStockMonitorDiagnostic} from '../src/diagnostics/stock-monitor.js';
 import {createAlarmAudio} from '../src/features/alarm-audio.js';
@@ -70,6 +71,8 @@ ${body}
 `;
 output=output.replace(/[\t ]+$/gm,'');
 new vm.Script(output,{filename:'torn-utilities-dev.user.js'});
+output=integrateDirectItems(output,version);
+new vm.Script(output,{filename:'torn-utilities-dev.final.user.js'});
 // Official PDA adaptSource normalizes typography before evaluating the entire script.
 new vm.Script(output.replace(/[“”]/g,'\"').replace(/[‘’]/g,"'"),{filename:'torn-utilities-dev.pda-adapted.user.js'});
 if((output.match(/^\/\/ ==UserScript==$/gm)||[]).length!==1)throw Error('Duplicate metadata');

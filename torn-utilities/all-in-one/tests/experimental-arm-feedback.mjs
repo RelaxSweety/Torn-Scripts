@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import {JSDOM} from 'jsdom';
-const code=fs.readFileSync(new URL('../dist/tu-quick-items-test.user.js',import.meta.url),'utf8');
+const code=fs.readFileSync(new URL(process.argv.includes('--primary')?'../dist/tu-integrated-staging-dev.user.js':'../dist/tu-quick-items-test.user.js',import.meta.url),'utf8');
 const marker='const createTravelEnhancements=',start=code.indexOf(marker)+marker.length,end=code.indexOf('\n};',start)+2;
 const factory=vm.runInNewContext('('+code.slice(start,end)+')');
 const w=new JSDOM('<div id="travel-root"><h4>Travel Agency</h4></div><section id="setup"></section>',{url:'https://www.torn.com/page.php?sid=travel',pretendToBeVisual:true}).window;
