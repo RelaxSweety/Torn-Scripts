@@ -12,7 +12,7 @@ function fixture({total=18,occupied=0,cash=100000,stock=1000,clamp=Infinity,mode
  const w=new JSDOM('<span id="user-money">$'+cash+'</span><div id="travel-root"><ul>'+shop+'</ul></div>',{url:'https://www.torn.com/page.php?sid=travel',pretendToBeVisual:true}).window,d=w.document;d.hasFocus=()=>true;d.cookie='rfc_v=PRIVATE_FIXTURE; path=/';w.HTMLElement.prototype.getClientRects=function(){return this.isConnected?[{}]:[];};
  const row=d.querySelector('[class*=row]');row.querySelector('[class*=tabletColD]').textContent='$300';
  const slots=Array.from({length:total},(_,i)=>({ID:String(100+i),item:i<occupied?{ID:'66',name:'Morphine'}:null}));let allowed=true,releaseRead,reads=0,clock=Date.now();
- const posts=[],nativeCalls=[],events=[],state={ownerId:'42',country:'mex',status:'Abroad',hospitalized:false,quantity:stock,stockVisible:true,traveling:false,returning:false};
+ let focusCount=0;w.addEventListener('focus',()=>focusCount++);const posts=[],nativeCalls=[],events=[],state={ownerId:'42',country:'mex',status:'Abroad',hospitalized:false,quantity:stock,stockVisible:true,traveling:false,returning:false};
  const pilot=createDirectQuickItems({window:w,document:d,isAuthorized:()=>true,fetchImpl:async(url,options)=>{
   const u=new URL(url),step=u.searchParams.get('step');assert.equal(options.credentials,'same-origin');
   if(step==='buy'){
@@ -34,11 +34,11 @@ function fixture({total=18,occupied=0,cash=100000,stock=1000,clamp=Infinity,mode
  const base=nativeFactory({window:w,document:d,enabled:()=>true}),adapter=createSnatchDirectItems({window:w,native:{...base,execute:async kind=>{nativeCalls.push(kind);if(kind==='buy')throw Error('Native purchase forbidden');return {returnBooked:true};}},getPilot:()=>pilot,getProfile:()=>{throw Error('No profile request for purchase');}});
  const run={ownerId:'42',intentId:'fixture',country:'mex',watchKey:'id:260',watchName:'Dahlia',minimumQty:1,maximumPrice:300};
  const options=()=>({event:{isTrusted:true},run,getSnapshot:()=>({...state}),guard:()=>allowed,onEvent:e=>events.push(e)});
- return {w,d,row,slots,posts,nativeCalls,pilot,adapter,run,state,options,events,release:()=>releaseRead?.(),disallow:()=>allowed=false,now:()=>clock,advance:ms=>clock+=ms,close(){adapter.cancel();pilot.stop();w.close();}};
+ return {w,d,row,slots,posts,nativeCalls,pilot,adapter,run,state,options,events,focusCount:()=>focusCount,release:()=>releaseRead?.(),disallow:()=>allowed=false,now:()=>clock,advance:ms=>clock+=ms,close(){adapter.cancel();pilot.stop();w.close();}};
 }
 for(const config of [ {},{total:8,occupied:3},{total:60,occupied:2},{cash:2000,clamp:2},{clamp:3},{clamp:1},{stock:7,clamp:3}]){
  const f=fixture(config);try{
-  let result;for(let i=0;i<6;i++){const before=f.posts.length;result=await f.adapter.execute('buy',f.options());assert.equal(f.posts.length,before+1,'One purchase per gesture');assert.equal(f.d.getElementById('tu-purchase-confirmation').textContent,f.run.directBuyAmount+'/'+(config.total||18)+' Dahlia Purchased');assert.deepEqual(f.nativeCalls,[]);if(!result.actionPending)break;await assert.rejects(f.adapter.execute('return',f.options()));}
+  let result;for(let i=0;i<6;i++){const before=f.posts.length;result=await f.adapter.execute('buy',f.options());assert.equal(f.posts.length,before+1,'One purchase per gesture');assert.equal(f.focusCount(),f.posts.length,'One non-blocking focus event per verified purchase');assert.equal(f.d.getElementById('tu-purchase-confirmation').textContent,f.run.directBuyAmount+'/'+(config.total||18)+' Dahlia Purchased');assert.deepEqual(f.nativeCalls,[]);if(!result.actionPending)break;await assert.rejects(f.adapter.execute('return',f.options()));}
   const expected=Math.min((config.total||18)-(config.occupied||0),Math.floor((config.cash??100000)/300),config.stock??1000,6*(config.clamp??Infinity));
   assert.equal(result.purchaseConfirmed,true);assert.equal(result.amount,expected);assert.equal(f.slots.filter(s=>s.item?.ID==='260').length,expected);assert.equal(f.slots.filter(s=>s.item?.ID==='66').length,config.occupied||0);assert.equal(f.pilot.hasPendingAttempt(),false);assert.ok(f.posts.length<=6);
   assert.equal(f.run.capacityLedger.purchased,expected);assert.equal(f.run.directBuySpent,expected*300);assert.ok(!JSON.stringify(f.pilot.report()).includes('PRIVATE_FIXTURE'));
@@ -47,9 +47,12 @@ for(const config of [ {},{total:8,occupied:3},{total:60,occupied:2},{cash:2000,c
   await f.adapter.execute('return',f.options());assert.deepEqual(f.nativeCalls,['return']);
  }finally{f.close();}
 }
+{
+ const f=fixture();try{f.pilot.refreshNativeInventory=()=>{throw Error('Refresh unavailable');};const result=await f.adapter.execute('buy',f.options());assert.equal(result.purchaseConfirmed,true);assert.equal(f.run.directBuyUncertain,undefined);await f.adapter.execute('return',f.options());assert.deepEqual(f.nativeCalls,['return'],'Refresh failure must not gate departure');}finally{f.close();}
+}
 for(const mode of ['network','reject','not-added','wrong-item','wrong-amount','price-rise','bad-after','unrelated','canceled-after']){
  const f=fixture({mode,occupied:1});try{
-  await assert.rejects(f.adapter.execute('buy',f.options()),e=>e.submitted===true);assert.equal(f.posts.length,1);assert.equal(f.d.getElementById('tu-purchase-confirmation'),null,'Unverified purchases do not show success');assert.equal(f.pilot.hasPendingAttempt(),true);assert.equal(f.run.directBuyUncertain,true);await assert.rejects(f.adapter.execute('buy',f.options()));await assert.rejects(f.adapter.execute('return',f.options()));assert.equal(f.posts.length,1);assert.equal(f.adapter.inspect(f.run).directItemUncertain,true);
+  await assert.rejects(f.adapter.execute('buy',f.options()),e=>e.submitted===true);assert.equal(f.posts.length,1);assert.equal(f.focusCount(),0,'Uncertain purchases must not trigger native refresh');assert.equal(f.d.getElementById('tu-purchase-confirmation'),null,'Unverified purchases do not show success');assert.equal(f.pilot.hasPendingAttempt(),true);assert.equal(f.run.directBuyUncertain,true);await assert.rejects(f.adapter.execute('buy',f.options()));await assert.rejects(f.adapter.execute('return',f.options()));assert.equal(f.posts.length,1);assert.equal(f.adapter.inspect(f.run).directItemUncertain,true);
   const p=createDirectQuickItems({window:f.w,document:f.d,isAuthorized:()=>true});assert.equal(p.hasPendingAttempt(),true);p.stop();
  }finally{f.close();}
 }

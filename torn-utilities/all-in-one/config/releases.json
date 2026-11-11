@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.101-dev",
+    "date": "2026-11-11",
+    "securityBundle": true,
+    "changes": {
+      "Improvements": [
+        "Refresh native inventory after verified purchases without reloading or delaying departure",
+        "Remove the native inventory refresh investigation controls"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.100-dev",
     "date": "2026-11-11",
     "securityBundle": true,

@@ -147,6 +147,7 @@ export function createSnatchDirectItems({native,getPilot,getProfile,window,now=(
    }
    try{showPurchaseNotice(run,capacity.total);}catch{clearPurchaseNotice();}
    onEvent({step:'direct-purchase-confirmed',amount:result.amount,quantity:run.directBuyAmount,attempt:run.directBuyAttempts,freeSlots:capacity.total-capacity.occupied,verified:true});
+   try{onEvent({step:'native-inventory-refresh',dispatched:pilot.refreshNativeInventory?.()===true,afterVerifiedPurchase:true});}catch{}
    if(capacity.occupied>=capacity.total||run.directBuyAmount>=run.directBuyTarget)return outcome();
    if(run.directBuyAttempts>=6)return outcome('Five remainder attempts completed; inventory is not full');
    run.directBuyRemaining=run.directBuyTarget-run.directBuyAmount;

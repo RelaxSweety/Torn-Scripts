@@ -72,3 +72,11 @@ Added **Test Native Inventory Refresh** to existing diagnostics. One explicit
 focus event is followed by five seconds of passive request/native-cell evidence.
 No automatic purchase integration or page reload. Real PDA redraw acceptance is
 pending. See [test and validation](NATIVE-FOCUS-REFRESH-20261111.md).
+
+## Non-blocking post-purchase native refresh — .101-dev
+
+One native focus event now follows each verified direct purchase, without
+waiting, a five-second observer, page reload or departure lock. Removed the
+Native inventory refresh investigation section; normal passive diagnostics
+remain. Real foreign-market acceptance is pending. See
+[implementation and validation](PURCHASE-NATIVE-REFRESH-20261111.md).
