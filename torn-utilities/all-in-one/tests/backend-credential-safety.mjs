@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import worker from '../cloudflare/tu-multiplayer-server-dev-option-a.js';
+import worker from './fixtures/worker.mjs';
 const KEY='aa11bb22cc33dd44',SECRET='PRIVATE_ERROR_'+KEY,originalFetch=globalThis.fetch,originalWarn=console.warn;
 let scenario='',outgoing=[],writes=[],warnings=[];
 console.warn=(...args)=>warnings.push(args.join(' '));
@@ -12,7 +12,7 @@ globalThis.fetch=async(url,options)=>{
 const budget={idFromName:name=>name,get:()=>({fetch:async()=>Response.json({allowed:true})})};
 function database(){return {prepare(sql){const statement={values:[],bind(...values){this.values=values;return this;},async first(){if(scenario==='database-secret')throw Error(SECRET);return null;},async run(){writes.push({sql,values:this.values});return {success:true,meta:{changes:1}};}};return statement;}};}
 function registration(body){return new Request('https://tu-multiplayer-server-dev.example/api/auth/register',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});}
-async function invoke(body={api_key:KEY,platform:'pda'}){outgoing=[];writes=[];return worker.fetch(registration(body),{TU_USERS_DB:database(),REGISTRATION_BUDGET:budget});}
+async function invoke(body={api_key:KEY,platform:'pda',manual:true}){outgoing=[];writes=[];return worker.fetch(registration(body),{TU_USERS_DB:database(),REGISTRATION_BUDGET:budget});}
 try{
  for(const mode of ['','mismatch','full','network-secret','http429','http503','code:2','code:5','code:8','code:9','code:13','code:18','database-secret']){
   scenario=mode;const response=await invoke(),text=await response.text();assert.ok(!text.includes(KEY)&&!text.includes(SECRET),'Responses exclude the raw key and upstream cause');assert.equal(response.headers.get('cache-control'),'no-store');assert.ok(!JSON.stringify(writes).includes(KEY),'Raw keys never appear in application DB bindings');

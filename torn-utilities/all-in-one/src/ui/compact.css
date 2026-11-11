@@ -59,3 +59,19 @@
 }
 
 #tpfg-stick-fighter>div>div:has(>#sff-min){font-size:12px}
+
+/* Pad content below sticky headers. */
+:is(#tuim-panel,#tuim-menu,#tuim-catalog,#tuim-travel-window,#tuim-data-window,#tu-who-panel,#tca-panel){padding-top:0!important}
+:is(#tuim-panel,#tuim-menu,#tuim-catalog) .tuim-header,
+:is(#tuim-travel-window,#tuim-data-window) .tuim-travel-header{
+ position:sticky!important;top:0!important;margin-top:0!important;
+ margin-inline:-9px!important;padding-inline:9px!important;background:#11191d!important;
+ z-index:100!important;isolation:isolate
+}
+#tuim-arm-feedback[hidden],#tuim-arm-feedback:empty{display:none!important}
+#tuim-alarm-settings :is(h3,h4){margin:6px 0 3px}
+#tuim-alarm-settings label{margin:3px 0}
+#tuim-alarm-settings :is(input:not([type=checkbox]),select){margin:2px 0 5px;padding:4px 6px;min-height:27px}
+#tuim-panel .tuim-alarm-channels{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+#tuim-panel .tuim-alarm-channels label{display:flex;align-items:center;gap:5px;margin:3px 0}
+#tuim-panel .tuim-alarm-channels input[type=checkbox]{display:inline-block;flex:none;width:18px;height:18px;min-height:18px;margin:0;padding:0}

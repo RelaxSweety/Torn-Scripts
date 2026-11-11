@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {createHash} from 'node:crypto';
 import fs from 'node:fs';
-import worker from '../cloudflare/tu-multiplayer-server-dev-option-a.js';
+import worker from './fixtures/worker.mjs';
 const publication=JSON.parse(fs.readFileSync(new URL('../../agreements/dev/current.json',import.meta.url),'utf8'));
 const previous=JSON.parse(fs.readFileSync(new URL('../../agreements/dev/history/1.2.json',import.meta.url),'utf8'));
 const users=new DatabaseSync(':memory:'),ledger=new DatabaseSync(':memory:');

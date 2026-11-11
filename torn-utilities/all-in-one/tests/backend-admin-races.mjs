@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {createHash} from 'node:crypto';
-import worker from '../cloudflare/tu-multiplayer-server-dev-option-a.js';
+import worker from './fixtures/worker.mjs';
 const token='11111111-1111-4111-8111-111111111111.22222222-2222-4222-8222-222222222222';
 const db=new DatabaseSync(':memory:');
 db.exec(`CREATE TABLE tu_users(torn_id INTEGER PRIMARY KEY,username TEXT,account_status TEXT,role TEXT,updated_at INTEGER,faction_id INTEGER);

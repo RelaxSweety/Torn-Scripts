@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import worker, { GameRoom } from '../cloudflare/tu-multiplayer-server-dev-option-a.js';
+import worker, { GameRoom } from './fixtures/worker.mjs';
 const publication=JSON.parse(await readFile(new URL('../../agreements/dev/current.json',import.meta.url),'utf8'));
 const bearer='11111111-1111-4111-8111-111111111111.22222222-2222-4222-8222-222222222222';
 const oldFetch=globalThis.fetch;

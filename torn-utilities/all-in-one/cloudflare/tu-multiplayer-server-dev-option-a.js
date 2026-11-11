@@ -1,3 +1,4 @@
+import {createIdentityCoordinator,trackIdentityRoom,eraseRoomIdentity} from './identity-deletion.js';
 import { SubmissionBudget } from './submission-budget.js';
 import { RegistrationBudget } from './registration-budget.js';
 var __defProp = Object.defineProperty;
@@ -143,7 +144,7 @@ async function handleAuth(req, env, url, authorizationContext = null) {
   if (path === "/api/auth/register") {
     if (req.method !== "POST") return respond({ error: "Method not allowed" }, 405);
     const body = await limitedJson(req);
-    if (!body || Array.isArray(body) || Object.keys(body).some(key=>!["api_key","platform","requested_access"].includes(key)) || !validPlatform(body.platform) || typeof body.api_key !== "string") return respond({ error: "Invalid registration request: missing API key or unsupported platform" }, 400);
+    if (!body || Array.isArray(body) || Object.keys(body).some(key=>!["api_key","platform","requested_access","manual"].includes(key)) || !validPlatform(body.platform) || typeof body.api_key !== "string") return respond({ error: "Invalid registration request: missing API key or unsupported platform" }, 400);
     body.api_key = body.api_key.trim();
     if (!/^[A-Za-z0-9]{16}$/.test(body.api_key)) return respond({ error: "Invalid registration request: API key must contain exactly 16 letters or digits" }, 400);
     if(body.requested_access!==undefined&&!['public','limited'].includes(body.requested_access))return respond({error:'Unsupported requested access'},400);
@@ -162,6 +163,7 @@ async function handleAuth(req, env, url, authorizationContext = null) {
       }
       if (!reservation.ok || (await reservation.json()).allowed !== true) throw Error('Registration budget unavailable');
     } catch { return respond({ error: 'Registration temporarily unavailable', code: 'REGISTRATION_BUDGET_UNAVAILABLE' }, 503); }
+    const registrationKeyHash=await digest('key:'+body.api_key);
     let identity;
     try{const verificationKey=body.api_key;delete body.api_key;identity=await tornIdentity(verificationKey);}
     catch(error){
@@ -173,7 +175,9 @@ async function handleAuth(req, env, url, authorizationContext = null) {
     if (body.requested_access !== void 0 && body.requested_access !== identity.accessLevel) return respond({ error: "Requested access does not match verified Torn API key" }, 400);
     const t = now();
     try {
+      if(env.__identityStorage&&await env.__identityStorage.get('deleting:'+identity.id)){const budget=env.REGISTRATION_BUDGET.get(env.REGISTRATION_BUDGET.idFromName('registration-global-v1'));const cleaned=await budget.fetch(new Request('https://budget.internal/forget',{method:'POST',body:JSON.stringify({keyHash:registrationKeyHash})}));if(!cleaned.ok)throw Error('Pending deletion budget cleanup failed');return respond({error:'Resume the pending account deletion before registering'},409);}
       const previous = await db.prepare("SELECT account_status FROM tu_users WHERE torn_id=?").bind(identity.id).first();
+      if(!previous&&body.manual!==true)return respond({error:'Enter an API key manually and accept the current agreement to register',code:'MANUAL_REGISTRATION_REQUIRED'},409);
       if (previous?.account_status === "suspended" || previous?.account_status === "revoked") return respond({ error: "Account restricted" }, 403);
       await db.prepare("INSERT INTO tu_users(torn_id,username,account_status,verified_at,created_at,updated_at) VALUES(?,?,'pending',?,?,?) ON CONFLICT(torn_id) DO UPDATE SET username=excluded.username,verified_at=excluded.verified_at,updated_at=excluded.updated_at").bind(identity.id, identity.username, t, t, t).run();
       const secret = crypto.randomUUID() + "." + crypto.randomUUID(), hash2 = await digest(secret), id = crypto.randomUUID(), expiry = t + 86400;
@@ -642,6 +646,7 @@ var GameRoom = class {
   }
   fetch(req) { return this.state.blockConcurrencyWhile(() => this.handleRequest(req)); }
   async handleRequest(req) {
+    const erased=await eraseRoomIdentity(this.state,req);if(erased)return erased;
     const url = new URL(req.url), room = url.pathname.split("/")[2], g = await this.state.storage.get("game");
     if (req.method === "POST" && url.pathname.endsWith("/create")) {
       if (g) return json({ error: "Room exists" }, 409);
@@ -759,6 +764,7 @@ var ArcadeRoom = class {
   }
   fetch(req) { return this.state.blockConcurrencyWhile(() => this.handleRequest(req)); }
   async handleRequest(req) {
+    const erased=await eraseRoomIdentity(this.state,req);if(erased)return erased;
     const url = new URL(req.url), parts = url.pathname.split("/"), room = parts[2], kind = parts[3], action = parts[4];
     let g = await this.state.storage.get("game");
     if (action === "create" && req.method === "POST") {
@@ -851,6 +857,7 @@ var MarbleRoom = class {
   }
   fetch(req) { return this.state.blockConcurrencyWhile(() => this.handleRequest(req)); }
   async handleRequest(req) {
+    const erased=await eraseRoomIdentity(this.state,req);if(erased)return erased;
     const parts = new URL(req.url).pathname.split("/"), room = parts[2], action = parts[3];
     let g = await this.state.storage.get("game");
     if (action === "create" && req.method === "POST") {
@@ -977,6 +984,7 @@ async function routeWorkerRequest(req,env){
   if (marble) {
     const room = marble[1] || code(), action = marble[2] || "create";
     if (!marble[1] && req.method !== "POST") return json({ error: "Not found" }, 404);
+    await trackIdentityRoom(env,req,'MARBLES','marbles:'+room);
     const stub2 = env.MARBLES.get(env.MARBLES.idFromName("marbles:" + room));
     return stub2.fetch(new Request(url.origin + "/rooms/" + room + "/" + action, req));
   }
@@ -984,24 +992,30 @@ async function routeWorkerRequest(req,env){
   if (arcade) {
     const kind = arcade[1], room = arcade[2] || code(), action = arcade[3] || "create";
     if (!arcade[2] && req.method !== "POST") return json({ error: "Not found" }, 404);
+    await trackIdentityRoom(env,req,'ARCADE',kind+':'+room);
     const stub2 = env.ARCADE.get(env.ARCADE.idFromName(kind + ":" + room));
     return stub2.fetch(new Request(url.origin + "/rooms/" + room + "/" + kind + "/" + action, req));
   }
   if (req.method === "POST" && url.pathname === "/api/rooms") {
     const room = code(), stub2 = env.GAME.get(env.GAME.idFromName(room));
+    await trackIdentityRoom(env,req,'GAME',room);
     return stub2.fetch(new Request(url.origin + "/rooms/" + room + "/create", req));
   }
   const m = url.pathname.match(/^\/api\/rooms\/([A-HJ-NP-Z2-9]{6})\/(join|state|move|rematch)$/);
   if (!m) return json({ error: "Not found" }, 404);
+  await trackIdentityRoom(env,req,'GAME',m[1]);
   const stub = env.GAME.get(env.GAME.idFromName(m[1]));
   return stub.fetch(new Request(url.origin + "/rooms/" + m[1] + "/" + m[2], req));
 }
+const IdentityCoordinator=createIdentityCoordinator({route:routeWorkerRequest,verify:tornIdentity,digest,readJson:limitedJson});
 var index_default = { async scheduled(event, env, ctx) {
   ctx.waitUntil(collectForeignStock(env).catch(()=>{console.warn('TU_FOREIGN_COLLECTION_FAILED');}));
 }, async fetch(req, env) {
-  try{return await routeWorkerRequest(req,env);}catch{console.warn('TU_REQUEST_FAILED');return respond({error:'Service unavailable',code:'INTERNAL_ERROR'},503);}
+  try{if(!env.IDENTITY_COORDINATOR)return respond({error:'Identity coordination unavailable'},503);return await env.IDENTITY_COORDINATOR.get(env.IDENTITY_COORDINATOR.idFromName('identity-lifecycle-v1')).fetch(req);}catch{console.warn('TU_REQUEST_FAILED');return respond({error:'Service unavailable',code:'INTERNAL_ERROR'},503);}
 } };
 export {
+  IdentityCoordinator,
+  routeWorkerRequest,
   RegistrationBudget,
   SubmissionBudget,
   ArcadeRoom,

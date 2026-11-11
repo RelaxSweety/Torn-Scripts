@@ -6,6 +6,7 @@
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
+// @grant        GM_listValues
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_deleteValue
@@ -233,7 +234,7 @@
     if(currentTab==='settings'&&!panel.hidden)render('settings');
   }
   let authorizationVerified=false,authRestorePending=true,authOpenRequested=false;
-  const authorized=()=>authorizationVerified&&!!devToken()&&!!readSavedKey()&&!!TU_TERMS_VERSION&&localStorage.getItem(TU_TERMS_KEY)===TU_TERMS_VERSION;
+  const authorized=()=>!readCredential('tu:dev:deletion-job:v1')&&authorizationVerified&&!!devToken()&&!!readSavedKey()&&!!TU_TERMS_VERSION&&localStorage.getItem(TU_TERMS_KEY)===TU_TERMS_VERSION;
   const publishAuthorization=ok=>{authorizationVerified=!!ok;pageWindow.dispatchEvent(new CustomEvent('tu-authorization-change',{detail:{authorized:authorized()}}));if(!authorized())stopModule();};
   const api = Object.freeze({
     isAuthorized:()=>authorized(),
@@ -469,7 +470,7 @@
   }
   async function devAccept(key,platform){
     if(apiGovernor.isKeySuspended(key))await requestIdentity(key,{revalidate:true});
-    const registration=await devRequest('/api/auth/register','POST',{api_key:key,platform},'');
+    const registration=await devRequest('/api/auth/register','POST',{api_key:key,platform,manual:true},'');
     if(!registration.token)throw Error('Registration returned no session');
     const token=registration.token;
     const accessLevel=registration.accessLevel;
@@ -723,12 +724,13 @@ __TU_COMPACT_UI_CSS__
   };
   function render(tab) {
     observeTUWindows();
-    if(!authorized()&&tab!=='about')tab='about';
+    if(!authorized()&&tab!=='about'&&!(tab==='settings'&&settingsPage==='api'))tab='about';
     if(tab!=='settings')settingsPage=null;
     currentTab=tab;
     panel.querySelectorAll('[data-tab]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===tab)));
     content.replaceChildren();
     if(credentials.mode==='private-unavailable'){const warning=document.createElement('p');warning.setAttribute('role','alert');warning.textContent=credentials.status().error;warning.style.cssText='padding:12px;border:2px solid #ec8585;color:#ec8585';content.append(warning);}
+    if(!authorized()){content.append(makeButton('Manage or delete TU account data',()=>{settingsPage='api';render('settings');}));}
     if(tab==='modules'){
       if(viewModule){
         const m=registry.modules.find(x=>x.id===viewModule);
@@ -815,6 +817,36 @@ __TU_COMPACT_UI_CSS__
       return;
       }
       if(settingsPage==='api'){
+        const deletionStatus=document.createElement('p');deletionStatus.setAttribute('role','status');
+        const deletion=createDataDeletion({
+         readJob:()=>{const raw=readCredential('tu:dev:deletion-job:v1');return raw?JSON.parse(raw):null;},
+         saveJob:job=>credentials.set('tu:dev:deletion-job:v1',JSON.stringify(job)),removeJob:()=>credentials.remove('tu:dev:deletion-job:v1'),
+         random:()=>Array.from(crypto.getRandomValues(new Uint8Array(32)),n=>n.toString(16).padStart(2,'0')).join(''),
+         request:body=>devRequest('/api/auth/delete-data','POST',body,''),
+         verify:async key=>{const info=checkedKeyInfo(await requestIdentity(key,{revalidate:true}));rememberVerifiedKey(key,info.level,info.playerId);return info;},entries:readStoredKeys,
+         stop:()=>{credentials.set(VAULT_CLEARED,'1');stopModule();publishAuthorization(false);authGeneration++;sessionStorage.removeItem(DEV_SESSION_KEY);clearAuthorizationCache();localStorage.removeItem(TU_TERMS_KEY);},
+         cleanup:async id=>{
+          const keys=readStoredKeys().filter(entry=>entry.playerId===id).map(entry=>entry.key);await apiGovernor.forgetKeys(keys);credentials.eraseKeys(keys);
+          clearPlayer();clearAuthorizationCache();sessionStorage.removeItem(DEV_SESSION_KEY);sessionStorage.removeItem(IDENTITY_CACHE);localStorage.removeItem(TU_TERMS_KEY);localStorage.removeItem(LOGIN_ACCESS_KEY);
+          for(const key of ['tu-ttt-dev-session-v1','tu:chaos-marbles:dev:session','tu:dev:torn-four:session','tu:dev:torn-fleet:session'])localStorage.removeItem(key);
+          for(const key of ['tu:snatch-run:v1','tu:landing-notification:v1'])sessionStorage.removeItem(key);
+          credentials.set(VAULT_CLEARED,'1');localStorage.setItem(VAULT_CLEARED,'1');
+          if(readStoredKeys().some(entry=>entry.playerId===id))throw Error('Local key cleanup incomplete');
+         }
+        });
+        const deleteData=makeButton(deletion.pending()?'Resume TU data deletion':'Delete My TU Data',async()=>{
+         let key=deletion.pending()?readSavedKey():'';
+         if(!deletion.pending()){
+          key=readSavedKey()||normalizeKey(prompt('Enter a Public Only or Limited Access API key for the account to delete.'));
+          if(!key){deletionStatus.textContent='An API key is required to verify account ownership.';return;}
+          let owner;try{owner=checkedKeyInfo(await requestIdentity(key,{revalidate:true}));}catch{deletionStatus.textContent='Ownership verification failed.';return;}
+          if(!confirm('Delete My TU Data for player '+owner.playerId+'? This removes TU registration, supplied keys and associated identifying data. Independent shared records are preserved. TU sessions end. Other devices and exported files need separate local cleanup.'))return;
+         }
+         deleteData.disabled=true;
+         try{await deletion.run(key,message=>{deletionStatus.textContent=message;});key='';deleteData.textContent=deletion.pending()?'Resume TU data deletion':'Delete My TU Data';}
+         catch{deletionStatus.textContent=deletion.pending()?'Deletion is incomplete. Keep this installation and use Resume TU data deletion to retry.':'Deletion has not started. Verify or remove legacy saved keys with unknown ownership, then retry.';}
+         finally{deleteData.disabled=false;}
+        });content.append(deleteData,deletionStatus);
         const note=document.createElement('p');note.textContent='Save Public Only or Limited Access keys individually. Adding a key preserves the current TU login. Use a saved key explicitly to switch login or select the Limited key for War Organizer. '+(credentials.mode==='userscript-private'?'Saved keys use userscript-manager storage and are removed from Torn-origin credential storage. This is storage isolation, not encryption. Revealing a full key places it in the page input where page scripts may read it.':credentials.mode==='private-unavailable'?credentials.status().error:'This environment uses unencrypted Torn-origin storage. Other scripts on Torn may be able to read saved keys.');content.append(note);
         const disclosure=createApiDisclosure({document,storageMode:credentials.mode,content:TU_API_DISCLOSURE_TEXT});content.append(disclosure);
         const form=document.createElement('form');form.autocomplete='off';
@@ -829,7 +861,7 @@ __TU_COMPACT_UI_CSS__
         async function useForLogin(key){
           try{
             const checked=await verifyEntry(key);
-            const registration=await devRequest('/api/auth/register','POST',{api_key:key,platform:scriptPlatform()},'');
+            const registration=await devRequest('/api/auth/register','POST',{api_key:key,platform:scriptPlatform(),manual:true},'');
             const expected=checked.level==='Limited Access'?'limited':'public';
             if(!registration.token||registration.accessLevel!==expected||(registration.playerId!=null&&String(registration.playerId)!==checked.playerId))throw Error('DEV registration verification mismatch');
             const current=await devRequest('/api/auth/agreement','GET',null,registration.token);

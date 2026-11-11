@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { RegistrationBudget } from '../cloudflare/registration-budget.js';
-import worker from '../cloudflare/tu-multiplayer-server-dev-option-a.js';
+import worker from './fixtures/worker.mjs';
 import { createHash } from 'node:crypto';
 const hash = value => createHash('sha256').update(value).digest('hex');
 // Serial storage double matches the transaction contract; not a Cloudflare runtime test.

@@ -37,6 +37,10 @@
       {
         "name": "SUBMISSION_BUDGET",
         "class_name": "SubmissionBudget"
+      },
+      {
+        "name": "IDENTITY_COORDINATOR",
+        "class_name": "IdentityCoordinator"
       }
     ]
   },
@@ -56,6 +60,12 @@
       "tag": "submission-budget-v1",
       "new_sqlite_classes": [
         "SubmissionBudget"
+      ]
+    },
+    {
+      "tag": "identity-deletion-v1",
+      "new_sqlite_classes": [
+        "IdentityCoordinator"
       ]
     }
   ]

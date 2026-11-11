@@ -1,5 +1,5 @@
 // Prepared private session persistence for the unpublished integrated candidate.
-export function createSessionTokenStore({window,privateMode=false,getValue,setValue,deleteValue}){
+export function createSessionTokenStore({window,privateMode=false,getValue,setValue,deleteValue,listValues}){
  const TOKEN='tu:dev:auth:session:v1',CACHE='tu:dev:authorization-cache:v1',TAB='tu:session:tab:v1';
  let failure=null,tab=window.sessionStorage.getItem(TAB);
  if(!/^[0-9a-f-]{36}$/i.test(tab||'')){tab=window.crypto.randomUUID();window.sessionStorage.setItem(TAB,tab);}
@@ -19,6 +19,11 @@ export function createSessionTokenStore({window,privateMode=false,getValue,setVa
   marker(){if(!privateMode){let marker=window.sessionStorage.getItem(TAB+':marker');if(!marker){marker=window.crypto.randomUUID();window.sessionStorage.setItem(TAB+':marker',marker);}return marker;}ensure();return read()?.marker||'';},
   set(token){if(typeof token!=='string'||!token)throw Error('Invalid session token');if(!privateMode){window.sessionStorage.setItem(TOKEN,token);window.sessionStorage.setItem(TAB+':marker',window.crypto.randomUUID());scrubCache(window.sessionStorage.getItem(TAB+':marker'));return;}ensure();persist({token,marker:window.crypto.randomUUID(),expiresAt:Date.now()+86400000});window.sessionStorage.removeItem(TOKEN);scrubCache(read().marker);},
   clear(){if(privateMode){ensure();removeRecord();}window.sessionStorage.removeItem(TOKEN);window.sessionStorage.removeItem(CACHE);window.sessionStorage.removeItem(TAB+':marker');},
+  async eraseHashes(hashes){
+   const targets=new Set(hashes);const hash=async token=>Array.from(new Uint8Array(await window.crypto.subtle.digest('SHA-256',new TextEncoder().encode(token)))).map(n=>n.toString(16).padStart(2,'0')).join('');
+   if(privateMode){if(typeof listValues!=='function')throw Error('Private session enumeration unavailable');for(const key of listValues()){if(!key.startsWith('tu:session:private:v1:'))continue;const raw=getValue(key,null);if(raw==null)continue;const record=typeof raw==='string'?JSON.parse(raw):raw;if(typeof record?.token!=='string')throw Error('Unknown private session record');if(targets.has(await hash(record.token))){if(deleteValue)deleteValue(key);else setValue(key,null);if(getValue(key,null)!=null)throw Error('Private session cleanup failed');}}}
+   this.clear();
+  },
   status:()=>({mode:privateMode?'userscript-private':'origin-session',error:failure})
  };
 }

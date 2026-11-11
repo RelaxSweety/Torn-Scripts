@@ -2,7 +2,7 @@
 export function createCredentialStore({window,handler='',pda=false,getValue,setValue,deleteValue}){
  const PRIVATE='tu:credentials:private:v1',REVISION='tu:credentials:revision:v1';
  const VAULT='tu:identity:public-only-key:v1',RING='tu:identity:saved-keys:v1',WHO='tu:who:limited-api-key:v1',EXTRAS='tu:api:additional-keys:v1',CLEARED='tu:identity:login-cleared:v1';
- const fields=[VAULT,RING,WHO,EXTRAS,CLEARED],secrets=[VAULT,RING,WHO,EXTRAS];
+ const fields=[VAULT,RING,WHO,EXTRAS,CLEARED,'tu:dev:deletion-job:v1'],secrets=[VAULT,RING,WHO,EXTRAS];
  const privateCapable=!pda&&/^(Tampermonkey|Violentmonkey|Greasemonkey)$/i.test(handler)&&typeof getValue==='function'&&typeof setValue==='function';
  let error=null;
  const key=value=>{if(typeof value!=='string')return null;value=value.trim();for(let n=0;n<3;n++){if(typeof value!=='string')return null;if(value.startsWith('GMV2_')){value=value.slice(5);continue;}if(value.startsWith('\"'))try{value=JSON.parse(value);continue;}catch{}break;}return typeof value==='string'&&/^[A-Za-z0-9]{16}$/.test(value)?value:null;};
@@ -29,5 +29,14 @@ export function createCredentialStore({window,handler='',pda=false,getValue,setV
   get(name){if(!fields.includes(name))throw Error('Unsupported credential field');if(!privateCapable)return window.localStorage.getItem(name);ensure();return readPrivate()?.values[name]??null;},
   set(name,value){if(!fields.includes(name)||typeof value!=='string')throw Error('Invalid credential field');if(!privateCapable){window.localStorage.setItem(name,value);return;}ensure();const data=readPrivate()||{schema:1,values:{}};const changed=data.values[name]!==value;data.values[name]=value;persist(data);window.localStorage.removeItem(name);if(changed&&[VAULT,CLEARED].includes(name))notify();},
   remove(name){if(!fields.includes(name))throw Error('Unsupported credential field');if(!privateCapable){window.localStorage.removeItem(name);return;}ensure();const data=readPrivate()||{schema:1,values:{}};const changed=data.values[name]!==undefined;delete data.values[name];persist(data);window.localStorage.removeItem(name);if(changed&&[VAULT,CLEARED].includes(name))notify();},
+  eraseKeys(values){
+   const removed=new Set(values.map(key).filter(Boolean));
+   const clean=(name,value)=>{if([VAULT,WHO].includes(name))return removed.has(key(value))?null:value;if([RING,EXTRAS].includes(name)){const list=JSON.parse(value||'[]');if(!Array.isArray(list))throw Error('Unrecognized legacy credential list');return JSON.stringify(list.filter(entry=>!removed.has(key(entry?.key))));}return value;};
+   for(const name of secrets){const value=this.get(name);if(value!==null){const next=clean(name,value);if(next===null)this.remove(name);else this.set(name,next);}
+    const legacy=window.localStorage.getItem(name);if(legacy!==null){const next=clean(name,legacy);if(next===null)window.localStorage.removeItem(name);else window.localStorage.setItem(name,next);}
+    if(typeof getValue==='function'){const legacyGM=getValue(name,null);if(legacyGM!==null&&legacyGM!==undefined){if(typeof legacyGM!=='string')throw Error('Unrecognized legacy credential');const next=clean(name,legacyGM);if(next===null){if(deleteValue)deleteValue(name);else setValue(name,'');}else if(setValue)setValue(name,next);else throw Error('Legacy credential storage cannot be updated');}}
+   }
+   for(const name of secrets){for(const raw of [this.get(name),window.localStorage.getItem(name),typeof getValue==='function'?getValue(name,null):null]){if(raw==null||raw==='')continue;if([VAULT,WHO].includes(name)){if(removed.has(key(raw)))throw Error('Credential cleanup was not persisted');}else if(JSON.parse(raw).some(entry=>removed.has(key(entry?.key))))throw Error('Credential cleanup was not persisted');}}
+  },
   status:()=>({mode:privateCapable?(error?'private-unavailable':'userscript-private'):'origin-local',isolated:privateCapable&&!error,error,encrypted:false})};
 }

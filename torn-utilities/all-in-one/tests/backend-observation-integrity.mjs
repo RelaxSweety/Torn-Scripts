@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
-import worker from '../cloudflare/tu-multiplayer-server-dev-option-a.js';
+import worker from './fixtures/worker.mjs';
 const db=new DatabaseSync(':memory:');
 db.exec(`CREATE TABLE foreign_stock_observations(country TEXT,item_id INTEGER,quantity INTEGER,unit_price INTEGER,source_observed_at INTEGER,collected_at INTEGER,provider TEXT);
 CREATE TABLE foreign_direct_observations(country TEXT,item_id INTEGER,observed_bucket INTEGER,quantity INTEGER,unit_price INTEGER,source TEXT DEFAULT 'tu_dom',received_at INTEGER);
