@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.98-dev",
+    "date": "2026-11-11",
+    "securityBundle": true,
+    "changes": {
+      "Improvements": [
+        "Remove automatic purchase page refresh and the departure delay",
+        "Keep verified purchase notifications and inventory check marks"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.97-dev",
     "date": "2026-11-11",
     "securityBundle": true,

@@ -31,17 +31,22 @@ with sync_playwright() as p:
     assert page.locator('#tu-purchase-confirmation').count()==0;assert page.locator('[data-tu-purchase-slot]').count()==0
     assert page.evaluate('fixture.pilot.hasPendingAttempt()');button.evaluate('e=>e.click()');page.wait_for_timeout(30);assert page.evaluate('fixture.posts.length')==1;assert page.evaluate('fixture.native.length')==0
    elif label=='partial':
-    notice=page.locator('#tu-purchase-confirmation');assert notice.inner_text()=='16/18 Dahlia Purchased';assert page.locator('[data-tu-purchase-slot=filled]').count()==16;assert page.locator('[data-tu-purchase-slot=unfilled]').count()==0;assert page.locator('#tu-snatch-departure-choice').count()==0;assert page.evaluate('fixture.posts')==[16];out=base.parent/'development/evidence/purchase-notice-95';out.mkdir(parents=True,exist_ok=True);page.screenshot(path=str(out/'partial.png'));page.wait_for_function('fixture.boots===2');page.locator('#tu-snatch-departure-choice').wait_for();page.screenshot(path=str(out/'partial-restored.png'));assert page.locator('#synced').inner_text()=='16 items displayed';assert page.evaluate('fixture.posts')==[16];page.wait_for_timeout(3200);assert page.evaluate('fixture.boots')==2
+    notice=page.locator('#tu-purchase-confirmation');assert notice.inner_text()=='16/18 Dahlia Purchased';assert page.locator('[data-tu-purchase-slot=filled]').count()==16;assert page.locator('[data-tu-purchase-slot=unfilled]').count()==0
+    dialog=page.locator('#tu-snatch-departure-choice');dialog.wait_for();assert page.evaluate('fixture.posts')==[16];out=base.parent/'development/evidence/purchase-no-refresh-98';out.mkdir(parents=True,exist_ok=True);page.screenshot(path=str(out/'partial.png'))
+    dialog.get_by_role('button',name='Depart now',exact=True).click();page.wait_for_function('fixture.native.length===1');assert page.evaluate('fixture.native')==['return'];page.wait_for_timeout(3500);assert page.evaluate('fixture.boots')==1
    else:
-    assert 'remainder 1/5' in button.inner_text();notice=page.locator('#tu-purchase-confirmation');assert notice.inner_text()==('1/18 Dahlia Purchased' if label=='exhausted' else '3/18 Dahlia Purchased');assert page.locator('[data-tu-purchase-slot=filled]').count()==(1 if label=='exhausted' else 3);assert page.locator('[data-tu-purchase-slot=unfilled]').count()==(17 if label=='exhausted' else 15);out=base.parent/'development'/'evidence'/'purchase-notice-95';out.mkdir(parents=True,exist_ok=True);page.screenshot(path=str(out/(label+'.png')))
+    assert 'remainder 1/5' in button.inner_text();notice=page.locator('#tu-purchase-confirmation');assert notice.inner_text()==('1/18 Dahlia Purchased' if label=='exhausted' else '3/18 Dahlia Purchased');assert page.locator('[data-tu-purchase-slot=filled]').count()==(1 if label=='exhausted' else 3);assert page.locator('[data-tu-purchase-slot=unfilled]').count()==(17 if label=='exhausted' else 15);out=base.parent/'development/evidence/purchase-no-refresh-98';out.mkdir(parents=True,exist_ok=True);page.screenshot(path=str(out/(label+'.png')))
     if label=='desktop':notice.wait_for(state='detached',timeout=4000)
     for count in range(2,7):button.click();page.wait_for_function('(n)=>fixture.posts.length===n',arg=count);page.wait_for_timeout(40)
     page.wait_for_function("fixture.engine.getState().purchaseConfirmed===true");expected=[18,17,16,15,14,13] if label=='exhausted' else [18,15,12,9,6,3];assert page.evaluate('fixture.posts')==expected;assert page.evaluate('fixture.native.length')==0
-    if label=='desktop':page.screenshot(path=str(out/'full.png'))
-    page.wait_for_function('fixture.boots===2');assert page.locator('#synced').inner_text()==('6 items displayed' if label=='exhausted' else '18 items displayed');assert page.evaluate('fixture.posts')==expected;assert page.locator('[data-tu-purchase-slot=filled]').count()==(6 if label=='exhausted' else 18);assert page.locator('[data-tu-purchase-slot=unfilled]').count()==(12 if label=='exhausted' else 0)
     if label=='exhausted':
-     page.locator('#tu-snatch-departure-choice').wait_for();page.screenshot(path=str(out/'exhausted-restored.png'));context.close();continue
-    button.click();page.wait_for_function('fixture.native.length===1');assert page.evaluate('fixture.native')==['return']
+     dialog=page.locator('#tu-snatch-departure-choice');dialog.wait_for();page.screenshot(path=str(out/'exhausted-complete.png'));dialog.get_by_role('button',name='Depart now',exact=True).click()
+    else:
+     if label=='desktop':page.screenshot(path=str(out/'full.png'))
+     button.click()
+    page.wait_for_function('fixture.native.length===1');assert page.evaluate('fixture.native')==['return'];page.wait_for_timeout(3500);assert page.evaluate('fixture.boots')==1,'No automatic navigation after purchase or popup expiry';assert page.locator('#tu-purchase-confirmation').count()==0
+    if label=='desktop':
+     page.reload();page.wait_for_function('fixture.boots===2');assert page.locator('#synced').inner_text()=='18 items displayed';assert page.evaluate('fixture.posts')==expected;assert page.locator('[data-tu-purchase-slot=filled]').count()==18
    context.close()
-  print('Chromium direct purchase passed: desktop/portrait/landscape, real trusted clicks, initial plus five verified partial fills, exact remainder quantities, synthetic rejection, per-purchase notifications, terminal-only real reload, restored departure choices, five-remainder limit and uncertain-outcome lock; all traffic mocked')
+  print('Chromium direct purchase passed: desktop/portrait/landscape, real trusted clicks, initial plus five verified partial fills, exact remainder quantities, synthetic rejection, per-purchase notifications, no automatic reload, immediate departure choices/return, preserved markers after explicit manual reload, five-remainder limit and uncertain-outcome lock; all traffic mocked')
  finally:browser.close()

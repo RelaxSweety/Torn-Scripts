@@ -1,7 +1,7 @@
 # TU implementation status — CURRENT DEV ONLY
 
 The approved compact UI and self-service deletion work is implemented for
-**TU 0.5.42.97-dev / Item Monitor 1.12.47-dev** with agreement **1.4 / number 5**.
+**TU 0.5.42.98-dev / Item Monitor 1.12.48-dev** with agreement **1.4 / number 5**.
 Earlier production-target references and implementation holds are superseded by
 the explicit DEV-only authorization.
 
@@ -49,3 +49,11 @@ See [purchase notification](PURCHASE-NOTICE-20261111.md).
 The .97 follow-up removes the redundant common Inventory Audio/Visual switches
 and makes per-item alert preferences authoritative. See
 [inventory alert settings](INVENTORY-ALERT-SETTINGS-20261111.md).
+
+## Current purchase refresh policy — .98-dev
+
+Automatic page refresh after purchase and its departure lock are removed. Keep
+verified slot badges and per-purchase confirmation notifications. Return and
+departure choices are immediately available after verification. A native
+inventory refresh command remains unverified and is not substituted. See
+[removal and validation](NO-AUTO-REFRESH-20261111.md).
