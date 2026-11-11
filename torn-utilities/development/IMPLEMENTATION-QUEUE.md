@@ -1,7 +1,7 @@
 # TU implementation status — CURRENT DEV ONLY
 
 The approved compact UI and self-service deletion work is implemented for
-**TU 0.5.42.93-dev / Item Monitor 1.12.43-dev** with agreement **1.4 / number 5**.
+**TU 0.5.42.94-dev / Item Monitor 1.12.44-dev** with agreement **1.4 / number 5**.
 Earlier production-target references and implementation holds are superseded by
 the explicit DEV-only authorization.
 
@@ -32,3 +32,7 @@ with one verified removal per trusted click. See [destruction validation](DIRECT
 The .93 follow-up routes foreign purchases through the direct handler and retains
 one initial purchase plus five trusted-click remainder attempts. See
 [direct purchase validation](DIRECT-PURCHASE-20261111.md).
+
+The .94 follow-up completes any same-player armed stage on confirmed return
+travel, clearing the action and screen alarm even after refresh. See
+[return-flight cleanup](RETURN-CLEANUP-20261111.md).

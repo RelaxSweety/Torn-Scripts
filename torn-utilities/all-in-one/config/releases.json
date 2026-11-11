@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.94-dev",
+    "date": "2026-11-11",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Clear the Snatch button and screen alarm when returning to Torn",
+        "Recognize return flights after refresh or native navigation"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.93-dev",
     "date": "2026-11-11",
     "securityBundle": true,

@@ -76,8 +76,12 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
  }
 
  async function loadHospitalClock(force=false){const expected=run;if(!expected||clockReadPending||!force&&clockReads.has(expected))return;clockReads.add(expected);clockReadPending=true;run.hospitalClockLookup='loading';if(action)action.dataset.hospitalClockLookup='loading';try{const context=await getContext();if(run===expected){run.hospitalClockLookup=context.hospitalUntil>0?'available':'unavailable';run.hospitalClock=context.hospitalClock||null;if(context.hospitalUntil>0){run.hospitalUntil=context.hospitalUntil;persist();}}}catch{if(run===expected)run.hospitalClockLookup='request-failed';emit('hospital-clock-unavailable');}finally{clockReadPending=false;if(run===expected)refresh();}}
+ function finishReturnFlight(s){
+  if(!run||run.stage==='complete'||!s.traveling||!s.returning||String(s.ownerId)!==run.ownerId)return false;
+  run.stage='complete';delete run.stepLabel;clearStatusTimer();executeAction?.cancel?.();departurePrompt?.remove();departurePrompt=null;persist();emit('return-flight-confirmed');notice('Return flight to Torn confirmed. Snatch and Run completed.');return true;
+ }
  function refresh(){
-  if(!action)return;const hide=!run||run.stage==='complete';action.dataset.hospitalSettingsActive=String(!hide);if(action.hidden!==hide)action.hidden=hide;const display=hide?'none':'block';if(action.style.display!==display)action.style.display=display;if(!run||hide){if(run?.stage==='complete'){action.textContent='Return flight booked';action.dataset.snatchStage='complete';}extraHosp?.setAttribute('hidden','');if(extraHosp)extraHosp.style.display='none';hospitalAudio?.stop?.();stopCountdown();document.getElementById('tu-snatch-screen-alert')?.remove();return;}
+  if(!action)return;finishReturnFlight(getSnapshot());const hide=!run||run.stage==='complete';action.dataset.hospitalSettingsActive=String(!hide);if(action.hidden!==hide)action.hidden=hide;const display=hide?'none':'block';if(action.style.display!==display)action.style.display=display;if(!run||hide){if(run?.stage==='complete'){action.textContent='Return flight booked';action.dataset.snatchStage='complete';}extraHosp?.setAttribute('hidden','');if(extraHosp)extraHosp.style.display='none';hospitalAudio?.stop?.();stopCountdown();document.getElementById('tu-snatch-screen-alert')?.remove();return;}
   const s=getSnapshot();hospitalRemaining=(s.hospitalized===true||s.hospitalized==null&&run.hospitalizedConfirmed)&&validRun(s)&&hasHospitalItem();screenAlert(s);const kind=run.stage,waiting=kind==='waiting',pending=kind.endsWith('-pending');
   const minimum=Math.max(1,Number(getItems().find(w=>w.key===run.watchKey)?.minQty)||1);
   const stockAvailable=kind==='hospitalize'?outbound(s)||Number.isFinite(s.quantity)&&s.quantity<minimum&&s.hospitalized===false:kind==='return'||(['buy','destroy'].includes(kind)?s.quantity>=minimum:!Number.isFinite(s.quantity)||s.quantity>=minimum);
@@ -152,7 +156,7 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   if(['buy','destroy'].includes(run.stage)&&s.hospitalized===true){if(run.medical){run.stage='heal';persist();}else{notice('Hospitalized: restore Travel Assistant and select a healing item, then re-arm.');}}
   if(run.stage==='heal-pending'&&s.hospitalized===false){clearStatusTimer();run.stage=afterHeal();persist();notice(run.stage==='destroy'?'Hospital release confirmed. Destroy Selected Items is ready with fresh stock.':'Hospital release confirmed. Return to the monitored shop and verify fresh stock before buying.');}
   if(!busy&&run.stage==='buy-pending'&&s.purchaseProof&&s.purchaseProof!==run.priorProof&&s.purchaseItemKey===run.watchKey){run.stage='return';run.purchaseConfirmed=true;persist();notice('Purchase confirmed. Return to Torn is ready.');}
-  if(run.stage==='return-pending'&&s.traveling&&s.returning){clearStatusTimer();run.stage='complete';persist();notice('Return flight to Torn confirmed. Snatch and Run completed.');}
+  finishReturnFlight(s);
   refresh();
  }
  function nativeControl(kind,s){
@@ -177,7 +181,7 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   const expected=run;if(options.extendHospital){run.extensionPending=true;run.extensionPriorUntil=getSnapshot().hospitalUntil||run.hospitalUntil||0;}busy=true;hospitalAudio?.stop?.();emit('action-start',{action:kind});run.priorProof=getSnapshot().purchaseProof||null;run.stage=kind+'-pending';persist();refresh();
   const guard=()=>run===expected&&active&&run.expiresAt>now()&&String(getSnapshot().ownerId)===run.ownerId&&getSnapshot().country===run.country;
   try{
-   const result=await executeAction.execute(kind,{...options,run:expected,getSnapshot,guard,onEvent:fields=>emit('native-step',{action:kind,...fields})});if(run!==expected)return false;
+   const result=await executeAction.execute(kind,{...options,run:expected,getSnapshot,guard,onEvent:fields=>emit('native-step',{action:kind,...fields})});if(run!==expected)return false;if(run.stage==='complete')return true;
    if(kind==='hospitalize'&&result.hospitalized){run.extensionPending=false;run.hospitalizedConfirmed=true;run.stage='waiting';void loadHospitalClock(true);const state=getSnapshot();if(Number.isFinite(state.quantity)&&state.quantity>=run.minimumQty){run.stockAt=now();run.stage='heal';}}
    if(kind==='heal'&&result.medicalUsed&&!result.hospitalReleased){run.stage='heal';void loadHospitalClock(true);}
    if(kind==='heal'&&result.hospitalReleased){run.hospitalizedConfirmed=false;hospitalAudio?.stop?.();run.stage=afterHeal();}
@@ -185,7 +189,7 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
    if(kind==='buy'&&result.purchaseConfirmed){finishPurchase();}
    if(kind==='return'&&result.returnBooked)run.stage='complete';
    persist();emit('action-result',{action:kind,result:'confirmed',amount:result.amount||null});notice(run.stage==='departure-choice'?'Purchase completed. Choose whether to depart or continue manually.':result.reconcileWarning?'Purchased '+result.amount+' item(s). Reconciliation stopped: '+result.reconcileWarning+'. Return to Torn is ready.':kind==='hospitalize'?'Hospitalization confirmed. Waiting for available stock.':kind==='heal'&&!result.hospitalReleased?'Healing item used; still hospitalized. Click again to use the next selected available heal.':kind==='heal'?(run.stage==='destroy'?'Hospital release confirmed. Destroy Selected Items is ready.':'Hospital release confirmed. Purchase Max is ready.'):kind==='destroy'?'Selected items destroyed. Purchase Max is ready.':kind==='buy'?'Purchase confirmed. Return to Torn is ready.':'Return flight booked.');if(run.stage==='departure-choice')showDepartureChoice();return true;
-  }catch(error){if(run===expected){if(!error.submitted){run.stage=options.extendHospital?'waiting':kind;run.extensionPending=false;}else{statusAttempts=0;scheduleStatus();}persist();emit('action-error',{action:kind,message:error.message,submitted:!!error.submitted});notice(error.message);}return false;}
+  }catch(error){if(run===expected&&run.stage==='complete')return true;if(run===expected){if(!error.submitted){run.stage=options.extendHospital?'waiting':kind;run.extensionPending=false;}else{statusAttempts=0;scheduleStatus();}persist();emit('action-error',{action:kind,message:error.message,submitted:!!error.submitted});notice(error.message);}return false;}
   finally{if(run===expected){busy=false;check();}}
  }
  async function hospitalizeBeforeLanding(){
