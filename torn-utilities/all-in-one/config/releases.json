@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.93-dev",
+    "date": "2026-11-11",
+    "securityBundle": true,
+    "changes": {
+      "Improvements": [
+        "Buy monitored foreign items through the direct handler",
+        "Retain five verified remainder attempts to fill available inventory"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.92-dev",
     "date": "2026-11-11",
     "securityBundle": true,

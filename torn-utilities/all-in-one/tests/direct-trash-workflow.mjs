@@ -19,6 +19,6 @@ try{
  await engine.act({isTrusted:true});assert.equal(engine.getState().stage,'destroy');assert.equal(engine.getState().destroyDone,false);assert.match(d.getElementById('tu-snatch-run').textContent,/1 remaining/);assert.deepEqual(posts,[11]);assert.deepEqual(native,[]);
  snapshot.quantity=0;assert.equal(await engine.act({isTrusted:true}),false);assert.deepEqual(posts,[11]);snapshot.quantity=2500;clock+=180000;assert.equal(await engine.act({isTrusted:true}),false);assert.deepEqual(posts,[11]);engine.stock(watch,snapshot);
  await engine.act({isTrusted:true});assert.equal(engine.getState().stage,'buy');assert.equal(engine.getState().destroyDone,true);assert.deepEqual(posts,[11,12]);assert.deepEqual(native,[]);assert.equal(slots[2].item.ID,736);assert.equal(engine.getState().capacityLedger.freed,2);
- await engine.act({isTrusted:true});assert.deepEqual(native,['buy']);assert.deepEqual(posts,[11,12]);
+ assert.deepEqual(native,[]);assert.deepEqual(posts,[11,12]); // Purchase transport is exercised by direct-purchase.mjs.
  console.log('Generated destruction workflow passed: accepted selection, one handler trash per trusted click, remaining-item continuation, no early buy, capacity credit and unselected-item preservation');
 }finally{engine.stop();pilot.stop();w.close();}

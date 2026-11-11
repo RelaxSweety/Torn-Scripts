@@ -23,7 +23,7 @@ with sync_playwright() as p:
     button.evaluate('e=>e.click()');page.wait_for_timeout(50);assert page.evaluate('fixture.posts.length')==1;assert page.evaluate('fixture.engine.getState().destroyDone')==False
    else:
     assert '1 remaining' in button.inner_text();out=base.parent/'development'/'evidence'/'direct-trash-92';out.mkdir(parents=True,exist_ok=True);page.screenshot(path=str(out/(label+'.png')));button.click();page.wait_for_function("fixture.engine.getState().stage==='buy'");assert page.evaluate('fixture.posts')==[11,12];assert page.evaluate('fixture.slots[2].item.ID')==736;assert page.evaluate('fixture.native.length')==0
-    button.click();page.wait_for_function('fixture.native.length===1');assert page.evaluate('fixture.native')==['buy']
+    assert page.evaluate('fixture.native.length')==0 # Purchase is covered by validate-direct-purchase.py.
    context.close()
   print('Chromium direct destruction passed: trusted clicks, one handler POST per item, verified continuation, unselected preservation, separate buy, uncertain-removal lock; all traffic mocked')
  finally:browser.close()

@@ -37,7 +37,7 @@ function fixture(mode='normal'){
   await assert.rejects(f.adapter.execute('buy',f.options()),/Resolve/);assert.deepEqual(f.nativeCalls,[]);
   const final=await f.adapter.execute('destroy',f.options());assert.equal(final.inventoryDestroyed,true);assert.equal(final.amount,2);assert.equal(f.adapter.hasPendingStep(),false);assert.equal(f.run.capacityLedger.freed,2);
   assert.deepEqual(f.calls.filter(c=>c.method==='POST').map(c=>JSON.parse(c.body).slotID),[11,12]);assert.equal(f.slots[2].item.ID,'736','Unselected blood bag survives');assert.deepEqual(f.nativeCalls,[]);
-  await f.adapter.execute('buy',f.options());assert.deepEqual(f.nativeCalls,['buy'],'Purchasing remains a separate user action');assert.equal(f.pilot.hasPendingAttempt(),false);assert.ok(!JSON.stringify(f.pilot.report()).includes('PRIVATE_FIXTURE'));
+  await f.adapter.execute('return',f.options());assert.deepEqual(f.nativeCalls,['return'],'Return remains a separate user action');assert.equal(f.pilot.hasPendingAttempt(),false);assert.ok(!JSON.stringify(f.pilot.report()).includes('PRIVATE_FIXTURE'));
  }finally{f.close();}
 }
 for(const scenario of ['untrusted','unaccepted','disabled','empty-selection','hospital','stock','travel','owner','capacity','not-trashable','wrong-id','wrong-instance']){

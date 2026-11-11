@@ -1,12 +1,14 @@
-// Item use and selected destruction share the direct handler; buying/return retain native controls.
+// Item use and selected destruction share the direct handler; purchasing also uses direct requests; return retains native controls.
 export function createSnatchDirectItems({native,getPilot,getProfile,window,now=()=>Date.now()}){
  let proof=null,generation=0,active=false,lastStatus=null,trashRun=null;
  const same=run=>proof&&proof.ownerId===run?.ownerId&&proof.intentId===run?.intentId&&proof.watchKey===run?.watchKey;
  function cancel(){generation++;getPilot()?.cancel();native?.cancel();}
  async function execute(kind,options){
   const pilot=getPilot();
+  if(options.run?.directBuyUncertain||options.run?.directTrashUncertain)throw Error('Review the uncertain action and re-arm before continuing.');
   if(kind==='destroy')return destroy(options);
-  if(!['heal','hospitalize'].includes(kind)){if(active||pilot.report().unconfirmedAttempt||proof?.uncertain||trashRun?.directTrashRemaining>0)throw Error('Resolve the direct item/status verification before continuing.');return native.execute(kind,options);}
+  if(kind==='buy')return buy(options);
+  if(!['heal','hospitalize'].includes(kind)){if(active||pilot.report().unconfirmedAttempt||proof?.uncertain||trashRun?.directTrashRemaining>0||trashRun?.directBuyRemaining>0)throw Error('Resolve the direct item/status verification before continuing.');return native.execute(kind,options);}
   if(!options.event?.isTrusted||active||pilot.report().unconfirmedAttempt)throw Error('A fresh user click and a resolved prior attempt are required.');
   const {run,getSnapshot,guard,onEvent=()=>{}}=options;
   const eligible=()=>{if(!guard()||run.capacityLedger?.valid===false)return false;const s=getSnapshot();if(kind==='heal')return s.hospitalized===true&&!s.traveling&&s.quantity>=Math.max(1,Number(run.minimumQty)||1);return options.extendHospital?s.hospitalized===true&&!s.traveling&&!s.returning:options.allowBeforeLanding?s.traveling===true&&!s.returning:s.hospitalized===false&&!s.traveling&&Number.isFinite(s.quantity)&&s.quantity<Math.max(1,Number(run.minimumQty)||1);};
@@ -73,6 +75,53 @@ export function createSnatchDirectItems({native,getPilot,getProfile,window,now=(
   }catch(error){if(consumed||error.submitted){error.submitted=true;if(run.capacityLedger&&!consumed){run.capacityLedger.valid=false;run.capacityLedger.reason='unconfirmed-direct-item';}}throw error;}
   finally{active=false;}
  }
+ async function buy(options){
+  const pilot=getPilot(),{run,getSnapshot,guard,onEvent=()=>{}}=options;
+  if(!options.event?.isTrusted||active||pilot.report().unconfirmedAttempt||proof?.uncertain||run.directBuyUncertain||run.directTrashUncertain||trashRun?.directTrashRemaining>0)throw Error('Resolve the prior action and use a fresh click before purchasing.');
+  if(run.purchaseConfirmed||run.directBuyComplete||(run.directBuyAttempts||0)>=6)throw Error('This purchase sequence is complete. Re-arm before another purchase.');
+  const signature=JSON.stringify([run.ownerId,run.intentId,run.watchKey,run.watchName,run.maximumPrice,run.minimumQty]);
+  const eligible=()=>{const s=getSnapshot();return guard()&&(!Number.isFinite(run.stockAt)||now()-run.stockAt<30000)&&signature===JSON.stringify([run.ownerId,run.intentId,run.watchKey,run.watchName,run.maximumPrice,run.minimumQty])&&s.hospitalized===false&&!s.traveling&&!s.returning&&s.stockVisible!==false&&Number.isSafeInteger(s.quantity)&&s.quantity>=(run.directBuyAmount?1:Math.max(1,Number(run.minimumQty)||1));};
+  if(!eligible()){
+   const state=getSnapshot();
+   if(run.directBuyAmount&&guard()&&state.hospitalized===false&&!state.traveling&&!state.returning&&state.stockVisible!==false&&state.quantity===0){run.directBuyRemaining=0;run.directBuyComplete=true;return {purchaseConfirmed:true,amount:run.directBuyAmount,reconcileWarning:'Stock exhausted after confirmed partial purchases'};}
+   throw Error('Fresh monitored stock and confirmed hospital release are required before buying.');
+  }
+  active=true;trashRun=run;const ticket=++generation;let submitted=false,plan=null;
+  const outcome=warning=>{run.directBuyRemaining=0;run.directBuyComplete=true;return {purchaseConfirmed:true,amount:run.directBuyAmount,...(warning?{reconcileWarning:warning}:{})};};
+  try{
+   const ensure=()=>ticket===generation&&guard()&&signature===JSON.stringify([run.ownerId,run.intentId,run.watchKey,run.watchName,run.maximumPrice,run.minimumQty]);
+   const quote=capacity=>{
+    if(!ensure()||!eligible())throw Error('Run changed before purchase');
+    const {id,row}=native.resolveItem(run),state=getSnapshot();
+    if(String(run.watchKey).startsWith('id:')&&String(run.watchKey)!=='id:'+id)throw Error('The shop item does not match the monitor');
+    const snapshotRun={...run,capacityLedger:{valid:true,total:capacity.total,initialOccupied:capacity.occupied,freed:0,purchased:0,cashBeforePurchase:run.directBuyCash,spent:run.directBuySpent||0}};
+    const limit=native.capacityFor(row,snapshotRun,state.quantity,capacity.total);
+    if(!limit.verified||run.maximumPrice!=null&&limit.price>run.maximumPrice||run.directBuyPrice!=null&&limit.price>run.directBuyPrice)throw Error('Current price, funds or capacity could not be verified within the approved limits');
+    const amount=Math.min(limit.desired,run.directBuyTarget==null?limit.desired:run.directBuyTarget-(run.directBuyAmount||0));
+    plan={id:String(id),name:run.watchName,amount,price:limit.price,cash:limit.cash};return plan;
+   };
+   const result=await pilot.buyRunItem(options.event,quote,ensure,run.directBuyFingerprint||null);
+   if(result.result!=='purchase-confirmed'){const error=Error(result.text||'Purchase blocked: '+result.result);error.submitted=result.result==='uncertain';throw error;}
+   submitted=true;run.directBuyAttempts=(run.directBuyAttempts||0)+1;
+   run.directBuyTarget??=result.requested;run.directBuyCash??=result.cash;run.directBuyPrice??=result.price;
+   run.directBuyAmount=(run.directBuyAmount||0)+result.amount;run.directBuySpent=(run.directBuySpent||0)+result.spent;run.directBuyFingerprint=result.inventoryFingerprint;
+   const capacity=result.inventoryCapacity;
+   const ledger=run.capacityLedger;
+   if(ledger?.valid&&ledger.total===capacity.total&&ledger.initialOccupied-ledger.freed+(ledger.purchased||0)+result.amount===capacity.occupied){ledger.purchased=(ledger.purchased||0)+result.amount;ledger.spent=(ledger.spent||0)+result.spent;ledger.cashBeforePurchase??=run.directBuyCash;}
+   else run.capacityLedger={valid:true,total:capacity.total,initialOccupied:capacity.occupied-run.directBuyAmount,freed:0,purchased:run.directBuyAmount,spent:run.directBuySpent,cashBeforePurchase:run.directBuyCash};
+   if(!ensure())throw Error('Run changed after purchase; review inventory before continuing');
+   onEvent({step:'direct-purchase-confirmed',amount:result.amount,quantity:run.directBuyAmount,attempt:run.directBuyAttempts,freeSlots:capacity.total-capacity.occupied,verified:true});
+   if(capacity.occupied>=capacity.total||run.directBuyAmount>=run.directBuyTarget)return outcome();
+   if(run.directBuyAttempts>=6)return outcome('Five remainder attempts completed; inventory is not full');
+   run.directBuyRemaining=run.directBuyTarget-run.directBuyAmount;
+   return {actionPending:true,nextLabel:'Buy remaining '+run.directBuyRemaining+' (remainder '+run.directBuyAttempts+'/5)'};
+  }catch(error){
+   if(submitted||error.submitted){error.submitted=true;run.directBuyUncertain=true;run.capacityLedger={...run.capacityLedger,valid:false,reason:'unconfirmed-direct-purchase'};throw error;}
+   // A pre-submission stop after confirmed partial fills is safe to finish, never to replay.
+   if(run.directBuyAmount&&ticket===generation&&guard()&&signature===JSON.stringify([run.ownerId,run.intentId,run.watchKey,run.watchName,run.maximumPrice,run.minimumQty]))return outcome(error.message);
+   throw error;
+  }finally{if(run.directBuyAmount&&(run.directBuyAmount>=run.directBuyTarget||run.directBuyAttempts>=6))run.directBuyRemaining=0;active=false;}
+ }
  async function destroy(options){
   const pilot=getPilot(),{run,getSnapshot,guard,onEvent=()=>{}}=options;
   if(!options.event?.isTrusted||active||pilot.report().unconfirmedAttempt)throw Error('A fresh user click and a resolved prior attempt are required.');
@@ -117,5 +166,5 @@ export function createSnatchDirectItems({native,getPilot,getProfile,window,now=(
   const summary=native.inventorySummary?.();if(summary?.verified&&[summary.total,summary.occupied,summary.free].every(Number.isSafeInteger)&&summary.total>=0&&summary.total<=100&&summary.free>=0&&summary.occupied>=0&&summary.occupied+summary.free===summary.total)return {total:summary.total,occupied:summary.occupied,free:summary.free,source:'current-travel-dom'};
   return null;
  }
- return {...native,execute,cancel,remainingCapacity,observeProfile,hasPendingStep:()=>!!(trashRun?.directTrashRemaining>0)||!!native.hasPendingStep?.(),forget(){cancel();proof=null;lastStatus=null;trashRun=null;native.forget?.();},inspect(run){trashRun=run;const base=native.inspect(run);if(run?.directTrashUncertain||getPilot()?.hasPendingAttempt?.())return {...base,directItemUncertain:true};if(!same(run))return base;if(proof.uncertain)return {...base,released:false,hospitalized:true,directItemUncertain:true};if(now()-proof.at>120000)return {...base,released:false,hospitalized:true,directItemUncertain:true};return {...base,released:proof.released,hospitalized:proof.hospitalized,hospitalUntil:proof.hospitalUntil,directItemConsumed:!!proof.consumed,directItemUncertain:false};},listInventory(){const pilot=getPilot(),inspection=pilot?.report().travelInspection;if(!inspection)return native.listInventory();return inspection.mappings.map(item=>({id:item.itemId,name:item.name,amount:1,source:'travel-direct-inventory'}));},report:()=>({active,lastStatus,proof:proof?{uncertain:proof.uncertain,hospitalized:proof.hospitalized,released:proof.released,consumed:!!proof.consumed,action:proof.kind||null,source:proof.releaseSource||'profile',at:proof.at}:null})};
+ return {...native,execute,cancel,remainingCapacity,observeProfile,hasPendingStep:()=>!!(trashRun?.directTrashRemaining>0||trashRun?.directBuyRemaining>0)||!!native.hasPendingStep?.(),forget(){cancel();proof=null;lastStatus=null;trashRun=null;native.forget?.();},inspect(run){trashRun=run;const base=native.inspect(run);if(run?.directTrashUncertain||run?.directBuyUncertain||getPilot()?.hasPendingAttempt?.())return {...base,directItemUncertain:true};if(!same(run))return base;if(proof.uncertain)return {...base,released:false,hospitalized:true,directItemUncertain:true};if(now()-proof.at>120000)return {...base,released:false,hospitalized:true,directItemUncertain:true};return {...base,released:proof.released,hospitalized:proof.hospitalized,hospitalUntil:proof.hospitalUntil,directItemConsumed:!!proof.consumed,directItemUncertain:false};},listInventory(){const pilot=getPilot(),inspection=pilot?.report().travelInspection;if(!inspection)return native.listInventory();return inspection.mappings.map(item=>({id:item.itemId,name:item.name,amount:1,source:'travel-direct-inventory'}));},report:()=>({active,lastStatus,proof:proof?{uncertain:proof.uncertain,hospitalized:proof.hospitalized,released:proof.released,consumed:!!proof.consumed,action:proof.kind||null,source:proof.releaseSource||'profile',at:proof.at}:null})};
 }
