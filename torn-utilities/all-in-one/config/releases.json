@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.92-dev",
+    "date": "2026-11-11",
+    "securityBundle": true,
+    "changes": {
+      "Improvements": [
+        "Use the direct item handler for selected inventory destruction",
+        "Verify one trashed item per click before continuing"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.91-dev",
     "date": "2026-11-11",
     "securityBundle": true,

@@ -1,7 +1,7 @@
 # TU implementation status — CURRENT DEV ONLY
 
 The approved compact UI and self-service deletion work is implemented for
-**TU 0.5.42.91-dev / Item Monitor 1.12.41-dev** with agreement **1.4 / number 5**.
+**TU 0.5.42.92-dev / Item Monitor 1.12.42-dev** with agreement **1.4 / number 5**.
 Earlier production-target references and implementation holds are superseded by
 the explicit DEV-only authorization.
 
@@ -25,3 +25,6 @@ other-installation cleanup limitations are recorded in the release report.
 The .91 correction routes every selected healing item through the direct item
 handler, removes the .90 native diversion, and retains travel inventory schema
 compatibility. See [handler regression evidence](HEALING-FIX-20261111.md).
+
+The .92 follow-up routes selected inventory destruction through the handler,
+with one verified removal per trusted click. See [destruction validation](DIRECT-TRASH-20261111.md).

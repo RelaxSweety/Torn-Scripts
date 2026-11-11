@@ -1,11 +1,12 @@
-// Experimental facade: item use changes transport; buying/destruction/return retain native handling.
+// Item use and selected destruction share the direct handler; buying/return retain native controls.
 export function createSnatchDirectItems({native,getPilot,getProfile,window,now=()=>Date.now()}){
- let proof=null,generation=0,active=false,lastStatus=null;
+ let proof=null,generation=0,active=false,lastStatus=null,trashRun=null;
  const same=run=>proof&&proof.ownerId===run?.ownerId&&proof.intentId===run?.intentId&&proof.watchKey===run?.watchKey;
  function cancel(){generation++;getPilot()?.cancel();native?.cancel();}
  async function execute(kind,options){
   const pilot=getPilot();
-  if(!['heal','hospitalize'].includes(kind)){if(active||pilot.report().unconfirmedAttempt||proof?.uncertain)throw Error('Resolve the direct item/status verification before continuing.');return native.execute(kind,options);}
+  if(kind==='destroy')return destroy(options);
+  if(!['heal','hospitalize'].includes(kind)){if(active||pilot.report().unconfirmedAttempt||proof?.uncertain||trashRun?.directTrashRemaining>0)throw Error('Resolve the direct item/status verification before continuing.');return native.execute(kind,options);}
   if(!options.event?.isTrusted||active||pilot.report().unconfirmedAttempt)throw Error('A fresh user click and a resolved prior attempt are required.');
   const {run,getSnapshot,guard,onEvent=()=>{}}=options;
   const eligible=()=>{if(!guard()||run.capacityLedger?.valid===false)return false;const s=getSnapshot();if(kind==='heal')return s.hospitalized===true&&!s.traveling&&s.quantity>=Math.max(1,Number(run.minimumQty)||1);return options.extendHospital?s.hospitalized===true&&!s.traveling&&!s.returning:options.allowBeforeLanding?s.traveling===true&&!s.returning:s.hospitalized===false&&!s.traveling&&Number.isFinite(s.quantity)&&s.quantity<Math.max(1,Number(run.minimumQty)||1);};
@@ -72,6 +73,33 @@ export function createSnatchDirectItems({native,getPilot,getProfile,window,now=(
   }catch(error){if(consumed||error.submitted){error.submitted=true;if(run.capacityLedger&&!consumed){run.capacityLedger.valid=false;run.capacityLedger.reason='unconfirmed-direct-item';}}throw error;}
   finally{active=false;}
  }
+ async function destroy(options){
+  const pilot=getPilot(),{run,getSnapshot,guard,onEvent=()=>{}}=options;
+  if(!options.event?.isTrusted||active||pilot.report().unconfirmedAttempt)throw Error('A fresh user click and a resolved prior attempt are required.');
+  if(!run.destroyInventory||!run.destroyAccepted||run.destroyDone||!run.destroyItems?.length)throw Error('Inventory Destruction is not accepted for this armed run.');
+  if(run.directTrashUncertain||proof?.uncertain)throw Error('Review the uncertain item outcome and re-arm before continuing.');
+  const selected=run.destroyItems.map(item=>({...item})),selectionKey=items=>JSON.stringify((items||[]).map(item=>[String(item.id||''),String(item.name||''),String(item.uid||'')])),approvedKey=selectionKey(selected);
+  const eligible=()=>{const state=getSnapshot();return run.destroyInventory&&run.destroyAccepted&&!run.destroyDone&&selectionKey(run.destroyItems)===approvedKey&&guard()&&run.capacityLedger?.valid===true&&state.hospitalized===false&&!state.traveling&&!state.returning&&Number.isFinite(state.quantity)&&state.quantity>=Math.max(1,Number(run.minimumQty)||1);};
+  if(!guard())throw Error('The armed run or player changed; no item was trashed.');
+  native.prepareRun?.(run);
+  if(!eligible())throw Error('Verified capacity, hospital release and available monitored stock are required before destroying items.');
+  active=true;trashRun=run;const ticket=++generation;let removed=false;
+  try{
+   const ensure=()=>ticket===generation&&eligible();
+   onEvent({step:'direct-trash-start',action:'destroy'});
+   const result=await pilot.trashRunItem(options.event,selected,ensure,run.directTrashFingerprint||null);
+   if(!['destruction-confirmed','nothing-selected-carried'].includes(result.result)){const error=Error(result.text||'Direct destruction was blocked: '+result.result);error.submitted=result.result==='uncertain';throw error;}
+   removed=result.result==='destruction-confirmed';
+   if(!ensure())throw Error('Run changed after the inventory check. No subsequent action was sent.');
+   const ledger=run.capacityLedger,capacity=result.inventoryCapacity,freed=ledger.initialOccupied+(ledger.purchased||0)-capacity?.occupied;
+   if(capacity?.total!==ledger.total||!Number.isSafeInteger(freed)||freed<0||freed>ledger.initialOccupied)throw Error('Fresh inventory conflicts with the capacity baseline. Review inventory and re-arm.');
+   ledger.freed=freed;run.directTrashDestroyed=(run.directTrashDestroyed||0)+(removed?1:0);run.directTrashRemaining=result.remaining;run.directTrashFingerprint=result.inventoryFingerprint;
+   onEvent({step:'direct-trash-confirmed',action:'destroy',amount:removed?1:0,quantity:result.remaining,capacityTotal:capacity.total,occupiedSlots:capacity.occupied,freedSlots:freed,verified:true});
+   if(result.remaining>0)return {actionPending:true,nextLabel:'Destroy next selected item ('+result.remaining+' remaining)'};
+   return {inventoryDestroyed:true,amount:run.directTrashDestroyed};
+  }catch(error){if(removed||error.submitted){error.submitted=true;run.directTrashUncertain=true;if(run.capacityLedger){run.capacityLedger.valid=false;run.capacityLedger.reason='unconfirmed-direct-trash';}}throw error;}
+  finally{active=false;}
+ }
  function observeProfile(payload){
   // Existing status reconciliation can recover a consumed item after a transient read failure.
   // Never clear an uncertain use outcome using hospital status alone.
@@ -89,5 +117,5 @@ export function createSnatchDirectItems({native,getPilot,getProfile,window,now=(
   const summary=native.inventorySummary?.();if(summary?.verified&&[summary.total,summary.occupied,summary.free].every(Number.isSafeInteger)&&summary.total>=0&&summary.total<=100&&summary.free>=0&&summary.occupied>=0&&summary.occupied+summary.free===summary.total)return {total:summary.total,occupied:summary.occupied,free:summary.free,source:'current-travel-dom'};
   return null;
  }
- return {...native,execute,cancel,remainingCapacity,observeProfile,forget(){cancel();proof=null;lastStatus=null;native.forget?.();},inspect(run){const base=native.inspect(run);if(!same(run))return base;if(proof.uncertain)return {...base,released:false,hospitalized:true,directItemUncertain:true};if(now()-proof.at>120000)return {...base,released:false,hospitalized:true,directItemUncertain:true};return {...base,released:proof.released,hospitalized:proof.hospitalized,hospitalUntil:proof.hospitalUntil,directItemConsumed:!!proof.consumed,directItemUncertain:false};},listInventory(){const pilot=getPilot(),inspection=pilot?.report().travelInspection;if(!inspection)return native.listInventory();return inspection.mappings.map(item=>({id:item.itemId,name:item.name,amount:1,source:'travel-direct-inventory'}));},report:()=>({active,lastStatus,proof:proof?{uncertain:proof.uncertain,hospitalized:proof.hospitalized,released:proof.released,consumed:!!proof.consumed,action:proof.kind||null,source:proof.releaseSource||'profile',at:proof.at}:null})};
+ return {...native,execute,cancel,remainingCapacity,observeProfile,hasPendingStep:()=>!!(trashRun?.directTrashRemaining>0)||!!native.hasPendingStep?.(),forget(){cancel();proof=null;lastStatus=null;trashRun=null;native.forget?.();},inspect(run){trashRun=run;const base=native.inspect(run);if(run?.directTrashUncertain||getPilot()?.hasPendingAttempt?.())return {...base,directItemUncertain:true};if(!same(run))return base;if(proof.uncertain)return {...base,released:false,hospitalized:true,directItemUncertain:true};if(now()-proof.at>120000)return {...base,released:false,hospitalized:true,directItemUncertain:true};return {...base,released:proof.released,hospitalized:proof.hospitalized,hospitalUntil:proof.hospitalUntil,directItemConsumed:!!proof.consumed,directItemUncertain:false};},listInventory(){const pilot=getPilot(),inspection=pilot?.report().travelInspection;if(!inspection)return native.listInventory();return inspection.mappings.map(item=>({id:item.itemId,name:item.name,amount:1,source:'travel-direct-inventory'}));},report:()=>({active,lastStatus,proof:proof?{uncertain:proof.uncertain,hospitalized:proof.hospitalized,released:proof.released,consumed:!!proof.consumed,action:proof.kind||null,source:proof.releaseSource||'profile',at:proof.at}:null})};
 }

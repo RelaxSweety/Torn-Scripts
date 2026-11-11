@@ -1,0 +1,15 @@
+# DEV selected destruction — 0.5.42.92-dev
+
+TU 0.5.42.92-dev / Item Monitor 1.12.42-dev adds selected inventory destruction to the existing direct item handler. Healing and hospitalization continue through that handler. Purchase and return remain separate native actions. Agreement 1.4 / number 5 remains current; its one-user-action-per-transaction rule is preserved.
+
+The supplied .91 diagnostic confirmed POST `/page.php?sid=travelData&step=trashItem` with JSON `{ "slotID": 11 }` (synthetic example), a `success:true` response and a fresh inventory with that slot empty. Unlike item use, this response does not require an `itemRemoved` field. Credentials, raw reports and actual user slot IDs are not committed.
+
+Each trusted click verifies acceptance, selected type/name/optional UID, current owner/run, hospital release, monitored stock and capacity. It obtains fresh complete inventory and sends at most one selected-item Trash POST. Success requires a fresh inventory with exactly the target slot emptied and all other slot identities unchanged. Further selected copies require another click; buying cannot begin early. Selection refers to all matching carried copies, as in the existing destruction option.
+
+The verified inventory fingerprint is retained between steps. Changed inventory requires review and re-arming. An unknown request outcome remains locked across reloads; no automatic retry or native destruction fallback occurs. After reviewing the real inventory and resolving the pending attempt, re-arm to continue. The endpoint accepts a slot ID rather than an atomic item-identity condition: avoid concurrent inventory actions during a transaction.
+
+Changed implementation: `direct-quick-items.js`, `snatch-direct-items.js`, generated integration readiness for destruction continuation, DEV version metadata and distributions. New regression fixtures cover selection, one-item steps, capacity, unchanged unselected items, acceptance/state/identity changes during reads, server/network/verification failures, reload locks and no early purchase. Payload budget increased by 5 KB for the verified destruction workflow.
+
+Validation: DEV build and complete `npm test` passed. The first validation run encountered the existing 60 ms header-control timing assertion; the unchanged test passed on rerun. Final continuation-guard adjustments were rebuilt and checked with the affected workflow/travel regressions. Also passed: `tests/direct-trash.mjs`, `tests/direct-trash-workflow.mjs`, and trusted Chromium `scripts/validate-direct-trash.py`. Browser traffic and inventory are entirely synthetic. Screenshots in `evidence/direct-trash-92/` show desktop, mobile portrait and landscape continuation. They verify the workflow fixture, not a live PDA installation. No real tester items were destroyed. Prior compact/deletion verification remains in DEV-RELEASE-20261111.md.
+
+Recovery before publication: commit `0cc38ea0096ec72466eb44b0aef90f7ddc7cfe0b` and archived .91 installer. No Worker, D1, Durable Object, agreement publication or other server/storage changes are needed. Separate production `main` remains `73c42788968612913ccfee20b1d5c194324dc8fd`.
