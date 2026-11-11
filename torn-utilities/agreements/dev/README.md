@@ -4,7 +4,7 @@
 
 Current published manifest: [current.json](./current.json). This file contains the agreement metadata and exact Markdown text as JSON. Only authorized TU personnel/agents should modify it. Protect the publication branch with repository permissions and review rules.
 
-Current publication: **1.3 / number 4**. [Readable agreement](./1.3.md). Previous text is preserved in `history/1.2.json`.
+Current publication: **1.4 / number 5**. [Readable agreement](./1.4.md). Previous texts are preserved in `history/1.2.json` and `history/1.3.json`.
 
 ## Publish a new version
 

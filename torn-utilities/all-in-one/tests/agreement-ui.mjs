@@ -24,10 +24,10 @@ async function boot({oldConsent=false,holdDocument=false}={}){
 {
  const b=await boot();try{const overlay=await b.review();assert.ok(overlay);assert.equal(overlay.querySelectorAll('table').length,7);assert.equal(overlay.querySelectorAll('tbody tr').length,35);assert.equal(overlay.querySelector('script,img'),null);
  const checkbox=overlay.querySelector('input[type=checkbox]'),accept=[...overlay.querySelectorAll('button')].find(button=>button.textContent==='I Agree — Continue');
- assert.equal(checkbox.checked,false);assert.equal(checkbox.disabled,false);assert.ok(overlay.textContent.includes('Agreement version 1.3'));assert.equal(overlay.querySelector('input[type=password]').value,'');
+ assert.equal(checkbox.checked,false);assert.equal(checkbox.disabled,false);assert.ok(overlay.textContent.includes('Agreement version '+published.agreement.agreement_version));assert.equal(overlay.querySelector('input[type=password]').value,'');
  assert.equal(overlay.querySelector('table').style.tableLayout,'fixed');assert.equal(overlay.querySelector('td').style.whiteSpace,'normal');assert.equal(overlay.querySelector('a').rel,'noopener noreferrer');
  accept.click();await pause();assert.equal(b.posts().length,0,'Unchecked consent cannot post acceptance');
- overlay.querySelector('input[type=password]').value=KEY;checkbox.checked=true;accept.click();await pause();await pause();assert.equal(b.posts().length,1);assert.equal(b.posts()[0].body.agreement_version,'1.3');assert.equal(b.w.TornUtilities.isAuthorized(),true);
+ overlay.querySelector('input[type=password]').value=KEY;checkbox.checked=true;accept.click();await pause();await pause();assert.equal(b.posts().length,1);assert.equal(b.posts()[0].body.agreement_version,published.agreement.agreement_version);assert.equal(b.w.TornUtilities.isAuthorized(),true);
  b.w.document.querySelector('[data-tab="settings"]').click();[...b.w.document.querySelectorAll('.tu-card')].find(card=>card.querySelector('strong')?.textContent==='API Keys').querySelector('button').click();
  assert.equal(b.w.document.querySelector('[data-tu-key-disclosure]').querySelectorAll('table').length,7,'Saved-key entry has the approved disclosures too');assert.deepEqual(b.errors,[]);
  }finally{b.close();}
@@ -36,6 +36,6 @@ async function boot({oldConsent=false,holdDocument=false}={}){
  const b=await boot({holdDocument:true});try{const overlay=await b.review();assert.equal(overlay.querySelector('input[type=checkbox]').disabled,true);const accept=[...overlay.querySelectorAll('button')].find(button=>button.textContent==='I Agree — Continue');assert.equal(accept.disabled,true);assert.equal(b.posts().length,0);[...overlay.querySelectorAll('button')].find(button=>button.textContent==='Decline / Info only').click();b.resume();await pause();assert.equal(b.posts().length,0);assert.equal(b.w.TornUtilities.isAuthorized(),false);assert.equal(b.w.document.getElementById('tu-agreement-overlay'),null);}finally{b.close();}
 }
 {
- const b=await boot({oldConsent:true});try{assert.equal(b.w.TornUtilities.isAuthorized(),false,'Previous consent is not current consent');const overlay=await b.review();assert.ok(overlay.textContent.includes('Agreement version 1.3'));assert.equal(overlay.querySelector('input[type=checkbox]').checked,false);assert.equal(b.posts().length,0);}finally{b.close();}
+ const b=await boot({oldConsent:true});try{assert.equal(b.w.TornUtilities.isAuthorized(),false,'Previous consent is not current consent');const overlay=await b.review();assert.ok(overlay.textContent.includes('Agreement version '+published.agreement.agreement_version));assert.equal(overlay.querySelector('input[type=checkbox]').checked,false);assert.equal(b.posts().length,0);}finally{b.close();}
 }
 console.log('Agreement UI passed: wrapped tables/links, both key-entry surfaces, explicit acceptance only, loading/decline gates and stale-consent rejection');

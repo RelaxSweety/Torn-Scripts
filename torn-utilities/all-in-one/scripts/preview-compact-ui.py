@@ -46,7 +46,16 @@ with sync_playwright() as p:
     page.evaluate('window.TUWindowNavigation.back("tuim-travel-window")');page.get_by_role('button',name='Open Item Monitor',exact=True).click();page.wait_for_selector('#tuim-panel',state='visible');row['itemMonitor']=page.locator('#tuim-panel').evaluate(metrics);snap(page,variant,layout,'item-monitor')
     if variant=='after':
      for key in ['moduleMenu','travelAssistant','itemMonitor']:assert not row[key]['horizontalOverflow'],(key,row[key])
-     assert page.locator('#tuim-panel').evaluate('e=>{e.scrollTop=e.scrollHeight;return e.scrollTop>0;}'),'Monitor scrolls'
+     for fraction in [0,.5,1]:
+      delta=page.locator('#tuim-panel').evaluate('(e,f)=>{e.scrollTop=(e.scrollHeight-e.clientHeight)*f;return e.querySelector(".tuim-header").getBoundingClientRect().top-e.getBoundingClientRect().top}',fraction)
+      assert abs(delta-1)<2,('Flush monitor header',layout,fraction,delta)
+     page.locator('#tuim-inventory-audio').uncheck();page.locator('#tuim-inventory-audio').check();page.locator('#tuim-inventory-visual').uncheck()
+     page.locator('#tuim-hospital-alarm-enabled').check();page.locator('#tuim-hospital-visual').uncheck()
+     page.locator('#tuim-landing-audio').uncheck();page.locator('#tuim-landing-audio').check();page.locator('#tuim-landing-visual').uncheck()
+     settings=page.evaluate('JSON.parse(localStorage.getItem("tuac-settings"))')
+     assert settings['inventoryAudio'] and not settings['inventoryVisual'] and settings['snatchSetup']['hospitalAlarm'] and not settings['snatchSetup']['hospitalVisual'] and settings['landingAlarm']['audio'] and not settings['landingAlarm']['visual'],settings
+     page.locator('#tuim-alarm-settings').scroll_into_view_if_needed();snap(page,variant,layout,'alarm-settings')
+
      page.locator('#tuim-panel').evaluate('e=>e.scrollTop=0');page.evaluate('window.TUWindowNavigation.minimize("tuim-panel")');page.locator('#tu-pda-launcher').click();assert page.locator('#tuim-panel').is_visible()
      page.evaluate('window.TornUtilities.closeActiveModule()');assert page.locator('#tu-pda-panel').is_visible()
      if layout=='desktop':

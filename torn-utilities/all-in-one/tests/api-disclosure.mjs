@@ -7,7 +7,7 @@ const agreement=JSON.parse(fs.readFileSync(new URL('../../agreements/dev/current
 const dom=new JSDOM('');try{
  for(const mode of ['userscript-private','origin-local']){
   const disclosure=createApiDisclosure({document:dom.window.document,storageMode:mode,content:agreement.content});assert.equal(disclosure.querySelectorAll('table').length,7);assert.equal(disclosure.querySelectorAll('tbody tr').length,35);
-  assert.ok(disclosure.textContent.includes('competitive'));assert.ok(disclosure.textContent.includes(mode==='userscript-private'?'userscript-manager':'Torn-origin'));assert.ok(disclosure.textContent.includes('No automatic remote deletion'));assert.equal(disclosure.querySelector('input,button,script'),null);
+  assert.ok(disclosure.textContent.includes('competitive'));assert.ok(disclosure.textContent.includes(mode==='userscript-private'?'userscript-manager':'Torn-origin'));assert.ok(disclosure.textContent.includes('Delete My TU Data'));assert.equal(disclosure.querySelector('input,button,script'),null);
   for(const table of disclosure.querySelectorAll('table')){assert.equal(table.querySelectorAll('thead th').length,2);assert.equal(table.style.tableLayout,'fixed');}
  }
  const safe=renderAgreementMarkdown({document:dom.window.document,markdown:'# Heading\n\nA wrapped\nparagraph with **bold** and [Torn](https://www.torn.com).\n\n<img src=x onerror=alert(1)> [Bad](javascript:alert(1))\n\n- First\n  continuation\n- Second'});

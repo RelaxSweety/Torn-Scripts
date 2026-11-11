@@ -19,7 +19,7 @@ try{
  const binding=object=>({idFromName:x=>x,get:()=>object});let fail=true,verified=0;
  const env={TU_DELETION_ENABLED:'true',TU_USERS_DB:users,FOREIGN_DB:{prepare(sql){if(fail)throw Error('Injected foreign failure');return foreign.prepare(sql);}},REGISTRATION_BUDGET:binding(budget),SUBMISSION_BUDGET:binding(submission),GAME:binding({fetch:async req=>eraseRoomIdentity(roomState,req)})};
  const Coordinator=createIdentityCoordinator({route:async()=>Response.json({routed:true}),verify:async key=>{verified++;if(key!=='a'.repeat(16))throw Error('Rejected');return {id:7};},digest:hash,readJson:req=>req.json()});
- const coordinator=new Coordinator(state,env),receipt='b'.repeat(64);
+ const coordinator=new Coordinator(state,env);let receipt='b'.repeat(64);
  const request=body=>new Request('https://dev.test/api/auth/delete-data',{method:'POST',body:JSON.stringify(body)});
  assert.equal((await coordinator.fetch(request({receipt,api_key:'a'.repeat(16),player_id:8}))).status,400,'Cannot choose a victim');
  assert.equal((await coordinator.fetch(request({receipt,api_key:'z'.repeat(16)}))).status,401);
@@ -38,11 +38,18 @@ try{
  assert.ok(budgetState.data.get('reservations').length,'Limiter cleanup not falsely claimed early');
  clock+=71001;await coordinator.alarm();
  assert.equal(budgetState.data.has('reservations'),false,'Expired previous-key and IP hashes pruned');
+ const oldReceipt=receipt;receipt='d'.repeat(64);assert.equal((await coordinator.fetch(request({receipt,api_key:'a'.repeat(16)}))).status,200,'Fresh ownership proof recovers a lost receipt');assert.equal((await coordinator.fetch(request({receipt:oldReceipt}))).status,401,'Transferred recovery invalidates the old receipt');
  assert.equal((await coordinator.fetch(request({receipt}))).status,200,'Lost response/restart recovery is idempotent');
  assert.equal((await coordinator.fetch(request({receipt,cleanup_ack:true}))).status,200);assert.deepEqual(await state.storage.get('receipt:'+hash(receipt)),{complete:true},'Completion receipt has no account linkage');
  assert.equal(await state.storage.get('deleting:7'),undefined);assert.equal(await state.storage.get('rooms:7'),undefined);
  assert.equal((await coordinator.fetch(new Request('https://dev.test/api/auth/register',{method:'POST'}))).status,200);
- assert.equal(verified,2,'Retries do not re-send credentials');
+ assert.equal(verified,3,'Only initial ownership proofs and explicit lost-receipt recovery contact Torn');
+ const pagedState=memoryState(),pagedReceipt='e'.repeat(64);let calls=0;
+ await pagedState.storage.put('receipt:'+hash(pagedReceipt),{id:'7',started:clock-72000});await pagedState.storage.put('deleting:7','receipt:'+hash(pagedReceipt));await pagedState.storage.put('active-deletion','receipt:'+hash(pagedReceipt));await pagedState.storage.put('rooms:7',Array.from({length:25},(_,i)=>({binding:'GAME',name:String(i)})));
+ const paged=new Coordinator(pagedState,{...env,GAME:binding({fetch:async req=>{calls++;return new URL(req.url).pathname==='/inspect'?Response.json({hashes:[]}):new Response(null,{status:204});}})});
+ assert.equal((await paged.fetch(request({receipt:pagedReceipt}))).status,202);assert.equal(calls,20,'Room inspection is bounded');
+ assert.equal((await paged.fetch(request({receipt:pagedReceipt}))).status,202);assert.equal(calls,45,'Retry resumes inspection and bounded erasure');
+ assert.equal((await paged.fetch(request({receipt:pagedReceipt}))).status,200);assert.equal(calls,50,'Completed pages are not replayed');
  let job=null,cleanFails=true,success=false;
  const client=createDataDeletion({readJob:()=>job,saveJob:v=>{job=structuredClone(v);},removeJob:()=>{job=null;},verify:async()=>({playerId:'7'}),entries:()=>[],random:()=>receipt,stop(){},request:async body=>body.cleanup_ack?({complete:true}):({ready_for_local_cleanup:true,session_hashes:[]}),cleanup:async()=>{if(cleanFails)throw Error('Storage unavailable');}});
  await assert.rejects(client.run('a'.repeat(16),message=>{if(message.startsWith('Your TU'))success=true;}));assert.equal(success,false);assert.equal(job.remoteReady,true,'Local failure retains recovery');

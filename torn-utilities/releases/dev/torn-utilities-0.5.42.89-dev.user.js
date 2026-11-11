@@ -953,6 +953,14 @@ const TU_RELEASES=[{"version":"0.5.42.89-dev","date":"2026-11-11","securityBundl
 #tuim-panel .tuim-alarm-channels label{display:flex;align-items:center;gap:5px;margin:3px 0}
 #tuim-panel .tuim-alarm-channels input[type=checkbox]{display:inline-block;flex:none;width:18px;height:18px;min-height:18px;margin:0;padding:0}
 
+/* Legacy multiplayer windows mount without IDs; identify their real title bars. */
+#tu-pda-module-host>:is(section,div):has(>div>strong):has(>div>button[title^="Minimize"]){padding-top:0!important}
+#tu-pda-module-host>:is(section,div)>div:has(>strong):has(>button[title^="Minimize"]){
+ position:sticky!important;top:0!important;z-index:100!important;
+ margin-top:0!important;margin-inline:-11.25px!important;padding-inline:11.25px!important;
+ background:#20252e!important;isolation:isolate
+}
+
 `;
   document.head.appendChild(style);
   const launcher = document.createElement('button');

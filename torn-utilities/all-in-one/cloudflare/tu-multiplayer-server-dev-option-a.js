@@ -1011,7 +1011,7 @@ const IdentityCoordinator=createIdentityCoordinator({route:routeWorkerRequest,ve
 var index_default = { async scheduled(event, env, ctx) {
   ctx.waitUntil(collectForeignStock(env).catch(()=>{console.warn('TU_FOREIGN_COLLECTION_FAILED');}));
 }, async fetch(req, env) {
-  try{if(!env.IDENTITY_COORDINATOR)return respond({error:'Identity coordination unavailable'},503);return await env.IDENTITY_COORDINATOR.get(env.IDENTITY_COORDINATOR.idFromName('identity-lifecycle-v1')).fetch(req);}catch{console.warn('TU_REQUEST_FAILED');return respond({error:'Service unavailable',code:'INTERNAL_ERROR'},503);}
+  try{const url=new URL(req.url);if(req.method==='GET'&&(/^\/api\/foreign\/(history|restocks|prediction|overview|status)$/.test(url.pathname)||['/health','/api/auth/agreement/current'].includes(url.pathname)))return await routeWorkerRequest(req,env);if(!env.IDENTITY_COORDINATOR)return respond({error:'Identity coordination unavailable'},503);return await env.IDENTITY_COORDINATOR.get(env.IDENTITY_COORDINATOR.idFromName('identity-lifecycle-v1')).fetch(req);}catch{console.warn('TU_REQUEST_FAILED');return respond({error:'Service unavailable',code:'INTERNAL_ERROR'},503);}
 } };
 export {
   IdentityCoordinator,

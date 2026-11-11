@@ -6,6 +6,7 @@ export function createIdentityCoordinator({route,verify,digest,readJson}) {
   fetch(req){return this.state.blockConcurrencyWhile(()=>this.handle(req));}
   async handle(req){
    const storage=this.state.storage,env={...this.env,__identityStorage:storage};
+   if(req.method==='OPTIONS')return route(req,env);
    if(new URL(req.url).pathname!=='/api/auth/delete-data'){if(new URL(req.url).pathname==='/api/auth/register'&&await storage.get('active-deletion'))return Response.json({error:'Registration temporarily paused during account cleanup'},{status:503});return route(req,env);}
    const reply=(data,status=200)=>Response.json(data,{status,headers:{'cache-control':'no-store','access-control-allow-origin':'*'}});
    if(env.TU_DELETION_ENABLED!=='true')return reply({error:'Self-service deletion is not enabled on this deployment'},503);
@@ -16,16 +17,17 @@ export function createIdentityCoordinator({route,verify,digest,readJson}) {
    let job=await storage.get(receipt);
    if(job?.complete)return reply({complete:true});
    if(!job){
-    if(await storage.get('active-deletion'))return reply({error:'Another deletion is pending; retry later'},409);
     if(!/^[A-Za-z0-9]{16}$/.test(body.api_key||''))return reply({error:'Provide a Torn API key to verify account ownership'},401);
     const budget=env.REGISTRATION_BUDGET.get(env.REGISTRATION_BUDGET.idFromName('registration-global-v1'));
     const decision=await budget.fetch(new Request('https://budget.internal/reserve',{method:'POST',body:JSON.stringify({keyHash:await digest('key:'+body.api_key),ipHash:await digest('ip:'+(req.headers.get('cf-connecting-ip')||'unknown'))})}));
-    if(!decision.ok)return reply({error:'Ownership verification rate-limited; retry later'},429);
+    if(!decision.ok||(await decision.json()).allowed!==true)return reply({error:'Ownership verification rate-limited; retry later'},429);
     let identity;try{identity=await verify(body.api_key);}catch{return reply({error:'Ownership verification failed; retry with a valid Public Only or Limited Access key'},401);}
-    const pending=await storage.get('deleting:'+identity.id);
-    if(pending&&pending!==receipt)return reply({error:'Deletion already pending; resume with the original receipt'},409);
-    job={id:String(identity.id),started:Date.now()};
-    await storage.transaction(async tx=>{await tx.put(receipt,job);await tx.put('deleting:'+job.id,receipt);await tx.put('active-deletion',receipt);await tx.setAlarm(job.started+71000);});
+    const forgotten=await budget.fetch(new Request('https://budget.internal/forget',{method:'POST',body:JSON.stringify({keyHash:await digest('key:'+body.api_key)})}));if(!forgotten.ok)return reply({error:'Ownership verification cleanup incomplete'},503);delete body.api_key;
+    const pending=await storage.get('deleting:'+identity.id),active=await storage.get('active-deletion');
+    if(active&&active!==pending)return reply({error:'Another deletion is pending; retry later'},409);
+    if(pending){job=await storage.get(pending);if(!job||job.id!==String(identity.id))throw Error('Deletion recovery state unavailable');await storage.transaction(async tx=>{await tx.delete(pending);await tx.put(receipt,job);await tx.put('deleting:'+job.id,receipt);if(active===pending)await tx.put('active-deletion',receipt);});}
+    else job={id:String(identity.id),started:Date.now()};
+    await storage.transaction(async tx=>{await tx.put(receipt,job);await tx.put('deleting:'+job.id,receipt);if(!job.ready){await tx.put('active-deletion',receipt);await tx.setAlarm(Math.max(Date.now()+1,job.started+71000));}});
    }
    if(job.ready&&body.cleanup_ack===true){await storage.transaction(async tx=>{await tx.delete('deleting:'+job.id);await tx.put(receipt,{complete:true});});return reply({complete:true});}
    return this.finish(job,receipt);
@@ -41,11 +43,17 @@ export function createIdentityCoordinator({route,verify,digest,readJson}) {
     // Revocation happens first and remains in place on every partial failure.
     await db.prepare('DELETE FROM tu_sessions WHERE torn_id=?').bind(id).run();
     const rooms=[...(await storage.get('rooms:'+id)||[]),...JSON.parse(env.LEGACY_IDENTITY_ROOMS||'[]')];
-    if(!job.roomHashes){job.roomHashes=[];for(const room of rooms){const binding=env[room.binding],stub=binding.get(room.objectId?binding.idFromString(room.objectId):binding.idFromName(room.name));const response=await stub.fetch(new Request('https://identity.internal/inspect',{method:'POST',headers:{'x-tu-erase-id':id}}));if(!response.ok)throw Error('Room inventory incomplete');job.roomHashes.push(...(await response.json()).hashes);}await storage.put(receipt,job);}
-    for(const room of rooms){
-     const response=await env[room.binding].get(room.objectId?env[room.binding].idFromString(room.objectId):env[room.binding].idFromName(room.name)).fetch(new Request('https://identity.internal/erase',{method:'POST',headers:{'x-tu-erase-id':id}}));
-     if(!response.ok)throw Error('Room cleanup incomplete');
+    if(!job.roomHashes)job.roomHashes=[];
+    const inspected=job.inspectedRooms||0,inspectEnd=Math.min(rooms.length,inspected+20);
+    for(let index=inspected;index<inspectEnd;index++){const room=rooms[index],binding=env[room.binding],stub=binding.get(room.objectId?binding.idFromString(room.objectId):binding.idFromName(room.name));const response=await stub.fetch(new Request('https://identity.internal/inspect',{method:'POST',headers:{'x-tu-erase-id':id}}));if(!response.ok)throw Error('Room inventory incomplete');job.roomHashes.push(...(await response.json()).hashes);job.inspectedRooms=index+1;await storage.put(receipt,job);}
+    if(inspectEnd<rooms.length){await storage.setAlarm(Date.now()+1000);return reply({complete:false,retry_after_seconds:1},202);}
+    const erased=job.erasedRooms||0,eraseEnd=Math.min(rooms.length,erased+20);
+    for(let index=erased;index<eraseEnd;index++){
+     const room=rooms[index],binding=env[room.binding];
+     const response=await binding.get(room.objectId?binding.idFromString(room.objectId):binding.idFromName(room.name)).fetch(new Request('https://identity.internal/erase',{method:'POST',headers:{'x-tu-erase-id':id}}));
+     if(!response.ok)throw Error('Room cleanup incomplete');job.erasedRooms=index+1;await storage.put(receipt,job);
     }
+    if(eraseEnd<rooms.length){await storage.setAlarm(Date.now()+1000);return reply({complete:false,retry_after_seconds:1},202);}
     await env.FOREIGN_DB.prepare('DELETE FROM tu_agreement_events WHERE player_id=?').bind(id).run();
     // Audit and permission records about other users remain; remove only the
     // requester attribution and unstructured details that could repeat it.
@@ -58,7 +66,7 @@ export function createIdentityCoordinator({route,verify,digest,readJson}) {
     // Legacy key/IP budget reservations cannot be attributed to a saved account.
     // Their bounded lifetime is allowed to expire before completion, so previous
     // supplied keys leave no pre-deletion limiter records. No key is retained.
-    if(Date.now()<job.started+71000)return reply({complete:false,retry_after_seconds:Math.ceil((job.started+71000-Date.now())/1000)},202);
+    if(Date.now()<job.started+71000){await storage.setAlarm(job.started+71000);return reply({complete:false,retry_after_seconds:Math.ceil((job.started+71000-Date.now())/1000)},202);}
     for(const [binding,name] of [['REGISTRATION_BUDGET','registration-global-v1'],['SUBMISSION_BUDGET','foreign-writes-global-v1']]){const r=await env[binding].get(env[binding].idFromName(name)).fetch(new Request('https://budget.internal/prune',{method:'POST'}));if(!r.ok)throw Error('Budget cleanup incomplete');}
     await storage.transaction(async tx=>{await tx.delete('active-deletion');await tx.delete('rooms:'+id);job.ready=true;await tx.put(receipt,job);});
     return reply({complete:false,ready_for_local_cleanup:true,session_hashes:job.sessionHashes,room_hashes:job.roomHashes||[]});
