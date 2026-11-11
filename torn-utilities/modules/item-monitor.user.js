@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.12.44-dev
+// @version      1.12.45-dev
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -238,7 +238,8 @@ const hospitalAudio=makeAudio('hospital',()=>({seconds:state.cfg.snatchSetup?.ho
 const landingAudio=makeAudio('landing',()=>({seconds:state.cfg.landingAlarm?.duration??3,untilMuted:!!state.cfg.landingAlarm?.untilMuted}));
 const landingAlarm=typeof createLandingAlarm==='function'?createLandingAlarm({document,window,getFlight:()=>{const route=nativeFlightRoute(),el=document.querySelector('#travel-root [aria-label="Flight progress"]');if(!route||!el)return null;const timerText=el.querySelector('time')?.textContent?.trim()||el.textContent.match(/\b\d{1,3}:[0-5]\d:[0-5]\d\b/)?.[0]||'';return {...route,route:(el.textContent||'').split(/Remaining Flight Time/i)[0].replace(/\s+/g,' ').trim(),timerText};},getSettings:()=>state.cfg.landingAlarm||{},audio:landingAudio,readSaved:()=>loadLandingNotification(),save:value=>{try{sessionStorage.setItem('tu:landing-notification:v1',JSON.stringify(value));}catch{}},onEvent:(event,fields)=>{document.dispatchEvent(new CustomEvent('tu-snatch-run-diagnostic',{detail:JSON.stringify({event,...fields})}));}}):null;
 function loadLandingNotification(){try{return JSON.parse(sessionStorage.getItem('tu:landing-notification:v1')||'null')}catch{return null}}
-const enhancements=typeof createTravelEnhancements==='function'?createTravelEnhancements({document,window,hospitalAudio,getDestinationETA:()=>landingAlarm?.snapshot(),executeAction:nativeActions,getItems:()=>state.items,getSetup:()=>state.cfg.snatchSetup||{},screenAlertEnabled:watch=>!!state.cfg.screenAlert&&!!watch&&watch.visualAlerts!==false,storeSetup:value=>{Object.assign(state.cfg.snatchSetup||(state.cfg.snatchSetup={}),value);saveCfg();},getContext:getSnatchContext,getSnapshot:snatchSnapshot,getRows:filterRows,getFilterContainer:filterContainer,matchRow:rowMatches,filterEnabled:()=>!!state.cfg.monitoredOnly,onArmed:()=>{landingAudio.unlock();host.TUWindowNavigation?.minimize?.('tuim-panel');if(state.panel)state.panel.hidden=true;state.catalogWindow?.remove();state.catalogWindow=null;},onNotice:message=>{const el=document.getElementById('tuim-snatch-notice');if(el)el.textContent=message;},restoreRun:(()=>{try{return JSON.parse(sessionStorage.getItem('tu:snatch-run:v1')||'null')}catch{return null}})(),storeRun:value=>{if(value)sessionStorage.setItem('tu:snatch-run:v1',JSON.stringify(value));else sessionStorage.removeItem('tu:snatch-run:v1');}}):null;
+const enhancements=typeof createTravelEnhancements==='function'?createTravelEnhancements({document,window,hospitalAudio,getHospitalCountdown:()=>hospitalClock?.displayRemaining?.()??null,getDestinationETA:()=>landingAlarm?.snapshot(),executeAction:nativeActions,getItems:()=>state.items,getSetup:()=>state.cfg.snatchSetup||{},screenAlertEnabled:watch=>!!state.cfg.screenAlert&&!!watch&&watch.visualAlerts!==false,storeSetup:value=>{Object.assign(state.cfg.snatchSetup||(state.cfg.snatchSetup={}),value);saveCfg();},getContext:getSnatchContext,getSnapshot:snatchSnapshot,getRows:filterRows,getFilterContainer:filterContainer,matchRow:rowMatches,filterEnabled:()=>!!state.cfg.monitoredOnly,onArmed:()=>{landingAudio.unlock();host.TUWindowNavigation?.minimize?.('tuim-panel');if(state.panel)state.panel.hidden=true;state.catalogWindow?.remove();state.catalogWindow=null;},onNotice:message=>{const el=document.getElementById('tuim-snatch-notice');if(el)el.textContent=message;},restoreRun:(()=>{try{return JSON.parse(sessionStorage.getItem('tu:snatch-run:v1')||'null')}catch{return null}})(),storeRun:value=>{if(value)sessionStorage.setItem('tu:snatch-run:v1',JSON.stringify(value));else sessionStorage.removeItem('tu:snatch-run:v1');}}):null;
+const nativeClockSync=typeof createNativeClockSync==='function'?createNativeClockSync({document,window,sync:()=>{landingAlarm?.tick();enhancements?.syncCountdown();}}):null;
 function renderMonitoredFilter(parent){
  const label=E('label',parent);label.className='tuim-monitored-toggle';const check=E('input',label);check.type='checkbox';check.id='tuim-monitored-only';check.checked=!!state.cfg.monitoredOnly;label.append(document.createTextNode('Show monitored items only'));check.onchange=()=>{state.cfg.monitoredOnly=check.checked;saveCfg();enhancements?.applyFilter();};
 }
@@ -1017,7 +1018,7 @@ function deactivate(){stopRuntime();travelClose();state.catalogWindow?.remove();
 every(()=>{if(state.items.length)scan()},2000);
 function startRuntime(){
  if(runtimeAbort)return;
- migrate();style();landingAlarm?.start();runtimeAbort=new AbortController();try{embeddedDiagnostic?.resume();if(embeddedDiagnostic?.isMonitoring())stockDiagnostic?.start();}catch{}
+ migrate();style();landingAlarm?.start();nativeClockSync?.start();runtimeAbort=new AbortController();try{embeddedDiagnostic?.resume();if(embeddedDiagnostic?.isMonitoring())stockDiagnostic?.start();}catch{}
  for(const task of runtimeTasks)task.timer=setInterval(task.fn,task.delay);
  runtimeObserver=new MutationObserver(records=>{if(document.hidden||!document.hasFocus()||!state.items.length||scanTimer!==null)return;if(records.every(record=>(record.target.nodeType===1?record.target:record.target.parentElement)?.closest('#tuim-menu,#tuim-panel,#tuim-catalog,#tuim-travel-window,#tuim-data-window,#tu-pda-panel,#tu-test-dev-panel,#tu-snatch-run')))return;scanTimer=setTimeout(()=>{scanTimer=null;if(runtimeAbort)scan()},400)});
  runtimeObserver.observe(document.documentElement,{childList:true,subtree:true,characterData:true});
@@ -1028,7 +1029,7 @@ function startRuntime(){
  window.addEventListener('popstate',scan,{signal:runtimeAbort.signal});
 }
 function stopRuntime(){
- landingAlarm?.stop();document.getElementById('tuim-exit-confirm')?.remove();enhancements?.stop();diagnosticStop();runtimeAbort?.abort();runtimeAbort=null;runtimeObserver?.disconnect();runtimeObserver=null;
+ nativeClockSync?.stop();landingAlarm?.stop();document.getElementById('tuim-exit-confirm')?.remove();enhancements?.stop();diagnosticStop();runtimeAbort?.abort();runtimeAbort=null;runtimeObserver?.disconnect();runtimeObserver=null;
  clearTimeout(scanTimer);scanTimer=null;
  for(const task of runtimeTasks){clearInterval(task.timer);task.timer=null}
  inventoryAudio.stop();

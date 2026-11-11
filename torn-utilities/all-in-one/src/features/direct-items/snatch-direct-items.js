@@ -1,6 +1,34 @@
 // Item use and selected destruction share the direct handler; purchasing also uses direct requests; return retains native controls.
 export function createSnatchDirectItems({native,getPilot,getProfile,window,now=()=>Date.now()}){
- let proof=null,generation=0,active=false,lastStatus=null,trashRun=null;
+ let proof=null,generation=0,active=false,lastStatus=null,trashRun=null,purchaseNotice=null,purchaseNoticeTimer=null;
+ function clearPurchaseNotice(){if(purchaseNoticeTimer!==null)window.clearTimeout(purchaseNoticeTimer);purchaseNoticeTimer=null;purchaseNotice?.remove();purchaseNotice=null;}
+ function showPurchaseNotice(run,total){
+  clearPurchaseNotice();const node=window.document.createElement('div');purchaseNotice=node;node.id='tu-purchase-confirmation';node.setAttribute('role','status');node.setAttribute('aria-live','polite');node.setAttribute('aria-atomic','true');node.textContent=run.directBuyAmount+'/'+total+' '+run.watchName+' Purchased';node.style.cssText='position:fixed;top:20%;left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100vw - 24px);box-sizing:border-box;padding:12px 16px;border:2px solid #78d7a0;border-radius:8px;background:#164c31;color:#fff;font:bold 16px system-ui;text-align:center;overflow-wrap:anywhere;box-shadow:0 4px 18px #0008;z-index:2147483647;pointer-events:none';window.document.body.append(node);window.requestAnimationFrame?.(()=>{if(purchaseNotice===node&&node.isConnected)window.document.body.append(node);});purchaseNoticeTimer=window.setTimeout(clearPurchaseNotice,3000);
+ }
+ let slotCache=null;
+ function clearPurchaseSlots(){
+  for(const node of window.document.querySelectorAll('[data-tu-purchase-slot]'))node.remove();
+  for(const [cell,prior] of slotCache?.positions||[])if(cell.style.position==='relative')cell.style.position=prior;
+  slotCache=null;
+ }
+ function renderPurchaseSlots(run){
+  const marks=run?.directBuySlotStatus;
+  if(!marks?.length){if(slotCache)clearPurchaseSlots();return;}
+  const panel=window.document.querySelector('#travel-root [class*=inventoryPanel]'),signature=JSON.stringify(marks);
+  if(slotCache?.panel===panel&&slotCache.signature===signature&&slotCache.nodes.every(node=>node.isConnected))return;
+  clearPurchaseSlots();if(!panel)return;
+  const cells=[...panel.querySelectorAll('li[class*=inventorySlot]')],total=run.capacityLedger?.total,numbered=new Map();
+  if(!Number.isSafeInteger(total)||total<1||total>100||cells.length!==total)return;
+  // Torn's DOM can use column order (1,7,13,2,...). Match its explicit slot labels, never DOM position.
+  for(const cell of cells){const label=cell.querySelector(':scope > button[aria-label]')?.getAttribute('aria-label')||cell.querySelector('[class*=srOnly]')?.textContent||'',number=Number(label.match(/\bslot\s+(\d+)\b/i)?.[1]);if(!Number.isSafeInteger(number)||number<1||number>total||numbered.has(number))return;numbered.set(number,cell);}
+  if(marks.some(mark=>!numbered.has(mark.number)||!['filled','unfilled'].includes(mark.status)))return;
+  const nodes=[],positions=[];
+  for(const mark of marks){const cell=numbered.get(mark.number),existing=cell.querySelector(':scope > button[aria-label]');if(mark.status==='unfilled'&&existing&&!/^(empty|available|free|unused)\b/i.test(existing.getAttribute('aria-label')||''))continue;const badge=window.document.createElement('span'),filled=mark.status==='filled';
+   badge.dataset.tuPurchaseSlot=mark.status;badge.setAttribute('role','img');badge.setAttribute('aria-label',filled?'Purchase verified in this slot':'Requested slot not filled');badge.title=filled?'Verified purchased item':'Requested inventory space is still empty';badge.textContent=filled?'✓':'✕';badge.style.cssText='position:absolute;top:1px;right:1px;z-index:5;display:grid;place-items:center;width:20px;height:20px;box-sizing:border-box;border:1px solid currentColor;border-radius:50%;font:bold 17px/1 system-ui;pointer-events:none;background:#15212aee;color:'+(filled?'#42ff83':'#ff6262');
+   if(window.getComputedStyle(cell).position==='static'||!window.getComputedStyle(cell).position){positions.push([cell,cell.style.position]);cell.style.position='relative';}cell.append(badge);nodes.push(badge);
+  }
+  slotCache={panel,signature,nodes,positions};
+ }
  const same=run=>proof&&proof.ownerId===run?.ownerId&&proof.intentId===run?.intentId&&proof.watchKey===run?.watchKey;
  function cancel(){generation++;getPilot()?.cancel();native?.cancel();}
  async function execute(kind,options){
@@ -83,11 +111,11 @@ export function createSnatchDirectItems({native,getPilot,getProfile,window,now=(
   const eligible=()=>{const s=getSnapshot();return guard()&&(!Number.isFinite(run.stockAt)||now()-run.stockAt<30000)&&signature===JSON.stringify([run.ownerId,run.intentId,run.watchKey,run.watchName,run.maximumPrice,run.minimumQty])&&s.hospitalized===false&&!s.traveling&&!s.returning&&s.stockVisible!==false&&Number.isSafeInteger(s.quantity)&&s.quantity>=(run.directBuyAmount?1:Math.max(1,Number(run.minimumQty)||1));};
   if(!eligible()){
    const state=getSnapshot();
-   if(run.directBuyAmount&&guard()&&state.hospitalized===false&&!state.traveling&&!state.returning&&state.stockVisible!==false&&state.quantity===0){run.directBuyRemaining=0;run.directBuyComplete=true;return {purchaseConfirmed:true,amount:run.directBuyAmount,reconcileWarning:'Stock exhausted after confirmed partial purchases'};}
+   if(run.directBuyAmount&&guard()&&state.hospitalized===false&&!state.traveling&&!state.returning&&state.stockVisible!==false&&state.quantity===0){run.directBuyRemaining=0;run.directBuyComplete=true;return {purchaseConfirmed:true,directPurchaseVerified:true,amount:run.directBuyAmount,reconcileWarning:'Stock exhausted after confirmed partial purchases'};}
    throw Error('Fresh monitored stock and confirmed hospital release are required before buying.');
   }
   active=true;trashRun=run;const ticket=++generation;let submitted=false,plan=null;
-  const outcome=warning=>{run.directBuyRemaining=0;run.directBuyComplete=true;return {purchaseConfirmed:true,amount:run.directBuyAmount,...(warning?{reconcileWarning:warning}:{})};};
+  const outcome=warning=>{run.directBuyRemaining=0;run.directBuyComplete=true;return {purchaseConfirmed:true,directPurchaseVerified:true,amount:run.directBuyAmount,...(warning?{reconcileWarning:warning}:{})};};
   try{
    const ensure=()=>ticket===generation&&guard()&&signature===JSON.stringify([run.ownerId,run.intentId,run.watchKey,run.watchName,run.maximumPrice,run.minimumQty]);
    const quote=capacity=>{
@@ -110,13 +138,21 @@ export function createSnatchDirectItems({native,getPilot,getProfile,window,now=(
    if(ledger?.valid&&ledger.total===capacity.total&&ledger.initialOccupied-ledger.freed+(ledger.purchased||0)+result.amount===capacity.occupied){ledger.purchased=(ledger.purchased||0)+result.amount;ledger.spent=(ledger.spent||0)+result.spent;ledger.cashBeforePurchase??=run.directBuyCash;}
    else run.capacityLedger={valid:true,total:capacity.total,initialOccupied:capacity.occupied-run.directBuyAmount,freed:0,purchased:run.directBuyAmount,spent:run.directBuySpent,cashBeforePurchase:run.directBuyCash};
    if(!ensure())throw Error('Run changed after purchase; review inventory before continuing');
+   if(result.slots){
+    const prior=run.directBuySlotStatus||[],filled=new Map(prior.filter(mark=>mark.status==='filled').map(mark=>[mark.id,mark]));
+    for(const slot of result.slots)if(slot.added)filled.set(slot.id,{number:slot.number,id:slot.id,status:'filled'});
+    const unfilled=result.slots.filter(slot=>slot.empty).slice(0,Math.max(0,run.directBuyTarget-run.directBuyAmount)).map(slot=>({number:slot.number,id:slot.id,status:'unfilled'}));
+    run.directBuySlotStatus=[...filled.values(),...unfilled];
+    try{renderPurchaseSlots(run);}catch{clearPurchaseSlots();}
+   }
+   try{showPurchaseNotice(run,capacity.total);}catch{clearPurchaseNotice();}
    onEvent({step:'direct-purchase-confirmed',amount:result.amount,quantity:run.directBuyAmount,attempt:run.directBuyAttempts,freeSlots:capacity.total-capacity.occupied,verified:true});
    if(capacity.occupied>=capacity.total||run.directBuyAmount>=run.directBuyTarget)return outcome();
    if(run.directBuyAttempts>=6)return outcome('Five remainder attempts completed; inventory is not full');
    run.directBuyRemaining=run.directBuyTarget-run.directBuyAmount;
    return {actionPending:true,nextLabel:'Buy remaining '+run.directBuyRemaining+' (remainder '+run.directBuyAttempts+'/5)'};
   }catch(error){
-   if(submitted||error.submitted){error.submitted=true;run.directBuyUncertain=true;run.capacityLedger={...run.capacityLedger,valid:false,reason:'unconfirmed-direct-purchase'};throw error;}
+   if(submitted||error.submitted){error.submitted=true;run.directBuyUncertain=true;delete run.directBuySlotStatus;clearPurchaseSlots();run.capacityLedger={...run.capacityLedger,valid:false,reason:'unconfirmed-direct-purchase'};throw error;}
    // A pre-submission stop after confirmed partial fills is safe to finish, never to replay.
    if(run.directBuyAmount&&ticket===generation&&guard()&&signature===JSON.stringify([run.ownerId,run.intentId,run.watchKey,run.watchName,run.maximumPrice,run.minimumQty]))return outcome(error.message);
    throw error;
@@ -166,5 +202,5 @@ export function createSnatchDirectItems({native,getPilot,getProfile,window,now=(
   const summary=native.inventorySummary?.();if(summary?.verified&&[summary.total,summary.occupied,summary.free].every(Number.isSafeInteger)&&summary.total>=0&&summary.total<=100&&summary.free>=0&&summary.occupied>=0&&summary.occupied+summary.free===summary.total)return {total:summary.total,occupied:summary.occupied,free:summary.free,source:'current-travel-dom'};
   return null;
  }
- return {...native,execute,cancel,remainingCapacity,observeProfile,hasPendingStep:()=>!!(trashRun?.directTrashRemaining>0||trashRun?.directBuyRemaining>0)||!!native.hasPendingStep?.(),forget(){cancel();proof=null;lastStatus=null;trashRun=null;native.forget?.();},inspect(run){trashRun=run;const base=native.inspect(run);if(run?.directTrashUncertain||run?.directBuyUncertain||getPilot()?.hasPendingAttempt?.())return {...base,directItemUncertain:true};if(!same(run))return base;if(proof.uncertain)return {...base,released:false,hospitalized:true,directItemUncertain:true};if(now()-proof.at>120000)return {...base,released:false,hospitalized:true,directItemUncertain:true};return {...base,released:proof.released,hospitalized:proof.hospitalized,hospitalUntil:proof.hospitalUntil,directItemConsumed:!!proof.consumed,directItemUncertain:false};},listInventory(){const pilot=getPilot(),inspection=pilot?.report().travelInspection;if(!inspection)return native.listInventory();return inspection.mappings.map(item=>({id:item.itemId,name:item.name,amount:1,source:'travel-direct-inventory'}));},report:()=>({active,lastStatus,proof:proof?{uncertain:proof.uncertain,hospitalized:proof.hospitalized,released:proof.released,consumed:!!proof.consumed,action:proof.kind||null,source:proof.releaseSource||'profile',at:proof.at}:null})};
+ return {...native,execute,cancel,remainingCapacity,observeProfile,hasPendingStep:()=>!!(trashRun?.directTrashRemaining>0||trashRun?.directBuyRemaining>0)||!!native.hasPendingStep?.(),forget(){cancel();clearPurchaseNotice();clearPurchaseSlots();proof=null;lastStatus=null;trashRun=null;native.forget?.();},inspect(run){try{renderPurchaseSlots(run);}catch{clearPurchaseSlots();}trashRun=run;const base=native.inspect(run);if(run?.directTrashUncertain||run?.directBuyUncertain||getPilot()?.hasPendingAttempt?.())return {...base,directItemUncertain:true};if(!same(run))return base;if(proof.uncertain)return {...base,released:false,hospitalized:true,directItemUncertain:true};if(now()-proof.at>120000)return {...base,released:false,hospitalized:true,directItemUncertain:true};return {...base,released:proof.released,hospitalized:proof.hospitalized,hospitalUntil:proof.hospitalUntil,directItemConsumed:!!proof.consumed,directItemUncertain:false};},listInventory(){const pilot=getPilot(),inspection=pilot?.report().travelInspection;if(!inspection)return native.listInventory();return inspection.mappings.map(item=>({id:item.itemId,name:item.name,amount:1,source:'travel-direct-inventory'}));},report:()=>({active,lastStatus,proof:proof?{uncertain:proof.uncertain,hospitalized:proof.hospitalized,released:proof.released,consumed:!!proof.consumed,action:proof.kind||null,source:proof.releaseSource||'profile',at:proof.at}:null})};
 }

@@ -38,7 +38,7 @@ function fixture({total=18,occupied=0,cash=100000,stock=1000,clamp=Infinity,mode
 }
 for(const config of [ {},{total:8,occupied:3},{total:60,occupied:2},{cash:2000,clamp:2},{clamp:3},{clamp:1},{stock:7,clamp:3}]){
  const f=fixture(config);try{
-  let result;for(let i=0;i<6;i++){const before=f.posts.length;result=await f.adapter.execute('buy',f.options());assert.equal(f.posts.length,before+1,'One purchase per gesture');assert.deepEqual(f.nativeCalls,[]);if(!result.actionPending)break;await assert.rejects(f.adapter.execute('return',f.options()));}
+  let result;for(let i=0;i<6;i++){const before=f.posts.length;result=await f.adapter.execute('buy',f.options());assert.equal(f.posts.length,before+1,'One purchase per gesture');assert.equal(f.d.getElementById('tu-purchase-confirmation').textContent,f.run.directBuyAmount+'/'+(config.total||18)+' Dahlia Purchased');assert.deepEqual(f.nativeCalls,[]);if(!result.actionPending)break;await assert.rejects(f.adapter.execute('return',f.options()));}
   const expected=Math.min((config.total||18)-(config.occupied||0),Math.floor((config.cash??100000)/300),config.stock??1000,6*(config.clamp??Infinity));
   assert.equal(result.purchaseConfirmed,true);assert.equal(result.amount,expected);assert.equal(f.slots.filter(s=>s.item?.ID==='260').length,expected);assert.equal(f.slots.filter(s=>s.item?.ID==='66').length,config.occupied||0);assert.equal(f.pilot.hasPendingAttempt(),false);assert.ok(f.posts.length<=6);
   assert.equal(f.run.capacityLedger.purchased,expected);assert.equal(f.run.directBuySpent,expected*300);assert.ok(!JSON.stringify(f.pilot.report()).includes('PRIVATE_FIXTURE'));
@@ -49,7 +49,7 @@ for(const config of [ {},{total:8,occupied:3},{total:60,occupied:2},{cash:2000,c
 }
 for(const mode of ['network','reject','not-added','wrong-item','wrong-amount','price-rise','bad-after','unrelated','canceled-after']){
  const f=fixture({mode,occupied:1});try{
-  await assert.rejects(f.adapter.execute('buy',f.options()),e=>e.submitted===true);assert.equal(f.posts.length,1);assert.equal(f.pilot.hasPendingAttempt(),true);assert.equal(f.run.directBuyUncertain,true);await assert.rejects(f.adapter.execute('buy',f.options()));await assert.rejects(f.adapter.execute('return',f.options()));assert.equal(f.posts.length,1);assert.equal(f.adapter.inspect(f.run).directItemUncertain,true);
+  await assert.rejects(f.adapter.execute('buy',f.options()),e=>e.submitted===true);assert.equal(f.posts.length,1);assert.equal(f.d.getElementById('tu-purchase-confirmation'),null,'Unverified purchases do not show success');assert.equal(f.pilot.hasPendingAttempt(),true);assert.equal(f.run.directBuyUncertain,true);await assert.rejects(f.adapter.execute('buy',f.options()));await assert.rejects(f.adapter.execute('return',f.options()));assert.equal(f.posts.length,1);assert.equal(f.adapter.inspect(f.run).directItemUncertain,true);
   const p=createDirectQuickItems({window:f.w,document:f.d,isAuthorized:()=>true});assert.equal(p.hasPendingAttempt(),true);p.stop();
  }finally{f.close();}
 }
@@ -90,3 +90,22 @@ for(const change of ['cancel','stock','price','owner','double']){
  try{engine.start();await engine.arm({watchKey:watch.key});engine.stock(watch,f.state);assert.equal(await engine.act({isTrusted:false}),false);for(let i=0;i<6;i++){assert.equal(await engine.act({isTrusted:true}),true);assert.equal(f.posts.length,i+1);if(i===0){f.advance(31000);assert.equal(await engine.act({isTrusted:true}),false);engine.stock(watch,f.state);}}assert.equal(engine.getState().purchaseConfirmed,true);assert.equal(engine.getState().stage,'return');assert.equal(f.slots.filter(s=>s.item?.ID==='260').length,18);assert.deepEqual(f.nativeCalls,[]);console.log('Generated direct purchase workflow passed: six trusted transactions, stale-stock gate and verified separate return stage');}finally{engine.stop();f.close();}
 }
 console.log('Direct purchase passed: captured GET contract; variable capacity/funds/stock; initial plus five partial-fill remainders; exact item/amount/price inventory proof; gesture, cancellation, identity, uncertainty and reload guards; no native purchase or automatic retry');
+
+{
+ const f=fixture({clamp:3});const scheduled=new Map();let next=100000;const originalSet=f.w.setTimeout.bind(f.w),originalClear=f.w.clearTimeout.bind(f.w);
+ f.w.setTimeout=(callback,ms,...args)=>{if(ms===3000){const id=next++;scheduled.set(id,callback);return id;}return originalSet(callback,ms,...args);};f.w.clearTimeout=id=>{scheduled.delete(id);originalClear(id);};
+ try{await f.adapter.execute('buy',f.options());const first=f.d.getElementById('tu-purchase-confirmation');assert.equal(first.getAttribute('role'),'status');assert.equal(first.style.pointerEvents,'none');assert.equal(scheduled.size,1);await f.adapter.execute('buy',f.options());assert.equal(first.isConnected,false);assert.equal(f.d.querySelectorAll('#tu-purchase-confirmation').length,1);assert.equal(scheduled.size,1,'A remainder replaces the notification and restarts its timer');assert.equal(f.d.getElementById('tu-purchase-confirmation').textContent,'6/18 Dahlia Purchased');[...scheduled.values()][0]();assert.equal(f.d.getElementById('tu-purchase-confirmation'),null);await f.adapter.execute('buy',f.options());f.adapter.forget();assert.equal(f.d.getElementById('tu-purchase-confirmation'),null);assert.equal(scheduled.size,0);}finally{f.close();}
+}
+console.log('Purchase notification passed: verified cumulative quantity/total capacity, single popup, three-second timer reset, no uncertain success and tool-exit cleanup');
+
+{
+ const f=fixture();try{f.d.body.append=()=>{throw Error('Fixture display unavailable');};const result=await f.adapter.execute('buy',f.options());assert.equal(result.purchaseConfirmed,true,'Display failure cannot invalidate a verified purchase');assert.equal(f.pilot.hasPendingAttempt(),false);assert.ok(!f.run.directBuyUncertain);}finally{f.close();}
+}
+
+{
+ const f=fixture({clamp:3,occupied:2});const panel=f.d.createElement('ul');panel.className='inventoryPanel_fixture';
+ function mount(bad=false){panel.replaceChildren();for(const number of [1,7,13,2,8,14,3,9,15,4,10,16,5,11,17,6,12,18]){const cell=f.d.createElement('li');cell.className='inventorySlot_fixture';cell.dataset.number=number;cell.innerHTML=number<=2?'<button aria-label="Morphine slot '+number+'"></button>':'<span class="srOnly_fixture">slot '+(bad?1:number)+' empty</span>';panel.append(cell);}const decoration=f.d.createElement('div');decoration.className='inventorySlot_fixture';panel.append(decoration);}
+ f.d.getElementById('travel-root').append(panel);mount();const numbers=status=>[...panel.querySelectorAll('[data-tu-purchase-slot="'+status+'"]')].map(n=>Number(n.parentElement.dataset.number)).sort((a,b)=>a-b);
+ try{await f.adapter.execute('buy',f.options());assert.deepEqual(numbers('filled'),[3,4,5]);assert.equal(numbers('unfilled').length,13);assert.equal(panel.querySelectorAll('button').length,2,'Badges do not fabricate native item controls');assert.equal(panel.querySelector(':scope > div [data-tu-purchase-slot]'),null);assert.equal(panel.querySelector('[data-tu-purchase-slot]').style.pointerEvents,'none');await f.adapter.execute('buy',f.options());assert.deepEqual(numbers('filled'),[3,4,5,6,7,8]);assert.deepEqual(numbers('unfilled'),[9,10,11,12,13,14,15,16,17,18]);mount();f.adapter.inspect(JSON.parse(JSON.stringify(f.run)));assert.equal(numbers('filled').length,6,'Verified marks restore on newly rendered native cells');mount(true);f.adapter.inspect(f.run);assert.equal(panel.querySelectorAll('[data-tu-purchase-slot]').length,0,'Ambiguous slot numbers are not marked');f.adapter.forget();assert.equal(panel.querySelectorAll('[data-tu-purchase-slot]').length,0);}finally{f.close();}
+}
+console.log('Purchase slot badges passed: explicit numbered mapping in column-order DOM, verified green cells, red unfilled targets that turn green, unrelated/decorative preservation, remount restoration, ambiguity rejection and noninteractive cleanup');

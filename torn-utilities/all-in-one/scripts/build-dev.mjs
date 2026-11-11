@@ -1,3 +1,4 @@
+import {createNativeClockSync} from '../src/features/native-clock-sync.js';
 import {createDataDeletion} from '../src/features/data-deletion.js';
 import {compactPresentation} from './compact-presentation.mjs';
 import {renderAgreementMarkdown} from '../src/features/agreement-renderer.js';
@@ -63,7 +64,7 @@ for(const tool of tools){
  if(tool.id==='war-hit-organizer')source=source.replace(/"data:image\/webp;base64,[A-Za-z0-9+/=]+"/g,'manager.getLogo()');
 
  if(tool.id==='item-monitor'&&preparedIntegration)source=secureCandidateReporting(source);
- if(tool.id==='item-monitor')source='const createStockMonitorDiagnostic='+createStockMonitorDiagnostic.toString()+';\nconst createAlarmAudio='+createAlarmAudio.toString()+';\nconst createLandingAlarm='+createLandingAlarm.toString()+';\nconst TU_INTEGRATED_BUILD='+JSON.stringify(version)+';\nconst createTravelDomDiagnostic='+createTravelDomDiagnostic.toString()+';\nconst createAcceptanceSession='+createAcceptanceSession.toString()+';\nconst detectTestEnvironment='+detectTestEnvironment.toString()+';\n'+'const createHospitalClock='+createHospitalClock.toString()+';\n'+'const createNativeTravelActions='+createNativeTravelActions.toString()+';\n'+'const createTravelEnhancements='+createTravelEnhancements.toString()+';\n'+source;
+ if(tool.id==='item-monitor')source='const createNativeClockSync='+createNativeClockSync.toString()+';\n'+'const createStockMonitorDiagnostic='+createStockMonitorDiagnostic.toString()+';\nconst createAlarmAudio='+createAlarmAudio.toString()+';\nconst createLandingAlarm='+createLandingAlarm.toString()+';\nconst TU_INTEGRATED_BUILD='+JSON.stringify(version)+';\nconst createTravelDomDiagnostic='+createTravelDomDiagnostic.toString()+';\nconst createAcceptanceSession='+createAcceptanceSession.toString()+';\nconst detectTestEnvironment='+detectTestEnvironment.toString()+';\n'+'const createHospitalClock='+createHospitalClock.toString()+';\n'+'const createNativeTravelActions='+createNativeTravelActions.toString()+';\n'+'const createTravelEnhancements='+createTravelEnhancements.toString()+';\n'+source;
  if(tool.id==='chat-archiver')source='const createChatCaptureSupport='+createChatCaptureSupport.toString()+';\n'+source;
  source=compactPresentation(source);
  // Each retained source runs only on first use. A private Window facade captures

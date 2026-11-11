@@ -1,7 +1,7 @@
 # TU implementation status — CURRENT DEV ONLY
 
 The approved compact UI and self-service deletion work is implemented for
-**TU 0.5.42.94-dev / Item Monitor 1.12.44-dev** with agreement **1.4 / number 5**.
+**TU 0.5.42.95-dev / Item Monitor 1.12.45-dev** with agreement **1.4 / number 5**.
 Earlier production-target references and implementation holds are superseded by
 the explicit DEV-only authorization.
 
@@ -36,3 +36,12 @@ one initial purchase plus five trusted-click remainder attempts. See
 The .94 follow-up completes any same-player armed stage on confirmed return
 travel, clearing the action and screen alarm even after refresh. See
 [return-flight cleanup](RETURN-CLEANUP-20261111.md).
+
+The .95 follow-up adds per-purchase three-second quantity/capacity feedback and
+a single inventory page refresh only after the purchase sequence finishes, and
+verified green/red inventory-slot badges and native flight/hospital countdown synchronization.
+See [purchase notification](PURCHASE-NOTICE-20261111.md).
+
+## Queued UI cleanup — requested 2026-11-11
+
+- **Pending:** Remove the **Direct Item Tools** section from the Travel Assistant and Item Monitor interface, including its standalone launch control and explanatory section text. Keep the integrated healing, hospitalization, destruction and purchase handlers and their diagnostic recording. This request queues the UI cleanup; it is not implemented in the current .95 work.

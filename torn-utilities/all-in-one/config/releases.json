@@ -1,5 +1,18 @@
 [
   {
+    "version": "0.5.42.95-dev",
+    "date": "2026-11-11",
+    "securityBundle": true,
+    "changes": {
+      "Improvements": [
+        "Show a three-second verified purchase notification with quantity and inventory capacity",
+        "Refresh Torn inventory after the completed purchase sequence",
+        "Mark verified purchased slots and unfilled requested slots",
+        "Synchronize flight and hospital countdown displays with native counter changes"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.94-dev",
     "date": "2026-11-11",
     "securityBundle": true,

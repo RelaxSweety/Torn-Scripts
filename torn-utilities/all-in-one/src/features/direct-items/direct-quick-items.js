@@ -77,7 +77,7 @@ export function createDirectQuickItems({window,document,fetchImpl,isAuthorized=(
    // Keep the lock if the run was canceled after submission, even if the inventory read succeeded.
    if(!guard()||active.signal.aborted)throw Error('run-changed');
    window.sessionStorage.removeItem(KEY);record('response',plan.id,'success-response');
-   return {result:'purchase-confirmed',amount:actual,spent:total,requested:plan.amount,price:plan.price,cash:plan.cash,inventoryCapacity:inventoryCapacity(after),inventoryFingerprint:inventoryFingerprint(after)};
+   return {result:'purchase-confirmed',amount:actual,spent:total,requested:plan.amount,price:plan.price,cash:plan.cash,slots:before.slots.map((slot,index)=>{const current=after.slots.find(s=>String(s.ID)===String(slot.ID));return {number:index+1,id:String(slot.ID),added:slot.item==null&&current.item!=null,empty:current.item==null};}),inventoryCapacity:inventoryCapacity(after),inventoryFingerprint:inventoryFingerprint(after)};
   }catch{return {result:posted?'uncertain':'inventory-unconfirmed',text:posted?'Purchase outcome is unconfirmed. Review Torn inventory before re-arming; no retry will occur.':'Purchase checks failed. No purchase request was sent.'};}
   finally{window.clearTimeout(timer);window.removeEventListener('pagehide',abort);if(controller===active)controller=null;busy=false;renderState();}
  }
