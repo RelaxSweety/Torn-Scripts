@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.12.49-dev
+// @version      1.12.50-dev
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -69,6 +69,8 @@ function renderEmbeddedDiagnostics(parent){
  E('h4',section,'Native inventory refresh investigation');E('p',section,'Inspect the native refresh function without running it. Then, at the Travel Agency in Torn while not traveling, add one A+ Blood Bag (732) per click to carried travel inventory. This moves the bag; it does not consume it. No automatic retry or page refresh. Generate a report after testing.');
  const inspect=B(section,'Inspect Native Inventory Refresh',event=>{if(embeddedDiagnostic?.isMonitoring()!==true){diagnosticNotice('Activate diagnostics first.');return;}const result=quickItemTest.inspectNativeRefresh(event);diagnosticNotice('Native refresh inspection: '+result.result+'. Generate a report.');});inspect.id='tuim-dev-inspect-refresh';
  const add=B(section,'Add 1 A+ Blood Bag to Travel Inventory',async event=>{if(embeddedDiagnostic?.isMonitoring()!==true){diagnosticNotice('Activate diagnostics first.');return;}add.disabled=true;try{const result=await quickItemTest.addDiagnosticBloodBag(event,()=>embeddedDiagnostic?.isMonitoring()===true&&(!enhancements?.getState()||enhancements.getState().stage==='complete'));diagnosticNotice(result.result==='addition-confirmed'?'Confirmed: 1 A+ Blood Bag added to carried travel inventory. Inspect the native function and generate a report.':result.result==='uncertain'?'Addition unconfirmed. Do not repeat it. Check native inventory, then review the unresolved attempt below.':'Bag not added: '+result.result+'.');}finally{add.disabled=false;}});add.id='tuim-dev-add-blood-bag';
+ E('p',section,'After adding a bag, test one native focus event and observe inventory reads and cell changes for five seconds. This does not reload the page. Other native read-only data may also refresh.');
+ const refreshTest=B(section,'Test Native Inventory Refresh',async event=>{refreshTest.disabled=true;diagnosticNotice('Testing native refresh for five seconds…');try{const result=await quickItemTest.testNativeRefresh(event,()=>embeddedDiagnostic?.isMonitoring()===true&&(!enhancements?.getState()||enhancements.getState().stage==='complete'));diagnosticNotice('Native refresh test: '+result.result+'. Generate a report before navigating.');}finally{refreshTest.disabled=false;}});refreshTest.id='tuim-dev-test-refresh';
  const review=B(section,'Review Unresolved Item Attempt',event=>{if(!event.isTrusted||!quickItemTest.hasPendingAttempt())return;if(!window.confirm('Only continue after checking Torn inventory and confirming the previous item action has finished. Clear the unresolved attempt lock?'))return;if(quickItemTest.review(event))diagnosticNotice('Attempt reviewed. Any next item action requires a new click.');});review.id='tuim-dev-review-attempt';syncDiagnosticControls();
 }
 function openItemMonitor(){

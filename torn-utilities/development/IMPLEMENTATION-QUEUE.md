@@ -65,3 +65,10 @@ bag add-to-carried-inventory POST test inside existing DEV diagnostics. Grounded
 Travel Agency/status guards, exact inventory verification and unresolved-attempt
 protection apply. Automatic page refresh remains removed. See
 [native refresh diagnostic and validation](NATIVE-REFRESH-DIAGNOSTIC-20261111.md).
+
+## Manual native focus refresh test — .100-dev
+
+Added **Test Native Inventory Refresh** to existing diagnostics. One explicit
+focus event is followed by five seconds of passive request/native-cell evidence.
+No automatic purchase integration or page reload. Real PDA redraw acceptance is
+pending. See [test and validation](NATIVE-FOCUS-REFRESH-20261111.md).

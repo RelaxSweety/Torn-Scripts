@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.100-dev",
+    "date": "2026-11-11",
+    "securityBundle": true,
+    "changes": {
+      "Diagnostics": [
+        "Add a manual native inventory refresh test with request and cell-change evidence",
+        "Keep page reload disabled and departure available"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.99-dev",
     "date": "2026-11-11",
     "securityBundle": true,
