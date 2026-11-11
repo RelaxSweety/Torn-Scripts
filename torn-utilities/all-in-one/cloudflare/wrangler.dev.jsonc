@@ -70,7 +70,7 @@
     }
   ],
   "vars": {
-    "TU_DELETION_ENABLED": "false",
+    "TU_DELETION_ENABLED": "true",
     "LEGACY_IDENTITY_ROOMS": "[]"
   }
 }

@@ -950,8 +950,8 @@ const TU_RELEASES=[{"version":"0.5.42.89-dev","date":"2026-11-11","securityBundl
 #tuim-alarm-settings label{margin:3px 0}
 #tuim-alarm-settings :is(input:not([type=checkbox]),select){margin:2px 0 5px;padding:4px 6px;min-height:27px}
 #tuim-panel .tuim-alarm-channels{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-#tuim-panel .tuim-alarm-channels label{display:flex;align-items:center;gap:5px;margin:3px 0}
-#tuim-panel .tuim-alarm-channels input[type=checkbox]{display:inline-block;flex:none;width:18px;height:18px;min-height:18px;margin:0;padding:0}
+#tuim-panel .tuim-alarm-channels label{display:flex!important;align-items:center;gap:5px;margin:3px 0!important}
+#tuim-panel .tuim-alarm-channels input[type=checkbox]{display:inline-block!important;flex:none;width:18px!important;height:18px!important;min-height:18px!important;margin:0!important;padding:0}
 
 /* Legacy multiplayer windows mount without IDs; identify their real title bars. */
 #tu-pda-module-host>:is(section,div):has(>div>strong):has(>div>button[title^="Minimize"]){padding-top:0!important}
@@ -959,6 +959,14 @@ const TU_RELEASES=[{"version":"0.5.42.89-dev","date":"2026-11-11","securityBundl
  position:sticky!important;top:0!important;z-index:100!important;
  margin-top:0!important;margin-inline:-11.25px!important;padding-inline:11.25px!important;
  background:#20252e!important;isolation:isolate
+}
+/* Put desktop branding on one row; identity retains separate player/faction lines.
+   Small screens retain wrapping and the larger touch/readability exception. */
+@media(min-width:600px){
+ #tu-pda-panel header>div{display:grid;grid-template-columns:max-content minmax(0,1fr);column-gap:6px;align-items:center}
+ #tu-pda-panel header h2{grid-column:1;grid-row:1}
+ #tu-pda-panel header p:not(.tu-player-identity){grid-column:2;grid-row:1;font-size:11px;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ #tu-pda-panel header .tu-player-identity{grid-column:1/-1;line-height:1.05}
 }
 
 `;

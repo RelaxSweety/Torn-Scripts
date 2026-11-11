@@ -1,0 +1,1048 @@
+[
+  {
+    "layout": "desktop",
+    "variant": "before",
+    "viewport": [
+      1280,
+      900
+    ],
+    "manager": {
+      "headerHeight": 99,
+      "panelWidth": 1203.21875,
+      "bodyFont": "14px",
+      "headerPadding": "12px",
+      "headerGap": "8px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 51.390625,
+          "width": 29.328125,
+          "height": 21
+        },
+        {
+          "label": "Exit",
+          "x": 1168.453125,
+          "width": 28.359375,
+          "height": 34
+        },
+        {
+          "label": "Minimize",
+          "x": 1204.8125,
+          "width": 23.796875,
+          "height": 21
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "moduleMenu": {
+      "headerHeight": 76,
+      "panelWidth": 440,
+      "bodyFont": "14px",
+      "headerPadding": "12px",
+      "headerGap": "8px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 328.1875,
+          "width": 38,
+          "height": 36
+        },
+        {
+          "label": "Minimize",
+          "x": 376.1875,
+          "width": 38,
+          "height": 36
+        },
+        {
+          "label": "Exit",
+          "x": 424.1875,
+          "width": 38,
+          "height": 36
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "travelAssistant": {
+      "headerHeight": 56,
+      "panelWidth": 520,
+      "bodyFont": "14px",
+      "headerPadding": "8px 0px 12px",
+      "headerGap": "normal",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 453.671875,
+          "width": 35.328125,
+          "height": 36
+        },
+        {
+          "label": "Minimize",
+          "x": 495,
+          "width": 35,
+          "height": 36
+        },
+        {
+          "label": "Exit",
+          "x": 536,
+          "width": 35,
+          "height": 36
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "itemMonitor": {
+      "headerHeight": 76,
+      "panelWidth": 440,
+      "bodyFont": "14px",
+      "headerPadding": "12px",
+      "headerGap": "8px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 328.1875,
+          "width": 38,
+          "height": 36
+        },
+        {
+          "label": "Minimize",
+          "x": 376.1875,
+          "width": 38,
+          "height": 36
+        },
+        {
+          "label": "Exit",
+          "x": 424.1875,
+          "width": 38,
+          "height": 36
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "otherTools": [
+      {
+        "name": "Chat Archiver",
+        "headerHeight": 36
+      },
+      {
+        "name": "War Organizer",
+        "headerHeight": 47
+      },
+      {
+        "name": "Flight Game",
+        "headerHeight": 34
+      },
+      {
+        "name": "Stick Fighter",
+        "headerHeight": 34
+      },
+      {
+        "name": "Slithering Streets",
+        "headerHeight": 32
+      },
+      {
+        "name": "Tic-Tac-Toe",
+        "headerHeight": 32
+      },
+      {
+        "name": "Torn Four",
+        "headerHeight": 32
+      },
+      {
+        "name": "Torn Fleet",
+        "headerHeight": 32
+      },
+      {
+        "name": "Chaos Marbles",
+        "headerHeight": 32
+      }
+    ],
+    "pageErrors": []
+  },
+  {
+    "layout": "desktop",
+    "variant": "after",
+    "viewport": [
+      1280,
+      900
+    ],
+    "manager": {
+      "headerHeight": 42.59375,
+      "panelWidth": 1203.21875,
+      "bodyFont": "11px",
+      "headerPadding": "1px 6px",
+      "headerGap": "6px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 1150.609375,
+          "width": 24,
+          "height": 24
+        },
+        {
+          "label": "Minimize",
+          "x": 1180.609375,
+          "width": 24,
+          "height": 24
+        },
+        {
+          "label": "Exit",
+          "x": 1210.609375,
+          "width": 24,
+          "height": 24
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "moduleMenu": {
+      "headerHeight": 29,
+      "panelWidth": 440,
+      "bodyFont": "11px",
+      "headerPadding": "2px 9px",
+      "headerGap": "6px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 400.1875,
+          "width": 24,
+          "height": 24
+        },
+        {
+          "label": "Minimize",
+          "x": 428.6875,
+          "width": 24,
+          "height": 24
+        },
+        {
+          "label": "Exit",
+          "x": 457.1875,
+          "width": 24,
+          "height": 24
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "travelAssistant": {
+      "headerHeight": 28.5,
+      "panelWidth": 520,
+      "bodyFont": "11px",
+      "headerPadding": "2px 9px",
+      "headerGap": "6px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 493,
+          "width": 24,
+          "height": 24
+        },
+        {
+          "label": "Minimize",
+          "x": 521.5,
+          "width": 24,
+          "height": 24
+        },
+        {
+          "label": "Exit",
+          "x": 550,
+          "width": 24,
+          "height": 24
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "itemMonitor": {
+      "headerHeight": 29,
+      "panelWidth": 440,
+      "bodyFont": "11px",
+      "headerPadding": "2px 9px",
+      "headerGap": "6px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 400.1875,
+          "width": 24,
+          "height": 24
+        },
+        {
+          "label": "Minimize",
+          "x": 428.6875,
+          "width": 24,
+          "height": 24
+        },
+        {
+          "label": "Exit",
+          "x": 457.1875,
+          "width": 24,
+          "height": 24
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "dragResizePersistence": true,
+    "independentModulePosition": true,
+    "otherTools": [
+      {
+        "name": "Chat Archiver",
+        "headerHeight": 25
+      },
+      {
+        "name": "War Organizer",
+        "headerHeight": 29
+      },
+      {
+        "name": "Flight Game",
+        "headerHeight": 24
+      },
+      {
+        "name": "Stick Fighter",
+        "headerHeight": 24
+      },
+      {
+        "name": "Slithering Streets",
+        "headerHeight": 24
+      },
+      {
+        "name": "Tic-Tac-Toe",
+        "headerHeight": 24
+      },
+      {
+        "name": "Torn Four",
+        "headerHeight": 24
+      },
+      {
+        "name": "Torn Fleet",
+        "headerHeight": 24
+      },
+      {
+        "name": "Chaos Marbles",
+        "headerHeight": 24
+      }
+    ],
+    "pageErrors": []
+  },
+  {
+    "layout": "portrait",
+    "variant": "before",
+    "viewport": [
+      390,
+      844
+    ],
+    "manager": {
+      "headerHeight": 135,
+      "panelWidth": 366.625,
+      "bodyFont": "14px",
+      "headerPadding": "12px",
+      "headerGap": "8px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 24.6875,
+          "width": 29.328125,
+          "height": 21
+        },
+        {
+          "label": "Exit",
+          "x": 305.15625,
+          "width": 28.359375,
+          "height": 34
+        },
+        {
+          "label": "Minimize",
+          "x": 341.515625,
+          "width": 23.796875,
+          "height": 21
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "moduleMenu": {
+      "headerHeight": 118.5625,
+      "panelWidth": 358.796875,
+      "bodyFont": "14px",
+      "headerPadding": "12px",
+      "headerGap": "8px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 211.390625,
+          "width": 38,
+          "height": 36
+        },
+        {
+          "label": "Minimize",
+          "x": 259.390625,
+          "width": 38,
+          "height": 36
+        },
+        {
+          "label": "Exit",
+          "x": 307.390625,
+          "width": 38,
+          "height": 36
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "travelAssistant": {
+      "headerHeight": 75.09375,
+      "panelWidth": 358.796875,
+      "bodyFont": "14px",
+      "headerPadding": "8px 0px 12px",
+      "headerGap": "normal",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 247.96875,
+          "width": 35.328125,
+          "height": 36
+        },
+        {
+          "label": "Minimize",
+          "x": 289.296875,
+          "width": 35,
+          "height": 36
+        },
+        {
+          "label": "Exit",
+          "x": 330.296875,
+          "width": 35,
+          "height": 36
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "itemMonitor": {
+      "headerHeight": 118.5625,
+      "panelWidth": 358.796875,
+      "bodyFont": "14px",
+      "headerPadding": "12px",
+      "headerGap": "8px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 211.390625,
+          "width": 38,
+          "height": 36
+        },
+        {
+          "label": "Minimize",
+          "x": 259.390625,
+          "width": 38,
+          "height": 36
+        },
+        {
+          "label": "Exit",
+          "x": 307.390625,
+          "width": 38,
+          "height": 36
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "pageErrors": []
+  },
+  {
+    "layout": "portrait",
+    "variant": "after",
+    "viewport": [
+      390,
+      844
+    ],
+    "manager": {
+      "headerHeight": 56.328125,
+      "panelWidth": 366.625,
+      "bodyFont": "11px",
+      "headerPadding": "1px 6px",
+      "headerGap": "4px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 231.3125,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Minimize",
+          "x": 279.3125,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Exit",
+          "x": 327.3125,
+          "width": 44,
+          "height": 44
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "moduleMenu": {
+      "headerHeight": 49,
+      "panelWidth": 358.796875,
+      "bodyFont": "11px",
+      "headerPadding": "2px 9px",
+      "headerGap": "6px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 223.390625,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Minimize",
+          "x": 271.890625,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Exit",
+          "x": 320.390625,
+          "width": 44,
+          "height": 44
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "travelAssistant": {
+      "headerHeight": 48,
+      "panelWidth": 358.796875,
+      "bodyFont": "11px",
+      "headerPadding": "2px 9px",
+      "headerGap": "6px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 227.296875,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Minimize",
+          "x": 275.796875,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Exit",
+          "x": 324.296875,
+          "width": 44,
+          "height": 44
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "itemMonitor": {
+      "headerHeight": 49,
+      "panelWidth": 358.796875,
+      "bodyFont": "11px",
+      "headerPadding": "2px 9px",
+      "headerGap": "6px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 223.390625,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Minimize",
+          "x": 271.890625,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Exit",
+          "x": 320.390625,
+          "width": 44,
+          "height": 44
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "pageErrors": []
+  },
+  {
+    "layout": "landscape",
+    "variant": "before",
+    "viewport": [
+      844,
+      390
+    ],
+    "manager": {
+      "headerHeight": 99,
+      "panelWidth": 793.375,
+      "bodyFont": "14px",
+      "headerPadding": "12px",
+      "headerGap": "8px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 38.3125,
+          "width": 29.328125,
+          "height": 21
+        },
+        {
+          "label": "Exit",
+          "x": 745.53125,
+          "width": 28.359375,
+          "height": 34
+        },
+        {
+          "label": "Minimize",
+          "x": 781.890625,
+          "width": 23.796875,
+          "height": 21
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "moduleMenu": {
+      "headerHeight": 76,
+      "panelWidth": 440,
+      "bodyFont": "14px",
+      "headerPadding": "12px",
+      "headerGap": "8px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 310.75,
+          "width": 38,
+          "height": 36
+        },
+        {
+          "label": "Minimize",
+          "x": 358.75,
+          "width": 38,
+          "height": 36
+        },
+        {
+          "label": "Exit",
+          "x": 406.75,
+          "width": 38,
+          "height": 36
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "travelAssistant": {
+      "headerHeight": 56,
+      "panelWidth": 520,
+      "bodyFont": "14px",
+      "headerPadding": "8px 0px 12px",
+      "headerGap": "normal",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 431.859375,
+          "width": 35.328125,
+          "height": 36
+        },
+        {
+          "label": "Minimize",
+          "x": 473.1875,
+          "width": 35,
+          "height": 36
+        },
+        {
+          "label": "Exit",
+          "x": 514.1875,
+          "width": 35,
+          "height": 36
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "itemMonitor": {
+      "headerHeight": 76,
+      "panelWidth": 440,
+      "bodyFont": "14px",
+      "headerPadding": "12px",
+      "headerGap": "8px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 310.75,
+          "width": 38,
+          "height": 36
+        },
+        {
+          "label": "Minimize",
+          "x": 358.75,
+          "width": 38,
+          "height": 36
+        },
+        {
+          "label": "Exit",
+          "x": 406.75,
+          "width": 38,
+          "height": 36
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "pageErrors": []
+  },
+  {
+    "layout": "landscape",
+    "variant": "after",
+    "viewport": [
+      844,
+      390
+    ],
+    "manager": {
+      "headerHeight": 47,
+      "panelWidth": 793.375,
+      "bodyFont": "11px",
+      "headerPadding": "1px 6px",
+      "headerGap": "4px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 671.6875,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Minimize",
+          "x": 719.6875,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Exit",
+          "x": 767.6875,
+          "width": 44,
+          "height": 44
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "moduleMenu": {
+      "headerHeight": 49,
+      "panelWidth": 440,
+      "bodyFont": "11px",
+      "headerPadding": "2px 9px",
+      "headerGap": "6px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 322.75,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Minimize",
+          "x": 371.25,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Exit",
+          "x": 419.75,
+          "width": 44,
+          "height": 44
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "travelAssistant": {
+      "headerHeight": 48,
+      "panelWidth": 520,
+      "bodyFont": "11px",
+      "headerPadding": "2px 9px",
+      "headerGap": "6px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 411.1875,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Minimize",
+          "x": 459.6875,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Exit",
+          "x": 508.1875,
+          "width": 44,
+          "height": 44
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "itemMonitor": {
+      "headerHeight": 49,
+      "panelWidth": 440,
+      "bodyFont": "11px",
+      "headerPadding": "2px 9px",
+      "headerGap": "6px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 322.75,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Minimize",
+          "x": 371.25,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Exit",
+          "x": 419.75,
+          "width": 44,
+          "height": 44
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "pageErrors": []
+  },
+  {
+    "layout": "narrow",
+    "variant": "before",
+    "viewport": [
+      320,
+      740
+    ],
+    "manager": {
+      "headerHeight": 182,
+      "panelWidth": 300.8125,
+      "bodyFont": "14px",
+      "headerPadding": "12px",
+      "headerGap": "8px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 22.59375,
+          "width": 29.328125,
+          "height": 21
+        },
+        {
+          "label": "Exit",
+          "x": 237.25,
+          "width": 28.359375,
+          "height": 34
+        },
+        {
+          "label": "Minimize",
+          "x": 273.609375,
+          "width": 23.796875,
+          "height": 21
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "moduleMenu": {
+      "headerHeight": 212.125,
+      "panelWidth": 294.390625,
+      "bodyFont": "14px",
+      "headerPadding": "12px",
+      "headerGap": "8px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 144.1875,
+          "width": 38,
+          "height": 36
+        },
+        {
+          "label": "Minimize",
+          "x": 192.1875,
+          "width": 38,
+          "height": 36
+        },
+        {
+          "label": "Exit",
+          "x": 240.1875,
+          "width": 38,
+          "height": 36
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "travelAssistant": {
+      "headerHeight": 102.640625,
+      "panelWidth": 294.390625,
+      "bodyFont": "14px",
+      "headerPadding": "8px 0px 12px",
+      "headerGap": "normal",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 180.0625,
+          "width": 35.328125,
+          "height": 36
+        },
+        {
+          "label": "Minimize",
+          "x": 221.390625,
+          "width": 35,
+          "height": 36
+        },
+        {
+          "label": "Exit",
+          "x": 262.390625,
+          "width": 35,
+          "height": 36
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "itemMonitor": {
+      "headerHeight": 212.125,
+      "panelWidth": 294.390625,
+      "bodyFont": "14px",
+      "headerPadding": "12px",
+      "headerGap": "8px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 144.1875,
+          "width": 38,
+          "height": 36
+        },
+        {
+          "label": "Minimize",
+          "x": 192.1875,
+          "width": 38,
+          "height": 36
+        },
+        {
+          "label": "Exit",
+          "x": 240.1875,
+          "width": 38,
+          "height": 36
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "pageErrors": []
+  },
+  {
+    "layout": "narrow",
+    "variant": "after",
+    "viewport": [
+      320,
+      740
+    ],
+    "manager": {
+      "headerHeight": 67.875,
+      "panelWidth": 300.8125,
+      "bodyFont": "11px",
+      "headerPadding": "1px 6px",
+      "headerGap": "4px 3px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 165.40625,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Minimize",
+          "x": 212.40625,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Exit",
+          "x": 259.40625,
+          "width": 44,
+          "height": 44
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "moduleMenu": {
+      "headerHeight": 51.546875,
+      "panelWidth": 294.390625,
+      "bodyFont": "11px",
+      "headerPadding": "2px 9px",
+      "headerGap": "6px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 156.1875,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Minimize",
+          "x": 204.6875,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Exit",
+          "x": 253.1875,
+          "width": 44,
+          "height": 44
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "travelAssistant": {
+      "headerHeight": 50.546875,
+      "panelWidth": 294.390625,
+      "bodyFont": "11px",
+      "headerPadding": "2px 9px",
+      "headerGap": "6px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 159.390625,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Minimize",
+          "x": 207.890625,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Exit",
+          "x": 256.390625,
+          "width": 44,
+          "height": 44
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "itemMonitor": {
+      "headerHeight": 51.546875,
+      "panelWidth": 294.390625,
+      "bodyFont": "11px",
+      "headerPadding": "2px 9px",
+      "headerGap": "6px",
+      "controls": [
+        {
+          "label": "Back",
+          "x": 156.1875,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Minimize",
+          "x": 204.6875,
+          "width": 44,
+          "height": 44
+        },
+        {
+          "label": "Exit",
+          "x": 253.1875,
+          "width": 44,
+          "height": 44
+        }
+      ],
+      "horizontalOverflow": false
+    },
+    "pageErrors": []
+  }
+]

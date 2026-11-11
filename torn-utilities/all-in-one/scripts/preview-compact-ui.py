@@ -54,6 +54,9 @@ with sync_playwright() as p:
      page.locator('#tuim-landing-audio').uncheck();page.locator('#tuim-landing-audio').check();page.locator('#tuim-landing-visual').uncheck()
      settings=page.evaluate('JSON.parse(localStorage.getItem("tuac-settings"))')
      assert settings['inventoryAudio'] and not settings['inventoryVisual'] and settings['snatchSetup']['hospitalAlarm'] and not settings['snatchSetup']['hospitalVisual'] and settings['landingAlarm']['audio'] and not settings['landingAlarm']['visual'],settings
+     for audio,visual in [('tuim-inventory-audio','tuim-inventory-visual'),('tuim-hospital-alarm-enabled','tuim-hospital-visual'),('tuim-landing-audio','tuim-landing-visual')]:
+      coords=page.evaluate('(ids)=>ids.map(id=>{const r=document.getElementById(id).getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}})',[audio,visual])
+      assert abs(coords[0]['y']-coords[1]['y'])<3 and coords[1]['x']>coords[0]['x'] and max(c['width'] for c in coords)<=20,(layout,audio,coords)
      page.locator('#tuim-alarm-settings').scroll_into_view_if_needed();snap(page,variant,layout,'alarm-settings')
 
      page.locator('#tuim-panel').evaluate('e=>e.scrollTop=0');page.evaluate('window.TUWindowNavigation.minimize("tuim-panel")');page.locator('#tu-pda-launcher').click();assert page.locator('#tuim-panel').is_visible()

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import worker from './fixtures/worker.mjs';
+import worker,{routeWorkerRequest} from './fixtures/worker.mjs';
 const KEY='aa11bb22cc33dd44',SECRET='PRIVATE_ERROR_'+KEY,originalFetch=globalThis.fetch,originalWarn=console.warn;
 let scenario='',outgoing=[],writes=[],warnings=[];
 console.warn=(...args)=>warnings.push(args.join(' '));
@@ -23,6 +23,8 @@ try{
   else assert.equal(response.status,503);
   for(const call of outgoing){assert.equal(new URL(call.url).origin,'https://api.torn.com');assert.ok(!call.url.includes(KEY),'Key is sent in authorization header, never URL');assert.equal(call.options.headers.Authorization,'ApiKey '+KEY);}
  }
+ scenario='';const manualRequired=await invoke({api_key:KEY,platform:'pda'});assert.equal(manualRequired.status,409);assert.equal(writes.length,0,'An old automatic renewal cannot recreate a deleted registration');
+ writes=[];const pending=await routeWorkerRequest(registration({api_key:KEY,platform:'pda',manual:true}),{TU_USERS_DB:database(),REGISTRATION_BUDGET:budget,__identityStorage:{get:async()=> 'pending-deletion'}});assert.equal(pending.status,409);assert.equal(writes.length,0,'A pending deletion rejects even a fresh registration until cleanup acknowledgement');
  scenario='';for(const body of [{api_key:KEY+'extra',platform:'pda'},{api_key:KEY,platform:'pda',password:SECRET},{api_key:KEY,platform:'pda',requested_access:'full'}]){const response=await invoke(body);assert.equal(response.status,400);assert.equal(outgoing.length,0,'Malformed registration never contacts Torn');assert.ok(!(await response.text()).includes(SECRET));}
  // Read chunked/undeclared bodies only up to the limit and cancel oversized streams.
  let cancelled=false;const stream=new ReadableStream({start(controller){controller.enqueue(new TextEncoder().encode('x'.repeat(2049)));},cancel(){cancelled=true;}});

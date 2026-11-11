@@ -1,8 +1,16 @@
-# Self-service identity deletion — pending implementation
+# Self-service identity deletion — DEV implementation
 
-Requested for the pending TU release. This is a specification, not a deployed
-capability. The compact preview does not currently delete remote identity data.
-The active agreement remains 1.3 / number 4.
+Implemented and validated for TU 0.5.42.89-dev / Item Monitor 1.12.39-dev with
+agreement 1.4 / number 5. This specification's earlier implementation hold is
+superseded by the user's explicit DEV implementation/publication authorization.
+Separate production is outside scope. See [the release record](DEV-RELEASE-20261111.md)
+for audited stores, tests, deployment evidence and limitations.
+
+Deletion covers the requester's registration, supplied-key-derived identity and
+related session/attribution records. Independently supported records remain even
+when they mention that player, including other users' API observations, player
+submissions, faction information, status and activity observations. Mixed records
+lose requester attribution while retaining independent information.
 
 ## User-facing flow
 
@@ -23,7 +31,7 @@ Deletion is for the selected verified account, not a general reset of shared
 browser storage, other users' records or non-identifying settings. Deleting TU
 copies does not revoke the key at Torn or alter Torn inventory/items.
 
-## Confirmed current behavior
+## Prior behavior that must not be confused with deletion
 
 The DEV Worker agreement-cancellation route writes a cancellation event and
 revokes sessions. It does not erase identity rows, agreement history or all
@@ -34,7 +42,7 @@ TU's application database. Raw saved keys still need removal from the client's
 private credential store, supported origin fallbacks and legacy copies. The
 agreement must not imply that raw keys were previously stored in a server DB.
 
-## Storage inventory and scope before implementation
+## Storage inventory and deletion scope
 
 - Client: enumerate selected-account credentials in private GM storage and
   supported PDA/origin fallback storage; known legacy aliases; player/faction
@@ -112,4 +120,4 @@ provider configuration must be checked before enabling the feature.
 [Proposed 1.4 text](../agreements/drafts/1.4-self-service-deletion-review-draft.md)
 adds the self-service process, clarifies retained non-identifying data and
 provider/export limitations, and removes the operator-contact deletion process.
-The current published manifest and immutable agreement history are unchanged.
+The reviewed draft remains preserved. Agreement 1.3 is archived without changing its wording; the operative DEV publication is 1.4 / number 5.
