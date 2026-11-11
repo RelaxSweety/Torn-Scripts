@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.90-dev",
+    "date": "2026-11-11",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Restore Snatch and Run healing with Morphine and other selected medical items",
+        "Recognize travel inventory identifiers and empty slots correctly"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.89-dev",
     "date": "2026-11-11",
     "securityBundle": true,

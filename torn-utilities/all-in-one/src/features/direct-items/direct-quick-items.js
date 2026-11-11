@@ -44,7 +44,8 @@ export function createDirectQuickItems({window,document,fetchImpl,isAuthorized=(
  function validTravelInventory(data){
   // An empty mapping alone is never proof of an empty inventory.
   if(!Array.isArray(data?.slots)||!Number.isSafeInteger(data.maxBaseSlots)||!Number.isSafeInteger(data.maxSpecialSlots)||data.maxBaseSlots<0||data.maxSpecialSlots<0||data.slots.length!==data.maxBaseSlots+data.maxSpecialSlots||data.slots.length>40)return false;
-  const ids=new Set();for(const slot of data.slots){if(!slot||!Number.isSafeInteger(slot.ID)||slot.ID<=0||ids.has(slot.ID)||!(slot.item===null||slot.item&&Number.isSafeInteger(slot.item.ID)&&slot.item.ID>0))return false;ids.add(slot.ID);}return true;
+  const positiveId=value=>/^[1-9][0-9]{0,14}$/.test(String(value))&&Number.isSafeInteger(Number(value));
+  const ids=new Set();for(const slot of data.slots){const id=String(slot?.ID);if(!slot||!positiveId(slot.ID)||ids.has(id)||!(slot.item==null||slot.item&&positiveId(slot.item.ID)))return false;ids.add(id);}return true;
  }
  async function useTravel(event,selection,consented=false,workflow=null){
   if(!event?.isTrusted||busy||inspecting||pending()||!consented||!travelContext())return {result:'blocked'};
@@ -66,12 +67,12 @@ export function createDirectQuickItems({window,document,fetchImpl,isAuthorized=(
    travelOutcome={at:new Date(now()).toISOString(),build,slotId:expected.slotId,itemId:expected.itemId,evidence,consumption:'unconfirmed',hospitalRelease:evidence.hospitalRelease};
    if(data.success!==true||data.itemRemoved!==true)throw Error('unconfirmed-use');
    const after=await travelRequest('inventory',active.signal);
-   if(!validTravelInventory(after)||!after.slots.some(slot=>String(slot.ID)===expected.slotId&&slot.item===null))throw Error('removal-unconfirmed');
+   if(!validTravelInventory(after)||!after.slots.some(slot=>String(slot.ID)===expected.slotId&&slot.item==null))throw Error('removal-unconfirmed');
    travelOutcome.consumption='confirmed-by-response-and-fresh-inventory';
    // Release is separate evidence; never advances purchase/travel or assumes a partial heal released the player.
    travelInspection={at:new Date(now()).toISOString(),build,...capture.inventoryInfo(after)};
    window.sessionStorage.removeItem(KEY);record('response',expected.itemId,'success-response',started);
-   return {result:'consumption-confirmed',inventoryCapacity:{total:after.slots.length,occupied:after.slots.filter(slot=>slot.item!==null).length},text:plain(data.message||data.text||'Item consumed.')+' Hospital release: '+travelOutcome.hospitalRelease+'.',...travelOutcome};
+   return {result:'consumption-confirmed',inventoryCapacity:{total:after.slots.length,occupied:after.slots.filter(slot=>slot.item!=null).length},text:plain(data.message||data.text||'Item consumed.')+' Hospital release: '+travelOutcome.hospitalRelease+'.',...travelOutcome};
   }catch{if(posted)record('uncertain',expected.itemId,'network-or-timeout',started);return {result:posted?'uncertain':'inventory-unconfirmed',text:posted?'Check Torn before clearing this attempt. No retry will occur.':'Inventory could not be verified. No item-use request was sent.'};}
   finally{window.clearTimeout(timer);window.removeEventListener('pagehide',abort);if(controller===active)controller=null;busy=false;renderState();refreshTravelChoices();}
  }

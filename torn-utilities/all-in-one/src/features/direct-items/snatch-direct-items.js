@@ -17,6 +17,16 @@ export function createSnatchDirectItems({native,getPilot,getProfile,window,now=(
   if(priorReason)onEvent({step:'direct-capacity-rebuild',reason:priorReason,verified:run.capacityLedger?.valid===true,total:run.capacityLedger?.total??null,occupied:run.capacityLedger?.initialOccupied??null});
   if(run.capacityLedger?.valid===false)throw Error('Current travel inventory capacity could not be verified. Load inventory or re-arm before using an item.');
   if(!eligible())throw Error('Hospital, stock or travel state no longer permits this item use.');
+  const healingItems=run.medicals?.length?run.medicals:[run.medical];
+  // Non-pilot medicals (for example Morphine) retain the existing visible,
+  // name-matched native controls. Choose transport before any direct use; never
+  // fall back after a submitted or uncertain request.
+  const directBag=item=>['732','736'].includes(String(item?.id))||!item?.id&&/^Blood Bag : (?:A|AB)\+$/.test(item?.name||'');
+  if(kind==='heal'&&healingItems.some(item=>item?.name&&(!directBag(item)||item.uid))){
+   if(proof?.uncertain)throw Error('Resolve the prior item/status verification before using another medical.');
+   proof=null;lastStatus=null;onEvent({step:'native-medical-selected',action:kind});
+   return native.execute(kind,options);
+  }
   lastStatus=null;active=true;const ticket=++generation;let consumed=false;
   const ensure=()=>ticket===generation&&guard();
   try{
