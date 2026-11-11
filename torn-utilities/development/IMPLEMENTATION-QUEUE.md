@@ -57,3 +57,11 @@ verified slot badges and per-purchase confirmation notifications. Return and
 departure choices are immediately available after verification. A native
 inventory refresh command remains unverified and is not substituted. See
 [removal and validation](NO-AUTO-REFRESH-20261111.md).
+
+## Temporary native refresh diagnostic — .99-dev
+
+Added read-only native refresh-function inspection and a trusted-click A+ blood
+bag add-to-carried-inventory POST test inside existing DEV diagnostics. Grounded
+Travel Agency/status guards, exact inventory verification and unresolved-attempt
+protection apply. Automatic page refresh remains removed. See
+[native refresh diagnostic and validation](NATIVE-REFRESH-DIAGNOSTIC-20261111.md).

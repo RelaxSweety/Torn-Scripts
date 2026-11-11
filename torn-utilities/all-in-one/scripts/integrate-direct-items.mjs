@@ -65,7 +65,7 @@ for(const [from,to] of [
  ['return hospitalizeBeforeLanding();','return hospitalizeBeforeLanding(event);'],
  ['return nativeAct(kind);','return nativeAct(kind,{event});']
 ]){if(!output.includes(from))throw Error('Trusted event integration changed: '+from);output=output.replace(from,to);}
-output=output.replace('function renderMenu(){',"const quickItemTest=createDirectQuickItems({window,document,fetchImpl:fetch,capturePage:quickItemCapturePage,isAuthorized:()=>host.TornUtilities?.isAuthorized?.()===true,build:TU_INTEGRATED_BUILD});\nfunction renderMenu(){");
+output=output.replace('function renderMenu(){',"const quickItemTest=createDirectQuickItems({window,document,fetchImpl:fetch,capturePage:quickItemCapturePage,getProfile:()=>host.TornUtilities.requestTravelInfo('profile'),isAuthorized:()=>host.TornUtilities?.isAuthorized?.()===true,build:TU_INTEGRATED_BUILD});\nfunction renderMenu(){");
 output=output.replace('productionAuthorized:false,uiEvents:(host.__TU_UI_DIAGNOSTICS__||[]).map(entry=>({...entry})),evidenceBuilds,stockMonitor:', 'productionAuthorized:false,quickItemExperiment:{...quickItemTest.report(),snatchDirectItems:nativeActions.report()},uiEvents:(host.__TU_UI_DIAGNOSTICS__||[]).map(entry=>({...entry})),evidenceBuilds,stockMonitor:');
 output=output.replace("function diagnosticStart(){try{embeddedDiagnostic?.start('Workflow (continuous)');","function diagnosticStart(){try{quickItemTest.captureStart();embeddedDiagnostic?.start('Workflow (continuous)');");
 output=output.replace('function diagnosticClear(){', 'function diagnosticClear(){quickItemTest.clearLogs();');

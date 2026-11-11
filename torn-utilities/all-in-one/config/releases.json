@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.99-dev",
+    "date": "2026-11-11",
+    "securityBundle": true,
+    "changes": {
+      "Diagnostics": [
+        "Inspect native inventory refresh without running it",
+        "Add one A+ Blood Bag to carried inventory per click at the grounded Travel Agency, with verified results"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.98-dev",
     "date": "2026-11-11",
     "securityBundle": true,
