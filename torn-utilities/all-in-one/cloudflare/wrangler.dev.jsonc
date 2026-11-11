@@ -68,5 +68,9 @@
         "IdentityCoordinator"
       ]
     }
-  ]
+  ],
+  "vars": {
+    "TU_DELETION_ENABLED": "false",
+    "LEGACY_IDENTITY_ROOMS": "[]"
+  }
 }

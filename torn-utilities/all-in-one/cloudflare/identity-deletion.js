@@ -8,6 +8,7 @@ export function createIdentityCoordinator({route,verify,digest,readJson}) {
    const storage=this.state.storage,env={...this.env,__identityStorage:storage};
    if(new URL(req.url).pathname!=='/api/auth/delete-data'){if(new URL(req.url).pathname==='/api/auth/register'&&await storage.get('active-deletion'))return Response.json({error:'Registration temporarily paused during account cleanup'},{status:503});return route(req,env);}
    const reply=(data,status=200)=>Response.json(data,{status,headers:{'cache-control':'no-store','access-control-allow-origin':'*'}});
+   if(env.TU_DELETION_ENABLED!=='true')return reply({error:'Self-service deletion is not enabled on this deployment'},503);
    if(req.method!=='POST')return reply({error:'Method not allowed'},405);
    const body=await readJson(req);
    if(!body||Object.keys(body).some(k=>!['receipt','api_key','cleanup_ack'].includes(k))||!/^[a-f0-9]{64}$/.test(body.receipt||''))return reply({error:'Invalid deletion request'},400);
@@ -35,13 +36,14 @@ export function createIdentityCoordinator({route,verify,digest,readJson}) {
    const reply=(data,status=200)=>Response.json(data,{status,headers:{'cache-control':'no-store','access-control-allow-origin':'*'}});
    try{
     const db=env.TU_USERS_DB,id=job.id;
-    if(job.ready)return reply({complete:false,ready_for_local_cleanup:true,session_hashes:job.sessionHashes});
+    if(job.ready)return reply({complete:false,ready_for_local_cleanup:true,session_hashes:job.sessionHashes,room_hashes:job.roomHashes||[]});
     if(!job.sessionHashes){const result=await db.prepare('SELECT token_hash FROM tu_sessions WHERE torn_id=?').bind(id).all();job.sessionHashes=result.results.map(row=>row.token_hash);await storage.put(receipt,job);}
     // Revocation happens first and remains in place on every partial failure.
     await db.prepare('DELETE FROM tu_sessions WHERE torn_id=?').bind(id).run();
-    const rooms=await storage.get('rooms:'+id)||[];
+    const rooms=[...(await storage.get('rooms:'+id)||[]),...JSON.parse(env.LEGACY_IDENTITY_ROOMS||'[]')];
+    if(!job.roomHashes){job.roomHashes=[];for(const room of rooms){const binding=env[room.binding],stub=binding.get(room.objectId?binding.idFromString(room.objectId):binding.idFromName(room.name));const response=await stub.fetch(new Request('https://identity.internal/inspect',{method:'POST',headers:{'x-tu-erase-id':id}}));if(!response.ok)throw Error('Room inventory incomplete');job.roomHashes.push(...(await response.json()).hashes);}await storage.put(receipt,job);}
     for(const room of rooms){
-     const response=await env[room.binding].get(env[room.binding].idFromName(room.name)).fetch(new Request('https://identity.internal/erase',{method:'POST',headers:{'x-tu-erase-id':id}}));
+     const response=await env[room.binding].get(room.objectId?env[room.binding].idFromString(room.objectId):env[room.binding].idFromName(room.name)).fetch(new Request('https://identity.internal/erase',{method:'POST',headers:{'x-tu-erase-id':id}}));
      if(!response.ok)throw Error('Room cleanup incomplete');
     }
     await env.FOREIGN_DB.prepare('DELETE FROM tu_agreement_events WHERE player_id=?').bind(id).run();
@@ -59,7 +61,7 @@ export function createIdentityCoordinator({route,verify,digest,readJson}) {
     if(Date.now()<job.started+71000)return reply({complete:false,retry_after_seconds:Math.ceil((job.started+71000-Date.now())/1000)},202);
     for(const [binding,name] of [['REGISTRATION_BUDGET','registration-global-v1'],['SUBMISSION_BUDGET','foreign-writes-global-v1']]){const r=await env[binding].get(env[binding].idFromName(name)).fetch(new Request('https://budget.internal/prune',{method:'POST'}));if(!r.ok)throw Error('Budget cleanup incomplete');}
     await storage.transaction(async tx=>{await tx.delete('active-deletion');await tx.delete('rooms:'+id);job.ready=true;await tx.put(receipt,job);});
-    return reply({complete:false,ready_for_local_cleanup:true,session_hashes:job.sessionHashes});
+    return reply({complete:false,ready_for_local_cleanup:true,session_hashes:job.sessionHashes,room_hashes:job.roomHashes||[]});
    }catch{await storage.setAlarm(Date.now()+60000);return reply({complete:false,error:'Deletion incomplete; keep the receipt and retry'},503);}
   }
  };
@@ -75,10 +77,11 @@ export async function trackIdentityRoom(env,req,binding,name){
 }
 
 export async function eraseRoomIdentity(state,req){
- if(new URL(req.url).origin!=='https://identity.internal'||new URL(req.url).pathname!=='/erase')return null;
+ if(new URL(req.url).origin!=='https://identity.internal'||!['/erase','/inspect'].includes(new URL(req.url).pathname))return null;
  const id=req.headers.get('x-tu-erase-id');if(req.method!=='POST'||!/^\d+$/.test(id||''))return new Response(null,{status:400});
  const game=await state.storage.get('game');
- if(game?.ids){
+ if(new URL(req.url).pathname==='/inspect'){const hashes=[];for(const seat of Object.keys(game?.ids||{}))if(String(game.ids[seat])===id&&game.players?.[seat])hashes.push(Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(game.players[seat])))).map(n=>n.toString(16).padStart(2,'0')).join(''));return Response.json({hashes});}
+ if(game?.ids&&Object.values(game.ids).some(value=>String(value)===id)){
   for(const seat of Object.keys(game.ids))if(String(game.ids[seat])===id){game.ids[seat]=null;game.players[seat]=null;if(game.names)game.names[seat]='Deleted player';}
   game.version=(game.version||0)+1;
   await state.storage.put('game',game);

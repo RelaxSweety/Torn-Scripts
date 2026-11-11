@@ -979,7 +979,7 @@ async function routeWorkerRequest(req,env){
       return json({ error: "Stock status unavailable" }, 503);
     }
   }
-  if (url.pathname === "/health") return json({ ok: true, version: "0.2.0" });
+  if (url.pathname === "/health") return json({ ok: true, version: "0.2.0", dev_release: "0.5.42.89-dev", identity_deletion: 1 });
   const marble = url.pathname.match(/^\/api\/marbles(?:\/([A-HJ-NP-Z2-9]{6})\/(join|state|roll|move))?$/);
   if (marble) {
     const room = marble[1] || code(), action = marble[2] || "create";

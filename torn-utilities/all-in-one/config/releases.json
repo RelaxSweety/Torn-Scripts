@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.89-dev",
+    "date": "2026-11-11",
+    "securityBundle": true,
+    "changes": {
+      "Improvements": [
+        "Compact windows and independent alarm controls",
+        "Add self-service deletion of TU registration and supplied credentials"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.88-dev",
     "date": "2026-11-10",
     "securityBundle": true,

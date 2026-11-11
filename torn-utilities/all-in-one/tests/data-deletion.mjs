@@ -17,7 +17,7 @@ try{
  await roomState.storage.put('game',{ids:{X:'7',O:'8'},names:{X:'Own',O:'Other'},players:{X:'own-seat',O:'other-seat'},board:['X','O'],version:1});
  await state.storage.put('rooms:7',[{binding:'GAME',name:'TEST'}]);
  const binding=object=>({idFromName:x=>x,get:()=>object});let fail=true,verified=0;
- const env={TU_USERS_DB:users,FOREIGN_DB:{prepare(sql){if(fail)throw Error('Injected foreign failure');return foreign.prepare(sql);}},REGISTRATION_BUDGET:binding(budget),SUBMISSION_BUDGET:binding(submission),GAME:binding({fetch:async req=>eraseRoomIdentity(roomState,req)})};
+ const env={TU_DELETION_ENABLED:'true',TU_USERS_DB:users,FOREIGN_DB:{prepare(sql){if(fail)throw Error('Injected foreign failure');return foreign.prepare(sql);}},REGISTRATION_BUDGET:binding(budget),SUBMISSION_BUDGET:binding(submission),GAME:binding({fetch:async req=>eraseRoomIdentity(roomState,req)})};
  const Coordinator=createIdentityCoordinator({route:async()=>Response.json({routed:true}),verify:async key=>{verified++;if(key!=='a'.repeat(16))throw Error('Rejected');return {id:7};},digest:hash,readJson:req=>req.json()});
  const coordinator=new Coordinator(state,env),receipt='b'.repeat(64);
  const request=body=>new Request('https://dev.test/api/auth/delete-data',{method:'POST',body:JSON.stringify(body)});

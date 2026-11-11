@@ -4,11 +4,11 @@ import {createSessionTokenStore} from '../src/adapters/session-token-store.js';
 export function secureCandidateManager(source){
  source=source.replace("  'use strict';","  'use strict';\nconst isScopedTornRead="+isScopedTornRead.toString()+";\n");
  const credentialLine='  const readCredential=name=>';
- const insert=`  const sessionTokens=(${createSessionTokenStore.toString()})({window,privateMode:credentials.mode!=='origin-local',getValue:typeof GM_getValue==='function'?GM_getValue:null,setValue:typeof GM_setValue==='function'?GM_setValue:null,deleteValue:typeof GM_deleteValue==='function'?GM_deleteValue:null,listValues:typeof GM_listValues==='function'?GM_listValues:null});\n`;
+ const insert=`  const sessionTokens=(${createSessionTokenStore.toString()})({window,privateMode:credentials.mode!=='origin-local',getValue:typeof GM_getValue==='function'?GM_getValue:null,setValue:typeof GM_setValue==='function'?GM_setValue:null,deleteValue:typeof GM_deleteValue==='function'?GM_deleteValue:null,listValues:typeof GM_listValues==='function'?GM_listValues:null,blocked:()=>identityDeletionInProgress||!!readCredential('tu:dev:deletion-job:v1')});\n`;
  if(!source.includes(credentialLine))throw Error('Credential integration changed');
  source=source.replace(credentialLine,insert+credentialLine);
  source=source.replace("const devToken=()=>sessionStorage.getItem(DEV_SESSION_KEY)||'';","const devToken=()=>sessionTokens.get();");
- source=source.replace('cleanup:async id=>{','cleanup:async (id,hashes)=>{await sessionTokens.eraseHashes(hashes);');
+ source=source.replace('cleanup:async id=>{','cleanup:async (id,hashes,roomHashes)=>{await sessionTokens.eraseHashes(hashes);');
  source=source.replaceAll('sessionStorage.removeItem(DEV_SESSION_KEY)','sessionTokens.clear()');
  source=source.replaceAll('sessionStorage.setItem(DEV_SESSION_KEY,registration.token)','sessionTokens.set(registration.token)').replaceAll('sessionStorage.setItem(DEV_SESSION_KEY,token)','sessionTokens.set(token)');
  source=source.replace('JSON.stringify({token,build:TU_VERSION,checkedAt:Date.now(),agreement:currentDevAgreement,accepted:true})','JSON.stringify({sessionMarker:sessionTokens.marker(),build:TU_VERSION,checkedAt:Date.now(),agreement:currentDevAgreement,accepted:true})');

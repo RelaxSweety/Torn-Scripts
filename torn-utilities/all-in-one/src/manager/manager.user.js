@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities DEV (All-in-One)
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.88-dev
+// @version      0.5.42.89-dev
 // @description  Integrated TU development bundle for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -49,7 +49,7 @@
   const rawManagerFetch=window.fetch.bind(window);
   const fetch=(input,options)=>apiGovernor.fetch(input,options,rawManagerFetch);
   const managerHttp=rawManagerHttp?details=>apiGovernor.request(details,rawManagerHttp):null;
-  const TU_VERSION='0.5.42.88-dev';
+  const TU_VERSION='0.5.42.89-dev';
   const TU_LOGO='__TU_LOGO_DATA_URL__';
   // Bundled tool directory: no external catalog, cache, or refresh requests.
   const registry={schemaVersion:1,categories:[{"id":"business","name":"Business Tools","icon":"▥","order":10},{"id":"games","name":"Games","icon":"♜","order":20},{"id":"single-player","name":"Single Player","icon":"▣","order":21,"parent":"games"},{"id":"multiplayer","name":"Multiplayer","icon":"♟","order":22,"parent":"games"},{"id":"chat","name":"Chat Tools","icon":"◉","order":30},{"id":"other","name":"War Tools","icon":"⚙","order":40}],modules:[{"id":"flight-game","name":"Flight Game","category":"single-player","version":"0.12.8","description":"Standalone Flight Game arcade module, playable anytime"},{"id":"stick-fighter","name":"Stick Fighter","category":"single-player","version":"0.2.7","description":"Standalone Stick Fighter arcade module, playable anytime"},{"id":"chat-archiver","name":"Chat Archiver","category":"chat","version":"0.1.8","description":"Archive Torn chat conversations"},{"id":"tic-tac-toe","name":"Tic-Tac-Toe","category":"multiplayer","version":"0.6.5","description":"Two-player Tic-Tac-Toe with named winners, green winning line, rematches and head-to-head history"},{"id":"torn-four","name":"Torn Four","category":"multiplayer","version":"0.2.5","description":"Connect Four: two-player multiplayer with private room codes"},{"id":"torn-fleet","name":"Torn Fleet","category":"multiplayer","version":"0.2.5","description":"Battleship: fleet placement and turn-based naval combat"},{"id":"torn-snake","name":"Slithering Streets","category":"single-player","version":"0.2.14","description":"Single-player Snake with touch controls and local high scores"},{"id":"chaos-marbles","name":"Chaos Marbles","category":"multiplayer","version":"0.2.5","description":"Online 2\u20134 player marble race with private player sessions, Waiting for Chaos staging, and game history"},{"id":"item-monitor","name":"Travel Assistant and Item Monitor","category":"business","version":"1.10.31-dev","description":"Item Monitor and Travel Assistant with D1 stock reporting, source diagnostics and stock estimation"},{"id":"war-hit-organizer","name":"War Organizer","category":"other","version":"0.3.17-dev","description":"Compact war target board, reservation controls, timer and local development settings"}]};
@@ -125,6 +125,7 @@
   const AUTH_CACHE='tu:dev:authorization-cache:v1',IDENTITY_CACHE='tu:dev:identity-cache:v1',AGREEMENT_CACHE='tu:dev:agreement-content:v1';
   const AUTH_TTL=5*60*1000,IDENTITY_TTL=30*60*1000,AGREEMENT_TTL=24*60*60*1000;
   const credentials=createCredentialStore({window,handler:typeof GM_info==='undefined'?'':GM_info.scriptHandler||'',pda:!!nativeBridge||typeof pageWindow.PDA_httpGet==='function',getValue:typeof GM_getValue==='function'?GM_getValue:null,setValue:typeof GM_setValue==='function'?GM_setValue:null,deleteValue:typeof GM_deleteValue==='function'?GM_deleteValue:null});
+  let identityDeletionInProgress=false;
   const readCredential=name=>{try{return credentials.get(name);}catch{return null;}};
   const readCache=key=>{try{return JSON.parse(sessionStorage.getItem(key)||'null')}catch{return null}};
   const fresh=(entry,ttl)=>entry&&Number.isFinite(entry.checkedAt)&&entry.checkedAt<=Date.now()&&Date.now()-entry.checkedAt<ttl;
@@ -133,7 +134,7 @@
   const loginAccessLabel=()=>readStoredKeys().find(entry=>entry.key===readSavedKey())?.level||'Access level unverified';
   const normalizeKey=v=>{if(typeof v!=='string')return '';let x=v.trim();for(let i=0;i<3;i++){if(x.startsWith('GMV2_')){x=x.slice(5);continue;}if(x.startsWith('"')&&x.endsWith('"')){try{const y=JSON.parse(x);if(typeof y==='string'){x=y.trim();continue}}catch{}}break;}return /^[A-Za-z0-9]{16}$/.test(x)?x:'';};
   const readSavedKey=()=>{let value='';try{value=readCredential(VAULT)||'';}catch{return '';}let key=normalizeKey(value);if(key)return key;if(credentials.mode!=='origin-local'||readCredential(VAULT_CLEARED)==='1')return '';try{return normalizeKey(typeof GM_getValue==='function'?GM_getValue(VAULT,''):'');}catch{return '';}};
-  const saveKey=key=>{clearAuthorizationCache();sessionStorage.removeItem(IDENTITY_CACHE);credentials.set(SAVED_KEYS,JSON.stringify(readStoredKeys()));credentials.set(VAULT,key);credentials.remove(VAULT_CLEARED);};
+  const saveKey=key=>{if(identityDeletionInProgress||readCredential('tu:dev:deletion-job:v1'))throw Error('Account deletion in progress');clearAuthorizationCache();sessionStorage.removeItem(IDENTITY_CACHE);credentials.set(SAVED_KEYS,JSON.stringify(readStoredKeys()));credentials.set(VAULT,key);credentials.remove(VAULT_CLEARED);};
   const removeSavedKey=()=>{clearAuthorizationCache();sessionStorage.removeItem(IDENTITY_CACHE);credentials.set(VAULT_CLEARED,'1');localStorage.setItem(VAULT_CLEARED,'1');localStorage.removeItem(LOGIN_ACCESS_KEY);credentials.remove(VAULT);if(credentials.mode==='origin-local')try{if(typeof GM_deleteValue==='function')GM_deleteValue(VAULT);else if(typeof GM_setValue==='function')GM_setValue(VAULT,'');}catch{}};
   const SAVED_KEYS='tu:identity:saved-keys:v1',WHO_KEY='tu:who:limited-api-key:v1',EXTRA_KEYS='tu:api:additional-keys:v1';
   const readExtras=()=>{try{const list=JSON.parse(readCredential(EXTRA_KEYS)||'[]');return Array.isArray(list)?list.filter(x=>normalizeKey(x?.key)):[]}catch{return []}};
@@ -145,7 +146,8 @@
     for(const value of [readSavedKey(),readCredential(WHO_KEY),...readExtras().map(e=>e.key)]){const key=normalizeKey(value);if(key&&!keys.has(key))keys.set(key,{key,level:null,playerId:null,verifiedAt:null});}
     return [...keys.values()];
   }
-  function rememberVerifiedKey(key,level,playerId){
+  function rememberVerifiedKey(key,level,playerId,{deletion=false}={}){
+    if(!deletion&&(identityDeletionInProgress||readCredential('tu:dev:deletion-job:v1')))throw Error('Account deletion in progress');
     if(!normalizeKey(key)||!['Public Only','Limited Access'].includes(level))throw Error('Unsupported verified key');
     const entries=readStoredKeys(),entry=entries.find(e=>e.key===key)||{key};
     const previous=entries.findIndex(e=>e.key===key);
@@ -234,7 +236,7 @@
     if(currentTab==='settings'&&!panel.hidden)render('settings');
   }
   let authorizationVerified=false,authRestorePending=true,authOpenRequested=false;
-  const authorized=()=>!readCredential('tu:dev:deletion-job:v1')&&authorizationVerified&&!!devToken()&&!!readSavedKey()&&!!TU_TERMS_VERSION&&localStorage.getItem(TU_TERMS_KEY)===TU_TERMS_VERSION;
+  const authorized=()=>!identityDeletionInProgress&&!readCredential('tu:dev:deletion-job:v1')&&authorizationVerified&&!!devToken()&&!!readSavedKey()&&!!TU_TERMS_VERSION&&localStorage.getItem(TU_TERMS_KEY)===TU_TERMS_VERSION;
   const publishAuthorization=ok=>{authorizationVerified=!!ok;pageWindow.dispatchEvent(new CustomEvent('tu-authorization-change',{detail:{authorized:authorized()}}));if(!authorized())stopModule();};
   const api = Object.freeze({
     isAuthorized:()=>authorized(),
@@ -608,7 +610,7 @@ __TU_COMPACT_UI_CSS__
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.88-dev</span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.89-dev</span></footer>';
   document.body.appendChild(panel);
   const headerBrand=panel.querySelector('.tu-logo');if(headerBrand){headerBrand.textContent='';headerBrand.classList.add('tu-brand-emblem');headerBrand.setAttribute('role','img');headerBrand.setAttribute('aria-label','Torn Utilities');}
   const identityLine=document.createElement('p');
@@ -823,12 +825,13 @@ __TU_COMPACT_UI_CSS__
          saveJob:job=>credentials.set('tu:dev:deletion-job:v1',JSON.stringify(job)),removeJob:()=>credentials.remove('tu:dev:deletion-job:v1'),
          random:()=>Array.from(crypto.getRandomValues(new Uint8Array(32)),n=>n.toString(16).padStart(2,'0')).join(''),
          request:body=>devRequest('/api/auth/delete-data','POST',body,''),
-         verify:async key=>{const info=checkedKeyInfo(await requestIdentity(key,{revalidate:true}));rememberVerifiedKey(key,info.level,info.playerId);return info;},entries:readStoredKeys,
-         stop:()=>{credentials.set(VAULT_CLEARED,'1');stopModule();publishAuthorization(false);authGeneration++;sessionStorage.removeItem(DEV_SESSION_KEY);clearAuthorizationCache();localStorage.removeItem(TU_TERMS_KEY);},
+         verify:async key=>{const info=checkedKeyInfo(await requestIdentity(key,{revalidate:true}));rememberVerifiedKey(key,info.level,info.playerId,{deletion:true});return info;},entries:readStoredKeys,
+         stop:()=>{identityDeletionInProgress=true;credentials.set(VAULT_CLEARED,'1');stopModule();publishAuthorization(false);authGeneration++;clearAuthorizationCache();localStorage.removeItem(TU_TERMS_KEY);},
          cleanup:async id=>{
           const keys=readStoredKeys().filter(entry=>entry.playerId===id).map(entry=>entry.key);await apiGovernor.forgetKeys(keys);credentials.eraseKeys(keys);
-          clearPlayer();clearAuthorizationCache();sessionStorage.removeItem(DEV_SESSION_KEY);sessionStorage.removeItem(IDENTITY_CACHE);localStorage.removeItem(TU_TERMS_KEY);localStorage.removeItem(LOGIN_ACCESS_KEY);
-          for(const key of ['tu-ttt-dev-session-v1','tu:chaos-marbles:dev:session','tu:dev:torn-four:session','tu:dev:torn-fleet:session'])localStorage.removeItem(key);
+          clearPlayer();clearAuthorizationCache();sessionStorage.removeItem(IDENTITY_CACHE);localStorage.removeItem(TU_TERMS_KEY);localStorage.removeItem(LOGIN_ACCESS_KEY);
+          savedKeys.replaceChildren();input.value='';
+          for(const key of ['tu-ttt-dev-session-v1','tu:chaos-marbles:dev:session','tu:dev:torn-four:session','tu:dev:torn-fleet:session']){const raw=localStorage.getItem(key);if(!raw)continue;const record=JSON.parse(raw);if(record?.token){const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(record.token)))).map(n=>n.toString(16).padStart(2,'0')).join('');if(roomHashes.includes(hash))localStorage.removeItem(key);}}
           for(const key of ['tu:snatch-run:v1','tu:landing-notification:v1'])sessionStorage.removeItem(key);
           credentials.set(VAULT_CLEARED,'1');localStorage.setItem(VAULT_CLEARED,'1');
           if(readStoredKeys().some(entry=>entry.playerId===id))throw Error('Local key cleanup incomplete');
@@ -843,7 +846,7 @@ __TU_COMPACT_UI_CSS__
           if(!confirm('Delete My TU Data for player '+owner.playerId+'? This removes TU registration, supplied keys and associated identifying data. Independent shared records are preserved. TU sessions end. Other devices and exported files need separate local cleanup.'))return;
          }
          deleteData.disabled=true;
-         try{await deletion.run(key,message=>{deletionStatus.textContent=message;});key='';deleteData.textContent=deletion.pending()?'Resume TU data deletion':'Delete My TU Data';}
+         try{const complete=await deletion.run(key,message=>{deletionStatus.textContent=message;});key='';if(complete){alert(deletionStatus.textContent);location.reload();}deleteData.textContent=deletion.pending()?'Resume TU data deletion':'Delete My TU Data';}
          catch{deletionStatus.textContent=deletion.pending()?'Deletion is incomplete. Keep this installation and use Resume TU data deletion to retry.':'Deletion has not started. Verify or remove legacy saved keys with unknown ownership, then retry.';}
          finally{deleteData.disabled=false;}
         });content.append(deleteData,deletionStatus);
