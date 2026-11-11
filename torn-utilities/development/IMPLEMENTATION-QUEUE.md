@@ -1,7 +1,7 @@
 # TU implementation status — CURRENT DEV ONLY
 
 The approved compact UI and self-service deletion work is implemented for
-**TU 0.5.42.90-dev / Item Monitor 1.12.40-dev** with agreement **1.4 / number 5**.
+**TU 0.5.42.91-dev / Item Monitor 1.12.41-dev** with agreement **1.4 / number 5**.
 Earlier production-target references and implementation holds are superseded by
 the explicit DEV-only authorization.
 
@@ -22,6 +22,6 @@ See [the release and validation record](DEV-RELEASE-20261111.md),
 Separate production remains unchanged. Real-device acceptance and provider/
 other-installation cleanup limitations are recorded in the release report.
 
-The .90 follow-up restores native healing for Morphine and other non-pilot
-medicals and handles the observed travel inventory ID/empty-slot schema.
-See [healing regression evidence](HEALING-FIX-20261111.md).
+The .91 correction routes every selected healing item through the direct item
+handler, removes the .90 native diversion, and retains travel inventory schema
+compatibility. See [handler regression evidence](HEALING-FIX-20261111.md).

@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.91-dev",
+    "date": "2026-11-11",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Use all selected healing items through the direct item handler",
+        "Preserve item identity checks and partial-heal verification"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.90-dev",
     "date": "2026-11-11",
     "securityBundle": true,
