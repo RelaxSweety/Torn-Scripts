@@ -1,7 +1,7 @@
 # TU implementation status — CURRENT DEV ONLY
 
 The approved compact UI and self-service deletion work is implemented for
-**TU 0.5.42.95-dev / Item Monitor 1.12.45-dev** with agreement **1.4 / number 5**.
+**TU 0.5.42.96-dev / Item Monitor 1.12.46-dev** with agreement **1.4 / number 5**.
 Earlier production-target references and implementation holds are superseded by
 the explicit DEV-only authorization.
 
@@ -42,6 +42,6 @@ a single inventory page refresh only after the purchase sequence finishes, and
 verified green/red inventory-slot badges and native flight/hospital countdown synchronization.
 See [purchase notification](PURCHASE-NOTICE-20261111.md).
 
-## Queued UI cleanup — requested 2026-11-11
+## Completed UI cleanup — requested 2026-11-11
 
-- **Pending:** Remove the **Direct Item Tools** section from the Travel Assistant and Item Monitor interface, including its standalone launch control and explanatory section text. Keep the integrated healing, hospitalization, destruction and purchase handlers and their diagnostic recording. This request queues the UI cleanup; it is not implemented in the current .95 work.
+- **Completed in .96-dev:** Removed the Direct Item Tools section heading, explanatory text and standalone launch button from Travel Assistant and Item Monitor. Integrated healing, hospitalization, destruction, purchase handlers and normal diagnostic controls are preserved. See [removal and validation](DIRECT-TOOLS-UI-REMOVAL-20261111.md).

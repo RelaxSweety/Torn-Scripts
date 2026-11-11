@@ -12,7 +12,6 @@ output=output.replace(marker,'const createSteppedNativeActions='+createSteppedNa
 const factoryMarker='/* Integrated tool: item-monitor (';const factoryStart=output.indexOf(factoryMarker);const factoryBody=output.indexOf('(()=>{',factoryStart)+'(()=>{'.length;if(factoryStart<0)throw Error('Item Monitor factory missing');output=output.slice(0,factoryBody)+'\nconst quickItemCapturePage=typeof unsafeWindow!==\'undefined\'&&unsafeWindow.document?unsafeWindow:window;'+output.slice(factoryBody);
 const menu="B(p,'Open Item Monitor',openItemMonitor);";
 if(!output.includes(menu))throw Error('Menu integration changed');
-output=output.replace(menu,menu+"E('h3',p,'Experimental Direct Requests');E('p',p,'Snatch and Run uses the direct handler for selected item use, destruction and foreign purchases.');B(p,'Open Direct Quick Items Test',()=>{diagnosticStart();quickItemTest.open();});");
 output=output.replace('const hospitalUntil=hospitalClock?.read()||snatchContext?.hospitalUntil||null;', 'const hospitalUntil=nativeState?.released?null:nativeState?.hospitalUntil||hospitalClock?.read()||snatchContext?.hospitalUntil||null;');
 output=output.replace('return {ownerId,hospitalUntil,hospitalClock:', 'return {ownerId,directItemConsumed:!!nativeState?.directItemConsumed,directItemUncertain:!!nativeState?.directItemUncertain,hospitalUntil,hospitalClock:');
 output=output.replace('if(!run)return;const s=getSnapshot();', 'if(!run)return;const s=getSnapshot();if(s.directItemUncertain){refresh();return;}');
