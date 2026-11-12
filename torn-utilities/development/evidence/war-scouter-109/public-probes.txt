@@ -1,0 +1,4 @@
+2026-11-12 UTC. Public OpenAPI version 1.20.0; specification SHA-256 2ebf615bdf83a64820c3ee743701072fd15b95ebfc9343e025f660af08b34ff4.
+GET https://ffscouter.com/api/v1/check-key (no key/targets/cookies/authorization): HTTP 400 {"code":1,"error":"API key is required","source":"ffscouter"}.
+GET https://ffscouter.com/api/v1/player-flights/batch (no key/targets/cookies/authorization): HTTP 400 {"code":1,"error":"API key is required"}.
+No authenticated API behavior verified.

@@ -1,0 +1,8 @@
+TU 0.5.42.109-dev / War Organizer 0.3.23-dev / Item Monitor 1.12.53-dev.
+Integrated payload 1009517 bytes; SHA-256 57acb687383765fd373287fc3174f83a281da5327fcc774306aaf343d3ec1c10.
+Build and full npm regression suite passed. Final premium-flight service/module focused tests additionally verified entitlement expiry and stale/offline ETA hiding.
+Final full-bundle Chromium fixtures passed at 1280x900, 390x844 and 844x390. Screenshots show synthetic personal premium return ETA beside travel status. Non-premium viewers do not request/see flight data.
+All credentials, rosters, premium flags and flight data in automated tests are synthetic. No live authenticated or real-device PDA/GM success claimed.
+Public credential-free endpoint probes returned expected HTTP 400 missing-key responses; no target IDs used.
+No flight data persisted/shared; key/account/auth/consent invalidation and existing workflow regressions verified.
+Production, archived installers/evidence, Workers, databases and agreements unchanged.

@@ -136,3 +136,10 @@ information cannot be distributed to non-premium faction members under these
 published rules. Provider permission or an appropriate faction-access product
 would be needed before implementing that design. No Worker, database,
 agreement or production change is included.
+
+## Personal premium return-flight ETA — .109-dev
+
+Added own-key FFScouter premium checks and private batched current-flight reads.
+Returning players display ETA MM:SS beside travel status, or earliest/latest
+countdowns where the provider supplies an arrival window. No premium data is
+shared with other users. See [contract, validation and limits](WAR-FFSCOUTER-FLIGHT-ETA-20261112.md).

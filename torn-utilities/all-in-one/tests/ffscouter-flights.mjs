@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict';
+import {webcrypto} from 'node:crypto';
+import {createFFScouter} from '../src/features/ffscouter.js';
+let clock=1800000000000,authorized=true,key='aaaaaaaaaaaaaaaa',premium=true,registered=true,policy=false,mode='normal',release,expiryOverride;
+const storage=new Map(),calls=[];
+const window={crypto:webcrypto,localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)}};
+const api=createFFScouter({window,now:()=>clock,isAuthorized:()=>authorized,getCredentials:()=>({key,playerId:'42',verified:true}),request:async url=>{
+ const u=new URL(url);assert.equal(u.origin,'https://ffscouter.com');assert.equal(u.searchParams.get('key'),key);calls.push(u);
+ if(u.pathname.endsWith('/check-key'))return {status:200,text:JSON.stringify({key,is_registered:registered,is_premium:premium,policy_update_required:policy,premium_entitlement_source:'personal',premium_expires_at:expiryOverride??clock/1000+3600})};
+ assert.equal(u.pathname,'/api/v1/player-flights/batch');assert.deepEqual([...u.searchParams.keys()],['key','targets']);const ids=u.searchParams.get('targets').split(',');assert.ok(ids.length<=100);
+ if(mode==='wait')await new Promise(r=>release=r);
+ if(mode==='network')throw Error(url);if(mode==='429')return {status:429,text:url};if(mode==='403')return {status:403,text:url};if(mode==='bad')return {status:200,text:url};
+ const flights=ids.map(id=>({player_id:Number(id),current:{status_description:id==='2'?'Traveling to Japan':id==='3'?'Returning to Torn from Japan':'Traveling to Torn',takeoff_time:clock/1000-300,earliest_arrival_time:clock/1000+600,latest_arrival_time:id==='4'?clock/1000-1:clock/1000+720},key}));
+ if(mode==='duplicate')flights.push(flights[0]);if(mode==='null')flights.forEach(r=>r.current=null);if(mode==='reversed')flights.forEach(r=>r.current.latest_arrival_time=r.current.earliest_arrival_time-1);
+ return {status:200,text:JSON.stringify({flights,key})};
+}});
+await assert.rejects(api.flights([1]),/Enable/);assert.equal(calls.length,0);
+await api.setEnabled(true);let data=await api.flights([1,2,3,4,1]);assert.equal(data.premium,true);assert.deepEqual(data.rows.map(r=>r.playerId),['1','3'],'Return trips only; reject outbound and reversed/expired windows');assert.ok(!JSON.stringify(data).includes(key));assert.equal(data.rows[0].validUntil,clock+60000);assert.equal(calls.length,2);
+await api.flights([1,2,3,4]);assert.equal(calls.length,2,'One-minute cache prevents roster-poll provider requests');
+const before=calls.length;await api.flights(Array.from({length:201},(_,i)=>100+i));assert.equal(calls.length-before,3,'At most 100 targets per flight batch');
+clock+=61000;mode='network';await assert.rejects(api.flights([1]),error=>/network/.test(error.message)&&!error.message.includes(key));const failedCount=calls.length;await assert.rejects(api.flights([1]),/Retry in/);assert.equal(calls.length,failedCount);
+clock+=61000;mode='429';await assert.rejects(api.flights([1]),/rate limit/);clock+=121000;mode='bad';await assert.rejects(api.flights([1]),error=>/unsupported/.test(error.message)&&!error.message.includes(key));clock+=61000;mode='duplicate';await assert.rejects(api.flights([1]),/unsupported/);
+clock+=61000;mode='normal';api.reset();premium=false;const nonpremiumStart=calls.length;data=await api.flights([1]);assert.equal(data.premium,false);assert.deepEqual(data.rows,[]);assert.equal(calls.length-nonpremiumStart,1,'Non-premium checks never call flight endpoint');await api.flights([1]);assert.equal(calls.length-nonpremiumStart,1,'Non-premium result is cached');
+premium=true;registered=false;api.reset();assert.equal((await api.flights([1])).premium,false);registered=true;policy=true;api.reset();assert.equal((await api.flights([1])).premium,false,'Provider policy update blocks premium use');policy=false;
+api.reset();mode='normal';await api.flights([1]);clock+=61000;mode='wait';const pending=api.flights([1]);await new Promise(r=>setTimeout(r,10));key='bbbbbbbbbbbbbbbb';await api.state();release();await assert.rejects(pending,/changed/);await assert.rejects(api.flights([1]),/Enable/,'Changed key cannot reuse previous consent');await api.setEnabled(true);mode='normal';assert.equal((await api.flights([1])).rows.length,1);
+api.reset();expiryOverride=clock/1000+30;assert.equal((await api.flights([1])).rows[0].validUntil,clock+30000,'Cached ETA is bounded by known entitlement expiry');clock+=31000;assert.equal((await api.flights([1])).premium,false,'Expired personal entitlement cannot return cached flights');expiryOverride=undefined;api.reset();
+clock+=61000;mode='403';await assert.rejects(api.flights([1]),/access denied/);await api.setEnabled(false);await assert.rejects(api.flights([1]),/Enable/);authorized=false;await assert.rejects(api.flights([1]),/Enable/);assert.ok(!JSON.stringify([...storage.values()]).includes('earliest'),'No premium flight results persisted');
+console.log('FFScouter premium flights passed: own-key opt-in, entitlement/policy gate, 100-ID batches, memory cache, return-only validated windows, expiry, credential-free failures/cooldowns, stale-response rejection and disable/auth isolation.');

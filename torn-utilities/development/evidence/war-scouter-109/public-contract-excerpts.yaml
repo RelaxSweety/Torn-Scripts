@@ -1,0 +1,269 @@
+  /api/v1/player-flights/batch:
+    get:
+      operationId: getPlayerFlightsBatch
+      tags: [Flights]
+      summary: Get the current trip for up to 100 players
+      parameters:
+        - $ref: '#/components/parameters/KeyQuery'
+        - name: targets
+          in: query
+          required: true
+          description: Comma-separated Torn player IDs (1-100 unique).
+          schema:
+            type: string
+          example: '1844049,2675763'
+      responses:
+        '200':
+          description: Current trip per requested player.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlightsBatchResponse'
+              examples:
+                default:
+                  value:
+                    flights:
+                      - player_id: 1844049
+                        current:
+                          takeoff_time: 1710000000
+                          status_description: Traveling to Japan
+                          earliest_arrival_time: 1710007200
+                          latest_arrival_time: 1710010800
+                          travel_method: Airline
+                          book_likely_being_used: true
+                      - player_id: 2675763
+                        current: null
+        '400':
+          description: >-
+            Invalid targets. Codes: 1 API key required, 2 invalid key format, 7 missing targets,
+            8 invalid target, 23 more than 100 targets.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missingKey:
+                  value:
+                    code: 1
+                    error: API key is required
+                invalidKeyFormat:
+                  value:
+                    code: 2
+                    error: Invalid API key format. Key must be 16 alphanumeric characters
+                missingTargets:
+                  value:
+                    code: 7
+                    error: The targets parameter is required
+                invalidTarget:
+                  value:
+                    code: 8
+                    error: Each target must be a single positive integer
+                tooManyTargets:
+                  value:
+                    code: 23
+                    error: Too many targets. Maximum 100 per request.
+        '401':
+          description: The API key is not registered (code 6).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalidKey:
+                  value:
+                    code: 6
+                    error: Invalid API key. Please sign up at ffscouter.com to use this service
+        '403':
+          description: >-
+            Active premium is required (code 19), or the account/faction is banned (codes 4010, 4011).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                premiumRequired:
+                  value:
+                    code: 19
+                    error: Active premium subscription required to use this endpoint
+                accountBanned:
+                  value:
+                    code: 4010
+                    error: >-
+                      Your account is banned from FFScouter. Join the FFScouter Discord if you have any
+                      questions. https://discord.gg/Gzr7Rb3Y5f
+                factionBanned:
+                  value:
+                    code: 4011
+                    error: >-
+                      Your faction is banned from FFScouter. Join the FFScouter Discord if you have any
+                      questions. https://discord.gg/Gzr7Rb3Y5f
+        '429':
+          description: Per-account rate limit exceeded (code 20). 100 requests per minute per account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                rateLimited:
+                  value:
+                    code: 20
+                    error: Rate limit exceeded. Maximum 100 requests per minute per account.
+                    retry_after_seconds: 12
+        '503':
+          description: Flight data is unavailable (code 22).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                unavailable:
+                  value:
+                    code: 22
+                    error: Flight data is currently unavailable.
+                    detail: Flight tracking is disabled.
+      x-laravel-middleware:
+        - premium.api
+        - throttle.player.flights
+
+
+  /api/v1/check-key:
+    get:
+      operationId: checkKey
+      tags: [API Keys]
+      summary: Check whether an API key is registered and premium
+      parameters:
+        - $ref: '#/components/parameters/KeyQuery'
+      responses:
+        '200':
+          description: Key status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckKeyResponse'
+              examples:
+                default:
+                  value:
+                    key: EXAMPLEKEY000000
+                    is_registered: true
+                    registered_at: 1640995200
+                    last_used: 1747333361
+                    policy_version: 2
+                    policy_update_required: false
+                    is_premium: true
+                    premium_expires_at: 1740000000
+                    faction_id: null
+                    faction_premium_expires_at: null
+                    premium_entitlement_source: personal
+                    elimination_team: Conspiracy Theorists
+                    tornstats_integration_enabled: true
+                    tornstats_key_in_place: true
+        '400':
+          description: Missing or invalid API key format (codes 1, 2).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missing:
+                  value:
+                    code: 1
+                    error: API key is required
+                    source: ffscouter
+                badFormat:
+                  value:
+                    code: 2
+                    error: Invalid API key format. Key must be 16 alphanumeric characters
+                    source: ffscouter
+        '403':
+          description: >-
+            The key owner or their faction is banned (codes 4010, 4011). A valid but unknown key
+            returns 200 with is_registered false instead.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                accountBanned:
+                  value:
+                    code: 4010
+                    error: >-
+                      Your account is banned from FFScouter. Join the FFScouter Discord if you have any
+                      questions. https://discord.gg/Gzr7Rb3Y5f
+                factionBanned:
+                  value:
+                    code: 4011
+                    error: >-
+                      Your faction is banned from FFScouter. Join the FFScouter Discord if you have any
+                      questions. https://discord.gg/Gzr7Rb3Y5f
+        '429':
+          description: Rate limit exceeded (code 21). 20 requests per minute per IP address.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                throttled:
+                  value:
+                    code: 21
+                    error: Rate limit exceeded. Please retry shortly.
+                    retry_after_seconds: 12
+      x-laravel-middleware:
+        - 'throttle:20,1'
+
+
+    FlightLeg:
+      type: object
+      properties:
+        takeoff_time:
+          type: integer
+          nullable: true
+        status_description:
+          type: string
+          nullable: true
+        earliest_arrival_time:
+          type: integer
+          nullable: true
+        latest_arrival_time:
+          type: integer
+          nullable: true
+        travel_method:
+          type: string
+        book_likely_being_used:
+          type: boolean
+          nullable: true
+        approx_landing_time:
+          type: integer
+          nullable: true
+
+    FlightResponse:
+      type: object
+      required: [player_id, current, recent_flights]
+      properties:
+        player_id:
+          type: integer
+        current:
+          allOf:
+            - $ref: '#/components/schemas/FlightLeg'
+          nullable: true
+        recent_flights:
+          type: array
+          items:
+            $ref: '#/components/schemas/FlightLeg'
+
+    FlightsBatchResponse:
+      type: object
+      required: [flights]
+      properties:
+        flights:
+          type: array
+          items:
+            type: object
+            required: [player_id, current]
+            properties:
+              player_id:
+                type: integer
+              current:
+                allOf:
+                  - $ref: '#/components/schemas/FlightLeg'
+                nullable: true
+

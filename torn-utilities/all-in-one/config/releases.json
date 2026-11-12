@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.109-dev",
+    "date": "2026-11-12",
+    "securityBundle": true,
+    "changes": {
+      "Features": [
+        "Show personal FFScouter Premium return-flight ETA countdowns beside travel status",
+        "Check premium entitlement on the selected viewer key; cache and batch flight requests privately"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.108-dev",
     "date": "2026-11-12",
     "securityBundle": true,

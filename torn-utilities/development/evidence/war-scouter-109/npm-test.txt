@@ -1,0 +1,137 @@
+
+> test
+> node tests/ffscouter.mjs && node tests/ffscouter-flights.mjs && node tests/war-scouter-ui.mjs && node tests/war-window-navigation.mjs && node tests/armed-healing-inventory.mjs && node tests/native-focus-refresh.mjs && node tests/native-refresh-diagnostic.mjs && node tests/native-clock-sync.mjs && node tests/purchase-departure-readiness.mjs && node tests/return-flight-cleanup.mjs && node tests/direct-purchase.mjs && node tests/direct-trash.mjs && node tests/direct-trash-workflow.mjs && node tests/selected-item-handler.mjs && node tests/data-deletion.mjs && node tests/deletion-storage.mjs && node tests/core-smoke.mjs && node tests/integration.mjs && node tests/compact-presentation.mjs && node tests/diagnostics.mjs && node tests/environment.mjs && node tests/saved-keys.mjs && node tests/performance.mjs && node tests/performance.mjs --with-monitor && node tests/session-lifecycle.mjs && node tests/travel-features.mjs && node tests/travel-dom.mjs && node tests/desktop-travel.mjs && node tests/pda-travel.mjs && node tests/native-item-id.mjs && node tests/startup.mjs && node tests/snatch-diagnostics-drag.mjs && node tests/travel-capacity.mjs && node tests/pda-loader.mjs && node tests/travel-navigation.mjs && node tests/travel-persistence.mjs && node tests/catalog-auth.mjs && node tests/chat-monitor.mjs && node tests/cross-location.mjs && node tests/chat-native-time.mjs && node tests/snatch-options.mjs && node tests/hospitalization-plan.mjs && node tests/travel-inventory-dom.mjs && node tests/before-landing.mjs && node tests/hospital-clock.mjs && node tests/hospital-clock-resume.mjs && node tests/purchase-reconcile-pda.mjs && node tests/purchase-five-retries.mjs && node tests/diagnostic-log-reset.mjs && node tests/hospital-multiple.mjs && node tests/hospital-diagnostics.mjs && node tests/inventory-overview.mjs && node tests/purchase-confirmation-row.mjs && node tests/travel-page-dom.mjs && node tests/travel-agency-inventory.mjs && node tests/item-alert-options.mjs && node tests/retained-snatch-state.mjs && node tests/launcher-tap.mjs && node tests/embedded-item-diagnostics.mjs && node tests/flight-refresh-readiness.mjs && node tests/landing-alarm.mjs && node tests/landing-ui-exit.mjs && node tests/alarm-audio.mjs && node tests/stock-monitor-diagnostics.mjs && node tests/stock-monitor-integrated.mjs && node tests/primary-direct-items.mjs && node tests/post-purchase-choice.mjs && node tests/direct-quick-items.mjs && node tests/travel-request-capture.mjs && node tests/travel-inventory-inspector.mjs && node tests/direct-travel-items.mjs && node tests/snatch-direct-items.mjs && node tests/stepped-native-actions.mjs --primary && node tests/experimental-arm-feedback.mjs --primary && node tests/torn-api-governor.mjs && node tests/credential-store.mjs && node tests/backend-credential-safety.mjs && node tests/backend-registration-budget.mjs && node tests/backend-authorization.mjs && npm run test:foreign-submissions && node tests/backend-submission-budget.mjs && node tests/backend-multiplayer-ownership.mjs && node tests/backend-admin-races.mjs && node tests/backend-observation-integrity.mjs && node tests/session-token-store.mjs && node tests/scoped-api-path.mjs && node tests/submission-delivery.mjs && node tests/api-disclosure.mjs && node tests/agreement-publication.mjs && node tests/agreement-ui.mjs
+
+FFScouter security/cache passed: opt-in; private key use; per-user/key isolation; stale-response rejection; batching/cache; generic errors; cooldown; validation; disable/deletion/auth revocation.
+FFScouter premium flights passed: own-key opt-in, entitlement/policy gate, 100-ID batches, memory cache, return-only validated windows, expiry, credential-free failures/cooldowns, stale-response rejection and disable/auth isolation.
+War Scouter UI passed: inline metrics; numeric FF sorts and unknown ordering; FF ranges; exact Okay filter; both-faction colored-count data; per-key invalidation; consent; no persisted FF values.
+War window navigation passed: previous page hidden; computed minimize visibility; launcher restoration; preserved position/draft; Back/card resume; clean close.
+Armed healing inventory: arm check; post-hospital refresh; persisted run binding; heal POST then verification GET only; missing/changed run and consumed-item rejection; failed post-heal verification stays locked.
+Armed snapshot invalidation passed: observed native mutations, conflicting passive inventory, diagnostic stop and cleared history require re-arming, without a pre-heal GET.
+Async arming race passed: pending inventory blocks actions and canceled preparation cannot resurrect an armed run.
+Native focus refresh: one event; passive inventory-read/cell-change evidence; absent/unchanged/cancelled outcomes; synthetic/inactive/duplicate guards; no direct fetch or mutation; private URLs excluded.
+Native refresh diagnostics: safe non-executing inspection; one numeric itemID POST; ground/status/account guards; AB+ preserved; concurrency, uncertain lock and no retries passed.
+Native clock sync passed: immediate same-second flight/hospital display at off-phase updates, no fixed time subtraction, stable deadline, one alarm, local fallback, visibility resume, irrelevant/self mutation isolation, no API requests and observer cleanup
+Purchase departure readiness passed: no automatic reload/timer/lock, immediate full-inventory return and partial/exhausted departure choices, unchanged intermediate/uncertain behavior and legacy refresh-state cleanup
+Return-flight cleanup passed: source/generated, manual departure, paused Continue step, different stages, changed destination, identity/outbound isolation, refresh and idempotent button/alarm cleanup
+Generated direct purchase workflow passed: six trusted transactions, stale-stock gate and verified separate return stage
+Direct purchase passed: captured GET contract; variable capacity/funds/stock; initial plus five partial-fill remainders; exact item/amount/price inventory proof; gesture, cancellation, identity, uncertainty and reload guards; no native purchase or automatic retry
+Purchase notification passed: verified cumulative quantity/total capacity, single popup, three-second timer reset, no uncertain success and tool-exit cleanup
+Purchase slot badges passed: explicit numbered mapping in column-order DOM, green marks absent including saved-state migration, red marks retained only for unfilled targets, unrelated/decorative preservation, remount restoration, ambiguity rejection and noninteractive cleanup
+Direct Trash passed: captured POST contract, selected-only one-item gestures, continuation, verified capacity, unrelated-item preservation, acceptance/identity/state guards, partial failures, reload locks and no native fallback/retry
+Generated destruction workflow passed: accepted selection, one handler trash per trusted click, remaining-item continuation, no early buy, capacity credit and unselected-item preservation
+Selected-item handler passed: Morphine, first-aid, Neumune, all eight filled blood bags and arbitrary selected type IDs use one direct handler POST; unavailable selections, identity conflicts, synthetic clicks and native item routing are rejected; partial healing remains hospitalized
+Data deletion: SQL isolation, foreign failures, retries, receipt recovery, session/seat revocation, independent provenance, limiter cleanup and truthful local completion passed
+Deletion storage passed: legacy key encodings, private/origin copies, other-account preservation, closed-tab sessions, failed deletion and late-write prevention
+TU core smoke tests passed
+Integration checks passed: 179
+Compact presentation passed: single baseline conversion, 75% spacing/type, readable minima, unchanged geometry/calculation values, shared headers, existing controls and touch exceptions
+TU Test regression checks passed: catalog coverage, redaction, build/host isolation, evidence gates, UI, exports and blocked networking
+Environment detection checks passed: Android/PDA, iOS/iPad desktop mode, Windows/Edge, host versions, Client Hints, unavailable values and editable autofill
+Saved-key regression checks passed: per-key levels, legacy migration, multiple keys, explicit selection, reload, account isolation, targeted removal and stale GM fallback
+Private Manager credential integration passed: migration, empty masked DOM fields, trusted reveal/hide, key addition and private reload
+Separate FFScouter keys passed: masked list, custom/full support, verified same-owner save, no fallback or pre-consent provider calls, private persistence/reload, role separation and removal.
+{
+  "fixture": "20 unrelated Torn DOM updates with Travel open; monitors=0",
+  "churn": {
+    "rootLookups": 0,
+    "layoutReads": 0,
+    "itemScans": 0,
+    "headerStyleWrites": 0
+  },
+  "idle": {
+    "rootLookups": 0,
+    "layoutReads": 0,
+    "itemScans": 0,
+    "headerStyleWrites": 0
+  }
+}
+{
+  "fixture": "20 unrelated Torn DOM updates with Travel open; monitors=1",
+  "churn": {
+    "rootLookups": 0,
+    "layoutReads": 0,
+    "itemScans": 1,
+    "headerStyleWrites": 0
+  },
+  "idle": {
+    "rootLookups": 0,
+    "layoutReads": 0,
+    "itemScans": 1,
+    "headerStyleWrites": 0
+  }
+}
+Session lifecycle checks passed: warm navigation, bounded rechecks, cached full text, version changes, expiry/revocation, no idle polling and scoped observation
+Travel features passed: minimized alarms, reversible filtering, gestures, native Max/Buy, confirmed heal/purchase/return, stale stock, focus, expiry and cleanup
+Travel DOM diagnostics passed: passive multi-click monitoring, async popup DOM, Stop cleanup, resume, ring buffer; blocked gameplay clicks, confirmation context, redaction, limits, same-tab persistence, Escape and clear
+Desktop travel passed: captured slots/popovers, matching Yes controls, native Max/text input, inventory purchase proof, Travel home/Back/Continue, explicit stage clicks, cancellation and blood-type isolation
+Desktop integrated bundle and rejection cases passed: host metadata, arming, exact confirmations, re-hospitalization and clean teardown
+Return regression passed: pre-existing empty panel, delayed question, single home/booking click and automatic flight advance
+PDA travel passed: captured Morphine/Yes, compact panel expansion, visible Max/Buy/Yes, hidden-field isolation, quantity/item checks, cancellation, inventory proof and full bridge-backed generated bundle
+Native item identity passed: legacy names, explicit-ID mismatch, exact names and ambiguous-row rejection
+Startup passed: pre-BODY PDA injection, delayed tool registration, duplicate injection and offscreen saved launcher coordinates
+Snatch diagnostics/drag passed: red and green dragging, persisted coordinates, no drag-release action, function/native-step/error timeline, redaction and Stop cleanup
+Travel capacity passed: freed medical slot, direct maximum and clamped 17 plus verified 1, stock/funds changes, unknown second result without retry, fresh/ghost inventory, remaining items, cash limits, stock limits and no-hospital purchase
+PDA loader passed: official wrapper/storage binding/quote normalization, reproduced old syntax error, normal and pre-BODY startup, visible launcher and ten registered tools
+Travel navigation passed: country-only labels, foreign/Torn filtering, repeated active-card resume, launcher/planner restore, unsaved fields and armed-flow preservation
+Travel persistence passed: full document reload, monitor resume after authorization, minimized UI, selections/drafts retained, no auto-arm and explicit exit
+Cold desktop catalog passed: Public Only login via Manager transport, no PDA key/raw key export, cached reopen
+Chat behavior passed: native timestamp evidence, no invented time, jump vs prepend, passive redacted recording and Stop cleanup
+Cross-location monitor passed: item identity across categories/countries and reversible empty-filter explanation
+Native chat time passed: M'AOL React createdAt, UTC/ms/source, identity rejection, ambiguity, getters/secrets, cycles and repeated-text virtualized private messages
+Snatch options passed: warning acceptance/decline, red/green overlay cleanup, heal/destroy/buy/return click order, exact native Trash confirmations, duplicates, home-inventory exclusion and partial-stop guards
+Hospitalization planning passed: pre-stock trusted click, confirmed hospital wait, stock-to-heal, already-stocked skip, native Use/Yes and stock-race No cancellation
+Travel inventory DOM passed: rejected inventory APIs cannot hide current carried items, both dropdowns, grouped quantities, no fake IDs, empty slots and home-item exclusion
+Before-landing passed: named-item prompt, decline, fresh flight/player verification, no queued duplicate, transient authorization and native Use/Yes hospital proof
+Hospital clock passed: seconds/ms deadline, flight-time exclusion, anchored native labels, local one-second text-only ticks, zero/unknown handling and timer cleanup
+Hospital clock resume passed: one bounded lookup restores missing deadline, unknown does not poll, and safe structured evidence exports without recording
+PDA reconciliation passed: captured compact panel, native 17 first, fresh panel for 1 remaining, exact Yes quantity and no capacity overflow
+Five-retry purchases passed: actual compiled stepped adapter, two freed medical slots, transient row, six bounded purchases, exact funds limits and one native action per gesture
+Diagnostic reset passed: update clears mixed-version evidence, preserves monitoring/settings/run/pending-use lock, and excludes TU self-mutations
+Multiple hospital items passed: selection persistence, live carried availability, MM:SS placement, accelerating blink, independent threshold sound, single-click extension guard, uncertain-result no replay and partial heal
+Hospital diagnostic evidence passed: configured/armed thresholds, rearm mismatch, shared volume, selected/carried counts, event threshold and seconds, dispatch vs audible proof, safe input allowlist, .66 fallback and navigation persistence
+Inventory overview passed: total/used/free, item slot counts, heal/hospitalization/destruction annotations, no speculative frees, selection-only repaint, baseline rebuild and refresh invalidation
+Purchase confirmation row passed: missing row is unknown stock, exact question and price survive replacement, real zero stock/cash drop/price increase cancel via No without submitting
+Automatic travel page DOM passed: no-click agency inventory/search/destination capture, late mounting, mutation refresh, unchanged deduplication, Stop cleanup, persistence, bounds and private content exclusion
+Travel Agency inventory passed: captured 0-item panel yields 18 active free slots, three decorative cells excluded, simulated carried item counted, incomplete numbering rejected
+Per-item alerts passed: legacy defaults, independent visual/audio controls, stopping muted sounds, silent filtering and Snatch readiness, border gating, edit preservation and reload persistence
+Retained Snatch state passed: post-run export without recording, capacity arithmetic, missing/malformed state and strict field allowlist
+Launcher tap passed: click-only activation, pointer/touch containment, near-position ghost-click cancellation, unrelated controls, drag suppression, keyboard activation and guard expiry
+Embedded Item Monitor diagnostics passed: separate menu, automatic start, deferred action persistence, minimize/Back/navigation continuity, Stop/restart/export, system info, privacy and exit cleanup
+Flight refresh readiness passed: restored outbound route, destination/return guards, focus recovery and confirmation
+Landing alarm passed: local seconds, optional enable, threshold, Chime default, once-per-flight/refresh, later trip, visual cleanup, return/unknown/zero exclusions
+Landing UI and armed exit passed: settings persistence, Chime default, one master volume slider, minimize preserves sequence, confirmed exit cleans up
+Alarm audio passed: finite deadline, until-muted repeat, bounded scheduling, master volume per batch, independent mute and resource cleanup
+Stock diagnostics passed: quantity/threshold evidence, skipped-focus observation, coalescing/heartbeat, dispatch state, strict fields, deferred persistence, reload provenance and independent bounded history
+Integrated stock evidence passed: threshold miss, unfocused refill visibility, resumed engine/alarm dispatch, unarmed rejection, muted alert, independent export and Stop
+Primary DEV direct workflow integration passed: startup, standard settings, diagnostics, removed standalone Direct Item Tools section, preserved integrated handlers/diagnostics and clean lifecycle
+Post-purchase choice passed: confirmed free-space accounting, automatic prompt, manual close, first departure step, full inventory, unknown capacity, restored choice and cancellation
+Direct Quick Items test passed: explicit consent/gesture, personal scope, exact POST, token exclusion, duplicate protection, no follow-ups/retries, result/uncertainty handling and reload lock
+Travel request capture passed: passive fetch/XHR, native-action correlation, exact pass-through, strict secret/chat exclusions, stop restoration and same-tab resume with build provenance
+Travel inventory inspection passed: GET only, bounded identity discovery, ambiguous mappings disabled, secret exclusion, typed consumption flags and separate release evidence
+Direct travel pilot passed: exact one-use POST, reused-slot rejection, consent/cancellation, duplicate/reload locks, separate release evidence and failed inventory checks
+Snatch direct integration passed: original trusted gesture, multi-item selection, one request, partial heal, verified release, extension/flight, exact capacity credit, uncertain status blocking and native return delegation
+Stepped native actions passed: one Torn click per gesture, next-step labels, cancellation, synthetic-click rejection and actual transformed return flow
+Experimental arming feedback passed: visible pre-departure explanation, pending state and restored button
+Torn API governor passed: shared budget, persistent invalid/disabled key suspension, explicit revalidation, cooldown, no gameplay interception and GM/fetch coverage
+Credential store passed: verified private migration, legacy/role/ring preservation, reload/removal, no raw origin keys, failure safety and explicit PDA fallback
+DEV Worker credential safety passed: exact key validation, bounded bodies, safe error classes, rate-limit/outage distinction, header-only keys, hashed sessions, DB canaries and generic-error redaction
+Backend budget passed: concurrent/global/key/IP limits, rolling expiry, alarm cleanup, bounded hashed state, fail-closed verification and private-route authorization
+Backend authorization passed: session expiry/revocation/status, agreement/permissions, admin denial, own-session scope and server-bound Tic-Tac-Toe identity/token ownership
+
+> test:foreign-submissions
+> node tests/foreign-submission-transport.mjs && node scripts/build-dev.mjs --preview-foreign-submission-auth=/tmp/tu-foreign-auth-preview.user.js && node tests/foreign-submission-preview.mjs
+
+Foreign submission transport passed: exact DEV routes, session headers, header formats, authentication requirement and unrelated endpoints untouched
+Unpublished DEV preview: /tmp/tu-foreign-auth-preview.user.js
+Unpublished preview passed: real integrated Item Monitor authenticates queued stock reporting through PDA POST, GM and fetch; default release untouched
+Submission budget passed: per-account/IP/global concurrent limits, rolling expiry and cleanup
+All multiplayer ownership passed: verified seats, own-room denial, concurrent join serialization, token/account binding and fail-closed legacy rooms
+Admin mutation races passed against SQLite: stale target status/role and revoked actor authority cannot overwrite concurrent changes; permission insert/upsert work
+Observation integrity passed against SQLite: ambiguous timestamp buckets excluded consistently from history, restock events and overview
+Session storage passed: verified private migration, token-free origin cache, reload/clear, failure isolation and explicit PDA fallback
+Scoped API reads passed: exact used endpoints; traversal, alternate scopes, fragments and query credentials rejected
+Submission delivery passed: enforced persistent retry deadline, no alternate transport on HTTP failure, auth signal, exact receipt IDs and idempotent network fallback
+Agreement disclosures passed: all approved tables, host storage notice, wrapped Markdown, safe links/literal HTML and missing-content rejection
+Agreement publication passed: immutable history, new-version reacceptance, stale rejection, idempotency, module denial until accepted and cancellation
+Agreement UI passed: wrapped tables/links, both key-entry surfaces, explicit acceptance only, loading/decline gates and stale-consent rejection

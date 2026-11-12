@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU War Organizer
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.3.22-dev
+// @version      0.3.23-dev
 // @description  Compact War Organizer target board and reservation design preview
 // @match        https://www.torn.com/*
 // @grant        none
@@ -15,7 +15,7 @@ const ID='war-hit-organizer',STORE='tu:who:state:v2',LOGO="data:image/webp;base6
 let root=null,ctx=null,stylesheet=null,lastUserScroll=0,rosterTimer=null,rosterEpoch=0,rosterLoading=false,rosterError='',rosterUpdated=0,ownOnline=null,enemyOnline=null,rosterFaction='',tab='targets',filter='all',query='',sort='release',expanded='',message='',poll=null;
 let state={};try{state=JSON.parse(localStorage.getItem(STORE)||'{}')}catch{}
 state.targets=state.targets||{};state.reservations=state.reservations||{};state.reservationLimit=Number(state.reservationLimit||state.hits||1);state.reservationTimer=Number(state.reservationTimer||5);
-let ownStatusCounts=null,enemyStatusCounts=null,scouterRows={},scouterScope=null,scouterEpoch=0,scouterPending=false,scouterEnabled=false,scouterAvailable=false,scouterError='',scouterConfirmed=false;
+let ownStatusCounts=null,enemyStatusCounts=null,scouterRows={},scouterScope=null,scouterEpoch=0,scouterPending=false,scouterEnabled=false,scouterAvailable=false,scouterError='',scouterConfirmed=false;let flightRows={},flightEpoch=0,flightPending=false,flightPremium=null,flightError='';
 sort=['release','level','name','ff-asc','ff-desc'].includes(state.sort)?state.sort:'release';filter=['all','hospital','okay','open','reserved'].includes(state.statusFilter)?state.statusFilter:'all';let ffDraftMin=String(state.ffMin??''),ffDraftMax=String(state.ffMax??'');
 const save=()=>localStorage.setItem(STORE,JSON.stringify(state));
 const el=(tag,parent,txt,cls)=>{const x=document.createElement(tag);if(txt!==undefined)x.textContent=txt;if(cls)x.className=cls;if(parent)parent.append(x);return x};
@@ -28,7 +28,7 @@ const isAdmin=()=>false; // Remote moderator/organizer roles not implemented; ne
 const format=(n)=>Number.isFinite(Number(n))?Number(n).toLocaleString():'—';
 const formatCountdown=s=>String(Math.floor(Math.max(0,s)/60)).padStart(2,'0')+':'+String(Math.max(0,s)%60).padStart(2,'0');
 const seconds=(t)=>{if(!t)return null;const v=typeof t==='number'?t:Date.parse(t)/1000;return Number.isFinite(v)?Math.ceil(v-Date.now()/1000):null};
-function close(){scouterEpoch++;scouterRows={};scouterScope=null;scouterPending=false;scouterEnabled=false;scouterAvailable=false;scouterConfirmed=false;scouterError='';window.removeEventListener('tu-player-updated',identityChanged);window.removeEventListener('tu-who-key-changed',scouterChanged);window.removeEventListener('storage',scouterStorage);rosterEpoch++;if(rosterTimer)clearTimeout(rosterTimer);rosterTimer=null;if(poll)clearInterval(poll);poll=null;root?.remove();stylesheet?.remove();stylesheet=null;root=null;ctx=null}
+function close(){clearFlights();scouterEpoch++;scouterRows={};scouterScope=null;scouterPending=false;scouterEnabled=false;scouterAvailable=false;scouterConfirmed=false;scouterError='';window.removeEventListener('tu-player-updated',identityChanged);window.removeEventListener('tu-who-key-changed',scouterChanged);window.removeEventListener('storage',scouterStorage);rosterEpoch++;if(rosterTimer)clearTimeout(rosterTimer);rosterTimer=null;if(poll)clearInterval(poll);poll=null;root?.remove();stylesheet?.remove();stylesheet=null;root=null;ctx=null}
 function membersOf(data){const raw=data?.members??data?.faction?.members??[];return Array.isArray(raw)?raw:Object.entries(raw||{}).filter(([id,v])=>/^\d+$/.test(id)&&v&&typeof v==='object').map(([id,v])=>({...v,id:v.id||Number(id)}))}
 function activityOf(m){const a=String(m.last_action?.status||'').toLowerCase();return a==='online'?'Online':a==='idle'?'Idle':a==='offline'?'Offline':'Unknown'}
 function onlineCount(members){return members.filter(m=>activityOf(m)==='Online').length}
@@ -105,13 +105,31 @@ function paintScouter(){
  const text=scouterError||(!scouterAvailable?'Choose and confirm your FFScouter key in Settings.':!scouterEnabled?'FFScouter off · enable for your key in Settings.':scouterPending?'Checking FFScouter…':scouterConfirmed?'FFScouter confirmed for your selected key.':'FFScouter has not confirmed this key.');
  for(const status of root.querySelectorAll('[data-scouter-status]'))status.textContent=text;
  const valid=root.querySelector('[data-scouter-valid]'),confirmed=root.querySelector('[data-scouter-confirmed]');for(const [node,ok,label] of [[valid,scouterAvailable,'Valid Key'],[confirmed,scouterEnabled&&scouterConfirmed,'FFScouter Confirmed']])if(node){node.dataset.valid=String(ok);node.textContent=(ok?'● ':'● ')+label+': '+(ok?'Yes':'No');}
+ paintFlights();
 
 }
-function scouterChanged(){scouterEpoch++;scouterPending=false;scouterRows={};scouterScope=null;scouterEnabled=false;scouterAvailable=false;scouterConfirmed=false;scouterError='';if(root)render();if(root&&!root.hidden)void refreshScouter();}
+function clearFlights(){flightEpoch++;flightRows={};flightPending=false;flightPremium=null;flightError='';paintFlights();}
+function paintFlights(){
+ if(!root)return;const now=Date.now()/1000;
+ for(const node of root.querySelectorAll('[data-flight-id]')){const id=node.dataset.flightId,value=flightRows[id],travel=/^travel(?:l)?ing$/i.test(state.targets[id]?.status||'');const show=state.mode!=='offline'&&scouterEnabled&&flightPremium===true&&travel&&value&&value.latest>now&&value.validUntil>Date.now();node.hidden=!show;if(!show){node.textContent='';continue;}
+  const early=formatCountdown(Math.ceil(value.earliest-now)),late=formatCountdown(Math.ceil(value.latest-now));node.textContent='ETA '+(value.earliest===value.latest?late:early+'–'+late);node.title='FFScouter Premium · returning to Torn · estimated arrival '+new Date(value.earliest*1000).toLocaleTimeString()+' – '+new Date(value.latest*1000).toLocaleTimeString();
+ }
+ for(const node of root.querySelectorAll('[data-flight-status]'))node.textContent=state.mode==='offline'?'Offline mode — premium flight requests paused.':flightError||(!scouterEnabled?'Premium return-flight ETA requires FFScouter opt-in.':flightPremium===false?'Return-flight ETA requires active FFScouter Premium on your own key.':flightPremium===true?'Personal premium return-flight ETA · estimated arrival window.':flightPending?'Checking personal premium flight access…':'Personal premium return-flight ETA appears for current return trips when available.');
+}
+async function refreshFlights(){
+ if(flightPending||!scouterEnabled||!root||root.hidden||state.mode==='offline'||!window.TornUtilities?.requestWhoScouterFlights)return;
+ const ids=Object.keys(state.targets).filter(id=>/^travel(?:l)?ing$/i.test(state.targets[id]?.status||''));if(!ids.length){flightRows={};paintFlights();return;}
+ const ticket=++flightEpoch,scope=scouterScope;flightPending=true;paintFlights();
+ try{const data=await window.TornUtilities.requestWhoScouterFlights(ids);if(ticket!==flightEpoch||scope!==scouterScope||data.scope!==scope||!scouterEnabled||!root)return;flightRows=Object.fromEntries(data.rows.map(row=>[String(row.playerId),row]));flightPremium=data.premium===true;flightError='';}
+ catch(error){if(ticket===flightEpoch){flightRows={};flightPremium=null;flightError=error.message||'Premium flight data unavailable.';}}
+ finally{if(ticket===flightEpoch){flightPending=false;paintFlights();}}
+}
+function scouterChanged(){clearFlights();scouterEpoch++;scouterPending=false;scouterRows={};scouterScope=null;scouterEnabled=false;scouterAvailable=false;scouterConfirmed=false;scouterError='';if(root)render();if(root&&!root.hidden)void refreshScouter();}
 function identityChanged(){ownStatusCounts=null;ownOnline=null;rosterEpoch++;rosterLoading=false;scouterChanged();if(root&&!root.hidden)startRoster();}
 async function refreshScouter(){
  if(scouterPending||!root||root.hidden)return;const api=window.TornUtilities;if(!api?.getWhoScouterState)return;const ticket=++scouterEpoch;scouterPending=true;
- try{const context=await api.getWhoScouterState();if(ticket!==scouterEpoch||!root)return;if(context.scope!==scouterScope){scouterRows={};scouterScope=context.scope;paintScouter();}scouterAvailable=context.available;scouterEnabled=context.enabled;scouterConfirmed=context.confirmed===true;scouterError='';if(state.mode==='offline'){scouterEnabled=false;scouterRows={};scouterError='Offline mode — FFScouter requests paused.';return;}if(!context.enabled){scouterRows={};return;}
+ try{const context=await api.getWhoScouterState();if(ticket!==scouterEpoch||!root)return;if(context.scope!==scouterScope){clearFlights();scouterRows={};scouterScope=context.scope;paintScouter();}scouterAvailable=context.available;scouterEnabled=context.enabled;scouterConfirmed=context.confirmed===true;scouterError='';if(state.mode==='offline'){clearFlights();scouterEnabled=false;scouterRows={};scouterError='Offline mode — FFScouter requests paused.';return;}if(!context.enabled){clearFlights();scouterRows={};return;}
+  void refreshFlights();
   const ids=Object.keys(state.targets);if(!ids.length&&context.viewerId)ids.push(String(context.viewerId));if(!ids.length)return;const data=await api.requestWhoScouter(ids);if(ticket!==scouterEpoch||!root||data.scope!==scouterScope)return;const next=Object.fromEntries(data.rows.map(row=>[String(row.playerId),row])),changed=JSON.stringify(next)!==JSON.stringify(scouterRows);scouterRows=next;const checked=await api.getWhoScouterState();if(ticket!==scouterEpoch||!root)return;scouterConfirmed=checked.confirmed===true;
   if(changed&&(sort.startsWith('ff-')||ffRange().min!==null||ffRange().max!==null)&&!root.hidden)render();else paintScouter();
  }catch(error){if(ticket===scouterEpoch){scouterRows={};scouterConfirmed=false;scouterError=error.message||'FFScouter estimates unavailable.';}}
@@ -133,13 +151,14 @@ function scouterSettings(parent){
  el('p',details,'Optional: send only your selected FFScouter key and target player IDs directly to FFScouter. FF is personalized and is not shared with other TU users. Estimates are cached in memory for up to ten minutes. FFScouter may log your IP address, retain registered keys/private stats, and use battle/personal stats for AI training. Registration requires provider-approved permissions; a TU public-only key is insufficient.','who-hint');
  const links=el('p',section,undefined,'who-ff-links');for(const [label,url] of [['API Guidance','https://ffscouter.com/api-docs/guidance'],['Data Policy','https://ffscouter.com/#data-policy'],['Privacy Policy','https://ffscouter.com/privacy'],['Support FFScouter','https://ffscouter.com/premium']]){const a=el('a',links,label);a.href=url;a.target='_blank';a.rel='noopener noreferrer';}
  const label=el('label',section,undefined,'who-ff-consent'),toggle=el('input',label);toggle.type='checkbox';toggle.id='tu-who-ff-consent';toggle.dataset.scouterConsent='1';toggle.checked=scouterEnabled;label.append(document.createTextNode(' I have reviewed the current FFScouter API guidance/data policy and allow my selected FFScouter key and target IDs to be sent for confirmation and estimates.'));
+ el('p',section,'Premium return-flight ETA is personal to your selected key. Travel target IDs are checked in batches; flight data stays in memory and is never shared. Arrival windows are estimates, not guaranteed landing times.','who-hint');const flightInfo=el('p',section,'','who-hint');flightInfo.dataset.flightStatus='1';
  const info=el('p',section,'','who-hint');info.dataset.scouterStatus='1';info.setAttribute('role','status');
- toggle.onchange=async event=>{toggle.disabled=true;try{const result=await window.TornUtilities.setWhoScouterEnabled(toggle.checked,event);scouterEpoch++;scouterPending=false;scouterRows={};scouterScope=result.scope;scouterEnabled=result.enabled;scouterAvailable=result.available;scouterConfirmed=result.confirmed===true;scouterError='';void refreshScouter();}catch(error){toggle.checked=false;scouterError=error.message;}finally{toggle.disabled=false;paintScouter();}};
+ toggle.onchange=async event=>{toggle.disabled=true;try{const result=await window.TornUtilities.setWhoScouterEnabled(toggle.checked,event);clearFlights();scouterEpoch++;scouterPending=false;scouterRows={};scouterScope=result.scope;scouterEnabled=result.enabled;scouterAvailable=result.available;scouterConfirmed=result.confirmed===true;scouterError='';void refreshScouter();}catch(error){toggle.checked=false;scouterError=error.message;}finally{toggle.disabled=false;paintScouter();}};
  void loadKeys();paintScouter();
 }
 
 function ffControls(parent){
- const providerStatus=el('p',parent,'','who-hint');providerStatus.dataset.scouterStatus='1';providerStatus.setAttribute('role','status');
+ const providerStatus=el('p',parent,'','who-hint');providerStatus.dataset.scouterStatus='1';providerStatus.setAttribute('role','status');const flightStatus=el('p',parent,'','who-hint');flightStatus.dataset.flightStatus='1';
  const range=ffRange(),details=el('details',parent,undefined,'who-ff-filters');details.open=!!state.ffFiltersOpen;const summary=el('summary',details,'FF filter'+(range.min!==null||range.max!==null?' · '+(range.min??'Any')+' – '+(range.max??'Any'):' · All'));details.ontoggle=()=>{state.ffFiltersOpen=details.open;save();};
  const fields=el('div',details,undefined,'who-ff-fields'),min=field(fields,'Minimum FF',ffDraftMin,'number'),max=field(fields,'Maximum FF',ffDraftMax,'number');for(const input of [min,max]){input.min='0';input.max='10000';input.step='0.01';}min.oninput=()=>ffDraftMin=min.value;max.oninput=()=>ffDraftMax=max.value;
  const status=el('small',details,'Targets without an FF value are hidden while an FF range is active.','who-hint');
@@ -179,7 +198,7 @@ const health=el('div',left,undefined,'who-health');el('small',health,'L'+(t.leve
 const bar=el('div',left,undefined,'who-bar');const fill=el('div',bar);fill.dataset.hpBar=id;fill.style.width='0%';paintHealth(id);
 const right=el('div',row,undefined,'who-right'),status=el('div',health,undefined,'who-status');
 const rem=seconds(t.releaseAt),hospital=t.status==='Hospital'&&rem!==null;
-el('span',status,hospital?'Hosp':(t.status||'Unknown'));
+el('span',status,hospital?'Hosp':(t.status||'Unknown'));const eta=el('span',status,'','who-flight-eta');eta.dataset.flightId=id;eta.hidden=true;
 if(hospital){const clock=el('span',status,formatCountdown(rem),'who-countdown');clock.dataset.releaseAt=String(t.releaseAt);clock.style.cssText='font-variant-numeric:tabular-nums;font-weight:700;margin-left:6px;color:'+(rem>0&&rem<=state.reservationTimer?'#8fe0a8':'#f0b85c');clock.title='Time until hospital release';}
 const activity=el('span',status,undefined,'who-dot '+({online:'online',idle:'idle',offline:'offline'}[String(t.activity||'').toLowerCase()]||'unknown'));activity.title=t.activity||'Unknown';
 const r=state.reservations[id];btn(right,r?r.name:'Reserve',()=>r?promptRelease(id,r):reserve(id,t),r?'who-reserved':'who-reserve');const reserveButton=right.lastElementChild;reserveButton.dataset.targetId=id;reserveButton.disabled=false;
@@ -279,12 +298,15 @@ stylesheet=document.createElement('style');stylesheet.textContent=`
 #tu-who-panel .who-ff-links a{color:#f0ce77}
 #tu-who-panel .who-ff-consent{display:flex;gap:8px;align-items:flex-start;line-height:1.45}
 #tu-who-panel .who-scouter-settings .who-ff-consent input{width:22px;min-width:22px;height:22px;flex-shrink:0;margin:0}
+#tu-who-panel .who-health .who-status{flex-wrap:wrap;min-width:0;white-space:normal}
+#tu-who-panel .who-flight-eta{color:#7fc8ff;white-space:nowrap;font-variant-numeric:tabular-nums}
+#tu-who-panel .who-flight-eta[hidden]{display:none!important}
 `;document.head.append(stylesheet);
 const grip=document.createElement('div');grip.className='who-resize-grip';grip.title='Resize window';grip.style.cssText='position:absolute;right:0;bottom:0;width:25px;height:25px;z-index:5;cursor:nwse-resize;touch-action:none;background:linear-gradient(135deg,transparent 50%,#a58a48 52%,#a58a48 58%,transparent 60%,transparent 72%,#a58a48 74%)';root.append(grip);
 const beginGesture=(e,resize)=>{if(e.button!==undefined&&e.button!==0)return;if(!resize&&e.target.closest('button,a,input,select'))return;const rect=root.getBoundingClientRect(),startX=e.clientX,startY=e.clientY,startW=rect.width,startH=rect.height,startL=rect.left,startT=rect.top;const handle=resize?grip:root.querySelector('.who-header');handle.setPointerCapture(e.pointerId);const move=ev=>{const dx=ev.clientX-startX,dy=ev.clientY-startY;if(resize){root.style.width=Math.max(300,Math.min(window.innerWidth-startL,startW+dx))+'px';root.style.height=Math.max(260,Math.min(window.innerHeight-startT,startH+dy))+'px'}else{root.style.left=Math.max(0,Math.min(window.innerWidth-80,startL+dx))+'px';root.style.top=Math.max(0,Math.min(window.innerHeight-46,startT+dy))+'px'}};const done=()=>{handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',done);handle.removeEventListener('pointercancel',done)};handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',done);handle.addEventListener('pointercancel',done)};
 root.addEventListener('pointerdown',e=>{if(e.target===grip)beginGesture(e,true);else if(e.target.closest('.who-header'))beginGesture(e,false)});
-root.addEventListener('touchmove',()=>{lastUserScroll=Date.now()},{passive:true});root.addEventListener('wheel',()=>{lastUserScroll=Date.now()},{passive:true});document.body.append(root);render();showOrganizer();startRoster();poll=setInterval(()=>{if(!root||root.hidden||tab!=='targets')return;for(const clock of root.querySelectorAll('.who-countdown')){const remaining=seconds(Number(clock.dataset.releaseAt));if(remaining===null)continue;clock.textContent=formatCountdown(remaining);clock.style.color=remaining>0&&remaining<=state.reservationTimer?'#8fe0a8':'#f0b85c';}for(const button of root.querySelectorAll('.who-reserve')){const id=button.dataset.targetId;if(id&&state.targets[id])button.disabled=false;}},1000);
+root.addEventListener('touchmove',()=>{lastUserScroll=Date.now()},{passive:true});root.addEventListener('wheel',()=>{lastUserScroll=Date.now()},{passive:true});document.body.append(root);render();showOrganizer();startRoster();poll=setInterval(()=>{if(!root||root.hidden||tab!=='targets')return;paintFlights();for(const clock of root.querySelectorAll('.who-countdown')){const remaining=seconds(Number(clock.dataset.releaseAt));if(remaining===null)continue;clock.textContent=formatCountdown(remaining);clock.style.color=remaining>0&&remaining<=state.reservationTimer?'#8fe0a8':'#f0b85c';}for(const button of root.querySelectorAll('.who-reserve')){const id=button.dataset.targetId;if(id&&state.targets[id])button.disabled=false;}},1000);
 }
-function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.22-dev',activate,resume,deactivate:close})}
+function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.23-dev',activate,resume,deactivate:close})}
 if(window.TornUtilities)register();else window.addEventListener('torn-utilities-ready',register,{once:true});
 })();
