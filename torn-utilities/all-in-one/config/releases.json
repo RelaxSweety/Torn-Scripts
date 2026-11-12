@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.104-dev",
+    "date": "2026-11-12",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Fix War Organizer minimize and launcher restoration",
+        "Hide the previous TU page when opening War Organizer"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.103-dev",
     "date": "2026-11-12",
     "securityBundle": true,

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities DEV (All-in-One)
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.103-dev
+// @version      0.5.42.104-dev
 // @description  Integrated TU development bundle for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -49,10 +49,10 @@
   const rawManagerFetch=window.fetch.bind(window);
   const fetch=(input,options)=>apiGovernor.fetch(input,options,rawManagerFetch);
   const managerHttp=rawManagerHttp?details=>apiGovernor.request(details,rawManagerHttp):null;
-  const TU_VERSION='0.5.42.103-dev';
+  const TU_VERSION='0.5.42.104-dev';
   const TU_LOGO='__TU_LOGO_DATA_URL__';
   // Bundled tool directory: no external catalog, cache, or refresh requests.
-  const registry={schemaVersion:1,categories:[{"id":"business","name":"Business Tools","icon":"▥","order":10},{"id":"games","name":"Games","icon":"♜","order":20},{"id":"single-player","name":"Single Player","icon":"▣","order":21,"parent":"games"},{"id":"multiplayer","name":"Multiplayer","icon":"♟","order":22,"parent":"games"},{"id":"chat","name":"Chat Tools","icon":"◉","order":30},{"id":"other","name":"War Tools","icon":"⚙","order":40}],modules:[{"id":"flight-game","name":"Flight Game","category":"single-player","version":"0.12.8","description":"Standalone Flight Game arcade module, playable anytime"},{"id":"stick-fighter","name":"Stick Fighter","category":"single-player","version":"0.2.7","description":"Standalone Stick Fighter arcade module, playable anytime"},{"id":"chat-archiver","name":"Chat Archiver","category":"chat","version":"0.1.8","description":"Archive Torn chat conversations"},{"id":"tic-tac-toe","name":"Tic-Tac-Toe","category":"multiplayer","version":"0.6.5","description":"Two-player Tic-Tac-Toe with named winners, green winning line, rematches and head-to-head history"},{"id":"torn-four","name":"Torn Four","category":"multiplayer","version":"0.2.5","description":"Connect Four: two-player multiplayer with private room codes"},{"id":"torn-fleet","name":"Torn Fleet","category":"multiplayer","version":"0.2.5","description":"Battleship: fleet placement and turn-based naval combat"},{"id":"torn-snake","name":"Slithering Streets","category":"single-player","version":"0.2.14","description":"Single-player Snake with touch controls and local high scores"},{"id":"chaos-marbles","name":"Chaos Marbles","category":"multiplayer","version":"0.2.5","description":"Online 2\u20134 player marble race with private player sessions, Waiting for Chaos staging, and game history"},{"id":"item-monitor","name":"Travel Assistant and Item Monitor","category":"business","version":"1.10.31-dev","description":"Item Monitor and Travel Assistant with D1 stock reporting, source diagnostics and stock estimation"},{"id":"war-hit-organizer","name":"War Organizer","category":"other","version":"0.3.17-dev","description":"Compact war target board, reservation controls, timer and local development settings"}]};
+  const registry={schemaVersion:1,categories:[{"id":"business","name":"Business Tools","icon":"▥","order":10},{"id":"games","name":"Games","icon":"♜","order":20},{"id":"single-player","name":"Single Player","icon":"▣","order":21,"parent":"games"},{"id":"multiplayer","name":"Multiplayer","icon":"♟","order":22,"parent":"games"},{"id":"chat","name":"Chat Tools","icon":"◉","order":30},{"id":"other","name":"War Tools","icon":"⚙","order":40}],modules:[{"id":"flight-game","name":"Flight Game","category":"single-player","version":"0.12.8","description":"Standalone Flight Game arcade module, playable anytime"},{"id":"stick-fighter","name":"Stick Fighter","category":"single-player","version":"0.2.7","description":"Standalone Stick Fighter arcade module, playable anytime"},{"id":"chat-archiver","name":"Chat Archiver","category":"chat","version":"0.1.8","description":"Archive Torn chat conversations"},{"id":"tic-tac-toe","name":"Tic-Tac-Toe","category":"multiplayer","version":"0.6.5","description":"Two-player Tic-Tac-Toe with named winners, green winning line, rematches and head-to-head history"},{"id":"torn-four","name":"Torn Four","category":"multiplayer","version":"0.2.5","description":"Connect Four: two-player multiplayer with private room codes"},{"id":"torn-fleet","name":"Torn Fleet","category":"multiplayer","version":"0.2.5","description":"Battleship: fleet placement and turn-based naval combat"},{"id":"torn-snake","name":"Slithering Streets","category":"single-player","version":"0.2.14","description":"Single-player Snake with touch controls and local high scores"},{"id":"chaos-marbles","name":"Chaos Marbles","category":"multiplayer","version":"0.2.5","description":"Online 2\u20134 player marble race with private player sessions, Waiting for Chaos staging, and game history"},{"id":"item-monitor","name":"Travel Assistant and Item Monitor","category":"business","version":"1.10.31-dev","description":"Item Monitor and Travel Assistant with D1 stock reporting, source diagnostics and stock estimation"},{"id":"war-hit-organizer","name":"War Organizer","category":"other","version":"0.3.18-dev","description":"Compact war target board, reservation controls, timer and local development settings"}]};
   const versionCompare=(a,b)=>{const aa=String(a||'0').split('.').map(v=>parseInt(v,10)||0),bb=String(b||'0').split('.').map(v=>parseInt(v,10)||0);for(let i=0;i<3;i++)if(aa[i]!==bb[i])return (aa[i]||0)-(bb[i]||0);return 0;};
   // Lifecycle API: modules register inert factories; only this manager calls activate().
   const registered = new Map();
@@ -544,10 +544,10 @@
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch {} };
   // TU unified window navigation (test release).
   const tuNav={history:[],current:'tu-pda-panel',minimized:true,exited:true};
-  const tuRoots=['tu-pda-panel','tuim-menu','tuim-panel','tuim-catalog','tuim-travel-window','tuim-data-window','tca-panel','tca-playbar','tpfg-root','tpfg-manager','tpfg-prompt','sff-root','tu-diagnostics-window'];
+  const tuRoots=['tu-pda-panel','tu-who-panel','tuim-menu','tuim-panel','tuim-catalog','tuim-travel-window','tuim-data-window','tca-panel','tca-playbar','tpfg-root','tpfg-manager','tpfg-prompt','sff-root','tu-diagnostics-window'];
   const tuRoot=id=>document.getElementById(id);
-  const tuHideAll=()=>tuRoots.forEach(id=>{const el=tuRoot(id);if(el){el.hidden=true;if(id==='tpfg-root')el.style.display='none';}});
-  const tuShow=id=>{const el=tuRoot(id);if(!el)return false;tuHideAll();el.hidden=false;if(id==='tpfg-root')el.style.display='block';tuNav.current=id;tuNav.minimized=false;tuNav.exited=false;observeTUWindows();if(observationReady)syncLauncher();return true;};
+  const tuHideAll=()=>tuRoots.forEach(id=>{const el=tuRoot(id);if(el){el.hidden=true;if(id==='tpfg-root'||id==='tu-who-panel')el.style.display='none';}});
+  const tuShow=id=>{const el=tuRoot(id);if(!el)return false;tuHideAll();el.hidden=false;if(id==='tpfg-root')el.style.display='block';if(id==='tu-who-panel')el.style.display='flex';tuNav.current=id;tuNav.minimized=false;tuNav.exited=false;observeTUWindows();if(observationReady)syncLauncher();return true;};
   const tuOpen=id=>{if(!tuRoot(id))return false;if(tuNav.current!==id&&tuRoot(tuNav.current))tuNav.history.push(tuNav.current);return tuShow(id);};
   const tuBack=(source)=>{const parents={'tuim-panel':'tuim-menu','tuim-travel-window':'tuim-menu','tuim-data-window':'tuim-travel-window','tuim-catalog':'tuim-panel'};const parent=parents[source];if(parent&&tuRoot(parent)){if(tuNav.history[tuNav.history.length-1]===parent)tuNav.history.pop();return tuShow(parent);}if(source&&tuRoot(source))tuNav.current=source;while(tuNav.history.length){const id=tuNav.history.pop();if(tuRoot(id))return tuShow(id);}return tuShow('tu-pda-panel');};
   const tuMinimize=(source)=>{if(source&&tuRoot(source))tuNav.current=source;
@@ -563,7 +563,7 @@
     if(tuNav.exited){tuNav.history.length=0;tuNav.current='tu-pda-panel';render(authorized()?'modules':'about');}
     if(!authorized()){tuShow('tu-pda-panel');showAgreement();return true;}
     let id=tuNav.current;
-    if(!tuRoot(id)&&active){id=({'item-monitor':'tuim-menu','flight-game':'tpfg-root','stick-fighter':'sff-root'}[active]||id);}
+    if(!tuRoot(id)&&active){id=({'item-monitor':'tuim-menu','flight-game':'tpfg-root','stick-fighter':'sff-root','war-hit-organizer':'tu-who-panel'}[active]||id);}
     return tuShow(tuRoot(id)?id:'tu-pda-panel');
   };
   pageWindow.TUWindowNavigation=Object.freeze({open:tuOpen,back:tuBack,minimize:tuMinimize,exit:tuExit,restore:tuRestore});
@@ -610,7 +610,7 @@ __TU_COMPACT_UI_CSS__
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.103-dev</span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.104-dev</span></footer>';
   document.body.appendChild(panel);
   const headerBrand=panel.querySelector('.tu-logo');if(headerBrand){headerBrand.textContent='';headerBrand.classList.add('tu-brand-emblem');headerBrand.setAttribute('role','img');headerBrand.setAttribute('aria-label','Torn Utilities');}
   const identityLine=document.createElement('p');
@@ -1005,7 +1005,7 @@ __TU_COMPACT_UI_CSS__
     return !!el&&el.isConnected&&!el.hidden&&getComputedStyle(el).display!=='none'&&getComputedStyle(el).visibility!=='hidden';
   };
   const syncLauncher=()=>{
-    const moduleVisible=!!active&&(['tuim-menu','tuim-panel','tuim-catalog','tpfg-root','tpfg-manager','tpfg-prompt','sff-root','tca-panel','tca-playbar'].some(isVisible)||[...moduleHost.children].some(el=>isVisible(el.id)||(!el.hidden&&el.getClientRects().length>0)));
+    const moduleVisible=!!active&&(['tu-who-panel','tuim-menu','tuim-panel','tuim-catalog','tpfg-root','tpfg-manager','tpfg-prompt','sff-root','tca-panel','tca-playbar'].some(isVisible)||[...moduleHost.children].some(el=>isVisible(el.id)||(!el.hidden&&el.getClientRects().length>0)));
     const consent=document.getElementById('tu-agreement-overlay');
     const hide=consent&&!consent.hidden&&consent.style.display!=='none'?true:(tuNav.minimized||tuNav.exited?false:(!panel.hidden||moduleVisible));
     if(launcher.hidden!==hide)launcher.hidden=hide;
@@ -1097,7 +1097,7 @@ __TU_COMPACT_UI_CSS__
     const latest=visible.find(id=>id!==tuNav.current&&id!=='tu-pda-panel')||visible[visible.length-1];
     if(latest!==tuNav.current&&tuRoot(tuNav.current))tuNav.history.push(tuNav.current);
     tuWindowSyncing=true;tuNav.current=latest;
-    for(const id of visible){if(id!==latest){const el=tuRoot(id);el.hidden=true;if(id==='tpfg-root')el.style.display='none';}}
+    for(const id of visible){if(id!==latest){const el=tuRoot(id);el.hidden=true;if(id==='tpfg-root'||id==='tu-who-panel')el.style.display='none';}}
     tuWindowSyncing=false;
   };
   const enhanceFloating=()=>floatIds.forEach(id=>setupFloating(document.getElementById(id)));

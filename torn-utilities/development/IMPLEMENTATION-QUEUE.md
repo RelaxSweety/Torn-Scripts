@@ -95,3 +95,10 @@ Removed filled-slot green checkmarks and prevented restoration from old saved
 state. Red X markers for unfilled slots, purchase notifications, native refresh,
 healing timing and DEV monitor tools remain. See
 [removal and validation](REMOVE-GREEN-CHECKMARKS-20261112.md).
+
+## War Organizer window navigation — .104-dev
+
+Registered War Organizer with shared TU navigation and fixed hidden/flex
+visibility, minimize/launcher restoration and previous-window hiding. Back and
+active-card resume preserve the existing window/drafts. See
+[fix and validation](WAR-WINDOW-NAVIGATION-20261112.md).
