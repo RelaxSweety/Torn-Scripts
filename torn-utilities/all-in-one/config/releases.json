@@ -1,5 +1,15 @@
 [
   {
+    "version": "0.5.42.108-dev",
+    "date": "2026-11-12",
+    "securityBundle": true,
+    "changes": {
+      "Improvements": [
+        "Add an FFScouter account setup link in War Organizer Settings"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.107-dev",
     "date": "2026-11-12",
     "securityBundle": true,

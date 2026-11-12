@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU War Organizer
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.3.21-dev
+// @version      0.3.22-dev
 // @description  Compact War Organizer target board and reservation design preview
 // @match        https://www.torn.com/*
 // @grant        none
@@ -120,6 +120,7 @@ async function refreshScouter(){
 function scouterSettings(parent){
  const section=el('section',parent,undefined,'who-scouter-settings');el('h3',section,'FFScouter');
  el('p',section,'Which API key do you use for FFScouter? Choose a saved TU key, or confirm and save another key. This selection is separate from TU login and War Organizer roster keys.','who-hint');
+ const setup=el('p',section,undefined,'who-hint');const setupLink=el('a',setup,'If you need to setup an FFScouter account, follow this link.');setupLink.href='https://ffscouter.com/#get-started';setupLink.target='_blank';setupLink.rel='noopener noreferrer';
  const lights=el('div',section,undefined,'who-key-lights');el('span',lights).dataset.scouterValid='1';el('span',lights).dataset.scouterConfirmed='1';
  const select=dropdown(section,'Saved API keys',[['','Choose your FFScouter key']],'');select.id='tu-who-ff-key';
  const keyStatus=el('p',section,'Loading saved keys…','who-hint');keyStatus.setAttribute('role','status');
@@ -284,6 +285,6 @@ const beginGesture=(e,resize)=>{if(e.button!==undefined&&e.button!==0)return;if(
 root.addEventListener('pointerdown',e=>{if(e.target===grip)beginGesture(e,true);else if(e.target.closest('.who-header'))beginGesture(e,false)});
 root.addEventListener('touchmove',()=>{lastUserScroll=Date.now()},{passive:true});root.addEventListener('wheel',()=>{lastUserScroll=Date.now()},{passive:true});document.body.append(root);render();showOrganizer();startRoster();poll=setInterval(()=>{if(!root||root.hidden||tab!=='targets')return;for(const clock of root.querySelectorAll('.who-countdown')){const remaining=seconds(Number(clock.dataset.releaseAt));if(remaining===null)continue;clock.textContent=formatCountdown(remaining);clock.style.color=remaining>0&&remaining<=state.reservationTimer?'#8fe0a8':'#f0b85c';}for(const button of root.querySelectorAll('.who-reserve')){const id=button.dataset.targetId;if(id&&state.targets[id])button.disabled=false;}},1000);
 }
-function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.21-dev',activate,resume,deactivate:close})}
+function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.22-dev',activate,resume,deactivate:close})}
 if(window.TornUtilities)register();else window.addEventListener('torn-utilities-ready',register,{once:true});
 })();

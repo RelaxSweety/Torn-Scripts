@@ -120,3 +120,19 @@ FFScouter separately from login and roster keys. Added red/green Torn-valid and
 provider-confirmed indicators, visible categorized errors during cooldown and
 mobile Settings spacing/status fixes. No automatic provider registration.
 See [behavior, validation and limits](WAR-FFSCOUTER-KEYS-20261112.md).
+
+## FFScouter account setup link — .108-dev
+
+Added the requested `https://ffscouter.com/#get-started` link and exact account
+setup sentence in War Organizer Settings. TU 0.5.42.108-dev / War Organizer
+0.3.22-dev; Item Monitor unchanged at 1.12.53-dev. Build, War Scouter UI,
+War navigation and PDA loader checks passed; integrated payload 1,001,021 bytes.
+
+Premium faction-wide redistribution was assessed but not implemented. Public
+API guidance checked on 2026-11-12 at https://ffscouter.com/api-docs/guidance
+prohibits showing premium data to users without active premium and using a
+single key to provide multiple users with data. One member's premium flight
+information cannot be distributed to non-premium faction members under these
+published rules. Provider permission or an appropriate faction-access product
+would be needed before implementing that design. No Worker, database,
+agreement or production change is included.
