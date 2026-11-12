@@ -1,0 +1,5 @@
+2026-11-12 UTC. No user credentials, cookies, authorization or real roster data sent.
+GET /api/v1/get-stats: HTTP 400 application/json, {"code":1,"error":"API key is required"}.
+GET with Origin https://www.torn.com: same response; access-control-allow-origin: *; x-ratelimit-limit: 120.
+OPTIONS with that Origin and Access-Control-Request-Method GET: HTTP 204; allow-origin *; allow-methods GET.
+OpenAPI version 1.20.0; full public specification SHA-256 2ebf615bdf83a64820c3ee743701072fd15b95ebfc9343e025f660af08b34ff4.

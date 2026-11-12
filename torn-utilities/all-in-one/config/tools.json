@@ -75,7 +75,7 @@
     "id": "war-hit-organizer",
     "name": "War Organizer",
     "category": "other",
-    "version": "0.3.19-dev",
+    "version": "0.3.20-dev",
     "description": "Compact war target board, reservation controls, timer and local development settings",
     "source": "torn-utilities/modules/war-hit-organizer.user.js"
   }

@@ -107,6 +107,7 @@ active-card resume preserve the existing window/drafts. See
 
 Added optional per-user/key FFScouter battle estimates and FF inline with target
 names, numerical FF sorting/range filters, Okay-only filtering, and green Okay /
-red Hosp / blue Trvl totals under both factions. Live provider verification is
-pending because its domain is not allowed; the user authorized continuation
-with isolated tests. See [implementation, privacy and validation](WAR-FFSCOUTER-20261112.md).
+red Hosp / blue Trvl totals under both factions. Public live documentation, unauthenticated HTTPS and Chromium fetch/CORS were
+verified in .106-dev after the new policy took effect. Corrected provider policy
+links and registration/retention disclosure. Authenticated FF and real PDA/GM
+transport remain unverified. See [implementation, privacy and validation](WAR-FFSCOUTER-20261112.md).

@@ -1,0 +1,5 @@
+Build: TU 0.5.42.106-dev; War Organizer 0.3.20-dev; Item Monitor 1.12.53-dev.
+Integrated installer: 992368 bytes; SHA-256 9192d5d50f66cfedcf921d22e82d9f8314f211ecb3893592f33c54adc71ee6a8.
+Full npm test passed. Build --check passed. Full-bundle synthetic Chromium fixture passed at 1280x900, 390x844 and 844x390.
+Environment current observations: enforced policy, ffscouter.com allowed.
+Live Chromium credential-free fetch result: browser-no-key.json; no authenticated behavior tested.

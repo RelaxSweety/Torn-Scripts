@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU War Organizer
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.3.19-dev
+// @version      0.3.20-dev
 // @description  Compact War Organizer target board and reservation design preview
 // @match        https://www.torn.com/*
 // @grant        none
@@ -115,9 +115,9 @@ async function refreshScouter(){
  finally{if(ticket===scouterEpoch){scouterPending=false;if(root&&tab==='targets'&&(sort.startsWith('ff-')||ffRange().min!==null||ffRange().max!==null))render();else paintScouter();}}
 }
 function scouterSettings(parent){
- el('h3',parent,'FFScouter estimates');el('p',parent,'Optional: send your selected War Organizer API key (or TU login key when none is selected) and target player IDs directly to FFScouter. FF depends on your key and is not shared with other TU users. Estimates are cached in memory for up to ten minutes. FFScouter may process your IP address and request logs.','who-hint');
- const links=el('p',parent);for(const [label,url] of [['FFScouter Terms','https://ffscouter.com/'],['Data Policy','https://ffscouter.com/privacy']]){const a=el('a',links,label);a.href=url;a.target='_blank';a.rel='noopener noreferrer';a.style.marginRight='12px';a.style.color='#f0ce77';}
- const label=el('label',parent,undefined,'who-ff-consent'),toggle=el('input',label);toggle.type='checkbox';toggle.id='tu-who-ff-consent';toggle.dataset.scouterConsent='1';toggle.checked=scouterEnabled;label.append(document.createTextNode(' I have reviewed the FFScouter terms/data policy and allow my selected key and target IDs to be sent to FFScouter.'));
+ el('h3',parent,'FFScouter estimates');el('p',parent,'Optional: send your selected War Organizer API key (or TU login key when none is selected) and target player IDs directly to FFScouter. FF depends on your key and is not shared with other TU users. Estimates are cached in memory for up to ten minutes. FFScouter may process your IP address and request logs, retain your registered key and private stats, and use battle/personal stats for AI training under its data policy. Your key must meet the FFScouter registration permissions; a TU public-only key is not sufficient for registration.','who-hint');
+ const links=el('p',parent);for(const [label,url] of [['API Guidance','https://ffscouter.com/api-docs/guidance'],['Data Policy','https://ffscouter.com/#data-policy'],['Privacy Policy','https://ffscouter.com/privacy'],['Support FFScouter','https://ffscouter.com/premium']]){const a=el('a',links,label);a.href=url;a.target='_blank';a.rel='noopener noreferrer';a.style.marginRight='12px';a.style.color='#f0ce77';}
+ const label=el('label',parent,undefined,'who-ff-consent'),toggle=el('input',label);toggle.type='checkbox';toggle.id='tu-who-ff-consent';toggle.dataset.scouterConsent='1';toggle.checked=scouterEnabled;label.append(document.createTextNode(' I have reviewed the current FFScouter API guidance/data policy and allow my selected key and target IDs to be sent to FFScouter.'));
  const info=el('small',parent,scouterEnabled?'FFScouter enabled for your selected key.':'Off until you explicitly enable it. Your key must already be registered with FFScouter.','who-hint');
  toggle.onchange=async event=>{toggle.disabled=true;try{const result=await window.TornUtilities.setWhoScouterEnabled(toggle.checked,event);scouterEpoch++;scouterPending=false;scouterRows={};scouterScope=result.scope;scouterEnabled=result.enabled;scouterAvailable=result.available;scouterError='';info.textContent=result.enabled?'Enabled for your selected key.':'FFScouter disabled.';void refreshScouter();}catch(error){toggle.checked=false;info.textContent=error.message;}finally{toggle.disabled=false;}};
 }
@@ -253,6 +253,6 @@ const beginGesture=(e,resize)=>{if(e.button!==undefined&&e.button!==0)return;if(
 root.addEventListener('pointerdown',e=>{if(e.target===grip)beginGesture(e,true);else if(e.target.closest('.who-header'))beginGesture(e,false)});
 root.addEventListener('touchmove',()=>{lastUserScroll=Date.now()},{passive:true});root.addEventListener('wheel',()=>{lastUserScroll=Date.now()},{passive:true});document.body.append(root);render();showOrganizer();startRoster();poll=setInterval(()=>{if(!root||root.hidden||tab!=='targets')return;for(const clock of root.querySelectorAll('.who-countdown')){const remaining=seconds(Number(clock.dataset.releaseAt));if(remaining===null)continue;clock.textContent=formatCountdown(remaining);clock.style.color=remaining>0&&remaining<=state.reservationTimer?'#8fe0a8':'#f0b85c';}for(const button of root.querySelectorAll('.who-reserve')){const id=button.dataset.targetId;if(id&&state.targets[id])button.disabled=false;}},1000);
 }
-function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.19-dev',activate,resume,deactivate:close})}
+function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.20-dev',activate,resume,deactivate:close})}
 if(window.TornUtilities)register();else window.addEventListener('torn-utilities-ready',register,{once:true});
 })();

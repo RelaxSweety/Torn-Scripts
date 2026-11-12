@@ -1,0 +1,9 @@
+{
+  "origin": "https://www.torn.com",
+  "status": 400,
+  "type": "cors",
+  "body": {
+    "code": 1,
+    "error": "API key is required"
+  }
+}

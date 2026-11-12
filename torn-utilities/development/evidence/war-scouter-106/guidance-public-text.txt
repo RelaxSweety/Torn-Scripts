@@ -1,0 +1,25 @@
+FFScouter API Guidance
+You are free to use the FFScouter API for any use. However, this should be done responsibly and in a way which does not simply exploit the service without either providing value to the user, or co-operating with FFScouter. For example, you must not:
+Sell or show premium data to users who do not have an active premium subscription
+Resell free data
+Use a single API key to provide multiple users with data (ie key sharing)
+You are free to make a tool, sell access to that tool and use FFScouter free data. However, the data must not be the sole product. If you are using FFScouter data, you should out of courtesy inform the users that FFScouter is the source of the data. The user, wherever possible, should also be asked to sign up to FFScouter and utilise their own API key to retrieve the data with.
+You must always follow the rules of Torn. This includes linking users to the appropriate data policy pages and sections. Even if you reproduce the data policy within your own tool, you MUST provide a link to it wherever a user is expected to provide their API key. The data policy of FFScouter may change from time to time, so I would recommend having the user acknowledge they have checked the website for the latest version, or making it an obvious and implicit requirement of using the tool.
+If premium data is used, you MUST use the API key of the user, not a shared one. Encouraging users to sign up to FFScouter and upgrade to premium supports the tool, and enables the team to continue improving it. We have taken a deliberately liberal approach to policing rate limits and large scale users as we hope to keep it as open as possible, but significant abuse of it will lead to restrictions. Most API endpoints will have a high rate limit, but we also monitor long term trends so deliberating maxing out the rate limit over time will be flagged up eventually.
+Where possible, use batch endpoints. Do not request a single user of information at a time if you can avoid it. Stat estimates can be queried up to 205 users at a time. When queried, I would recommend caching the data for 1 hour for that user in line with most other tools. Estimates do not change very often, so lower caches than this are unlikely to bring any benefit to the end user and wastes resources.
+If you are selling services, some of them may offer a bonus or commission for sending orders to FFScouter. For example, if you provide the user with the option to order bounties, once their order is completed and hits are being made, you may be eligible for a portion of the service fees we collect. We will send these to you no more than once per day. You can view your commission earnings from the FFScouter Dashboard pages.
+Finally, we use an OpenAPI specification. If you are building appropriate tests in your code, I would strongly recommend it records the specification version it is using at the time of release. This is to help ensure changes in this time are easier to flag. The use of AI agents and tools makes this quite trivial, as does pulling the OpenAPI spec upon which to build those tools.
+If you have any questions, I would recommend joining our Discord and talking to the team there. I am always open to ideas and new services we could provide, and want to make the experience of using this community tool as seamless as possible.
+Thanks,
+Glasnost
+Privacy Policy
+|
+Contact
+|
+© Glasnost [1844049] 2026
+FFScouter is not affiliated with Torn, it is an independent community tool.
+Display
+Theme
+Dark
+Light
+Dark is the default. Light uses dark text on a warm background.

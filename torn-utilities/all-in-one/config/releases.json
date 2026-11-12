@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.106-dev",
+    "date": "2026-11-12",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Link FFScouter API guidance and its specific data policy before opt-in",
+        "Clarify provider key permissions, retention and AI training disclosure"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.105-dev",
     "date": "2026-11-12",
     "securityBundle": true,

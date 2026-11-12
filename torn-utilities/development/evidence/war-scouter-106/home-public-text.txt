@@ -1,0 +1,99 @@
+Details of our data policy can be found below. Please note this policy only covers the main FFScouter service/tool as your API key is used, and does not cover the volunteer data gathering service.
+On small screens, swipe sideways on the table to see all columns.
+Category
+Details
+Data Storage
+Will the data be stored for any purpose?
+Player ID:
+Persistent - forever
+Battlestats:
+Persistent - until account deletion
+Private Battle Stat Score (bss_private):
+Persistent - until account deletion
+Hall of Fame:
+Temporary - less than a minute
+Attacks:
+Temporary - less than a minute
+API Key:
+Persistent - until account deletion
+Public Battle Stat Score (bss_public) [Other People]:
+Persistent - forever
+Personal Stats:
+Persistent - until account deletion
+Data Sharing
+Who can access the data besides the end user?
+Player ID:
+General public
+Battlestats:
+Service owners only
+Private Battle Stat Score (bss_private):
+Service owners only
+Hall of Fame:
+Nobody (requested, never stored)
+Attacks:
+Nobody (requested, never stored)
+API Key:
+Service owners (only for debugging/bug fixing purposes)
+Public Battle Stat Score (bss_public) [Other People]:
+General public
+Personal Stats:
+Service owners only
+Purpose of Use
+What is the stored data being used for?
+Player ID:
+Analysis [Non malicious statistical analysis], Public community tools
+Battlestats:
+Analysis, AI training
+Private Battle Stat Score (bss_private):
+Analysis [Non malicious statistical analysis]
+Hall of Fame:
+Analysis (requested, not stored)  [Non malicious statistical analysis]
+Attacks:
+Analysis (requested, not stored)  [Non malicious statistical analysis]
+API Key:
+Analysis [Non malicious statistical analysis]
+Public Battle Stat Score (bss_public) [Other People]:
+Analysis [Non malicious statistical analysis], Public community tools, Competetive advantage [estimation of other player's battle stats]
+Personal Stats:
+AI training
+Key Storage & Sharing
+Will the API key be stored securely and who can access it?
+Stored / Used only for automation
+Key Access Level
+What key access level or specific selections are required?
+Regardless of the key access level from this list, the same data/functionality is provided:
+Custom - Pre 16th September 2025 (selections: basic, battlestats, hof, attacks)
+Custom - Post 16th September 2025 (selections: hof, faction, basic, profile, cooldowns, refills, attacks, battlestats, faction members/rankedwarreport/warfare/wars/rankedwars, torn rankedwarreport/rankedwars)
+Custom - Post 25th January 2026 (selections: hof, faction, basic, profile, cooldowns, refills, attacks, battlestats, faction members/rankedwarreport/warfare/wars/rankedwars, torn rankedwarreport/rankedwars, personalstats)
+Limited (
+works, but not recommended
+)
+Full (
+works, but not recommended
+)
+Torn API selections requested (Core FFScouter):
+basic, battlestats, attacks, hof, personalstats
+Additional selections (Post 16th September 2025):
+profile, cooldowns, refills, faction (members, rankedwarreport, warfare, wars, rankedwars), torn (rankedwarreport, rankedwars)
+Additional selections (Post 25th January 2026):
+personalstats
+Data Stored:
+player_id, bss_private (*), bss_private_timestamp (*), bss_public (**), bss_public_timestamp (**), API key, created_at, last_updated, battle stats, personalstats selection
+Basis for request selections:
+basic:
+Contains your player_id so we can attribute the data correctly
+battlestats:
+This is used to calculate your bss_private
+attacks:
+Retrieves your opponents and the Fair Fight score so we can calculate their bss_public
+hof:
+Identifies players who are in the top 1,000 HoF for battle stats (FF entries excluded)
+personalstats:
+Stores the personalstats selection data for use in AI training only
+Attack history is used with your bss_private (a score only you can see and is stored on FFScouter) to estimate opponents' bss_public (a score everyone can see). We never store who updated a public score, except temporarily to help diagnose any errors we encounter and will share it with Torn Admins. This will be deleted when it is no longer required, but no later than 30 days after it was saved in any case.
+Your attack logs are not saved to the database at any point; they are deleted once analysed (usually within 1–2 seconds of a request being made using your key, exceptionally up to 10 seconds). Attack logs are never saved to the database, shared, or sold.
+(*) Your bss_private is calculated from your battle stats using the formula found on the Torn Wiki (
+Fair fights
+). It is stored by FFScouter to provide you with an accurate estimated "Fair Fight" score of your opponent. It is never visible to other users, sold, shared or used except to enable you to use the service and for AI training. The bss_private_timestamp is used to schedule updates to your bss_private score by storing the last time it was updated.
+(**) Your bss_private is then used, alongside the Fair Fight score from each attack requested, to estimate the bss_public of your opponents where they are known (i.e. not stealthed). This bss_public is stored against their profile, but with the exception of fixing bugs (noted above), we do not store that your score provided this estimate. A bss_public also has a "bss_public_timestamp" associated with it, so we know when it was last updated to prevent old estimates replacing newer ones.
+Your own bss_public is not updated by registering for this service. You will likely have a bss_public even if you never sign up to FFScouter, as this data is generated by the estimates of other users. You may view your own stat estimates when using FFScouter by requesting it for your own ID.

@@ -1,0 +1,270 @@
+openapi: 3.0.4
+
+info:
+  title: FFScouter API
+  version: 1.20.0
+  description: |
+    Public FFScouter API for battle stat estimates, player flights, activity, hit calling, the losses marketplace, targets, and public statistics. If developing scripts to use these endpoints, ensure you provide a link to the data policy of each feature where it applies in accordance with Torn's rules. You must not use data from FFScouter and resell it. Do not use your own API key to share information to others, you must always prompt the user to provide their own API key to obtain data from this API, and you should encourage users to upgrade to premium if using this data. Read the [FFScouter API Guidance](/api-docs/guidance) before building on this API.
+
+    ### Script developer commissions
+
+    To earn a commission on orders placed through your scripts, contact [Glasnost [1844049]](https://www.torn.com/profiles.php?XID=1844049) to be added to the approved list. Orders placed through your scripts will not credit you unless you are on this list.
+
+servers:
+  - url: /
+
+externalDocs:
+  description: API changelog
+  url: https://ffscouter.com/api-docs/changelog
+
+tags:
+  - name: Player Stats
+    description: Public battle stat estimates and history.
+  - name: Flights
+    description: Premium player flight tracking.
+  - name: Activity
+    description: Premium time-bucketed activity from scanner data.
+  - name: Hit Calling
+    description: Premium faction target claim queue.
+  - name: Losses
+    description: Losses marketplace buyer and seller API.
+  - name: API Keys
+    description: Key registration and status.
+  - name: TornStats
+    description: >-
+      Store or replace the caller's TornStats API key for faction spy sync. Requires a registered
+      FFScouter API key. The TornStats key and its masked form are never returned by the API.
+  - name: Targets
+    description: Target Finder candidate search.
+  - name: Bounty Board
+    description: Bounty buyer orders and seller claims. Buyer endpoints are public; seller endpoints require a registered FFScouter API key with accepted Bounty Board policy consent.
+  - name: OD Insurance
+    description: >-
+      OD Insurance plans and personal coverage. The plans endpoint is public; the status and
+      history endpoints require a registered FFScouter API key and return only the key owner's
+      own policies.
+  - name: Notes
+    description: >-
+      Personal, faction, and FFScouter team notes about players and factions. Requires a registered
+      FFScouter API key. Note content is plaintext ASCII and must be rendered as text, never as HTML,
+      code, or links.
+  - name: Account
+    description: >-
+      Xanax-funded prepaid balances. Send Xanax to the platform account with the message deposit
+      (personal) or factiondeposit (faction) to credit a balance. Withdrawals are not offered.
+  - name: Script Metrics
+    description: >-
+      Self-reported script telemetry. Requires a registered FFScouter API key. Submissions are
+      stored per key and visible to staff on player search.
+
+security:
+  - FfscouterKey: []
+
+paths:
+  /api/v1/get-stats:
+    get:
+      operationId: getStats
+      tags: [Player Stats]
+      summary: Get battle stat estimates for up to 205 players
+      parameters:
+        - $ref: '#/components/parameters/KeyQuery'
+        - name: targets
+          in: query
+          required: true
+          description: Comma-separated Torn player IDs.
+          schema:
+            type: string
+          example: '2675763,1426381'
+      responses:
+        '200':
+          description: One estimate object per requested target.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PlayerStats'
+              examples:
+                default:
+                  value:
+                    - player_id: 267456763
+                      fair_fight: 5.39
+                      bs_estimate: 2989885521
+                      bs_estimate_human: 2.99b
+                      bss_public: 123456
+                      last_updated: 1747333361
+                      source: premium
+                      premium_insights_available: true
+                      distribution:
+                        last_updated: 1747333361
+                        distribution_human: STR (60%) SPD (30%)
+                        stats_percentage:
+                          strength: 60
+                          speed: 30
+                      spies:
+                        - strength: 1000000
+                          speed: 2000000
+                          defense: 3000000
+                          dexterity: 4000000
+                          total: 10000000000
+                          last_updated: 1747330000
+                          source: tornstats
+                          source_faction_id: 12345
+                      available_estimates:
+                        bss:
+                          bss_public: 123456
+                          bs_estimate: 2989885521
+                          bs_estimate_human: 2.99b
+                          last_updated: 1747333361
+                          fair_fight: 5.39
+                        premium:
+                          bs_estimate: 3100000000
+                          bs_estimate_human: 3.1b
+                          last_updated: 1747330000
+                          fair_fight: 6.12
+                        spies:
+                          bs_estimate: 10000000000
+                          bs_estimate_human: 10b
+                          last_updated: 1747330000
+                          source: tornstats
+                          fair_fight: 8.45
+                    - player_id: 142625381
+                      fair_fight: null
+                      bs_estimate: null
+                      bs_estimate_human: null
+                      bss_public: null
+                      last_updated: null
+                      source: bss
+                      distribution: null
+                      premium_insights_available: false
+                      spies: []
+                      available_estimates:
+                        bss: null
+                        premium: null
+                        spies: null
+        '400':
+          description: >-
+            Invalid request. Codes: 1 API key required, 2 invalid key format, 3 missing targets
+            parameter, 4 empty or more than 205 target IDs, 5 non-numeric target IDs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missingKey:
+                  value:
+                    code: 1
+                    error: API key is required
+                invalidKeyFormat:
+                  value:
+                    code: 2
+                    error: Invalid API key format. Key must be 16 alphanumeric characters
+                missingTargets:
+                  value:
+                    code: 3
+                    error: The targets parameter is required
+                maximumTargets:
+                  value:
+                    code: 4
+                    error: At least one target ID is required and no more than 205
+                nonNumericTargets:
+                  value:
+                    code: 5
+                    error: All target IDs must be positive integers
+        '401':
+          description: The API key is not registered (code 6).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalidKey:
+                  value:
+                    code: 6
+                    error: Invalid API key. Please sign up at ffscouter.com to use this service
+        '403':
+          description: The key owner or their faction is banned (codes 4010, 4011).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                accountBanned:
+                  value:
+                    code: 4010
+                    error: >-
+    PlayerStats:
+      type: object
+      required:
+        - player_id
+        - fair_fight
+        - bs_estimate
+        - bs_estimate_human
+        - bss_public
+        - last_updated
+        - source
+        - premium_insights_available
+        - spies
+        - available_estimates
+      properties:
+        player_id:
+          type: integer
+        fair_fight:
+          type: number
+          nullable: true
+        bs_estimate:
+          type: integer
+          nullable: true
+        bs_estimate_human:
+          type: string
+          nullable: true
+        bss_public:
+          type: integer
+          nullable: true
+        last_updated:
+          type: integer
+          nullable: true
+        source:
+          type: string
+        premium_insights_available:
+          type: boolean
+        distribution:
+          type: object
+          nullable: true
+          properties:
+            last_updated:
+              type: integer
+            distribution_human:
+              type: string
+            stats_percentage:
+              type: object
+              properties:
+                strength:
+                  type: integer
+                speed:
+                  type: integer
+                defense:
+                  type: integer
+                dexterity:
+                  type: integer
+        spies:
+          type: array
+          items:
+            $ref: '#/components/schemas/Spy'
+        available_estimates:
+          type: object
+          required: [bss, premium, spies]
+          properties:
+            bss:
+              allOf:
+                - $ref: '#/components/schemas/PublicEstimate'
+              nullable: true
+            premium:
+              allOf:
+                - $ref: '#/components/schemas/PremiumEstimate'
+              nullable: true
+            spies:
+              allOf:
+                - $ref: '#/components/schemas/SpyEstimate'
+              nullable: true
+
