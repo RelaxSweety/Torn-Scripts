@@ -1,0 +1,7 @@
+TU 0.5.42.110-dev / War Organizer 0.3.24-dev / Item Monitor 1.12.53-dev.
+Build and full npm regression suite passed; final focused module test additionally asserts ETA ~MM:SS for a partial estimate.
+Final integrated payload 1013133 bytes; SHA-256 255640057d7732ead87d136482254eed485a3326fdbfdba926501f8f0298456f.
+Full-bundle Chromium at desktop 1280x900, mobile portrait 390x844 and landscape 844x390 passed. Provider takeoff_time is null in the success fixture. Premium success/current null reports no current flight in the aggregate and expanded player explanation.
+All test identities, credentials, rosters and provider responses synthetic. No authenticated live response was requested, and the supplied user screenshot/status does not establish which individual parser restriction or unavailable-data condition occurred.
+Update comparison tests detect fourth-component increments and numeric rollovers. Native PDA installation remains host-managed.
+Archived installers/evidence, production, Workers, databases and agreements unchanged.

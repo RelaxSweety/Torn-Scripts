@@ -65,17 +65,23 @@ export function createFFScouter({window,getCredentials,isAuthorized,request,now=
    const batch=missing.slice(i,i+100),jobKey=c.id+':flights:'+batch.join(',');let job=flightJobs.get(jobKey);
    if(!job){job=(async()=>{
     const data=await get('player-flights/batch',{targets:batch.join(',')});if(!Array.isArray(data?.flights))invalid();const accepted=new Map();
-    for(const row of data.flights){const id=String(row?.player_id);if(!batch.includes(id))continue;if(accepted.has(id))invalid();const leg=row.current;let value=null;
-     if(leg&&typeof leg==='object'&&typeof leg.status_description==='string'&&/^(?:returning to torn(?: from .+)?|travel(?:l)?ing (?:back )?to torn(?: from .+)?)\.?$/i.test(leg.status_description.trim())){
-      const early=number(leg.earliest_arrival_time),late=number(leg.latest_arrival_time),takeoff=number(leg.takeoff_time),secondsNow=now()/1000;
-      if(early&&late&&takeoff&&takeoff<=secondsNow+60&&early>=takeoff&&late>=early&&late>secondsNow&&late<=secondsNow+86400)value={playerId:id,earliest:early,latest:late,validUntil:Math.min(now()+60000,premiumUntil)};
+    for(const row of data.flights){const id=String(row?.player_id);if(!batch.includes(id))continue;if(accepted.has(id))invalid();const leg=row.current,base={playerId:id,validUntil:Math.min(now()+60000,premiumUntil)};let value={...base,reason:'no-current'};
+     if(leg&&typeof leg==='object'){
+      const description=typeof leg.status_description==='string'?leg.status_description.trim().replace(/\s+/g,' '):'';
+      const returning=/^(?:returning to torn(?: from .+)?|travel(?:l)?ing (?:back )?to torn(?: from .+)?)\.?$/i.test(description),outbound=/^travel(?:l)?ing to (?!torn(?:\b|$)).+/i.test(description);
+      value={...base,reason:outbound?'outbound':returning?'no-arrival':'unknown-direction'};
+      if(returning){
+       const first=number(leg.earliest_arrival_time),last=number(leg.latest_arrival_time),early=first||last,late=last||first,takeoff=number(leg.takeoff_time),secondsNow=now()/1000;
+       const takeoffValid=leg.takeoff_time==null||(takeoff&&takeoff<=secondsNow+60&&early>=takeoff);
+       if(early&&late){value.reason=late<=secondsNow?'expired':'invalid-window';if(takeoffValid&&late>=early&&late>secondsNow&&late<=secondsNow+86400)value={...base,reason:'arrival',earliest:early,latest:late,partial:!first||!last};}
+      }
      }accepted.set(id,value);
     }
-    for(const id of batch)flightCache.set(id,{value:accepted.get(id)||null,expires:Math.min(now()+60000,premiumUntil)});while(flightCache.size>1000)flightCache.delete(flightCache.keys().next().value);flightFailure='';
+    for(const id of batch)flightCache.set(id,{value:accepted.get(id)||{playerId:id,reason:'not-returned',validUntil:Math.min(now()+60000,premiumUntil)},expires:Math.min(now()+60000,premiumUntil)});while(flightCache.size>1000)flightCache.delete(flightCache.keys().next().value);flightFailure='';
    })();flightJobs.set(jobKey,job);job.finally(()=>{if(flightJobs.get(jobKey)===job)flightJobs.delete(jobKey);}).catch(()=>{});}
    await job;await active();
   }
-  return {scope:c.id,premium:true,rows:targets.map(id=>flightCache.get(id)?.value).filter(Boolean)};
+  return {scope:c.id,premium:true,rows:targets.map(id=>flightCache.get(id)?.value).filter(value=>value?.reason==='arrival'),availability:targets.map(id=>flightCache.get(id)?.value).filter(Boolean).map(value=>({playerId:value.playerId,reason:value.reason,validUntil:value.validUntil}))};
  }
  function forget(playerId){try{const data=JSON.parse(window.localStorage.getItem(CONSENT)||'null');if(String(data?.playerId)===String(playerId))window.localStorage.removeItem(CONSENT);}finally{reset();}}
  return {state,setEnabled,stats,flights,reset,forget};

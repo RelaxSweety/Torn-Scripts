@@ -1,0 +1,4 @@
+2026-11-12. Credential-free GET https://ffscouter.com/war-room succeeded. Public page SHA-256 f73f02bd3615cc4b125dd320fed70454690f78dd78968602ffba819080ced6a2.
+Public client normalizes flight status_description with trim/lowercase/whitespace collapse, and applyFlightPayloadResult reads earliest_arrival_time/latest_arrival_time without requiring takeoff_time. updateFlightEtaDom rejects only when both arrival bounds are null before rendering its estimate.
+Official Torn PDA reference commit 28fdc2b8a0ea6e39758ceba8483d4cf4367c4067: models/chaining/ffscouter/ffscouter_flights_model.dart estimatedArrival returns earliestArrivalTime ?? latestArrivalTime when both are not available; takeoffTime is nullable.
+These are public client/contract observations, not authenticated provider verification.

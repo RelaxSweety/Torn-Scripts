@@ -143,3 +143,11 @@ Added own-key FFScouter premium checks and private batched current-flight reads.
 Returning players display ETA MM:SS beside travel status, or earliest/latest
 countdowns where the provider supplies an arrival window. No premium data is
 shared with other users. See [contract, validation and limits](WAR-FFSCOUTER-FLIGHT-ETA-20261112.md).
+
+## Premium ETA availability correction and update detection — .110-dev
+
+Accepted valid return estimates with nullable takeoff and single arrival bounds,
+added aggregate/per-player reasons for unavailable ETA, and fixed TU's update
+check to compare the fourth numeric version component. Premium success alone
+no longer implies a usable return estimate exists. See
+[correction, validation and remaining limits](WAR-FFSCOUTER-ETA-FIX-20261112.md).

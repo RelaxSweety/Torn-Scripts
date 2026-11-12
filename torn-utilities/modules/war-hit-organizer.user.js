@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU War Organizer
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.3.23-dev
+// @version      0.3.24-dev
 // @description  Compact War Organizer target board and reservation design preview
 // @match        https://www.torn.com/*
 // @grant        none
@@ -15,7 +15,7 @@ const ID='war-hit-organizer',STORE='tu:who:state:v2',LOGO="data:image/webp;base6
 let root=null,ctx=null,stylesheet=null,lastUserScroll=0,rosterTimer=null,rosterEpoch=0,rosterLoading=false,rosterError='',rosterUpdated=0,ownOnline=null,enemyOnline=null,rosterFaction='',tab='targets',filter='all',query='',sort='release',expanded='',message='',poll=null;
 let state={};try{state=JSON.parse(localStorage.getItem(STORE)||'{}')}catch{}
 state.targets=state.targets||{};state.reservations=state.reservations||{};state.reservationLimit=Number(state.reservationLimit||state.hits||1);state.reservationTimer=Number(state.reservationTimer||5);
-let ownStatusCounts=null,enemyStatusCounts=null,scouterRows={},scouterScope=null,scouterEpoch=0,scouterPending=false,scouterEnabled=false,scouterAvailable=false,scouterError='',scouterConfirmed=false;let flightRows={},flightEpoch=0,flightPending=false,flightPremium=null,flightError='';
+let ownStatusCounts=null,enemyStatusCounts=null,scouterRows={},scouterScope=null,scouterEpoch=0,scouterPending=false,scouterEnabled=false,scouterAvailable=false,scouterError='',scouterConfirmed=false;let flightRows={},flightEpoch=0,flightPending=false,flightPremium=null,flightError='',flightAvailability={};
 sort=['release','level','name','ff-asc','ff-desc'].includes(state.sort)?state.sort:'release';filter=['all','hospital','okay','open','reserved'].includes(state.statusFilter)?state.statusFilter:'all';let ffDraftMin=String(state.ffMin??''),ffDraftMax=String(state.ffMax??'');
 const save=()=>localStorage.setItem(STORE,JSON.stringify(state));
 const el=(tag,parent,txt,cls)=>{const x=document.createElement(tag);if(txt!==undefined)x.textContent=txt;if(cls)x.className=cls;if(parent)parent.append(x);return x};
@@ -108,20 +108,24 @@ function paintScouter(){
  paintFlights();
 
 }
-function clearFlights(){flightEpoch++;flightRows={};flightPending=false;flightPremium=null;flightError='';paintFlights();}
+function clearFlights(){flightEpoch++;flightRows={};flightPending=false;flightPremium=null;flightError='';flightAvailability={};paintFlights();}
+const flightReasonText={arrival:'Return arrival estimate available.',outbound:'Outbound trip; no return-to-Torn ETA.', 'no-current':'FFScouter has no current flight for this player.','not-returned':'FFScouter did not return this player.','unknown-direction':'Provider has not identified a return-to-Torn trip.','no-arrival':'Return trip found, but provider arrival times are unavailable.',expired:'Provider arrival estimate has already passed.','invalid-window':'Provider arrival times are inconsistent or unsupported.'};
+function flightSummary(){const counts={};for(const [id,value] of Object.entries(flightAvailability)){if(!/^travel(?:l)?ing$/i.test(state.targets[id]?.status||''))continue;const reason=value.validUntil>Date.now()?value.reason:'expired';counts[reason]=(counts[reason]||0)+1;}const parts=[];for(const [reason,label] of [['arrival','return ETA'],['outbound','outbound'],['no-current','no current flight'],['not-returned','not returned'],['unknown-direction','unknown direction'],['no-arrival','no arrival times'],['expired','expired'],['invalid-window','invalid times']])if(counts[reason])parts.push(counts[reason]+' '+label);return 'FFScouter Premium confirmed · '+(parts.length?parts.join(' · '):'no traveling targets')+'.';}
+function flightDetail(id){if(!scouterEnabled)return 'Enable FFScouter for your own selected key.';if(flightError)return flightError;if(flightPremium!==true)return flightPremium===false?'Your selected key has no active premium flight access.':'Premium flight access has not been checked.';const value=flightAvailability[id];return value?.validUntil>Date.now()?(flightReasonText[value.reason]||'Flight information unavailable.'):'Flight information is not yet available or needs refreshing.';}
 function paintFlights(){
  if(!root)return;const now=Date.now()/1000;
  for(const node of root.querySelectorAll('[data-flight-id]')){const id=node.dataset.flightId,value=flightRows[id],travel=/^travel(?:l)?ing$/i.test(state.targets[id]?.status||'');const show=state.mode!=='offline'&&scouterEnabled&&flightPremium===true&&travel&&value&&value.latest>now&&value.validUntil>Date.now();node.hidden=!show;if(!show){node.textContent='';continue;}
-  const early=formatCountdown(Math.ceil(value.earliest-now)),late=formatCountdown(Math.ceil(value.latest-now));node.textContent='ETA '+(value.earliest===value.latest?late:early+'–'+late);node.title='FFScouter Premium · returning to Torn · estimated arrival '+new Date(value.earliest*1000).toLocaleTimeString()+' – '+new Date(value.latest*1000).toLocaleTimeString();
+  const early=formatCountdown(Math.ceil(value.earliest-now)),late=formatCountdown(Math.ceil(value.latest-now));node.textContent='ETA '+(value.partial?'~':'')+(value.earliest===value.latest?late:early+'–'+late);node.title='FFScouter Premium · returning to Torn · estimated arrival '+new Date(value.earliest*1000).toLocaleTimeString()+' – '+new Date(value.latest*1000).toLocaleTimeString();
  }
- for(const node of root.querySelectorAll('[data-flight-status]'))node.textContent=state.mode==='offline'?'Offline mode — premium flight requests paused.':flightError||(!scouterEnabled?'Premium return-flight ETA requires FFScouter opt-in.':flightPremium===false?'Return-flight ETA requires active FFScouter Premium on your own key.':flightPremium===true?'Personal premium return-flight ETA · estimated arrival window.':flightPending?'Checking personal premium flight access…':'Personal premium return-flight ETA appears for current return trips when available.');
+ for(const node of root.querySelectorAll('[data-flight-detail]'))node.textContent='Premium flight: '+flightDetail(node.dataset.flightDetail);
+ for(const node of root.querySelectorAll('[data-flight-status]'))node.textContent=state.mode==='offline'?'Offline mode — premium flight requests paused.':flightError||(!scouterEnabled?'Premium return-flight ETA requires FFScouter opt-in.':flightPremium===false?'Return-flight ETA requires active FFScouter Premium on your own key.':flightPremium===true?flightSummary():flightPending?'Checking personal premium flight access…':'Personal premium return-flight ETA appears for current return trips when available.');
 }
 async function refreshFlights(){
  if(flightPending||!scouterEnabled||!root||root.hidden||state.mode==='offline'||!window.TornUtilities?.requestWhoScouterFlights)return;
- const ids=Object.keys(state.targets).filter(id=>/^travel(?:l)?ing$/i.test(state.targets[id]?.status||''));if(!ids.length){flightRows={};paintFlights();return;}
+ const ids=Object.keys(state.targets).filter(id=>/^travel(?:l)?ing$/i.test(state.targets[id]?.status||''));if(!ids.length){flightRows={};flightAvailability={};paintFlights();return;}
  const ticket=++flightEpoch,scope=scouterScope;flightPending=true;paintFlights();
- try{const data=await window.TornUtilities.requestWhoScouterFlights(ids);if(ticket!==flightEpoch||scope!==scouterScope||data.scope!==scope||!scouterEnabled||!root)return;flightRows=Object.fromEntries(data.rows.map(row=>[String(row.playerId),row]));flightPremium=data.premium===true;flightError='';}
- catch(error){if(ticket===flightEpoch){flightRows={};flightPremium=null;flightError=error.message||'Premium flight data unavailable.';}}
+ try{const data=await window.TornUtilities.requestWhoScouterFlights(ids);if(ticket!==flightEpoch||scope!==scouterScope||data.scope!==scope||!scouterEnabled||!root)return;flightRows=Object.fromEntries(data.rows.map(row=>[String(row.playerId),row]));flightPremium=data.premium===true;flightAvailability=Object.fromEntries((data.availability||data.rows.map(row=>({playerId:row.playerId,reason:'arrival',validUntil:row.validUntil}))).map(value=>[String(value.playerId),value]));flightError='';}
+ catch(error){if(ticket===flightEpoch){flightRows={};flightAvailability={};flightPremium=null;flightError=error.message||'Premium flight data unavailable.';}}
  finally{if(ticket===flightEpoch){flightPending=false;paintFlights();}}
 }
 function scouterChanged(){clearFlights();scouterEpoch++;scouterPending=false;scouterRows={};scouterScope=null;scouterEnabled=false;scouterAvailable=false;scouterConfirmed=false;scouterError='';if(root)render();if(root&&!root.hidden)void refreshScouter();}
@@ -203,7 +207,7 @@ if(hospital){const clock=el('span',status,formatCountdown(rem),'who-countdown');
 const activity=el('span',status,undefined,'who-dot '+({online:'online',idle:'idle',offline:'offline'}[String(t.activity||'').toLowerCase()]||'unknown'));activity.title=t.activity||'Unknown';
 const r=state.reservations[id];btn(right,r?r.name:'Reserve',()=>r?promptRelease(id,r):reserve(id,t),r?'who-reserved':'who-reserve');const reserveButton=right.lastElementChild;reserveButton.dataset.targetId=id;reserveButton.disabled=false;
 btn(row,expanded===id?'⌃':'⌄',()=>{expanded=expanded===id?'':id;render()},'who-expand');
-if(expanded===id){const detail=el('div',list,undefined,'who-detail');el('div',detail,'ID: '+id+' · Battle estimate: '+(scouterRows[id]?.bs?format(scouterRows[id].bs):'Unavailable')+' · FF: '+(scouterRows[id]?.ff?.toFixed(2)||'Unavailable'));if(scouterRows[id]?.lastUpdated)el('div',detail,'FFScouter updated: '+new Date(scouterRows[id].lastUpdated*1000).toLocaleString());el('div',detail,'Source: '+(t.source||'Unknown')+' · Activity: '+(t.activity||'Unknown'));el('div',detail,'Reservation: '+(r?.name||'Available'))}
+if(expanded===id){const detail=el('div',list,undefined,'who-detail');el('div',detail,'ID: '+id+' · Battle estimate: '+(scouterRows[id]?.bs?format(scouterRows[id].bs):'Unavailable')+' · FF: '+(scouterRows[id]?.ff?.toFixed(2)||'Unavailable'));if(scouterRows[id]?.lastUpdated)el('div',detail,'FFScouter updated: '+new Date(scouterRows[id].lastUpdated*1000).toLocaleString());el('div',detail,'Source: '+(t.source||'Unknown')+' · Activity: '+(t.activity||'Unknown'));el('div',detail,'Reservation: '+(r?.name||'Available'));if(/^travel(?:l)?ing$/i.test(t.status||'')){const flightInfo=el('div',detail);flightInfo.dataset.flightDetail=id;}}
 });
 if(!entries.length)el('p',list,scouterPending&&ranged?'Loading FF estimates…':'No targets match the current search and filters.','who-hint');
 paintScouter();
@@ -307,6 +311,6 @@ const beginGesture=(e,resize)=>{if(e.button!==undefined&&e.button!==0)return;if(
 root.addEventListener('pointerdown',e=>{if(e.target===grip)beginGesture(e,true);else if(e.target.closest('.who-header'))beginGesture(e,false)});
 root.addEventListener('touchmove',()=>{lastUserScroll=Date.now()},{passive:true});root.addEventListener('wheel',()=>{lastUserScroll=Date.now()},{passive:true});document.body.append(root);render();showOrganizer();startRoster();poll=setInterval(()=>{if(!root||root.hidden||tab!=='targets')return;paintFlights();for(const clock of root.querySelectorAll('.who-countdown')){const remaining=seconds(Number(clock.dataset.releaseAt));if(remaining===null)continue;clock.textContent=formatCountdown(remaining);clock.style.color=remaining>0&&remaining<=state.reservationTimer?'#8fe0a8':'#f0b85c';}for(const button of root.querySelectorAll('.who-reserve')){const id=button.dataset.targetId;if(id&&state.targets[id])button.disabled=false;}},1000);
 }
-function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.23-dev',activate,resume,deactivate:close})}
+function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.24-dev',activate,resume,deactivate:close})}
 if(window.TornUtilities)register();else window.addEventListener('torn-utilities-ready',register,{once:true});
 })();

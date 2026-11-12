@@ -1,5 +1,17 @@
 [
   {
+    "version": "0.5.42.110-dev",
+    "date": "2026-11-12",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Accept premium flight estimates with nullable takeoff time or one arrival bound",
+        "Explain why each traveling target has no return ETA",
+        "Compare all TU version components when checking updates"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.109-dev",
     "date": "2026-11-12",
     "securityBundle": true,
