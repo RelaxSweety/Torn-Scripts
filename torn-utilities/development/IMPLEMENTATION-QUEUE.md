@@ -179,3 +179,16 @@ hidden; confirmed active values display green Revivable. Gold separators mark
 complete player sections, including expanded details. War Organizer 0.3.26-dev,
 included alongside Snatch item-cell refresh. See
 [correction, ETA verification scope and validation](WAR-TRAVEL-REVIVE-FIX-20261112.md).
+
+## Shared War settings, roles and reservations — .113-dev
+
+TU 0.5.42.113-dev / War Organizer 0.3.27-dev; Item Monitor remains 1.12.54-dev.
+Implemented the explicitly authorized DEV-only shared service, native faction
+leadership/delegated admins, separate War/Personal settings and opt-in, Tag Team
+slots, long-press bookings/boot, 1–10 reservation limit, 0–60-second forfeits and
+both reset choices. Latest button rules: Okay with bookings is orange Reserve
+with countdown; Okay without bookings is red ATTACK open to faction members.
+Active bookings otherwise gate this tool's attack links. List position survives
+close/minimize/attack navigation; private key-scoped BS/FF values survive empty
+or failed refreshes and same-tab navigation. No premium data redistribution.
+See [behavior, service boundaries, validation and limits](WAR-SHARED-COORDINATION-20261112.md).

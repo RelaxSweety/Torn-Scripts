@@ -1,5 +1,9 @@
 # War Organizer estimates and filters — DEV .105
 
+Current .113 private session-cache retention is described in
+[shared War coordination](WAR-SHARED-COORDINATION-20261112.md); it supersedes the
+original memory-only estimate retention below. Premium data remains personal.
+
 Current .107 separate-key behavior supersedes the original key fallback described below. See [separate key selection and validation](WAR-FFSCOUTER-KEYS-20261112.md).
 
 TU **0.5.42.105-dev**, War Organizer **0.3.19-dev**; Item Monitor remains **1.12.53-dev**.

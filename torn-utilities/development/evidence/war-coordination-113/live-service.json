@@ -1,0 +1,43 @@
+{
+  "worker_version_id": "edbe6fc5-2687-4a24-a2d6-c9c4287de864",
+  "credential_free": true,
+  "authenticated_functionality_verified": false,
+  "transport": "curl; Python urllib received Cloudflare browser-signature denial 1010",
+  "probes": [
+    {
+      "path": "/health",
+      "method": "GET",
+      "status": 200,
+      "sha256": "18afaffccf3a9583b61f0866d7847b1743f63543834ad32546b39d501f458eeb",
+      "dev_release": "0.5.42.113-dev",
+      "war_coordination": 1
+    },
+    {
+      "path": "/api/war/state",
+      "method": "GET",
+      "status": 401,
+      "sha256": "f2e1bcb84dba550cdd4b3f72c070ec7271298bc13f16276a9ff14091e4723f3f"
+    },
+    {
+      "path": "/api/war/reserve",
+      "method": "POST",
+      "status": 401,
+      "sha256": "f2e1bcb84dba550cdd4b3f72c070ec7271298bc13f16276a9ff14091e4723f3f"
+    },
+    {
+      "path": "/api/war/state",
+      "method": "OPTIONS",
+      "status": 204,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "allows_war_key_header": true
+    },
+    {
+      "path": "/api/auth/agreement/current",
+      "method": "GET",
+      "status": 200,
+      "sha256": "72085bfe944b459876f6d0be0367e1f5c190267e8e40849679026a8f5bfb5797",
+      "agreement_version": "1.4",
+      "agreement_number": 5
+    }
+  ]
+}

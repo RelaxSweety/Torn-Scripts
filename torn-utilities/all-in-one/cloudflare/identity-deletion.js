@@ -1,3 +1,4 @@
+import {eraseWarIdentity} from './war-organizer.js';
 // All identity-bearing DEV requests share this coordinator. Serializing the
 // complete request prevents a verified registration/report from racing erasure.
 export function createIdentityCoordinator({route,verify,digest,readJson}) {
@@ -38,6 +39,7 @@ export function createIdentityCoordinator({route,verify,digest,readJson}) {
    const reply=(data,status=200)=>Response.json(data,{status,headers:{'cache-control':'no-store','access-control-allow-origin':'*'}});
    try{
     const db=env.TU_USERS_DB,id=job.id;
+    await eraseWarIdentity(storage,id);
     if(job.ready)return reply({complete:false,ready_for_local_cleanup:true,session_hashes:job.sessionHashes,room_hashes:job.roomHashes||[]});
     if(!job.sessionHashes){const result=await db.prepare('SELECT token_hash FROM tu_sessions WHERE torn_id=?').bind(id).all();job.sessionHashes=result.results.map(row=>row.token_hash);await storage.put(receipt,job);}
     // Revocation happens first and remains in place on every partial failure.

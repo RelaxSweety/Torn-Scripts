@@ -35,6 +35,12 @@ try{
  accepted=false;assert.equal((await run('/api/rooms','POST',{})).status,403);accepted=true;
  dbUnavailable=true;const unavailable=await run('/api/rooms','POST',{});assert.equal(unavailable.status,503);assert.ok(!(await unavailable.text()).includes('PRIVATE_DB_ERROR'));dbUnavailable=false;
  assert.equal(forwarded.length,0,'Rejected authorization never reaches a game object');
+ // Shared War endpoints must pass the existing session, agreement and module gate.
+ assert.equal((await worker.fetch(new Request('https://tu.example/api/war/state'),env)).status,401);
+ permission=0;assert.equal((await run('/api/war/state')).status,403);permission=1;
+ accepted=false;assert.equal((await run('/api/war/settings','POST',{})).status,403);accepted=true;
+ expired=true;assert.equal((await run('/api/war/state')).status,401);expired=false;
+ assert.equal((await run('/api/war/state')).status,400,'A TU session alone cannot substitute for a verified native key');
  const normalBudget=env.SUBMISSION_BUDGET,originalForeignCount=foreignWrites.length;
  for(const [budget,expected] of [[undefined,503],[{idFromName:x=>x,get:()=>({fetch:async()=>Response.json({allowed:false},{status:429})})},429]]){
   env.SUBMISSION_BUDGET=budget;const result=await run('/api/foreign/observations','POST',{});assert.equal(result.status,expected);if(expected===429)assert.equal(result.headers.get('retry-after'),'60');assert.equal(foreignWrites.length,originalForeignCount);

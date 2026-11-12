@@ -1,0 +1,11 @@
+TU 0.5.42.113-dev / War Organizer 0.3.27-dev / Item Monitor 1.12.54-dev.
+Build and full npm regression suite: PASS.
+Final backend role/ownership/slot/expiry/boot/reset/deletion and authorization checks: PASS.
+Full-bundle synthetic Chromium shared coordination and private FFScouter fixtures: PASS at desktop 1280x900, portrait 390x844 and landscape 844x390.
+Approved board/browser navigation regressions: PASS.
+DEV Worker: edbe6fc5-2687-4a24-a2d6-c9c4287de864.
+Public credential-free service probes: PASS; authenticated live coordination/provider behavior not tested.
+Payload bytes: 1055067
+SHA-256: d7f2e50ce1e9fce7488b0d50ae6015808aed4e85ceb0dd30f70cf4216a553cb1
+Generic, .113 archive and tested integrated distribution are byte-identical.
+Production main expected unchanged: 73c42788968612913ccfee20b1d5c194324dc8fd.

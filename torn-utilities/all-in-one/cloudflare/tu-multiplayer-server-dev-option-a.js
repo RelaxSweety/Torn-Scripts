@@ -1,3 +1,4 @@
+import {handleWar} from './war-organizer.js';
 import {createIdentityCoordinator,trackIdentityRoom,eraseRoomIdentity} from './identity-deletion.js';
 import { SubmissionBudget } from './submission-budget.js';
 import { RegistrationBudget } from './registration-budget.js';
@@ -606,6 +607,7 @@ __name(foreignStatus, "foreignStatus");
 
 // src/index.js
 var protectedModules = [
+  {pattern:/^\/api\/war(?:\/|$)/,id:"war-hit-organizer"},
   { pattern: /^\/api\/foreign\/(observations|feedback)$/, id: "item-monitor" },
   { pattern: new RegExp("^/api/marbles(?:/|$)"), id: "chaos-marbles" },
   { pattern: new RegExp("^/api/connect(?:/|$)"), id: "torn-four" },
@@ -620,7 +622,7 @@ async function requireModuleAccess(req, env, moduleId, authorizationContext) {
 }
 __name(requireModuleAccess, "requireModuleAccess");
 var json = /* @__PURE__ */ __name((v, s = 200) => new Response(JSON.stringify(v), { status: s, headers: { "content-type": "application/json", "access-control-allow-origin": "*", "cache-control": "no-store" } }), "json");
-var headers = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST, OPTIONS", "access-control-allow-headers": "content-type, authorization, x-tu-room-token" };
+var headers = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST, OPTIONS", "access-control-allow-headers": "content-type, authorization, x-tu-room-token, x-tu-war-key" };
 var alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 var code = /* @__PURE__ */ __name(() => Array.from(crypto.getRandomValues(new Uint8Array(6)), (x) => alphabet[x % alphabet.length]).join(""), "code");
 var token = /* @__PURE__ */ __name(() => crypto.randomUUID() + crypto.randomUUID(), "token");
@@ -952,6 +954,7 @@ async function routeWorkerRequest(req,env){
     trustedHeaders.set('x-tu-verified-id', authorizationContext.player.id);
     trustedHeaders.set('x-tu-verified-name', authorizationContext.player.name);
     req = new Request(req, { headers: trustedHeaders });
+    if(url.pathname.startsWith('/api/war/'))return handleWar(req,env,authorizationContext.player,{read:verificationRead,readJson:limitedJson});
   }
   if (req.method === 'POST' && /^\/api\/foreign\/(observations|feedback)$/.test(url.pathname)) {
     try {
@@ -979,7 +982,7 @@ async function routeWorkerRequest(req,env){
       return json({ error: "Stock status unavailable" }, 503);
     }
   }
-  if (url.pathname === "/health") return json({ ok: true, version: "0.2.0", dev_release: "0.5.42.89-dev", identity_deletion: 1 });
+  if (url.pathname === "/health") return json({ ok: true, version: "0.2.0", dev_release: "0.5.42.113-dev", identity_deletion: 1, war_coordination: 1 });
   const marble = url.pathname.match(/^\/api\/marbles(?:\/([A-HJ-NP-Z2-9]{6})\/(join|state|roll|move))?$/);
   if (marble) {
     const room = marble[1] || code(), action = marble[2] || "create";

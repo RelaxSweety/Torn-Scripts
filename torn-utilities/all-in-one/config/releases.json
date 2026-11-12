@@ -1,5 +1,21 @@
 [
   {
+    "version": "0.5.42.113-dev",
+    "date": "2026-11-12",
+    "securityBundle": true,
+    "changes": {
+      "Features": [
+        "Shared faction War roles, settings, Tag Team reservations and authoritative forfeit timers on DEV",
+        "Separate War and Personal Settings with explicit shared-board opt-in",
+        "Orange Reserve for attackable reserved players, red open ATTACK and live reservation counts"
+      ],
+      "Fixes": [
+        "Restore player list position across close, minimize and attack navigation",
+        "Retain private key-scoped FF estimates until replacement data arrives"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.112-dev",
     "date": "2026-11-12",
     "securityBundle": true,
