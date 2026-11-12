@@ -102,3 +102,11 @@ Registered War Organizer with shared TU navigation and fixed hidden/flex
 visibility, minimize/launcher restoration and previous-window hiding. Back and
 active-card resume preserve the existing window/drafts. See
 [fix and validation](WAR-WINDOW-NAVIGATION-20261112.md).
+
+## War Organizer FFScouter and faction totals — .105-dev
+
+Added optional per-user/key FFScouter battle estimates and FF inline with target
+names, numerical FF sorting/range filters, Okay-only filtering, and green Okay /
+red Hosp / blue Trvl totals under both factions. Live provider verification is
+pending because its domain is not allowed; the user authorized continuation
+with isolated tests. See [implementation, privacy and validation](WAR-FFSCOUTER-20261112.md).

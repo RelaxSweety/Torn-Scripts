@@ -1,5 +1,17 @@
 [
   {
+    "version": "0.5.42.105-dev",
+    "date": "2026-11-12",
+    "securityBundle": true,
+    "changes": {
+      "Features": [
+        "Show compact FFScouter battle estimates and personalized FairFight in War Organizer",
+        "Add FF sorting and range filters, plus an Okay-status filter",
+        "Show colored Okay, Hospital and Travel totals for both factions"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.104-dev",
     "date": "2026-11-12",
     "securityBundle": true,

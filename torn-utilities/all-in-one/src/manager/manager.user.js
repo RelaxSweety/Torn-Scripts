@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities DEV (All-in-One)
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.104-dev
+// @version      0.5.42.105-dev
 // @description  Integrated TU development bundle for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -11,6 +11,7 @@
 // @grant        GM_setValue
 // @grant        GM_deleteValue
 // @grant        unsafeWindow
+// @connect      ffscouter.com
 // @connect      api.torn.com
 // @connect      raw.githubusercontent.com
 // @connect      api.github.com
@@ -49,10 +50,10 @@
   const rawManagerFetch=window.fetch.bind(window);
   const fetch=(input,options)=>apiGovernor.fetch(input,options,rawManagerFetch);
   const managerHttp=rawManagerHttp?details=>apiGovernor.request(details,rawManagerHttp):null;
-  const TU_VERSION='0.5.42.104-dev';
+  const TU_VERSION='0.5.42.105-dev';
   const TU_LOGO='__TU_LOGO_DATA_URL__';
   // Bundled tool directory: no external catalog, cache, or refresh requests.
-  const registry={schemaVersion:1,categories:[{"id":"business","name":"Business Tools","icon":"▥","order":10},{"id":"games","name":"Games","icon":"♜","order":20},{"id":"single-player","name":"Single Player","icon":"▣","order":21,"parent":"games"},{"id":"multiplayer","name":"Multiplayer","icon":"♟","order":22,"parent":"games"},{"id":"chat","name":"Chat Tools","icon":"◉","order":30},{"id":"other","name":"War Tools","icon":"⚙","order":40}],modules:[{"id":"flight-game","name":"Flight Game","category":"single-player","version":"0.12.8","description":"Standalone Flight Game arcade module, playable anytime"},{"id":"stick-fighter","name":"Stick Fighter","category":"single-player","version":"0.2.7","description":"Standalone Stick Fighter arcade module, playable anytime"},{"id":"chat-archiver","name":"Chat Archiver","category":"chat","version":"0.1.8","description":"Archive Torn chat conversations"},{"id":"tic-tac-toe","name":"Tic-Tac-Toe","category":"multiplayer","version":"0.6.5","description":"Two-player Tic-Tac-Toe with named winners, green winning line, rematches and head-to-head history"},{"id":"torn-four","name":"Torn Four","category":"multiplayer","version":"0.2.5","description":"Connect Four: two-player multiplayer with private room codes"},{"id":"torn-fleet","name":"Torn Fleet","category":"multiplayer","version":"0.2.5","description":"Battleship: fleet placement and turn-based naval combat"},{"id":"torn-snake","name":"Slithering Streets","category":"single-player","version":"0.2.14","description":"Single-player Snake with touch controls and local high scores"},{"id":"chaos-marbles","name":"Chaos Marbles","category":"multiplayer","version":"0.2.5","description":"Online 2\u20134 player marble race with private player sessions, Waiting for Chaos staging, and game history"},{"id":"item-monitor","name":"Travel Assistant and Item Monitor","category":"business","version":"1.10.31-dev","description":"Item Monitor and Travel Assistant with D1 stock reporting, source diagnostics and stock estimation"},{"id":"war-hit-organizer","name":"War Organizer","category":"other","version":"0.3.18-dev","description":"Compact war target board, reservation controls, timer and local development settings"}]};
+  const registry={schemaVersion:1,categories:[{"id":"business","name":"Business Tools","icon":"▥","order":10},{"id":"games","name":"Games","icon":"♜","order":20},{"id":"single-player","name":"Single Player","icon":"▣","order":21,"parent":"games"},{"id":"multiplayer","name":"Multiplayer","icon":"♟","order":22,"parent":"games"},{"id":"chat","name":"Chat Tools","icon":"◉","order":30},{"id":"other","name":"War Tools","icon":"⚙","order":40}],modules:[{"id":"flight-game","name":"Flight Game","category":"single-player","version":"0.12.8","description":"Standalone Flight Game arcade module, playable anytime"},{"id":"stick-fighter","name":"Stick Fighter","category":"single-player","version":"0.2.7","description":"Standalone Stick Fighter arcade module, playable anytime"},{"id":"chat-archiver","name":"Chat Archiver","category":"chat","version":"0.1.8","description":"Archive Torn chat conversations"},{"id":"tic-tac-toe","name":"Tic-Tac-Toe","category":"multiplayer","version":"0.6.5","description":"Two-player Tic-Tac-Toe with named winners, green winning line, rematches and head-to-head history"},{"id":"torn-four","name":"Torn Four","category":"multiplayer","version":"0.2.5","description":"Connect Four: two-player multiplayer with private room codes"},{"id":"torn-fleet","name":"Torn Fleet","category":"multiplayer","version":"0.2.5","description":"Battleship: fleet placement and turn-based naval combat"},{"id":"torn-snake","name":"Slithering Streets","category":"single-player","version":"0.2.14","description":"Single-player Snake with touch controls and local high scores"},{"id":"chaos-marbles","name":"Chaos Marbles","category":"multiplayer","version":"0.2.5","description":"Online 2\u20134 player marble race with private player sessions, Waiting for Chaos staging, and game history"},{"id":"item-monitor","name":"Travel Assistant and Item Monitor","category":"business","version":"1.10.31-dev","description":"Item Monitor and Travel Assistant with D1 stock reporting, source diagnostics and stock estimation"},{"id":"war-hit-organizer","name":"War Organizer","category":"other","version":"0.3.19-dev","description":"Compact war target board, reservation controls, timer and local development settings"}]};
   const versionCompare=(a,b)=>{const aa=String(a||'0').split('.').map(v=>parseInt(v,10)||0),bb=String(b||'0').split('.').map(v=>parseInt(v,10)||0);for(let i=0;i<3;i++)if(aa[i]!==bb[i])return (aa[i]||0)-(bb[i]||0);return 0;};
   // Lifecycle API: modules register inert factories; only this manager calls activate().
   const registered = new Map();
@@ -237,7 +238,11 @@
   }
   let authorizationVerified=false,authRestorePending=true,authOpenRequested=false;
   const authorized=()=>!identityDeletionInProgress&&!readCredential('tu:dev:deletion-job:v1')&&authorizationVerified&&!!devToken()&&!!readSavedKey()&&!!TU_TERMS_VERSION&&localStorage.getItem(TU_TERMS_KEY)===TU_TERMS_VERSION;
-  const publishAuthorization=ok=>{authorizationVerified=!!ok;pageWindow.dispatchEvent(new CustomEvent('tu-authorization-change',{detail:{authorized:authorized()}}));if(!authorized())stopModule();};
+  const ffScouter=createFFScouter({window,isAuthorized:authorized,getCredentials:()=>{const key=normalizeKey(readCredential(WHO_KEY)||'')||readSavedKey(),entry=readStoredKeys().find(row=>row.key===key),id=getPlayer()?.id;return {key,playerId:id,verified:!!id&&!!entry?.verifiedAt&&String(entry.playerId)===String(id)};},request:url=>new Promise((resolve,reject)=>{
+    if(managerHttp)managerHttp({method:'GET',url,anonymous:true,redirect:'error',headers:{Accept:'application/json'},timeout:20000,onload:r=>resolve({status:r.status,text:r.responseText}),onerror:()=>reject(Error('FFScouter network error')),ontimeout:()=>reject(Error('FFScouter timeout'))});
+    else{const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);rawManagerFetch(url,{method:'GET',headers:{Accept:'application/json'},credentials:'omit',redirect:'error',cache:'no-store',signal:controller.signal}).then(async r=>({status:r.status,text:await r.text()})).then(resolve,reject).finally(()=>clearTimeout(timer));}
+  })});
+  const publishAuthorization=ok=>{authorizationVerified=!!ok;pageWindow.dispatchEvent(new CustomEvent('tu-authorization-change',{detail:{authorized:authorized()}}));if(!authorized()){ffScouter.reset();stopModule();}};
   const api = Object.freeze({
     isAuthorized:()=>authorized(),
     async getAgreementVersion({refresh=false}={}){
@@ -301,6 +306,9 @@
       if(data?.error)throw Error(data.error.error||'Torn API error');
       return data;
     },
+    getWhoScouterState:()=>ffScouter.state(),
+    setWhoScouterEnabled:(value,event)=>{if(value===true){let target;try{if(event?.isTrusted!==true)throw Error();target=Object.getOwnPropertyDescriptor(pageWindow.Event.prototype,'target').get.call(event);}catch{throw Error('Use the FFScouter consent checkbox in War Organizer Settings.');}if(!target?.isSameNode(document.getElementById('tu-who-ff-consent'))||!target.checked||target.closest('#tu-who-panel')?.hidden)throw Error('Use the FFScouter consent checkbox in War Organizer Settings.');}return ffScouter.setEnabled(value);},
+    requestWhoScouter:ids=>ffScouter.stats(ids),
     getFaction:()=>playerInfo?.factionId?Object.freeze({id:playerInfo.factionId,name:playerInfo.factionName||null}):null,
     refreshPlayer:()=>Promise.resolve(!!playerInfo),
     requestPlayerProfile:openProfileHelp,
@@ -610,7 +618,7 @@ __TU_COMPACT_UI_CSS__
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.104-dev</span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.105-dev</span></footer>';
   document.body.appendChild(panel);
   const headerBrand=panel.querySelector('.tu-logo');if(headerBrand){headerBrand.textContent='';headerBrand.classList.add('tu-brand-emblem');headerBrand.setAttribute('role','img');headerBrand.setAttribute('aria-label','Torn Utilities');}
   const identityLine=document.createElement('p');
@@ -828,6 +836,7 @@ __TU_COMPACT_UI_CSS__
          verify:async key=>{const info=checkedKeyInfo(await requestIdentity(key,{revalidate:true}));rememberVerifiedKey(key,info.level,info.playerId,{deletion:true});return info;},entries:readStoredKeys,
          stop:()=>{identityDeletionInProgress=true;credentials.set(VAULT_CLEARED,'1');stopModule();publishAuthorization(false);authGeneration++;clearAuthorizationCache();localStorage.removeItem(TU_TERMS_KEY);},
          cleanup:async id=>{
+          ffScouter.forget(id);
           const keys=readStoredKeys().filter(entry=>entry.playerId===id).map(entry=>entry.key);await apiGovernor.forgetKeys(keys);credentials.eraseKeys(keys);
           clearPlayer();clearAuthorizationCache();sessionStorage.removeItem(IDENTITY_CACHE);localStorage.removeItem(TU_TERMS_KEY);localStorage.removeItem(LOGIN_ACCESS_KEY);
           savedKeys.replaceChildren();input.value='';
@@ -886,7 +895,7 @@ __TU_COMPACT_UI_CSS__
             row.append(makeButton('Show / Hide',event=>{if(credentials.mode==='userscript-private'){if(!event?.isTrusted)return;const reveal=field.type==='password';field.value=reveal?entry.key:'';field.type=reveal?'text':'password';}else field.type=field.type==='password'?'text':'password';}));
             row.append(makeButton('Recheck access level',guarded(async()=>{try{await verifyEntry(entry.key);status.textContent='Saved key access level verified by Torn';renderSaved();}catch{status.textContent='Key could not be verified. It remains saved until you remove it.'}})));
             if(entry.key!==readSavedKey())row.append(makeButton('Use for TU login',guarded(()=>useForLogin(entry.key))));
-            if(entry.level==='Limited Access'&&entry.key!==normalizeKey(readCredential(WHO_KEY)))row.append(makeButton('Use for War Organizer',guarded(async()=>{try{const checked=await verifyEntry(entry.key);if(checked.level!=='Limited Access'||checked.playerId!==getPlayer()?.id)throw Error('Use a Limited key belonging to the current TU player');credentials.set(WHO_KEY,entry.key);status.textContent='Limited key selected for War Organizer';renderSaved();}catch{status.textContent='Select a valid Limited key belonging to the current TU player.'}})));
+            if(entry.level==='Limited Access'&&entry.key!==normalizeKey(readCredential(WHO_KEY)))row.append(makeButton('Use for War Organizer',guarded(async()=>{try{const checked=await verifyEntry(entry.key);if(checked.level!=='Limited Access'||checked.playerId!==getPlayer()?.id)throw Error('Use a Limited key belonging to the current TU player');credentials.set(WHO_KEY,entry.key);ffScouter.reset();pageWindow.dispatchEvent(new Event('tu-who-key-changed'));status.textContent='Limited key selected for War Organizer';renderSaved();}catch{status.textContent='Select a valid Limited key belonging to the current TU player.'}})));
             row.append(makeButton('Remove',guarded(async()=>{
               if(!confirm('Remove only this saved API key? Other saved keys will be retained.'))return;
               const activeKey=entry.key===readSavedKey();

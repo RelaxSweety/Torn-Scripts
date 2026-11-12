@@ -91,3 +91,28 @@
  #tu-pda-panel header p:not(.tu-player-identity){grid-column:2;grid-row:1;font-size:11px;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  #tu-pda-panel header .tu-player-identity{grid-column:1/-1;line-height:1.05}
 }
+/* Compact War Organizer estimates and faction totals; keep reservation taps usable. */
+#tu-who-panel .who-status-totals{display:flex;justify-content:center;flex-wrap:wrap;gap:3px 7px;font-size:11px;line-height:1.35}
+#tu-who-panel .who-total-okay{color:#75d49a}
+#tu-who-panel .who-total-hospital{color:#ff8e8e}
+#tu-who-panel .who-total-travel{color:#83bcff}
+#tu-who-panel .who-list .who-row{padding:4px 5px!important;gap:5px!important;min-height:52px!important}
+#tu-who-panel .who-left{min-width:0;flex:1}
+#tu-who-panel .who-line{display:flex;align-items:baseline;gap:6px;overflow:hidden;line-height:1.4}
+#tu-who-panel .who-line>a,#tu-who-panel .who-line>span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+#tu-who-panel .who-scouter{display:inline-flex;align-items:baseline;gap:7px;flex-shrink:0;color:#b6c3cb;font-size:10px;white-space:nowrap}
+#tu-who-panel .who-scouter strong{color:#eef2f4;font-size:11px;font-variant-numeric:tabular-nums;font-weight:700}
+#tu-who-panel .who-scouter .who-ff-value{color:#f0ce77}
+#tu-who-panel .who-row .who-right{width:78px!important;flex-shrink:0;gap:0}
+#tu-who-panel .who-list .who-row .who-right>button{min-height:44px!important;width:100%;font-size:12px!important}
+#tu-who-panel .who-row .who-health{display:flex;align-items:center;flex-wrap:wrap;gap:3px 6px;margin-top:2px;color:#afbbc2;font-size:10px;line-height:1.3}
+#tu-who-panel .who-health .who-status{display:inline-flex;justify-content:flex-start;gap:3px;font-size:10px}
+#tu-who-panel .who-health .who-countdown{margin-left:0!important}
+#tu-who-panel .who-row .who-bar{margin-top:3px;height:2px}
+#tu-who-panel .who-row .who-expand{width:16px!important;min-width:16px!important;padding:0!important;min-height:44px!important}
+#tu-who-panel .who-ff-filters{margin:5px 0;color:#b9c7cf;font-size:11px}
+#tu-who-panel .who-ff-filters summary{cursor:pointer;min-height:28px;display:flex;align-items:center}
+#tu-who-panel .who-ff-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#tu-who-panel .who-ff-fields input{width:100%;min-width:0}
+#tu-who-panel .who-ff-consent{display:flex;gap:8px;align-items:flex-start;line-height:1.4}
+#tu-who-panel .who-ff-consent input{min-width:20px;min-height:20px;flex-shrink:0}
