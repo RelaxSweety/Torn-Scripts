@@ -88,3 +88,10 @@ verification. Heal skips its pre-use inventory GET and retains the post-use
 consumption check. Missing/changed snapshots require re-arming; no hidden fallback
 GET or automatic retry. DEV monitor controls remain, per the user's final
 instruction. See [implementation and validation](ARMED-HEALING-INVENTORY-20261112.md).
+
+## Green purchase checkmark removal — .103-dev
+
+Removed filled-slot green checkmarks and prevented restoration from old saved
+state. Red X markers for unfilled slots, purchase notifications, native refresh,
+healing timing and DEV monitor tools remain. See
+[removal and validation](REMOVE-GREEN-CHECKMARKS-20261112.md).

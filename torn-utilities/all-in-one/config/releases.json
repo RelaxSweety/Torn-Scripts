@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.103-dev",
+    "date": "2026-11-12",
+    "securityBundle": true,
+    "changes": {
+      "Improvements": [
+        "Remove green purchase checkmarks, including saved-run restoration",
+        "Keep purchase confirmations and red markers for unfilled slots"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.102-dev",
     "date": "2026-11-12",
     "securityBundle": true,

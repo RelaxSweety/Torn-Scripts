@@ -12,8 +12,10 @@ export function createSnatchDirectItems({native,getPilot,getProfile,window,now=(
   slotCache=null;
  }
  function renderPurchaseSlots(run){
-  const marks=run?.directBuySlotStatus;
-  if(!marks?.length){if(slotCache)clearPurchaseSlots();return;}
+  const marks=run?.directBuySlotStatus?.filter(mark=>mark.status==='unfilled');
+  if(run?.directBuySlotStatus)run.directBuySlotStatus=marks;
+  for(const node of window.document.querySelectorAll('[data-tu-purchase-slot=filled]'))node.remove();
+  if(!marks?.length){clearPurchaseSlots();return;}
   const panel=window.document.querySelector('#travel-root [class*=inventoryPanel]'),signature=JSON.stringify(marks);
   if(slotCache?.panel===panel&&slotCache.signature===signature&&slotCache.nodes.every(node=>node.isConnected))return;
   clearPurchaseSlots();if(!panel)return;
@@ -21,10 +23,10 @@ export function createSnatchDirectItems({native,getPilot,getProfile,window,now=(
   if(!Number.isSafeInteger(total)||total<1||total>100||cells.length!==total)return;
   // Torn's DOM can use column order (1,7,13,2,...). Match its explicit slot labels, never DOM position.
   for(const cell of cells){const label=cell.querySelector(':scope > button[aria-label]')?.getAttribute('aria-label')||cell.querySelector('[class*=srOnly]')?.textContent||'',number=Number(label.match(/\bslot\s+(\d+)\b/i)?.[1]);if(!Number.isSafeInteger(number)||number<1||number>total||numbered.has(number))return;numbered.set(number,cell);}
-  if(marks.some(mark=>!numbered.has(mark.number)||!['filled','unfilled'].includes(mark.status)))return;
+  if(marks.some(mark=>!numbered.has(mark.number)||mark.status!=='unfilled'))return;
   const nodes=[],positions=[];
-  for(const mark of marks){const cell=numbered.get(mark.number),existing=cell.querySelector(':scope > button[aria-label]');if(mark.status==='unfilled'&&existing&&!/^(empty|available|free|unused)\b/i.test(existing.getAttribute('aria-label')||''))continue;const badge=window.document.createElement('span'),filled=mark.status==='filled';
-   badge.dataset.tuPurchaseSlot=mark.status;badge.setAttribute('role','img');badge.setAttribute('aria-label',filled?'Purchase verified in this slot':'Requested slot not filled');badge.title=filled?'Verified purchased item':'Requested inventory space is still empty';badge.textContent=filled?'✓':'✕';badge.style.cssText='position:absolute;top:1px;right:1px;z-index:5;display:grid;place-items:center;width:20px;height:20px;box-sizing:border-box;border:1px solid currentColor;border-radius:50%;font:bold 17px/1 system-ui;pointer-events:none;background:#15212aee;color:'+(filled?'#42ff83':'#ff6262');
+  for(const mark of marks){const cell=numbered.get(mark.number),existing=cell.querySelector(':scope > button[aria-label]');if(mark.status==='unfilled'&&existing&&!/^(empty|available|free|unused)\b/i.test(existing.getAttribute('aria-label')||''))continue;const badge=window.document.createElement('span');
+   badge.dataset.tuPurchaseSlot=mark.status;badge.setAttribute('role','img');badge.setAttribute('aria-label','Requested slot not filled');badge.title='Requested inventory space is still empty';badge.textContent='✕';badge.style.cssText='position:absolute;top:1px;right:1px;z-index:5;display:grid;place-items:center;width:20px;height:20px;box-sizing:border-box;border:1px solid currentColor;border-radius:50%;font:bold 17px/1 system-ui;pointer-events:none;background:#15212aee;color:#ff6262';
    if(window.getComputedStyle(cell).position==='static'||!window.getComputedStyle(cell).position){positions.push([cell,cell.style.position]);cell.style.position='relative';}cell.append(badge);nodes.push(badge);
   }
   slotCache={panel,signature,nodes,positions};
@@ -139,10 +141,8 @@ export function createSnatchDirectItems({native,getPilot,getProfile,window,now=(
    else run.capacityLedger={valid:true,total:capacity.total,initialOccupied:capacity.occupied-run.directBuyAmount,freed:0,purchased:run.directBuyAmount,spent:run.directBuySpent,cashBeforePurchase:run.directBuyCash};
    if(!ensure())throw Error('Run changed after purchase; review inventory before continuing');
    if(result.slots){
-    const prior=run.directBuySlotStatus||[],filled=new Map(prior.filter(mark=>mark.status==='filled').map(mark=>[mark.id,mark]));
-    for(const slot of result.slots)if(slot.added)filled.set(slot.id,{number:slot.number,id:slot.id,status:'filled'});
     const unfilled=result.slots.filter(slot=>slot.empty).slice(0,Math.max(0,run.directBuyTarget-run.directBuyAmount)).map(slot=>({number:slot.number,id:slot.id,status:'unfilled'}));
-    run.directBuySlotStatus=[...filled.values(),...unfilled];
+    run.directBuySlotStatus=unfilled;
     try{renderPurchaseSlots(run);}catch{clearPurchaseSlots();}
    }
    try{showPurchaseNotice(run,capacity.total);}catch{clearPurchaseNotice();}
