@@ -1,0 +1,7 @@
+TU 0.5.42.107-dev; War Organizer 0.3.21-dev; Item Monitor 1.12.53-dev.
+Build and full npm regression suite passed; focused FFScouter and saved-key integration tests passed after expanded negative cases.
+Full-bundle Chromium: desktop 1280x900, portrait 390x844, landscape 844x390. All credentials, identities, rosters and FFScouter responses synthetic.
+Separate saved-key choice and new Custom key save, masked saved-key list, unchanged TU login/roster keys, no provider request before consent, selected-key transport, valid/provider-confirmed indicators, HTTP 401 rejection and retained cooldown category passed.
+Inline layout, Reserve height, sort/range/Okay filters, faction totals, cache and disabling passed.
+Integrated build 1000599 bytes; SHA-256 6f6dc7f9fe6977ed3b93587d8bc688a4f105d73336c580df3fd9139414606463.
+No authenticated live provider or real-device GM/PDA validation. Production, Workers, databases and agreements untouched.

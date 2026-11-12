@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities DEV (All-in-One)
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.106-dev
+// @version      0.5.42.107-dev
 // @description  Integrated TU development bundle for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -50,10 +50,10 @@
   const rawManagerFetch=window.fetch.bind(window);
   const fetch=(input,options)=>apiGovernor.fetch(input,options,rawManagerFetch);
   const managerHttp=rawManagerHttp?details=>apiGovernor.request(details,rawManagerHttp):null;
-  const TU_VERSION='0.5.42.106-dev';
+  const TU_VERSION='0.5.42.107-dev';
   const TU_LOGO='__TU_LOGO_DATA_URL__';
   // Bundled tool directory: no external catalog, cache, or refresh requests.
-  const registry={schemaVersion:1,categories:[{"id":"business","name":"Business Tools","icon":"▥","order":10},{"id":"games","name":"Games","icon":"♜","order":20},{"id":"single-player","name":"Single Player","icon":"▣","order":21,"parent":"games"},{"id":"multiplayer","name":"Multiplayer","icon":"♟","order":22,"parent":"games"},{"id":"chat","name":"Chat Tools","icon":"◉","order":30},{"id":"other","name":"War Tools","icon":"⚙","order":40}],modules:[{"id":"flight-game","name":"Flight Game","category":"single-player","version":"0.12.8","description":"Standalone Flight Game arcade module, playable anytime"},{"id":"stick-fighter","name":"Stick Fighter","category":"single-player","version":"0.2.7","description":"Standalone Stick Fighter arcade module, playable anytime"},{"id":"chat-archiver","name":"Chat Archiver","category":"chat","version":"0.1.8","description":"Archive Torn chat conversations"},{"id":"tic-tac-toe","name":"Tic-Tac-Toe","category":"multiplayer","version":"0.6.5","description":"Two-player Tic-Tac-Toe with named winners, green winning line, rematches and head-to-head history"},{"id":"torn-four","name":"Torn Four","category":"multiplayer","version":"0.2.5","description":"Connect Four: two-player multiplayer with private room codes"},{"id":"torn-fleet","name":"Torn Fleet","category":"multiplayer","version":"0.2.5","description":"Battleship: fleet placement and turn-based naval combat"},{"id":"torn-snake","name":"Slithering Streets","category":"single-player","version":"0.2.14","description":"Single-player Snake with touch controls and local high scores"},{"id":"chaos-marbles","name":"Chaos Marbles","category":"multiplayer","version":"0.2.5","description":"Online 2\u20134 player marble race with private player sessions, Waiting for Chaos staging, and game history"},{"id":"item-monitor","name":"Travel Assistant and Item Monitor","category":"business","version":"1.10.31-dev","description":"Item Monitor and Travel Assistant with D1 stock reporting, source diagnostics and stock estimation"},{"id":"war-hit-organizer","name":"War Organizer","category":"other","version":"0.3.20-dev","description":"Compact war target board, reservation controls, timer and local development settings"}]};
+  const registry={schemaVersion:1,categories:[{"id":"business","name":"Business Tools","icon":"▥","order":10},{"id":"games","name":"Games","icon":"♜","order":20},{"id":"single-player","name":"Single Player","icon":"▣","order":21,"parent":"games"},{"id":"multiplayer","name":"Multiplayer","icon":"♟","order":22,"parent":"games"},{"id":"chat","name":"Chat Tools","icon":"◉","order":30},{"id":"other","name":"War Tools","icon":"⚙","order":40}],modules:[{"id":"flight-game","name":"Flight Game","category":"single-player","version":"0.12.8","description":"Standalone Flight Game arcade module, playable anytime"},{"id":"stick-fighter","name":"Stick Fighter","category":"single-player","version":"0.2.7","description":"Standalone Stick Fighter arcade module, playable anytime"},{"id":"chat-archiver","name":"Chat Archiver","category":"chat","version":"0.1.8","description":"Archive Torn chat conversations"},{"id":"tic-tac-toe","name":"Tic-Tac-Toe","category":"multiplayer","version":"0.6.5","description":"Two-player Tic-Tac-Toe with named winners, green winning line, rematches and head-to-head history"},{"id":"torn-four","name":"Torn Four","category":"multiplayer","version":"0.2.5","description":"Connect Four: two-player multiplayer with private room codes"},{"id":"torn-fleet","name":"Torn Fleet","category":"multiplayer","version":"0.2.5","description":"Battleship: fleet placement and turn-based naval combat"},{"id":"torn-snake","name":"Slithering Streets","category":"single-player","version":"0.2.14","description":"Single-player Snake with touch controls and local high scores"},{"id":"chaos-marbles","name":"Chaos Marbles","category":"multiplayer","version":"0.2.5","description":"Online 2\u20134 player marble race with private player sessions, Waiting for Chaos staging, and game history"},{"id":"item-monitor","name":"Travel Assistant and Item Monitor","category":"business","version":"1.10.31-dev","description":"Item Monitor and Travel Assistant with D1 stock reporting, source diagnostics and stock estimation"},{"id":"war-hit-organizer","name":"War Organizer","category":"other","version":"0.3.21-dev","description":"Compact war target board, reservation controls, timer and local development settings"}]};
   const versionCompare=(a,b)=>{const aa=String(a||'0').split('.').map(v=>parseInt(v,10)||0),bb=String(b||'0').split('.').map(v=>parseInt(v,10)||0);for(let i=0;i<3;i++)if(aa[i]!==bb[i])return (aa[i]||0)-(bb[i]||0);return 0;};
   // Lifecycle API: modules register inert factories; only this manager calls activate().
   const registered = new Map();
@@ -142,14 +142,14 @@
   function readStoredKeys(){
     let records=[];try{const data=JSON.parse(readCredential(SAVED_KEYS)||'[]');if(Array.isArray(data))records=data}catch{}
     const keys=new Map();
-    for(const entry of records){const key=normalizeKey(entry?.key);if(key&&!keys.has(key))keys.set(key,{key,level:['Public Only','Limited Access'].includes(entry.level)?entry.level:null,playerId:/^[1-9][0-9]*$/.test(String(entry.playerId||''))?String(entry.playerId):null,verifiedAt:typeof entry.verifiedAt==='string'?entry.verifiedAt:null});}
+    for(const entry of records){const key=normalizeKey(entry?.key);if(key&&!keys.has(key))keys.set(key,{key,level:['Public Only','Limited Access','Custom','Full Access'].includes(entry.level)?entry.level:null,playerId:/^[1-9][0-9]*$/.test(String(entry.playerId||''))?String(entry.playerId):null,verifiedAt:typeof entry.verifiedAt==='string'?entry.verifiedAt:null,ffscouter:entry.ffscouter===true});}
     // Recover every legacy key without treating stale role labels as verified access.
     for(const value of [readSavedKey(),readCredential(WHO_KEY),...readExtras().map(e=>e.key)]){const key=normalizeKey(value);if(key&&!keys.has(key))keys.set(key,{key,level:null,playerId:null,verifiedAt:null});}
     return [...keys.values()];
   }
   function rememberVerifiedKey(key,level,playerId,{deletion=false}={}){
     if(!deletion&&(identityDeletionInProgress||readCredential('tu:dev:deletion-job:v1')))throw Error('Account deletion in progress');
-    if(!normalizeKey(key)||!['Public Only','Limited Access'].includes(level))throw Error('Unsupported verified key');
+    if(!normalizeKey(key)||!['Public Only','Limited Access','Custom','Full Access'].includes(level))throw Error('Unsupported verified key');
     const entries=readStoredKeys(),entry=entries.find(e=>e.key===key)||{key};
     const previous=entries.findIndex(e=>e.key===key);
     Object.assign(entry,{level,playerId:/^[1-9][0-9]*$/.test(String(playerId||''))?String(playerId):entry.playerId||null,verifiedAt:new Date().toISOString()});
@@ -164,10 +164,10 @@
     credentials.set(EXTRA_KEYS,JSON.stringify(readExtras().filter(e=>normalizeKey(e.key)!==key)));
     credentials.set(SAVED_KEYS,JSON.stringify(remaining));
   }
-  function checkedKeyInfo(data){
+  function checkedKeyInfo(data,{extended=false}={}){
     if(data?.error)throw Error('Torn rejected key');
     const level=String(data?.info?.access?.type??data?.info?.access??'').trim(),playerId=Number(data?.info?.user?.id);
-    if(!['Public Only','Limited Access'].includes(level))throw Error('Only Public Only or Limited Access keys are supported');
+    if(!(extended?['Public Only','Limited Access','Custom','Full Access']:['Public Only','Limited Access']).includes(level))throw Error('Unsupported key access level');
     if(!Number.isSafeInteger(playerId)||playerId<=0)throw Error('Torn did not return a valid key owner');
     return {level,playerId:String(playerId)};
   }
@@ -238,10 +238,22 @@
   }
   let authorizationVerified=false,authRestorePending=true,authOpenRequested=false;
   const authorized=()=>!identityDeletionInProgress&&!readCredential('tu:dev:deletion-job:v1')&&authorizationVerified&&!!devToken()&&!!readSavedKey()&&!!TU_TERMS_VERSION&&localStorage.getItem(TU_TERMS_KEY)===TU_TERMS_VERSION;
-  const ffScouter=createFFScouter({window,isAuthorized:authorized,getCredentials:()=>{const key=normalizeKey(readCredential(WHO_KEY)||'')||readSavedKey(),entry=readStoredKeys().find(row=>row.key===key),id=getPlayer()?.id;return {key,playerId:id,verified:!!id&&!!entry?.verifiedAt&&String(entry.playerId)===String(id)};},request:url=>new Promise((resolve,reject)=>{
+  const ffScouter=createFFScouter({window,isAuthorized:authorized,getCredentials:()=>{const id=getPlayer()?.id,entry=readStoredKeys().find(row=>row.ffscouter&&row.playerId===String(id));return {key:entry?.key,playerId:id,verified:!!id&&!!entry?.verifiedAt&&String(entry.playerId)===String(id)};},request:url=>new Promise((resolve,reject)=>{
     if(managerHttp)managerHttp({method:'GET',url,anonymous:true,redirect:'error',headers:{Accept:'application/json'},timeout:20000,onload:r=>resolve({status:r.status,text:r.responseText}),onerror:()=>reject(Error('FFScouter network error')),ontimeout:()=>reject(Error('FFScouter timeout'))});
     else{const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);rawManagerFetch(url,{method:'GET',headers:{Accept:'application/json'},credentials:'omit',redirect:'error',cache:'no-store',signal:controller.signal}).then(async r=>({status:r.status,text:await r.text()})).then(resolve,reject).finally(()=>clearTimeout(timer));}
   })});
+  const scouterKeyId=async entry=>{const bytes=new TextEncoder().encode('tu-ffscouter-v1:'+entry.playerId+':'+entry.key);return Array.from(new Uint8Array(await window.crypto.subtle.digest('SHA-256',bytes)),v=>v.toString(16).padStart(2,'0')).join('');};
+  async function scouterKeys(){if(!authorized())throw Error('Verify your TU session first.');return Promise.all(readStoredKeys().map(async entry=>({id:await scouterKeyId(entry),label:(entry.level||'Unverified')+' · ending '+entry.key.slice(-4)+(entry.playerId?' · Player '+entry.playerId:''),selected:entry.ffscouter&&entry.playerId===String(getPlayer()?.id),valid:!!entry.verifiedAt&&entry.playerId===String(getPlayer()?.id)})));}
+  async function selectScouterKey(id,newKey){
+    if(!authorized())throw Error('Verify your TU session first.');const viewer=String(getPlayer()?.id),login=readSavedKey();
+    let key;if(newKey!==undefined){key=normalizeKey(newKey);if(!key)throw Error('Enter a 16-character Torn API key.');}else{for(const entry of readStoredKeys())if(await scouterKeyId(entry)===id){key=entry.key;break;}if(!key)throw Error('Saved key changed. Refresh Settings and select it again.');}
+    let info;try{info=checkedKeyInfo(await requestIdentity(key,{revalidate:true}),{extended:true});}catch{if(String(getPlayer()?.id)===viewer&&readStoredKeys().some(entry=>entry.key===key&&entry.ffscouter)){credentials.set(SAVED_KEYS,JSON.stringify(readStoredKeys().map(entry=>entry.key===key?{...entry,verifiedAt:null}:entry)));ffScouter.forget(viewer);pageWindow.dispatchEvent(new Event('tu-who-key-changed'));}throw Error('Torn could not verify this key. Check the key and connection.');}
+    if(!authorized()||String(getPlayer()?.id)!==viewer||readSavedKey()!==login)throw Error('TU account changed. Select the key again.');
+    if(info.playerId!==viewer)throw Error('Select a key belonging to the current TU player.');
+    rememberVerifiedKey(key,info.level,info.playerId);
+    credentials.set(SAVED_KEYS,JSON.stringify(readStoredKeys().map(entry=>({...entry,ffscouter:entry.playerId===viewer?entry.key===key:entry.ffscouter}))));
+    await ffScouter.setEnabled(false);pageWindow.dispatchEvent(new Event('tu-who-key-changed'));return scouterKeys();
+  }
   const publishAuthorization=ok=>{authorizationVerified=!!ok;pageWindow.dispatchEvent(new CustomEvent('tu-authorization-change',{detail:{authorized:authorized()}}));if(!authorized()){ffScouter.reset();stopModule();}};
   const api = Object.freeze({
     isAuthorized:()=>authorized(),
@@ -306,6 +318,8 @@
       if(data?.error)throw Error(data.error.error||'Torn API error');
       return data;
     },
+    getWhoScouterKeys:scouterKeys,
+    selectWhoScouterKey:(id,newKey)=>selectScouterKey(id,newKey),
     getWhoScouterState:()=>ffScouter.state(),
     setWhoScouterEnabled:(value,event)=>{if(value===true){let target;try{if(event?.isTrusted!==true)throw Error();target=Object.getOwnPropertyDescriptor(pageWindow.Event.prototype,'target').get.call(event);}catch{throw Error('Use the FFScouter consent checkbox in War Organizer Settings.');}if(!target?.isSameNode(document.getElementById('tu-who-ff-consent'))||!target.checked||target.closest('#tu-who-panel')?.hidden)throw Error('Use the FFScouter consent checkbox in War Organizer Settings.');}return ffScouter.setEnabled(value);},
     requestWhoScouter:ids=>ffScouter.stats(ids),
@@ -618,7 +632,7 @@ __TU_COMPACT_UI_CSS__
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.106-dev</span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.107-dev</span></footer>';
   document.body.appendChild(panel);
   const headerBrand=panel.querySelector('.tu-logo');if(headerBrand){headerBrand.textContent='';headerBrand.classList.add('tu-brand-emblem');headerBrand.setAttribute('role','img');headerBrand.setAttribute('aria-label','Torn Utilities');}
   const identityLine=document.createElement('p');
@@ -833,7 +847,7 @@ __TU_COMPACT_UI_CSS__
          saveJob:job=>credentials.set('tu:dev:deletion-job:v1',JSON.stringify(job)),removeJob:()=>credentials.remove('tu:dev:deletion-job:v1'),
          random:()=>Array.from(crypto.getRandomValues(new Uint8Array(32)),n=>n.toString(16).padStart(2,'0')).join(''),
          request:body=>devRequest('/api/auth/delete-data','POST',body,''),
-         verify:async key=>{const info=checkedKeyInfo(await requestIdentity(key,{revalidate:true}));rememberVerifiedKey(key,info.level,info.playerId,{deletion:true});return info;},entries:readStoredKeys,
+         verify:async key=>{const info=checkedKeyInfo(await requestIdentity(key,{revalidate:true}),{extended:true});rememberVerifiedKey(key,info.level,info.playerId,{deletion:true});return info;},entries:readStoredKeys,
          stop:()=>{identityDeletionInProgress=true;credentials.set(VAULT_CLEARED,'1');stopModule();publishAuthorization(false);authGeneration++;clearAuthorizationCache();localStorage.removeItem(TU_TERMS_KEY);},
          cleanup:async id=>{
           ffScouter.forget(id);
@@ -869,10 +883,10 @@ __TU_COMPACT_UI_CSS__
         const savedKeys=document.createElement('div');savedKeys.style.cssText='margin:10px 0';let viewing=true,keyOperation=false;
         const guarded=action=>async()=>{if(keyOperation)return;keyOperation=true;try{await action()}finally{keyOperation=false;}};
         const reportError=()=>{status.textContent='Operation failed. Check the key, network connection and DEV session, then retry.'};
-        async function verifyEntry(key){const data=await requestIdentity(key,{revalidate:true}),info=checkedKeyInfo(data);rememberVerifiedKey(key,info.level,info.playerId);if(key===readSavedKey())localStorage.setItem(LOGIN_ACCESS_KEY,info.level==='Limited Access'?'limited':'public');return {data,...info};}
+        async function verifyEntry(key){const data=await requestIdentity(key,{revalidate:true}),info=checkedKeyInfo(data,{extended:true});rememberVerifiedKey(key,info.level,info.playerId);if(key===readSavedKey())localStorage.setItem(LOGIN_ACCESS_KEY,info.level==='Limited Access'?'limited':'public');return {data,...info};}
         async function useForLogin(key){
           try{
-            const checked=await verifyEntry(key);
+            const checked=await verifyEntry(key);if(!['Public Only','Limited Access'].includes(checked.level))throw Error('Unsupported TU login key');
             const registration=await devRequest('/api/auth/register','POST',{api_key:key,platform:scriptPlatform(),manual:true},'');
             const expected=checked.level==='Limited Access'?'limited':'public';
             if(!registration.token||registration.accessLevel!==expected||(registration.playerId!=null&&String(registration.playerId)!==checked.playerId))throw Error('DEV registration verification mismatch');
@@ -888,19 +902,19 @@ __TU_COMPACT_UI_CSS__
           const summary=document.createElement('p');summary.textContent=keys.length+' saved API key(s)';savedKeys.append(summary);if(!viewing)return;
           for(const [index,entry] of keys.entries()){
             const row=document.createElement('div');row.dataset.tuKeyEntry=String(index);row.style.cssText='padding:9px 0;border-top:1px solid #555';
-            const roles=[entry.key===readSavedKey()?'TU login':null,entry.key===normalizeKey(readCredential(WHO_KEY))?'War Organizer':null].filter(Boolean);
+            const roles=[entry.key===readSavedKey()?'TU login':null,entry.key===normalizeKey(readCredential(WHO_KEY))?'War Organizer':null,entry.ffscouter?'FFScouter':null].filter(Boolean);
             const label=document.createElement('strong');label.textContent=(entry.level||'Access level unverified')+(roles.length?' ('+roles.join(', ')+')':'');row.append(label);
             const owner=document.createElement('small');owner.textContent=entry.playerId?' · Player '+entry.playerId:' · Recheck legacy key to verify its access level';row.append(owner);
             const field=document.createElement('input');field.type='password';field.readOnly=true;field.value=credentials.mode==='userscript-private'?'':entry.key;field.placeholder='Key ending in '+entry.key.slice(-4);field.style.cssText='display:block;width:100%;box-sizing:border-box;padding:8px;margin:6px 0';row.append(field);
             row.append(makeButton('Show / Hide',event=>{if(credentials.mode==='userscript-private'){if(!event?.isTrusted)return;const reveal=field.type==='password';field.value=reveal?entry.key:'';field.type=reveal?'text':'password';}else field.type=field.type==='password'?'text':'password';}));
             row.append(makeButton('Recheck access level',guarded(async()=>{try{await verifyEntry(entry.key);status.textContent='Saved key access level verified by Torn';renderSaved();}catch{status.textContent='Key could not be verified. It remains saved until you remove it.'}})));
-            if(entry.key!==readSavedKey())row.append(makeButton('Use for TU login',guarded(()=>useForLogin(entry.key))));
+            if(entry.key!==readSavedKey()&&(!entry.level||['Public Only','Limited Access'].includes(entry.level)))row.append(makeButton('Use for TU login',guarded(()=>useForLogin(entry.key))));
             if(entry.level==='Limited Access'&&entry.key!==normalizeKey(readCredential(WHO_KEY)))row.append(makeButton('Use for War Organizer',guarded(async()=>{try{const checked=await verifyEntry(entry.key);if(checked.level!=='Limited Access'||checked.playerId!==getPlayer()?.id)throw Error('Use a Limited key belonging to the current TU player');credentials.set(WHO_KEY,entry.key);ffScouter.reset();pageWindow.dispatchEvent(new Event('tu-who-key-changed'));status.textContent='Limited key selected for War Organizer';renderSaved();}catch{status.textContent='Select a valid Limited key belonging to the current TU player.'}})));
             row.append(makeButton('Remove',guarded(async()=>{
               if(!confirm('Remove only this saved API key? Other saved keys will be retained.'))return;
               const activeKey=entry.key===readSavedKey();
               if(activeKey){try{await devCancel()}catch{status.textContent='Cancellation not confirmed; key retained. Check the DEV connection and retry.';return;}}
-              forgetStoredKey(entry.key);
+              forgetStoredKey(entry.key);ffScouter.reset();pageWindow.dispatchEvent(new Event('tu-who-key-changed'));
               if(activeKey){resetDevAuthFailure();localStorage.removeItem(TU_TERMS_KEY);sessionStorage.removeItem(DEV_SESSION_KEY);clearPlayer();publishAuthorization(false);showAgreement();syncLauncher();}
               else{status.textContent='Selected key removed; other saved keys retained';renderSaved();}
             })));savedKeys.append(row);
@@ -913,7 +927,7 @@ __TU_COMPACT_UI_CSS__
           if(!key){keyOperation=false;status.textContent='Enter a valid 16-character API key';return;}
           submit.disabled=true;status.textContent='Verifying key with Torn…';
           try{const checked=await verifyEntry(key);status.textContent=checked.level+' key verified and saved individually; TU login unchanged';renderSaved();}
-          catch{status.textContent='Not saved: Torn must verify a valid Public Only or Limited Access key and its owner';}
+          catch{status.textContent='Not saved: Torn must verify a supported API key and its owner';}
           finally{keyOperation=false;submit.disabled=false;}
         });renderSaved();return;
       }

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {webcrypto} from 'node:crypto';
 import {JSDOM} from 'jsdom';
 const code=fs.readFileSync(new URL('../dist/tu-integrated-staging-dev.user.js',import.meta.url),'utf8');
 const A='aaaaaaaaaaaaaaaa',B='bbbbbbbbbbbbbbbb',C='cccccccccccccccc',D='dddddddddddddddd',E='eeeeeeeeeeeeeeee',F='ffffffffffffffff';
@@ -7,6 +8,7 @@ const VAULT='tu:identity:public-only-key:v1',WHO='tu:who:limited-api-key:v1',EXT
 const tick=()=>new Promise(r=>setTimeout(r,30));
 async function boot({local=null,gmInitial=A,deleteGM=true,clearGM=true,privateStore=false,gmEntries=null,gmFailWrite=false}={}){
  const dom=new JSDOM('<body/>',{url:'https://www.torn.com/',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window;
+ Object.defineProperty(w,'crypto',{value:webcrypto});w.TextEncoder=TextEncoder;
  const clickHandlers=new WeakMap(),nativeAdd=w.EventTarget.prototype.addEventListener;w.EventTarget.prototype.addEventListener=function(type,handler,...rest){if(type==='click'&&this.tagName==='BUTTON'){const handlers=clickHandlers.get(this)||[];handlers.push(handler);clickHandlers.set(this,handlers);}return nativeAdd.call(this,type,handler,...rest);};
  const observers=[],errors=[],requests=[];let gmKey=gmInitial;const privateValues=new Map(gmEntries||[[VAULT,gmInitial]]);if(privateStore)w.GM_info={scriptHandler:'Tampermonkey'};
  const Observer=w.MutationObserver;w.MutationObserver=class extends Observer{constructor(fn){super(fn);observers.push(this)}};
@@ -48,7 +50,7 @@ let local;
   assert.equal(b.w.localStorage.getItem(VAULT),A,'Adding a key must not replace login');assert.equal(b.w.localStorage.getItem(WHO),C,'Saving another Limited key preserves selected War key');
   assert.ok(b.row(C).querySelector('strong').textContent.includes('Limited Access'));assert.ok(b.row(D).querySelector('strong').textContent.includes('Limited Access'));
   assert.equal(b.row(B).querySelector('input').type,'password');b.button(b.row(B),'Show / Hide').click();assert.equal(b.row(B).querySelector('input').type,'text');
-  await b.save(E);assert.equal(b.row(E),undefined,'Unsupported keys not added');
+  await b.save(E);assert.ok(b.row(E),'Full keys can be saved for provider use');assert.equal(b.button(b.row(E),'Use for TU login'),undefined,'Provider keys cannot widen TU login access');b.button(b.row(E),'Remove').click();await tick();
   await b.save(F);assert.ok(b.row(F));b.button(b.row(F),'Use for War Organizer').click();await tick();assert.equal(b.w.localStorage.getItem(WHO),C,'A different player key cannot be selected for current War Organizer');
   b.button(b.row(D),'Use for War Organizer').click();await tick();assert.equal(b.w.localStorage.getItem(WHO),D);assert.ok(b.row(C),'Replacing a role does not remove prior key');
   b.control.registrationFailure=true;b.button(b.row(B),'Use for TU login').click();await tick();assert.equal(b.w.localStorage.getItem(VAULT),A,'Registration failure leaves current login intact');
@@ -105,3 +107,21 @@ console.log('Private Manager credential integration passed: migration, empty mas
 {
  const b=await boot({privateStore:true,gmFailWrite:true});try{assert.equal(b.w.localStorage.getItem(VAULT),A,'Failed migration preserves original credentials');assert.ok(b.w.document.querySelector('[role=alert]')?.textContent.includes('Private credential storage'));assert.ok(!b.requests.some(request=>request.url.startsWith('https://api.torn.com')),'No API fallback reads legacy keys after private storage fails');assert.deepEqual(b.errors,[]);}finally{b.close();}
 }
+
+{
+ const b=await boot({privateStore:true});try{
+  const api=b.w.TornUtilities;assert.equal((await api.getWhoScouterState()).available,false,'No login/War key fallback before explicit selection');
+  await api.selectWhoScouterKey(null,C);assert.equal((await api.getWhoScouterState()).available,true);assert.equal((await api.getWhoScouterState()).enabled,false);
+  const choices=await api.getWhoScouterKeys();assert.equal(choices.filter(k=>k.selected).length,1);for(const key of [A,B,C])assert.ok(!JSON.stringify(choices).includes(key),'Only masked labels and opaque IDs leave Manager');
+  const loginBefore=b.gmEntries();await api.selectWhoScouterKey(null,E);const selected=(await api.getWhoScouterKeys()).find(k=>k.selected);assert.ok(selected.label.includes('Full Access'));assert.ok(selected.label.includes('eeee'));
+  await assert.rejects(api.selectWhoScouterKey(null,F),/current TU player/);assert.equal((await api.getWhoScouterKeys()).find(k=>k.selected).id,selected.id);
+  b.fixtures.set(D,{level:'Custom',id:42});await api.selectWhoScouterKey(null,D);assert.ok((await api.getWhoScouterKeys()).find(k=>k.selected).label.includes('Custom'));
+  const chosen=(await api.getWhoScouterKeys()).find(k=>k.selected);b.fixtures.delete(D);await assert.rejects(api.selectWhoScouterKey(chosen.id),/could not verify/);assert.equal((await api.getWhoScouterState()).available,false,'Failed selected-key recheck clears stale validity');b.fixtures.set(D,{level:'Custom',id:42});await api.selectWhoScouterKey(null,D);
+  const privateRecord=JSON.parse(new Map(b.gmEntries()).get('tu:credentials:private:v1'));assert.equal(privateRecord.values[VAULT],A);assert.equal(privateRecord.values[WHO],C,'Provider key selection leaves roster key unchanged');assert.ok(JSON.parse(privateRecord.values[RING]).some(k=>k.key===D&&k.ffscouter));
+  assert.equal(b.requests.filter(o=>o.url.startsWith('https://ffscouter.com')).length,0,'Verifying/saving never sends to provider before opt-in');await assert.rejects(api.requestWhoScouter([1]),/Enable/);
+  for(const key of [A,C,D,E])assert.ok(!JSON.stringify(b.local()).includes(key),'No provider key in origin persistence with private storage');
+  const reloaded=await boot({privateStore:true,local:b.local(),gmEntries:b.gmEntries()});try{assert.equal((await reloaded.w.TornUtilities.getWhoScouterKeys()).find(k=>k.selected).id,(await api.getWhoScouterKeys()).find(k=>k.selected).id,'Separate key selection survives reload');}finally{reloaded.close();}
+  b.settings();const row=[...b.w.document.querySelectorAll('[data-tu-key-entry]')].find(r=>r.textContent.includes('FFScouter'));b.button(row,'Remove').click();await tick();assert.equal((await api.getWhoScouterState()).available,false,'Removing selected provider key disables access');assert.deepEqual(b.errors,[]);
+ }finally{b.close();}
+}
+console.log('Separate FFScouter keys passed: masked list, custom/full support, verified same-owner save, no fallback or pre-consent provider calls, private persistence/reload, role separation and removal.');

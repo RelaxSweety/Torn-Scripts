@@ -1,5 +1,20 @@
 [
   {
+    "version": "0.5.42.107-dev",
+    "date": "2026-11-12",
+    "securityBundle": true,
+    "changes": {
+      "Features": [
+        "Select a separate saved FFScouter key or verify and save another in War Organizer Settings",
+        "Show distinct Torn-valid and FFScouter-confirmed key indicators"
+      ],
+      "Fixes": [
+        "Keep FFScouter errors visible during retry cooldown",
+        "Improve War Organizer Settings spacing and live consent status"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.106-dev",
     "date": "2026-11-12",
     "securityBundle": true,

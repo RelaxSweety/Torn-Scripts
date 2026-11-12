@@ -1,5 +1,7 @@
 # War Organizer estimates and filters — DEV .105
 
+Current .107 separate-key behavior supersedes the original key fallback described below. See [separate key selection and validation](WAR-FFSCOUTER-KEYS-20261112.md).
+
 TU **0.5.42.105-dev**, War Organizer **0.3.19-dev**; Item Monitor remains **1.12.53-dev**.
 
 Targets place the player name, battle-stat estimate and personalized FF on one line. Level, HP, status, countdown and activity share the second line. Reserve controls retain at least 44px height. FF sorts numerically in either direction, with unavailable values last; minimum/maximum ranges use the displayed two-decimal value. The Okay filter matches only Okay players. Both faction headers show Online and colored Okay (green), Hosp (red), Trvl (blue) totals from the complete roster. Trvl includes traveling and abroad members. Counts are not affected by target filters.

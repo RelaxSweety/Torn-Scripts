@@ -111,3 +111,12 @@ red Hosp / blue Trvl totals under both factions. Public live documentation, unau
 verified in .106-dev after the new policy took effect. Corrected provider policy
 links and registration/retention disclosure. Authenticated FF and real PDA/GM
 transport remain unverified. See [implementation, privacy and validation](WAR-FFSCOUTER-20261112.md).
+
+
+## Separate FFScouter key selection — .107-dev
+
+War Organizer Settings lists saved TU keys or verifies/saves another key for
+FFScouter separately from login and roster keys. Added red/green Torn-valid and
+provider-confirmed indicators, visible categorized errors during cooldown and
+mobile Settings spacing/status fixes. No automatic provider registration.
+See [behavior, validation and limits](WAR-FFSCOUTER-KEYS-20261112.md).
