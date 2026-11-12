@@ -85,6 +85,35 @@ export function createDirectQuickItems({window,document,fetchImpl,isAuthorized=(
  const inventoryFingerprint=data=>JSON.stringify(data.slots.map(slotIdentity).sort((a,b)=>a[0].localeCompare(b[0])));
  const selectedSlot=(slot,items)=>!!slot.item&&(items||[]).some(item=>typeof item?.name==='string'&&!!item.name.trim()&&slot.item.name===item.name&&(!item.id||String(item.id)===String(slot.item.ID))&&(!item.uid||String(slot.item.UID??slot.item.uid??'')===String(item.uid)));
  const inventoryCapacity=data=>({total:data.slots.length,occupied:data.slots.filter(slot=>slot.item!=null).length});
+ function snapshotEpoch(){try{return window.sessionStorage.getItem(KEY+':inventory-epoch')||'0';}catch{return null;}}
+ function invalidateRunInventory(){try{window.sessionStorage.setItem(KEY+':inventory-epoch',window.crypto.randomUUID());}catch{}}
+ function runInventoryKey(run){return JSON.stringify([run?.ownerId,run?.intentId,run?.watchKey,run?.country]);}
+ function rememberRunInventory(run,data,source){
+  if(!run||!validTravelInventory(data))return;
+  run.directItemInventory={epoch:snapshotEpoch(),build,key:runInventoryKey(run),at:new Date(now()).toISOString(),source,data:{maxBaseSlots:data.maxBaseSlots,maxSpecialSlots:data.maxSpecialSlots,slots:data.slots.map(slot=>({ID:slot.ID,item:slot.item?{ID:slot.item.ID,name:slot.item.name,...(slot.item.UID!=null?{UID:slot.item.UID}:{})}:null}))}};
+ }
+ function armedRunInventory(run){
+  const saved=run?.directItemInventory;
+  if(!saved||saved.epoch===null||saved.epoch!==snapshotEpoch()||saved.build!==build||saved.key!==runInventoryKey(run)||!validTravelInventory(saved.data))return null;
+  const mutations=new Set(['buy','useItem','trashItem','addSlotItem','removeSlotItem','fillSlotItems','clear','setLoadout']);
+  if(capture.activity().records.some(record=>mutations.has(record.step)&&(record.at>=saved.at||record.response?.state!=='received'))){delete run.directItemInventory;return null;}
+  // Reuse passive native reads to detect changed slots, without issuing a heal-time GET.
+  const recorded=capture.report();if(recorded.actions.some(action=>action.kind==='recording-stop'&&action.at>=saved.at)){delete run.directItemInventory;return null;}
+  const latest=recorded.records.filter(record=>record.at>=saved.at&&record.response?.inventory).at(-1)?.response.inventory;
+  if(latest){
+   const rows=[];for(const row of latest.slots||[]){const match=row.path?.match(/^slots\[(\d+)\](\.item)?$/);if(!match)continue;const index=Number(match[1]);rows[index]||={};if(match[2])rows[index].item=row.fields;else Object.assign(rows[index],row.fields);}
+   const data={...latest.capacities,slots:rows};
+   const identity=value=>JSON.stringify(value.slots.map(slot=>[String(slot.ID),slot.item?[String(slot.item.ID),slot.item.name]:null]).sort((a,b)=>a[0].localeCompare(b[0])));
+   if(!validTravelInventory(data)||identity(data)!==identity(saved.data)){delete run.directItemInventory;return null;}
+  }
+  return saved.data;
+ }
+ async function prepareRunInventory(run){
+  if(busy||inspecting||pending()||!travelContext())return {result:'blocked'};
+  inspecting=true;const abort=new window.AbortController(),cancel=()=>abort.abort(),timer=window.setTimeout(cancel,timeoutMs);controller=abort;window.addEventListener('pagehide',cancel,{once:true});
+  try{capture.start();const data=await travelRequest('inventory',abort.signal);if(!travelContext()||!validTravelInventory(data))return {result:'inventory-unconfirmed'};rememberRunInventory(run,data,'arming');travelInspection={at:new Date(now()).toISOString(),build,...capture.inventoryInfo(data)};return {result:'inventory-prepared',inventoryCapacity:inventoryCapacity(data)};}
+  catch{return {result:'inventory-unconfirmed'};}finally{window.clearTimeout(timer);window.removeEventListener('pagehide',cancel);if(controller===abort)controller=null;inspecting=false;}
+ }
  async function useTravel(event,selection,consented=false,workflow=null){
   if(!event?.isTrusted||busy||inspecting||pending()||!consented||!travelContext())return {result:'blocked'};
   const trashing=workflow?.operation==='trash';
@@ -94,7 +123,8 @@ export function createDirectQuickItems({window,document,fetchImpl,isAuthorized=(
   busy=true;travelOutcome=null;controller=new window.AbortController();const active=controller,started=now();let posted=false;
   const abort=()=>active.abort(),timer=window.setTimeout(abort,timeoutMs);window.addEventListener('pagehide',abort,{once:true});renderState();
   try{
-   capture.start();const before=await travelRequest('inventory',active.signal);
+   capture.start();const before=workflow?.useArmedInventory?armedRunInventory(workflow.run):await travelRequest('inventory',active.signal);
+   if(workflow?.useArmedInventory&&!before)return {result:'armed-inventory-unavailable',text:'The armed inventory snapshot is missing or changed. Re-arm Snatch and Run before healing.'};
    if(!validTravelInventory(before))return {result:'inventory-unconfirmed'};
    if(workflow){
     if(!workflow.guard())return {result:'blocked'};
@@ -112,6 +142,7 @@ export function createDirectQuickItems({window,document,fetchImpl,isAuthorized=(
    if(trashing&&current.item.isTrashable===false)return {result:'not-trashable',text:'Torn marks the selected item as not trashable. No request was sent.'};
    // Reserve before the sole state-changing request; reloads and uncertain outcomes stay locked.
    window.sessionStorage.setItem(KEY,JSON.stringify({scope:'travel',operation:trashing?'trash':'use',itemId:expected.itemId,slotId:expected.slotId,at:new Date(now()).toISOString()}));
+   if(workflow?.run)delete workflow.run.directItemInventory;
    posted=true;record('requested',expected.itemId,'response-received',started);
    const data=await travelRequest(trashing?'trashItem':'useItem',active.signal,expected.slotId),evidence=capture.useInfo(data);
    travelOutcome={at:new Date(now()).toISOString(),build,operation:trashing?'trash':'use',slotId:expected.slotId,itemId:expected.itemId,evidence,consumption:'unconfirmed',hospitalRelease:evidence.hospitalRelease};
@@ -123,6 +154,7 @@ export function createDirectQuickItems({window,document,fetchImpl,isAuthorized=(
     if(after.maxBaseSlots!==before.maxBaseSlots||after.maxSpecialSlots!==before.maxSpecialSlots||inventoryFingerprint(after)!==inventoryFingerprint(expectedAfter))throw Error('unrelated-inventory-change');
    }
    travelOutcome.consumption='confirmed-by-response-and-fresh-inventory';
+   if(workflow?.run)rememberRunInventory(workflow.run,after,workflow.useArmedInventory?'healing':'hospitalization');
    // Release is separate evidence; never advances purchase/travel or assumes a partial heal released the player.
    travelInspection={at:new Date(now()).toISOString(),build,...capture.inventoryInfo(after)};
    window.sessionStorage.removeItem(KEY);record('response',expected.itemId,'success-response',started);
@@ -231,5 +263,5 @@ export function createDirectQuickItems({window,document,fetchImpl,isAuthorized=(
   for(const button of panel.querySelectorAll('button'))button.style.cssText='padding:10px;margin:6px;background:#d6b65c;color:#111;border:0;border-radius:6px;font:bold 14px system-ui;cursor:pointer';panel.querySelector('select').style.cssText='display:block;width:100%;padding:10px;background:#283239;color:white';
   panel.querySelector('[data-inspect]').onclick=async event=>{const button=event.currentTarget;button.disabled=true;const result=await inspectTravel(event);if(panel)panel.querySelector('[data-inspection]').textContent=JSON.stringify(result,null,2);button.disabled=false;refreshTravelChoices();};panel.querySelector('[data-capture]').disabled=!capture.canStart();panel.querySelector('[data-capture]').onclick=event=>{if(capture.start(event))close();};panel.querySelector('[data-close]').onclick=close;panel.querySelector('[data-refresh]').onclick=refresh;panel.querySelector('select').onchange=renderState;panel.querySelector('[data-consent]').onchange=renderState;panel.querySelector('[data-review]').onclick=review;panel.querySelector('[data-use]').onclick=async event=>{const select=panel?.querySelector('select');const result=await use(event,select?.value,panel?.querySelector('[data-consent]').checked);if(panel)panel.querySelector('[data-result]').textContent=result.text||result.result;};panel.querySelector('[data-travel-select]').onchange=renderState;panel.querySelector('[data-travel-consent]').onchange=renderState;panel.querySelector('[data-travel-use]').onclick=async event=>{const selection=panel?.querySelector('[data-travel-select]').value,consented=panel?.querySelector('[data-travel-consent]').checked;const result=await useTravel(event,selection,consented);if(panel)panel.querySelector('[data-travel-result]').textContent=result.text||result.result;};document.body.append(panel);refresh();refreshTravelChoices();
  }
- return {refreshNativeInventory,testNativeRefresh,inspectNativeRefresh,addDiagnosticBloodBag,clearLogs(){cancelFocusTest?.();focusTests=[];capture.clear();records=[];refreshProbes=[];addOutcome=null;if(!busy&&!inspecting){travelInspection=null;travelOutcome=null;}try{window.sessionStorage.removeItem(LOG);}catch{}},open,close,stop(){cancelFocusTest?.();close();capture.stop();},captureStart:()=>capture.start(),captureStop:()=>{cancelFocusTest?.();capture.stop();},captureResume:()=>capture.resume(),inspectTravel,useTravel,buyRunItem,useRunItem:(event,items,guard)=>useTravel(event,null,true,{items,guard}),trashRunItem:(event,items,guard,expectedFingerprint)=>useTravel(event,null,true,{items,guard,operation:'trash',expectedFingerprint}),hasPendingAttempt:pending,cancel:()=>controller?.abort(),use,review,inventory,report:()=>({nativeInventoryRefresh:{focusTests:JSON.parse(JSON.stringify(focusTests)),probes:refreshProbes.map(entry=>({...entry,assets:[...entry.assets]})),addOutcome},build,transport:'direct-website-post',inventoryScope:'personal-medical-and-selected-travel-items',travelRequestCapture:capture.report(),travelInspection,travelOutcome,travelPilot:{enabled:true,selectionScope:'explicit-user-selected-carried-items',freshIdentityCheck:true,automaticFollowUps:false},busy,unconfirmedAttempt:pending(),records:records.map(entry=>({...entry})),limitation:'Response receipt is not proof of travel inventory consumption. Snatch item use and selected destruction use the direct handler; purchase uses verified direct requests; return travel retains native transport.'})};
+ return {prepareRunInventory,refreshNativeInventory,testNativeRefresh,inspectNativeRefresh,addDiagnosticBloodBag,clearLogs(){invalidateRunInventory();cancelFocusTest?.();focusTests=[];capture.clear();records=[];refreshProbes=[];addOutcome=null;if(!busy&&!inspecting){travelInspection=null;travelOutcome=null;}try{window.sessionStorage.removeItem(LOG);}catch{}},open,close,stop(){invalidateRunInventory();cancelFocusTest?.();close();capture.stop();},captureStart:()=>capture.start(),captureStop:()=>{invalidateRunInventory();cancelFocusTest?.();capture.stop();},captureResume:()=>capture.resume(),inspectTravel,useTravel,buyRunItem,useRunItem:(event,items,guard,options={})=>useTravel(event,null,true,{items,guard,...options}),trashRunItem:(event,items,guard,expectedFingerprint)=>useTravel(event,null,true,{items,guard,operation:'trash',expectedFingerprint}),hasPendingAttempt:pending,cancel:()=>controller?.abort(),use,review,inventory,report:()=>({nativeInventoryRefresh:{focusTests:JSON.parse(JSON.stringify(focusTests)),probes:refreshProbes.map(entry=>({...entry,assets:[...entry.assets]})),addOutcome},build,transport:'direct-website-post',inventoryScope:'personal-medical-and-selected-travel-items',travelRequestCapture:capture.report(),travelInspection,travelOutcome,travelPilot:{enabled:true,selectionScope:'explicit-user-selected-carried-items',freshIdentityCheck:true,automaticFollowUps:false},busy,unconfirmedAttempt:pending(),records:records.map(entry=>({...entry})),limitation:'Response receipt is not proof of travel inventory consumption. Snatch item use and selected destruction use the direct handler; purchase uses verified direct requests; return travel retains native transport.'})};
 }

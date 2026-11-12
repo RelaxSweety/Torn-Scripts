@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.102-dev",
+    "date": "2026-11-12",
+    "securityBundle": true,
+    "changes": {
+      "Improvements": [
+        "Check healing inventory when arming and after hospitalization-item use",
+        "Remove the extra inventory request before healing while retaining consumption verification"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.101-dev",
     "date": "2026-11-11",
     "securityBundle": true,

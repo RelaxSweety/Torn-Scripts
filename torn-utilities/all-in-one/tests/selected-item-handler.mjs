@@ -9,11 +9,11 @@ for(const [id,name,status] of [[66,'Morphine','Abroad'],[67,'First Aid Kit','Hos
  const pilot=createDirectQuickItems({window:w,document:w.document,isAuthorized:()=>true,fetchImpl:async(url,options)=>{const step=new URL(url).searchParams.get('step');calls.push(step);if(step==='useItem'){posts++;assert.equal(options.method,'POST');assert.deepEqual(JSON.parse(options.body),{slotID:123});current={maxBaseSlots:2,maxSpecialSlots:0,slots:[{ID:'123'},{ID:'124'}]};return {ok:true,text:async()=>JSON.stringify({success:true,itemRemoved:true,message:'Medical item used.'})};}return {ok:true,text:async()=>JSON.stringify(current)};}});
  const native={prepareRun(){},cancel(){},inspect:()=>({}),execute(){nativeCalls++;throw Error('Native item use is forbidden');}};
  const adapter=createSnatchDirectItems({window:w,native,getPilot:()=>pilot,getProfile:async()=>({status:{state:status,until:Math.floor(Date.now()/1000)+3600}})});
- const run={ownerId:'fixture',intentId:'fixture',watchKey:'id:206',minimumQty:1,medicals:[{id:999,name:'Not carried'}, {id,name,...(id===66?{uid:'instance-one'}:{})}],capacityLedger:{valid:true,total:2,initialOccupied:1,freed:0,purchased:0}};
+ const run={hospital:true,ownerId:'fixture',intentId:'fixture',watchKey:'id:206',minimumQty:1,medicals:[{id:999,name:'Not carried'}, {id,name,...(id===66?{uid:'instance-one'}:{})}],capacityLedger:{valid:true,total:2,initialOccupied:1,freed:0,purchased:0}};
  const options={event:{isTrusted:true},run,getSnapshot:()=>({hospitalized:true,traveling:false,quantity:2500}),guard:()=>true};
  try{
   await assert.rejects(adapter.execute('heal',{...options,event:{isTrusted:false}}));assert.equal(posts,0);
-  const result=await adapter.execute('heal',options);assert.equal(result.medicalUsed,true);assert.equal(result.hospitalReleased,status==='Abroad');assert.equal(run.capacityLedger.freed,1);assert.equal(posts,1);assert.equal(nativeCalls,0);assert.deepEqual(calls,['inventory','useItem','inventory']);
+  await adapter.prepareRun(run);const result=await adapter.execute('heal',options);assert.equal(result.medicalUsed,true);assert.equal(result.hospitalReleased,status==='Abroad');assert.equal(run.capacityLedger.freed,1);assert.equal(posts,1);assert.equal(nativeCalls,0);assert.deepEqual(calls,['inventory','useItem','inventory']);
  }finally{adapter.cancel();pilot.stop();w.close();}
 }
 // Empty bag 731 uses the same handler when explicitly selected; drawing blood

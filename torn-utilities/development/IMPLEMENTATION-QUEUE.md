@@ -80,3 +80,11 @@ waiting, a five-second observer, page reload or departure lock. Removed the
 Native inventory refresh investigation section; normal passive diagnostics
 remain. Real foreign-market acceptance is pending. See
 [implementation and validation](PURCHASE-NATIVE-REFRESH-20261111.md).
+
+## Armed healing inventory — .102-dev
+
+Healing inventory is prepared while arming and refreshed by post-hospitalization
+verification. Heal skips its pre-use inventory GET and retains the post-use
+consumption check. Missing/changed snapshots require re-arming; no hidden fallback
+GET or automatic retry. DEV monitor controls remain, per the user's final
+instruction. See [implementation and validation](ARMED-HEALING-INVENTORY-20261112.md).
