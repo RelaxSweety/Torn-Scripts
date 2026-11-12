@@ -1,0 +1,7 @@
+TU 0.5.42.111-dev / War Organizer 0.3.25-dev / Item Monitor 1.12.53-dev.
+Build and full npm regression passed. Final focused War/module/window/travel checks and generated-bundle browser tests passed after final interaction/layout changes.
+Payload 1030083 bytes; SHA-256 9dece64907cbeea58f62784bde5a434ec3f02ebc480fb215ccf7e7cfecadddff.
+Long-roster Chromium tests at 1280x900, 390x844 and 844x390: 80 own + 80 opposing synthetic players; stable anchors/DOM under repeated refresh and insertion, FF-sorted refresh, per-faction scroll, fixed controls/footer, search31px, Reserve90.9x27px, native destinations and revive yes/no/unknown/partial totals, profile-only own rows, minimize/restore scroll/draft, failed-own isolation, personal provider ETA and no persisted/shared FF fields.
+Existing FFScouter desktop/mobile full-bundle fixture also passed with new Players label and approved Reserve dimensions.
+All identities, credentials, rosters and provider results synthetic. No authenticated live or real-device PDA result claimed.
+Production, archived releases/evidence, Workers, databases, agreements and Item Monitor behavior unchanged.

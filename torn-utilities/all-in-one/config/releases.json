@@ -1,5 +1,21 @@
 [
   {
+    "version": "0.5.42.111-dev",
+    "date": "2026-11-12",
+    "securityBundle": true,
+    "changes": {
+      "Features": [
+        "Switch between own and opposing faction player lists",
+        "Show travel destinations and per-player revive availability with faction Rev totals"
+      ],
+      "Improvements": [
+        "Use the approved compact player layout with fixed search and filter controls",
+        "Preserve the visible player and list position during background refreshes",
+        "Move source and provider details below the independently scrolling player list"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.110-dev",
     "date": "2026-11-12",
     "securityBundle": true,

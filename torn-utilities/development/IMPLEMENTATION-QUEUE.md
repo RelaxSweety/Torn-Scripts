@@ -151,3 +151,14 @@ added aggregate/per-player reasons for unavailable ETA, and fixed TU's update
 check to compare the fourth numeric version component. Premium success alone
 no longer implies a usable return estimate exists. See
 [correction, validation and remaining limits](WAR-FFSCOUTER-ETA-FIX-20261112.md).
+
+## Approved compact dual-faction board — .111-dev
+
+Implemented the approved v6 layout: fixed compact controls; stable independently
+scrolling player list; health/name/level and right-aligned BS/FF arrangement;
+smaller/narrower Reserve controls; own/opposing faction switching; travel
+destinations; player revive availability and same-line faction Rev totals.
+Source/provider information is below the list. Refresh, faction switching and
+minimize/restore preserve player position; background updates preserve Settings
+drafts. Own faction has profile/Details actions only. See
+[implementation, validation and limits](WAR-BOARD-APPROVED-20261112.md).
