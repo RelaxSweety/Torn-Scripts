@@ -58,7 +58,7 @@ export function createSnatchDirectItems({native,getPilot,getProfile,window,now=(
    onEvent({step:'direct-item-start',action:kind});
    const result=await pilot.useRunItem(options.event,selected,()=>ensure()&&eligible(),{run,useArmedInventory:kind==='heal'});
    if(result.result!=='consumption-confirmed'){const error=Error(result.text||'Direct item use was blocked: '+result.result);error.submitted=result.result==='uncertain';if(error.submitted)proof={ownerId:run.ownerId,intentId:run.intentId,watchKey:run.watchKey,uncertain:true,at:now()};throw error;}
-   consumed=true;refreshItemCells(pilot,onEvent,kind);
+   consumed=true;if(result.inventorySource==='fresh-recovery')onEvent({step:'direct-heal-inventory-recovered',verified:true});refreshItemCells(pilot,onEvent,kind);
    // Credit each confirmed request once; the server slot ID can later be reused.
    if(run.capacityLedger?.valid){
     const ledger=run.capacityLedger;ledger.freed=Math.min(ledger.initialOccupied,ledger.freed+1);

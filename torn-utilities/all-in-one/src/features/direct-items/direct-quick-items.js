@@ -123,8 +123,14 @@ export function createDirectQuickItems({window,document,fetchImpl,isAuthorized=(
   busy=true;travelOutcome=null;controller=new window.AbortController();const active=controller,started=now();let posted=false;
   const abort=()=>active.abort(),timer=window.setTimeout(abort,timeoutMs);window.addEventListener('pagehide',abort,{once:true});renderState();
   try{
-   capture.start();const before=workflow?.useArmedInventory?armedRunInventory(workflow.run):await travelRequest('inventory',active.signal);
-   if(workflow?.useArmedInventory&&!before)return {result:'armed-inventory-unavailable',text:'The armed inventory snapshot is missing or changed. Re-arm Snatch and Run before healing.'};
+   capture.start();let inventorySource=workflow?.useArmedInventory?'armed':'fresh';let before=workflow?.useArmedInventory?armedRunInventory(workflow.run):await travelRequest('inventory',active.signal);
+   if(workflow?.useArmedInventory&&!before){
+    const saved=workflow.run?.directItemInventory,mutations=new Set(['buy','useItem','trashItem','addSlotItem','removeSlotItem','fillSlotItems','clear','setLoadout']);
+    if(saved&&saved.key!==runInventoryKey(workflow.run)||capture.activity().records.some(record=>mutations.has(record.step)&&record.response?.state!=='received'))return {result:'armed-inventory-unavailable',text:'A different run or unresolved inventory action prevents healing. Wait for Torn or re-arm.'};
+    if(!workflow.guard()||!travelContext())return {result:'blocked'};
+    before=await travelRequest('inventory',active.signal);if(!workflow.guard()||!travelContext()||active.signal.aborted)return {result:'blocked'};
+    if(validTravelInventory(before)){rememberRunInventory(workflow.run,before,'heal-recovery');inventorySource='fresh-recovery';}
+   }
    if(!validTravelInventory(before))return {result:'inventory-unconfirmed'};
    if(workflow){
     if(!workflow.guard())return {result:'blocked'};
@@ -158,7 +164,7 @@ export function createDirectQuickItems({window,document,fetchImpl,isAuthorized=(
    // Release is separate evidence; never advances purchase/travel or assumes a partial heal released the player.
    travelInspection={at:new Date(now()).toISOString(),build,...capture.inventoryInfo(after)};
    window.sessionStorage.removeItem(KEY);record('response',expected.itemId,'success-response',started);
-   return {result:trashing?'destruction-confirmed':'consumption-confirmed',inventoryCapacity:inventoryCapacity(after),...(trashing?{remaining:after.slots.filter(slot=>selectedSlot(slot,workflow.items)).length,inventoryFingerprint:inventoryFingerprint(after)}:{}),text:plain(data.message||data.text||'Item consumed.')+' Hospital release: '+travelOutcome.hospitalRelease+'.',...travelOutcome};
+   return {result:trashing?'destruction-confirmed':'consumption-confirmed',inventorySource,inventoryCapacity:inventoryCapacity(after),...(trashing?{remaining:after.slots.filter(slot=>selectedSlot(slot,workflow.items)).length,inventoryFingerprint:inventoryFingerprint(after)}:{}),text:plain(data.message||data.text||'Item consumed.')+' Hospital release: '+travelOutcome.hospitalRelease+'.',...travelOutcome};
   }catch{if(posted)record('uncertain',expected.itemId,'network-or-timeout',started);return {result:posted?'uncertain':'inventory-unconfirmed',text:posted?'Check Torn before clearing this attempt. No retry will occur.':'Inventory could not be verified. No item-use request was sent.'};}
   finally{window.clearTimeout(timer);window.removeEventListener('pagehide',abort);if(controller===active)controller=null;busy=false;renderState();refreshTravelChoices();}
  }

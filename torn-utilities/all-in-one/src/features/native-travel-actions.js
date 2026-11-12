@@ -1,6 +1,6 @@
 // Captured desktop and PDA Torn travel UI. One trusted TU action may expand its native
 // controls and confirm that same item/action; it never starts the next TU stage.
-export function createNativeTravelActions({document,window,enabled=()=>false,now=()=>Date.now()}){
+export function createNativeTravelActions({document,window,enabled=()=>false,now=()=>Date.now(),navigate=url=>window.location.assign(url)}){
  const norm=v=>String(v||'').normalize('NFKC').replace(/\s+/g,' ').trim().toLowerCase();
  const label=e=>norm(e?.getAttribute('aria-label')||e?.textContent||e?.value);
  const shown=e=>!!e?.isConnected&&!e.disabled&&e.getAttribute('aria-disabled')!=='true'&&e.getClientRects().length>0&&window.getComputedStyle(e).visibility!=='hidden'&&!e.closest('#tuim-panel,#tu-snatch-run,#tu-snatch-extra-hosp,#tu-pda-panel');
@@ -74,10 +74,10 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
   const flight=!!scope()?.querySelector('[aria-label="Flight progress"]')||norm(scope()?.querySelector('h4')?.textContent)==='traveling';
   return {...(same(hospitalizedProof,run)&&!hospitalizedProof.healed&&!release&&now()-hospitalizedProof.at<120000?{hospitalized:true}:{}),released:!!release,purchaseProof:same(purchased,run)?purchased.proof:null,purchaseItemKey:same(purchased,run)?run.watchKey:null,traveling:!!(same(booked,run)||flight),returning:!!same(booked,run)};
  }
- async function execute(kind,{run,getSnapshot,guard,allowBeforeLanding=false,extendHospital=false,onEvent=()=>{}}){
+ async function execute(kind,{run,getSnapshot,guard,allowBeforeLanding=false,extendHospital=false,onEvent=()=>{},awaitAction=null}){
   if(!enabled())throw Error('Native Tampermonkey/PDA controls unavailable');cancel();const current=new window.AbortController();controller=current;
   const signal=current.signal;let submitted=false;
-  const ensure=()=>{if((kind!=='return'&&run.capacityLedger?.valid===false)||signal.aborted||!guard()||document.hidden||!document.hasFocus())throw Error('Action canceled or page/player changed. Continue manually if Torn already accepted it.');};
+  const ensure=()=>{if((!['return','return-continue'].includes(kind)&&run.capacityLedger?.valid===false)||signal.aborted||!guard()||document.hidden||!document.hasFocus())throw Error('Action canceled or page/player changed. Continue manually if Torn already accepted it.');};
   const click=e=>{ensure();if(!shown(e))throw Error('Native action is no longer available');onEvent({step:'native-click',control:label(e).slice(0,220),controlId:e.id||'',panel:e.getAttribute('aria-controls')||''});e.click();};
   const wait=(read,timeout=4000)=>new Promise((resolve,reject)=>{
    let observer,timer,done=false;
@@ -89,7 +89,7 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
   const foreground=()=>{if(document.hidden||!document.hasFocus())current.abort();};
   document.addEventListener('visibilitychange',foreground);window.addEventListener('blur',foreground);
   try{
-   if(kind!=='return')prepareRun(run);ensure();if(!scope())throw Error('Open the native foreign travel page');
+   if(!['return','return-continue'].includes(kind))prepareRun(run);ensure();if(!scope())throw Error('Open the native foreign travel page');
    if(kind==='hospitalize'){
     if((!extendHospital&&!run.planHospitalize)||!(run.hospitalizations?.length||run.hospitalization?.name))throw Error('Select the planned hospitalization item first');
     const eligible=state=>extendHospital?state.hospitalized===true&&!state.returning&&!state.traveling:allowBeforeLanding?state.traveling===true&&!state.returning&&state.hospitalized!==true:!state.traveling&&state.hospitalized===false&&Number.isFinite(state.quantity)&&state.quantity<Math.max(1,Number(run.minimumQty)||1);
@@ -222,6 +222,14 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
     }catch(error){if(submitted&&run.capacityLedger){run.capacityLedger.valid=false;run.capacityLedger.reason='unconfirmed-remainder';}if(confirmedAmount){onEvent({step:'reconcile-stopped',message:error.message,submitted:!!error.submitted,amount:confirmedAmount});return outcome(error.message);}throw error;}}
     return outcome();
    }
+   if(kind==='return-continue'){
+    const panel=scope()?.querySelector('#travel-home-panel'),snapshot=getSnapshot();
+    if(!run.returnBookingConfirmed||!(/you make your way over to the airstrip and tell your pilot to head for torn/i.test(panel?.textContent||'')||snapshot.traveling&&snapshot.returning))throw Error('A confirmed return flight is required before continuing.');
+    const controls=[...(panel?.querySelectorAll('button')||[])].filter(e=>/^continue(?:\s*\(\d+\))?$/.test(label(e))&&e.isConnected&&e.getClientRects().length>0);
+    if(controls.length>1)throw Error('More than one flight Continue control is present. Continue manually.');
+    const button=controls[0];if(button&&shown(button))click(button);else{ensure();onEvent({step:'return-flight-navigation',source:'confirmed-booking',countdownBypassed:true});navigate(new window.URL('/page.php?sid=travel',window.location.href).href);}
+    return {returnContinued:true};
+   }
    if(kind==='return'){
     if(!run.purchaseConfirmed)throw Error('Confirm the purchase before returning');
     const currentPanel=()=>scope()?.querySelector('#travel-home-panel');
@@ -243,7 +251,7 @@ export function createNativeTravelActions({document,window,enabled=()=>false,now
      const back=returnButton(candidate);return back?{panel:candidate,back}:null;
     });
     panel=confirmation.panel;submitted=true;click(confirmation.back);
-    panel=await wait(()=>{const candidate=currentPanel();return candidate&&/you make your way over to the airstrip and tell your pilot to head for torn/i.test(candidate.textContent)?candidate:null;});booked={...run};
+    panel=await wait(()=>{const candidate=currentPanel();return candidate&&/you make your way over to the airstrip and tell your pilot to head for torn/i.test(candidate.textContent)?candidate:null;});booked={...run};run.returnBookingConfirmed=true;if(awaitAction)return {returnBooked:true,continueRequired:true};
     const next=await wait(()=>{
      // Torn may advance automatically when its countdown ends.
      if(scope()?.querySelector('[aria-label="Flight progress"]')||norm(scope()?.querySelector('h4')?.textContent)==='traveling')return {complete:true};

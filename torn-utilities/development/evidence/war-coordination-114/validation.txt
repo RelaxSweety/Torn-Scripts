@@ -1,0 +1,12 @@
+TU 0.5.42.114-dev / War Organizer 0.3.28-dev / Item Monitor 1.12.55-dev.
+Build and full npm regression suite PASS.
+War generated-bundle Chromium desktop/portrait/landscape: PASS; admin-only shared mode, no extra War authorization section, direct icon restore after attack/reload, player anchors and Personal/Tag Team tab/scroll retention.
+Generated Snatch/native Chromium desktop/portrait/landscape: PASS; Confirm travel navigates the already-booked flight on a trusted click while Continue (5) is disabled; no duplicate booking or automatic continuation.
+Healing fast path, fresh user-click recovery and changed-run rejection: PASS.
+Existing FFScouter/private-key consent/premium tests and approved board regressions: PASS.
+All authenticated execution fixtures synthetic; no real item use, attack, purchase or tester credentials.
+DEV Worker version: a7a9a994-60f5-4c18-9f5c-1bd57a45aadb.
+Payload bytes: 1058888
+SHA-256: 9d33a8224f630cc2f623c890b2030040f0929865d62892c2b141f8e6c3fc2a3f
+Generic, versioned .114 and tested integrated distributions are byte-identical.
+Production main remains 73c42788968612913ccfee20b1d5c194324dc8fd.

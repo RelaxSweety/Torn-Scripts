@@ -192,3 +192,15 @@ Active bookings otherwise gate this tool's attack links. List position survives
 close/minimize/attack navigation; private key-scoped BS/FF values survive empty
 or failed refreshes and same-tab navigation. No premium data redistribution.
 See [behavior, service boundaries, validation and limits](WAR-SHARED-COORDINATION-20261112.md).
+
+## War mode/restoration and uploaded Snatch reports — .114-dev
+
+TU 0.5.42.114-dev / War Organizer 0.3.28-dev / Item Monitor 1.12.55-dev.
+Moved War mode to shared admin-only War Settings, removed the redundant War
+coordination authorization section, and restored minimized War UI directly
+through the icon after attack navigation with tab/menu/scroll retained.
+Addressed the .112 uploads: recover missing healing inventory on a fresh user
+click while preserving the armed fast path; keep Confirm travel available after
+verified boarding and permit immediate click-driven flight-page navigation
+without waiting on the native Continue countdown. No automatic gameplay or
+post-purchase reload. See [findings, changes, tests and limits](WAR-SNATCH-FIXES-20261112.md).

@@ -1,5 +1,18 @@
 [
   {
+    "version": "0.5.42.114-dev",
+    "date": "2026-11-12",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Move shared War mode to admin-only War Settings and remove redundant War key consent",
+        "Minimize and restore War Organizer across attacks, preserving tab, menu and scroll position",
+        "Recover missing healing inventory safely on a user click while preserving the fast armed path",
+        "Offer Confirm travel after verified return booking without waiting for the native countdown"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.113-dev",
     "date": "2026-11-12",
     "securityBundle": true,

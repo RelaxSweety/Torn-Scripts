@@ -1,0 +1,34 @@
+{
+  "raw_reports_committed": false,
+  "user_credentials_used": false,
+  "reports": [
+    {
+      "report": 1,
+      "sha256": "5ec87f3e6257a4ed8e53d9a93eeaf08b7c02ba530cbce725d96c21fbb2380986",
+      "installedBuild": "0.5.42.112-dev",
+      "heal_pre_submission_errors": 6,
+      "item_action_records": 0,
+      "heal_confirmed": false,
+      "purchase_confirmed": false,
+      "return_booking_observed": true,
+      "continue_click_observed": false,
+      "guard_error": "The armed inventory snapshot is missing or changed. Re-arm Snatch and Run before healing."
+    },
+    {
+      "report": 2,
+      "sha256": "cec0f1cedfb9bd0990e2bf44fd5ee174ca2296cab96b633e609995e20e42c228",
+      "installedBuild": "0.5.42.112-dev",
+      "heal_pre_submission_errors": 0,
+      "item_action_records": 4,
+      "heal_confirmed": true,
+      "purchase_confirmed": true,
+      "return_booking_observed": true,
+      "continue_click_observed": false
+    }
+  ],
+  "limits": "Retained state does not prove the original invalidation trigger or unrecorded manual actions. Captures contain truncated/dropped history.",
+  "fixes": [
+    "Fresh user-click inventory recovery only if the armed snapshot is unavailable; the valid fast path remains POST then verification GET.",
+    "Keep confirmed boarding visible as Confirm travel; a user click navigates to the booked flight without waiting on the native countdown or repeating the booking."
+  ]
+}

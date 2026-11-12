@@ -1,0 +1,20 @@
+{
+  "build": "0.5.42.114-dev",
+  "synthetic_only": true,
+  "viewports": [
+    "desktop",
+    "portrait",
+    "landscape"
+  ],
+  "checks": [
+    "agreement-authorized coordination without a redundant checkbox",
+    "native key transport",
+    "admin role/slot/settings actions",
+    "orange reserved Okay / red open ATTACK",
+    "countdown/counts",
+    "long press/boot",
+    "admin stars",
+    "close/minimize/reload/attack icon restoration and settings tab/scroll",
+    "read-only member settings"
+  ]
+}

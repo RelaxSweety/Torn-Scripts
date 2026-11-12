@@ -2,7 +2,7 @@
 // Native Torn keys are request-scoped; FFScouter data/keys never enter this service.
 const OWNER='4539436',identities=new Map(),nativeReads=new Map();
 const positive=value=>/^[1-9][0-9]{0,11}$/.test(String(value||''));
-const defaults=()=>({enemyFactionId:null,enemyName:'',reservationLimit:1,reservationTimer:5,attackForfeit:0,slots:{}});
+const defaults=()=>({mode:'real',enemyFactionId:null,enemyName:'',reservationLimit:1,reservationTimer:5,attackForfeit:0,slots:{}});
 const reply=(value,status=200)=>Response.json(value,{status,headers:{'cache-control':'no-store','access-control-allow-origin':'*'}});
 // Keep each Durable Object value below its 128 KiB limit even for a full
 // faction using ten reservations per member. Each target has its own record.
@@ -34,6 +34,7 @@ export async function handleWar(req,env,actor,{read:providerRead,readJson,now=()
   if(String(basic?.id)!==faction||!positive(basic?.leader_id)||!Array.isArray(members)||!members.some(m=>String(m.id)===String(actor.id)))return reply({error:'Current faction membership/leadership could not be verified'},503);
   const own=new Map(members.filter(m=>positive(m.id)).map(m=>[String(m.id),m])),automatic=[OWNER,String(basic.leader_id),...(positive(basic.co_leader_id)?[String(basic.co_leader_id)]:[])];
   const room=await loadRoom(storage,faction)||{settings:defaults(),admins:{},reservations:{},version:0,settingsVersion:0};
+  room.settings.mode=room.settings.mode||'real';
   async function index(id){const name='war:index:'+id,rooms=await storage.get(name)||[];if(!rooms.includes(faction)){rooms.push(faction);await storage.put(name,rooms);}}
   await index(String(actor.id));for(const id of Object.keys(room.admins))if(!own.has(id))delete room.admins[id];
   const isAdmin=automatic.includes(String(actor.id))||room.admins[String(actor.id)]===true;
@@ -44,9 +45,10 @@ export async function handleWar(req,env,actor,{read:providerRead,readJson,now=()
   if(req.method==='GET')return snapshot();
   const action=path.slice('/api/war/'.length),adminActions=['settings','admin','slots','boot','reset'];
   if(adminActions.includes(action)&&!isAdmin)return reply({error:'Faction War administrator access required'},403);
-  const expectedKeys={settings:['expectedVersion','enemyFactionId','reservationLimit','reservationTimer','attackForfeit'],admin:['targetId','enabled'],slots:['targetId','slots'],reserve:['targetId'],release:['targetId','reservationId'],boot:['targetId','reservationId'],attack:['targetId','reservationId'],reset:['mode']};
+  const expectedKeys={settings:['mode','expectedVersion','enemyFactionId','reservationLimit','reservationTimer','attackForfeit'],admin:['targetId','enabled'],slots:['targetId','slots'],reserve:['targetId'],release:['targetId','reservationId'],boot:['targetId','reservationId'],attack:['targetId','reservationId'],reset:['mode']};
   if(!Object.hasOwn(expectedKeys,action)||Object.keys(body).some(k=>!expectedKeys[action].includes(k)))return reply({error:'Unsupported war action'},400);
   if(action==='settings'){
+   if(body.mode!==undefined&&!['real','offline'].includes(body.mode))return reply({error:'Invalid War mode'},400);
    if(body.expectedVersion!==room.settingsVersion)return reply({error:'War settings changed. Reload settings before saving.'},409);
    if(!Number.isInteger(body.reservationLimit)||body.reservationLimit<1||body.reservationLimit>10||!Number.isInteger(body.reservationTimer)||body.reservationTimer<1||body.reservationTimer>30||!Number.isInteger(body.attackForfeit)||body.attackForfeit<0||body.attackForfeit>60)return reply({error:'Invalid reservation or forfeit settings'},400);
    const counts={};for(const entries of Object.values(room.reservations))for(const entry of entries)counts[entry.playerId]=(counts[entry.playerId]||0)+1;if(Object.values(counts).some(count=>count>body.reservationLimit))return reply({error:'Release excess reservations before lowering the player limit'},409);
@@ -54,12 +56,13 @@ export async function handleWar(req,env,actor,{read:providerRead,readJson,now=()
    let name='';if(destination){const data=await native('/v2/faction/'+destination+'/basic','basic:'+destination);if(String(data?.basic?.id)!==destination)return reply({error:'Opposing faction could not be verified'},400);name=String(data.basic.name||destination).slice(0,100);}
    if(destination!==room.settings.enemyFactionId){room.reservations={};room.settings.slots={};}
    if(body.attackForfeit!==room.settings.attackForfeit)for(const entries of Object.values(room.reservations))for(const entry of entries){entry.readyAt=null;entry.expiresAt=null;}
-   Object.assign(room.settings,{enemyFactionId:destination,enemyName:name,reservationLimit:body.reservationLimit,reservationTimer:body.reservationTimer,attackForfeit:body.attackForfeit});room.settingsVersion++;sweep();return snapshot();
+   Object.assign(room.settings,{mode:body.mode||room.settings.mode,enemyFactionId:destination,enemyName:name,reservationLimit:body.reservationLimit,reservationTimer:body.reservationTimer,attackForfeit:body.attackForfeit});room.settingsVersion++;sweep();return snapshot();
   }
   if(action==='admin'){const id=String(body.targetId);if(!own.has(id)||typeof body.enabled!=='boolean')return reply({error:'Select a current faction member'},400);if(automatic.includes(id))return reply({error:'Automatic administrators cannot be removed or reassigned'},403);if(body.enabled){room.admins[id]=true;await index(id);}else delete room.admins[id];return snapshot();}
   if(action==='reset'){if(!['reservations','all'].includes(body.mode))return reply({error:'Choose a reset mode'},400);room.reservations={};if(body.mode==='all'){room.settings=defaults();room.settingsVersion++;}return snapshot();}
   const target=String(body.targetId);if(!positive(target)||!enemy.has(target))return reply({error:'Target is not in the configured opposing faction'},400);const entries=room.reservations[target]||[],mine=entries.find(entry=>entry.playerId===String(actor.id)),member=enemy.get(target),capacity=room.settings.slots[target]||1;
   if(action==='slots'){if(!Number.isInteger(body.slots)||body.slots<1||body.slots>Math.min(1000,own.size))return reply({error:'Invalid Tag Team capacity'},400);if(entries.length>body.slots)return reply({error:'Boot excess reservations before reducing capacity'},409);room.settings.slots[target]=body.slots;return snapshot();}
+  if(['reserve','attack'].includes(action)&&room.settings.mode==='offline')return reply({error:'War mode is Offline Only. A War Admin must enable Real War.'},409);
   if(action==='reserve'){
    if(mine)return snapshot();if(entries.length>=capacity)return reply({error:'All reservation slots are full'},409);
    if(Object.values(room.reservations).flat().filter(entry=>entry.playerId===String(actor.id)).length>=room.settings.reservationLimit)return reply({error:'Your reservation limit has been reached'},409);
