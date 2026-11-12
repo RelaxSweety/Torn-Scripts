@@ -162,3 +162,20 @@ Source/provider information is below the list. Refresh, faction switching and
 minimize/restore preserve player position; background updates preserve Settings
 drafts. Own faction has profile/Details actions only. See
 [implementation, validation and limits](WAR-BOARD-APPROVED-20261112.md).
+
+## Snatch and Grab item-cell refresh — .112-dev
+
+Added the existing non-blocking native focus refresh after verified hospital/heal
+item consumption and destruction. Partial heals refresh when the item removal
+is confirmed; uncertain/no-op attempts do not. No extra verification GET, delay,
+page reload or automatic follow-up. Item Monitor 1.12.54-dev; War Organizer
+unchanged. See [implementation and validation](SNATCH-ITEM-CELL-REFRESH-20261112.md).
+
+## War direction/revive/separator corrections — .112-dev
+
+Recognized the reported Traveling from South Africa to Torn wording in both
+native destination and premium ETA parsing. False/unknown revive values are
+hidden; confirmed active values display green Revivable. Gold separators mark
+complete player sections, including expanded details. War Organizer 0.3.26-dev,
+included alongside Snatch item-cell refresh. See
+[correction, ETA verification scope and validation](WAR-TRAVEL-REVIVE-FIX-20261112.md).

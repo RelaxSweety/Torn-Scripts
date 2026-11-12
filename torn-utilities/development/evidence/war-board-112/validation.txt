@@ -1,0 +1,7 @@
+TU 0.5.42.112-dev / War Organizer 0.3.26-dev / Item Monitor 1.12.54-dev.
+Build/full npm regression passed. Final focused War/PDA checks and generated-bundle browser tests passed after incremental-paint scroll protection.
+Payload 1032011 bytes; SHA-256 6969be07f6d82e20d9be160c4eeb49616060ce0b1217b811b5c408f5b14e0bd0.
+Desktop 1280x900, portrait 390x844 and landscape 844x390: exact Traveling from South Africa to Torn native/provider wording produces return ETA from valid bounds; outbound routes are recognized/excluded; true-only green Revivable, gold separators, stable scroll through refresh/insertion/faction switch/minimize and ETA-expiry paints, profile-only own rows, correct unknown/partial native totals, no provider data persisted/shared.
+Generated Snatch browser fixtures verify one non-blocking focus dispatch after verified healing consumption or each destroyed item, exact armed-heal request order, no focus for uncertain destruction, unresolved focus-listener promises do not stall the workflow. Unit coverage additionally checks hospital/partial-heal use, status failures and throwing refresh hooks.
+All credentials/players/inventories/provider responses are synthetic. Live authenticated arrival fields/accuracy and real PDA item-cell redraw are unverified.
+Production/Workers/databases/agreements and earlier archives/evidence unchanged.

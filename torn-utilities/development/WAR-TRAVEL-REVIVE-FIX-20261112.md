@@ -1,0 +1,19 @@
+# War travel direction, revive labels and separators — DEV .112
+
+TU **0.5.42.112-dev**, War Organizer **0.3.26-dev**, Item Monitor **1.12.54-dev**. The same DEV release includes [Snatch and Grab item-cell refresh](SNATCH-ITEM-CELL-REFRESH-20261112.md).
+
+The supplied live .111 screenshot showed `Traveling → Unknown`, while its expanded native status said **Traveling from South Africa to Torn**. The provider diagnostics also reported an unrecognized return direction. Premium access was active, but the old return parser handled "Returning to Torn from ..." and "Traveling to Torn ...", not the from/to wording. Consequently this format could suppress a usable provider arrival window as well as the native destination label.
+
+The native destination parser and the private provider flight parser now recognize **Traveling/Travelling from [origin] to [destination]**, including multiword locations and Torn as destination. A Torn destination displays **Returning → Torn**; a foreign destination displays **Traveling → [destination]** and suppresses a stale return ETA. Existing "Returning to Torn from ...", "Traveling to ..." and nullable/single-bound arrival handling remain supported. The user screenshot's exact phrase is now a regression case in service/module tests and in both the native and provider payloads of the generated-bundle browser fixture.
+
+Player rows show only green **Revivable** for confirmed active `is_revivable: true`. False/unknown values have no visible row label. Expanded details follow the same rule. Native boolean values remain available internally for honest faction Rev totals, including unknown/partial-data treatment; no false value is inferred for a missing API field.
+
+A gold horizontal separator marks the bottom of each complete player section. When details are expanded, the gold line follows the expanded details rather than separating those details from their own player row. The approved compact controls, metrics position, Reserve dimensions and faction switching are retained. Incremental health/FF/ETA paints now preserve the visible-player anchor as well as full roster renders, including ETA expiry changing row height; unchanged paints do not force a scroll write.
+
+## Verification and limits
+
+Build and full npm regression suite, plus focused premium flight, War UI, Snatch and Grab, trash and purchase/healing checks. The generated-bundle War board fixture verifies the exact reported from/to wording in the native roster and provider current-flight response, visible return ETA, outbound exclusion, green-only revive labels, gold separator color, own/opposing faction behavior, fixed controls, stable scroll anchors and minimize/draft retention. Desktop, portrait and landscape evidence is under [war-board-112](evidence/war-board-112/) and [war-scouter-112](evidence/war-scouter-112/). Snatch browser fixtures independently verify item refresh dispatch/order without real actions.
+
+**ETA confirmation scope:** the screenshot proves a native parsing defect and shows a failed direction classification; it does not expose authenticated provider arrival timestamps. Tests now demonstrate that the exact wording produces ETA from valid supplied bounds. Live premium flight availability/accuracy and real PDA rendering still need user-side acceptance after updating. No API keys, authenticated real-provider responses or tester data were requested or used. Premium data remains personal to each viewer's selected key, in memory only, without registration or redistribution.
+
+Publish only `dev/tu-all-in-one` and `release/approved-changes-20261110`. Separate production main stays `73c42788968612913ccfee20b1d5c194324dc8fd`. Archived .111 and older releases/evidence, Workers, databases, agreements, DEV monitor tools, purchase notification/red marker/no-reload policy and faster healing path are preserved.

@@ -1,5 +1,18 @@
 [
   {
+    "version": "0.5.42.112-dev",
+    "date": "2026-11-12",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Refresh native item cells after verified Snatch and Grab hospital/healing item use or destruction without waiting or reloading",
+        "Recognize Traveling from South Africa to Torn and other from/to routes in destination and ETA parsing",
+        "Show only green Revivable labels for active revive availability",
+        "Add gold separators between complete player sections"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.111-dev",
     "date": "2026-11-12",
     "securityBundle": true,

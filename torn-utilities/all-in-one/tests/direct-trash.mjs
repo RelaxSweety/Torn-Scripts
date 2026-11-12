@@ -7,6 +7,7 @@ function fixture(mode='normal'){
  const w=new JSDOM('<div id="travel-root"></div>',{url:'https://www.torn.com/page.php?sid=travel',pretendToBeVisual:true}).window;
  w.document.hasFocus=()=>true;w.document.cookie='rfc_v=PRIVATE_FIXTURE; path=/';w.confirm=()=>true;
  const slots=[{ID:'11',item:{ID:'732',name:'Blood Bag : A+',isTrashable:true}},{ID:'12',item:{ID:'732',name:'Blood Bag : A+',isTrashable:true}},{ID:'13',item:{ID:'736',name:'Blood Bag : AB+'}},{ID:'14'}];
+ let focusCount=0;w.addEventListener('focus',()=>focusCount++);
  const calls=[],nativeCalls=[];let resumeInventory;let stock=2500,hospital=false,traveling=false,allowed=true;
  const inventory=()=>({maxBaseSlots:4,maxSpecialSlots:0,slots:structuredClone(slots)});
  const pilot=createDirectQuickItems({window:w,document:w.document,isAuthorized:()=>true,fetchImpl:async(url,options)=>{
@@ -28,14 +29,14 @@ function fixture(mode='normal'){
  const adapter=createSnatchDirectItems({window:w,native,getPilot:()=>pilot,getProfile:()=>{throw Error('Trash does not use hospital profile confirmation');}});
  const run={ownerId:'7',intentId:'fixture',watchKey:'id:206',minimumQty:1,destroyInventory:true,destroyAccepted:true,destroyItems:[{id:732,name:'Blood Bag : A+'}],capacityLedger:{valid:true,total:4,initialOccupied:3,freed:0,purchased:0}};
  const options=()=>({event:{isTrusted:true},run,guard:()=>allowed,getSnapshot:()=>({hospitalized:hospital,traveling,returning:false,quantity:stock}),onEvent(){}});
- return {w,pilot,adapter,run,slots,calls,nativeCalls,options,resume:()=>resumeInventory?.(),setStock:v=>{stock=v;},setHospital:v=>{hospital=v;},setTravel:v=>{traveling=v;},setAllowed:v=>{allowed=v;},close(){adapter.cancel();pilot.stop();w.close();}};
+ return {w,pilot,adapter,run,slots,calls,nativeCalls,focusCount:()=>focusCount,options,resume:()=>resumeInventory?.(),setStock:v=>{stock=v;},setHospital:v=>{hospital=v;},setTravel:v=>{traveling=v;},setAllowed:v=>{allowed=v;},close(){adapter.cancel();pilot.stop();w.close();}};
 }
 {
  const f=fixture();try{
-  const first=await f.adapter.execute('destroy',f.options());assert.equal(first.actionPending,true);assert.match(first.nextLabel,/1 remaining/);assert.equal(f.adapter.hasPendingStep(),true);
+  const first=await f.adapter.execute('destroy',f.options());assert.equal(first.actionPending,true);assert.equal(f.focusCount(),1,'Verified destruction refreshes once');assert.match(first.nextLabel,/1 remaining/);assert.equal(f.adapter.hasPendingStep(),true);
   assert.deepEqual(f.calls.map(c=>c.step),['inventory','trashItem','inventory']);assert.equal(JSON.parse(f.calls[1].body).slotID,11);assert.equal(f.run.capacityLedger.freed,1);assert.equal(f.slots[1].item.ID,'732');assert.equal(f.slots[2].item.ID,'736');
   await assert.rejects(f.adapter.execute('buy',f.options()),/Resolve/);assert.deepEqual(f.nativeCalls,[]);
-  const final=await f.adapter.execute('destroy',f.options());assert.equal(final.inventoryDestroyed,true);assert.equal(final.amount,2);assert.equal(f.adapter.hasPendingStep(),false);assert.equal(f.run.capacityLedger.freed,2);
+  const final=await f.adapter.execute('destroy',f.options());assert.equal(final.inventoryDestroyed,true);assert.equal(final.amount,2);assert.equal(f.focusCount(),2,'Each confirmed destroyed item refreshes once');assert.equal(f.adapter.hasPendingStep(),false);assert.equal(f.run.capacityLedger.freed,2);
   assert.deepEqual(f.calls.filter(c=>c.method==='POST').map(c=>JSON.parse(c.body).slotID),[11,12]);assert.equal(f.slots[2].item.ID,'736','Unselected blood bag survives');assert.deepEqual(f.nativeCalls,[]);
   await f.adapter.execute('return',f.options());assert.deepEqual(f.nativeCalls,['return'],'Return remains a separate user action');assert.equal(f.pilot.hasPendingAttempt(),false);assert.ok(!JSON.stringify(f.pilot.report()).includes('PRIVATE_FIXTURE'));
  }finally{f.close();}
@@ -58,7 +59,7 @@ for(const change of ['cancel','revoke','selection','owner']){
 }
 for(const scenario of ['network','reject','not-removed','bad-after','unrelated-change']){
  const f=fixture(scenario);try{
-  await assert.rejects(f.adapter.execute('destroy',f.options()),error=>error.submitted===true);assert.equal(f.pilot.hasPendingAttempt(),true);assert.equal(f.run.directTrashUncertain,true);assert.equal(f.run.capacityLedger.freed,0);assert.equal(f.run.capacityLedger.valid,false);
+  await assert.rejects(f.adapter.execute('destroy',f.options()),error=>error.submitted===true);assert.equal(f.focusCount(),0,'Uncertain destruction never refreshes');assert.equal(f.pilot.hasPendingAttempt(),true);assert.equal(f.run.directTrashUncertain,true);assert.equal(f.run.capacityLedger.freed,0);assert.equal(f.run.capacityLedger.valid,false);
   const count=f.calls.length;await assert.rejects(f.adapter.execute('destroy',f.options()));await assert.rejects(f.adapter.execute('buy',f.options()));assert.equal(f.calls.length,count,'Unknown destruction is not replayed');assert.equal(f.adapter.inspect(f.run).directItemUncertain,true);
   const reloaded=createDirectQuickItems({window:f.w,document:f.w.document,isAuthorized:()=>true,fetchImpl:()=>{throw Error('Reload must remain locked');}});assert.equal(reloaded.hasPendingAttempt(),true);reloaded.stop();
  }finally{f.close();}
@@ -72,7 +73,10 @@ for(const scenario of ['network','reject','not-removed','bad-after','unrelated-c
 {
  const f=fixture();try{
   f.slots[0].item=null;f.slots[1].item=null;f.run.capacityLedger.initialOccupied=1;
-  const result=await f.adapter.execute('destroy',f.options());assert.equal(result.inventoryDestroyed,true);assert.equal(result.amount,0);assert.equal(f.calls.filter(c=>c.method==='POST').length,0,'Fresh absence of selected types is a no-op');assert.equal(f.slots[2].item.ID,'736');
+  const result=await f.adapter.execute('destroy',f.options());assert.equal(result.inventoryDestroyed,true);assert.equal(result.amount,0);assert.equal(f.focusCount(),0,'No-op destruction never refreshes');assert.equal(f.calls.filter(c=>c.method==='POST').length,0,'Fresh absence of selected types is a no-op');assert.equal(f.slots[2].item.ID,'736');
  }finally{f.close();}
 }
+
+{const f=fixture();try{f.pilot.refreshNativeInventory=()=>{throw Error('Synthetic refresh unavailable');};const result=await f.adapter.execute('destroy',f.options());assert.equal(result.actionPending,true);assert.equal(f.run.directTrashUncertain,undefined,'Refresh failure must not turn verified trash into uncertainty');}finally{f.close();}}
+
 console.log('Direct Trash passed: captured POST contract, selected-only one-item gestures, continuation, verified capacity, unrelated-item preservation, acceptance/identity/state guards, partial failures, reload locks and no native fallback/retry');

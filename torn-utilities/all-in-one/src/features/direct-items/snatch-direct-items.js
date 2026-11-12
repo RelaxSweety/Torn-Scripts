@@ -33,6 +33,7 @@ export function createSnatchDirectItems({native,getPilot,getProfile,window,now=(
  }
  const same=run=>proof&&proof.ownerId===run?.ownerId&&proof.intentId===run?.intentId&&proof.watchKey===run?.watchKey;
  function cancel(){generation++;getPilot()?.cancel();native?.cancel();}
+ function refreshItemCells(pilot,onEvent,action){let dispatched=false;try{dispatched=pilot.refreshNativeInventory?.()===true;}catch{}try{onEvent({step:'native-inventory-refresh',dispatched,afterVerifiedItem:true,action});}catch{}}
  async function execute(kind,options){
   const pilot=getPilot();
   if(options.run?.directBuyUncertain||options.run?.directTrashUncertain)throw Error('Review the uncertain action and re-arm before continuing.');
@@ -57,7 +58,7 @@ export function createSnatchDirectItems({native,getPilot,getProfile,window,now=(
    onEvent({step:'direct-item-start',action:kind});
    const result=await pilot.useRunItem(options.event,selected,()=>ensure()&&eligible(),{run,useArmedInventory:kind==='heal'});
    if(result.result!=='consumption-confirmed'){const error=Error(result.text||'Direct item use was blocked: '+result.result);error.submitted=result.result==='uncertain';if(error.submitted)proof={ownerId:run.ownerId,intentId:run.intentId,watchKey:run.watchKey,uncertain:true,at:now()};throw error;}
-   consumed=true;
+   consumed=true;refreshItemCells(pilot,onEvent,kind);
    // Credit each confirmed request once; the server slot ID can later be reused.
    if(run.capacityLedger?.valid){
     const ledger=run.capacityLedger;ledger.freed=Math.min(ledger.initialOccupied,ledger.freed+1);
@@ -175,7 +176,7 @@ export function createSnatchDirectItems({native,getPilot,getProfile,window,now=(
    onEvent({step:'direct-trash-start',action:'destroy'});
    const result=await pilot.trashRunItem(options.event,selected,ensure,run.directTrashFingerprint||null);
    if(!['destruction-confirmed','nothing-selected-carried'].includes(result.result)){const error=Error(result.text||'Direct destruction was blocked: '+result.result);error.submitted=result.result==='uncertain';throw error;}
-   removed=result.result==='destruction-confirmed';
+   removed=result.result==='destruction-confirmed';if(removed)refreshItemCells(pilot,onEvent,'destroy');
    if(!ensure())throw Error('Run changed after the inventory check. No subsequent action was sent.');
    const ledger=run.capacityLedger,capacity=result.inventoryCapacity,freed=ledger.initialOccupied+(ledger.purchased||0)-capacity?.occupied;
    if(capacity?.total!==ledger.total||!Number.isSafeInteger(freed)||freed<0||freed>ledger.initialOccupied)throw Error('Fresh inventory conflicts with the capacity baseline. Review inventory and re-arm.');

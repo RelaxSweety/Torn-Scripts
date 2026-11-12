@@ -68,7 +68,7 @@ export function createFFScouter({window,getCredentials,isAuthorized,request,now=
     for(const row of data.flights){const id=String(row?.player_id);if(!batch.includes(id))continue;if(accepted.has(id))invalid();const leg=row.current,base={playerId:id,validUntil:Math.min(now()+60000,premiumUntil)};let value={...base,reason:'no-current'};
      if(leg&&typeof leg==='object'){
       const description=typeof leg.status_description==='string'?leg.status_description.trim().replace(/\s+/g,' '):'';
-      const returning=/^(?:returning to torn(?: from .+)?|travel(?:l)?ing (?:back )?to torn(?: from .+)?)\.?$/i.test(description),outbound=/^travel(?:l)?ing to (?!torn(?:\b|$)).+/i.test(description);
+      const returning=/^(?:returning to torn(?: from .+)?|travel(?:l)?ing (?:back )?to torn(?: from .+)?|travel(?:l)?ing from .+? to torn)\.?$/i.test(description),outbound=/^travel(?:l)?ing (?:to|from .+? to) (?!torn(?:\b|$)).+/i.test(description);
       value={...base,reason:outbound?'outbound':returning?'no-arrival':'unknown-direction'};
       if(returning){
        const first=number(leg.earliest_arrival_time),last=number(leg.latest_arrival_time),early=first||last,late=last||first,takeoff=number(leg.takeoff_time),secondsNow=now()/1000;
