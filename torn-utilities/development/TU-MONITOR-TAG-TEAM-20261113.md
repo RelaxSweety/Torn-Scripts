@@ -43,18 +43,23 @@ redacted on both client and server; raw page DOM, chat, input values, BS/FF and
 premium flights are excluded. Uploads are identity-scoped, bounded and retried
 with immutable IDs. Existing local diagnostic tools remain available.
 
-**Live Monitor deployment is blocked by the environment's Cloudflare token.**
-Wrangler's additive DEV D1 migration `/import` returned code 10000. The standard
-D1 SQL endpoint returned code 7500: no permission to perform the operation.
-Neither attempt applied the schema. Account → D1 → Edit on the existing account
-is needed, configured through environment secrets rather than chat.
+**Monitor activated on DEV — 2026-11-13.** Initial migration attempts failed
+with permission codes 10000 and 7500; these are resolved. A fresh read check and
+all five additive schema statements succeeded on `tu-users-dev`. The private
+.115 Worker was then deployed as version
+`7f0ee2ac-889c-45e5-bd82-171d21881f01` after preserving the previous DEV snapshot
+and verifying that production had no changes.
 
 The client checks the credential-free DEV health capability before enabling
-server reporting. Until `tu_monitor:1` is advertised, upload/feedback controls
-are disabled with a deployment-pending message; local diagnostics keep working.
-No unavailable Monitor link is offered. There is no startup readiness polling.
-The current DEV Worker remains .114 until its schema can be applied safely.
-The Monitor service must not be advertised as live based on local/mocked tests.
+server reporting. Live health now advertises `tu_monitor:1` and .115, enabling
+the existing client's reporting controls after its health check. Automatic
+uploads remain off until each user opts in. No new installer version is needed
+for server activation. Local diagnostics remain available.
+
+Live credential-free checks confirmed the Monitor shell/assets return 200 and
+anonymous users/usage/reports/exports and War state requests return 401. No real
+user key or diagnostic record was used. Authenticated delivery/dashboard
+acceptance remains unverified; local/mocked tests do not establish that result.
 
 ## Validation and evidence
 

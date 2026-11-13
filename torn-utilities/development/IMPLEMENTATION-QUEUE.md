@@ -212,7 +212,8 @@ Standardized remaining timers to MM:SS. Added long-press admin Tag Team slots,
 purple multi-slot targets, name search and numeric level/FF sorting with personal
 BS/FF information in the Tag Team settings list. Private TU Monitor code provides
 user/activity and use-rate tabs, feedback, versioned admin review and AI exports.
-Client reporting is readiness-gated and off by default. **Monitor live deployment
-is blocked pending D1 Edit permission on the environment token; no migration or
-Worker change was applied.** Local diagnostics remain usable. See
+Client reporting is readiness-gated and off by default. **Monitor activated on DEV after D1 Edit was confirmed: five additive schema
+statements succeeded, .115 health advertises readiness, and anonymous data/export
+requests return 401.** Automatic reporting remains per-user opt-in; real-user
+authenticated acceptance remains unverified. Local diagnostics remain usable. See
 [behavior, private repository, tests and deployment boundary](TU-MONITOR-TAG-TEAM-20261113.md).
