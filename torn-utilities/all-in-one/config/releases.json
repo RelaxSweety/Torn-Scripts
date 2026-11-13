@@ -1,5 +1,19 @@
 [
   {
+    "version": "0.5.42.115-dev",
+    "date": "2026-11-13",
+    "securityBundle": true,
+    "changes": {
+      "Features": [
+        "Prepare optional diagnostics and feedback for private TU Monitor; server reporting stays disabled until DEV service deployment",
+        "Admin long-press Tag Team assignment, purple targets, searchable and sortable level/FF settings list"
+      ],
+      "Fixes": [
+        "Use MM:SS for destination, landing and travel remaining countdowns"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.114-dev",
     "date": "2026-11-12",
     "securityBundle": true,

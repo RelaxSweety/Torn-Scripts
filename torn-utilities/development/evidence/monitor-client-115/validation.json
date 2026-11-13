@@ -1,0 +1,18 @@
+{
+  "build": "0.5.42.115-dev",
+  "synthetic_only": true,
+  "viewports": [
+    "desktop",
+    "portrait",
+    "landscape"
+  ],
+  "checks": [
+    "default off",
+    "trusted opt-in only",
+    "structured automatic upload",
+    "no raw DOM/FF or credentials",
+    "anonymous redirect-rejecting native transport",
+    "explicit feedback",
+    "no FFScouter requests"
+  ]
+}

@@ -1,3 +1,4 @@
+import {createMonitorClient} from '../src/features/monitor-client.js';
 import {createFFScouter} from '../src/features/ffscouter.js';
 import {createNativeClockSync} from '../src/features/native-clock-sync.js';
 import {createDataDeletion} from '../src/features/data-deletion.js';
@@ -42,7 +43,7 @@ let manager=read('src/manager/manager.user.js').replaceAll('__TU_LOGO_DATA_URL__
 if(previewArgument?.startsWith('--preview-compact-ui='))manager=manager.replace('// @name         Torn Utilities DEV (All-in-One)','// @name         Torn Utilities DEV Compact Preview').replace('// @namespace    https://github.com/RelaxSweety/Torn-Scripts','// @namespace    https://github.com/RelaxSweety/Torn-Scripts/compact-preview');
 if(previewArgument)manager=manager.replaceAll(releases[0].version,version).replace(/^\/\/ @updateURL.*$/m,'// @updateURL    none').replace(/^\/\/ @downloadURL.*$/m,'// @downloadURL  none');
 if(preparedIntegration)manager=secureCandidateManager(manager);
-manager=manager.replace("  'use strict';","  'use strict';\nconst createFFScouter="+createFFScouter.toString()+";\nconst createDataDeletion="+createDataDeletion.toString()+";\nconst renderAgreementMarkdown="+renderAgreementMarkdown.toString()+";\nconst createApiDisclosure="+createApiDisclosure.toString()+";\nconst TU_API_DISCLOSURE_TEXT="+JSON.stringify(disclosureText)+";\nconst createTornApiGovernor="+createTornApiGovernor.toString()+";\nconst createCredentialStore="+createCredentialStore.toString()+";");
+manager=manager.replace("  'use strict';","  'use strict';\nconst createMonitorClient="+createMonitorClient.toString()+";\nconst createFFScouter="+createFFScouter.toString()+";\nconst createDataDeletion="+createDataDeletion.toString()+";\nconst renderAgreementMarkdown="+renderAgreementMarkdown.toString()+";\nconst createApiDisclosure="+createApiDisclosure.toString()+";\nconst TU_API_DISCLOSURE_TEXT="+JSON.stringify(disclosureText)+";\nconst createTornApiGovernor="+createTornApiGovernor.toString()+";\nconst createCredentialStore="+createCredentialStore.toString()+";");
 const registry=/const registry=\{schemaVersion:1,categories:(\[.*?\]),modules:\[.*?\]\};/;
 if(!registry.test(manager))throw Error('Manager tool directory missing');
 manager=manager.replace(registry,(_,categories)=>`const registry={schemaVersion:1,categories:${categories},modules:${JSON.stringify(tools.map(({source,...t})=>t))}};\nconst TU_RELEASES=${JSON.stringify(releases)};`);

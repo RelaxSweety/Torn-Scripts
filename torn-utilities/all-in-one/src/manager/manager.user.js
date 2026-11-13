@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities DEV (All-in-One)
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.114-dev
+// @version      0.5.42.115-dev
 // @description  Integrated TU development bundle for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -50,7 +50,7 @@
   const rawManagerFetch=window.fetch.bind(window);
   const fetch=(input,options)=>apiGovernor.fetch(input,options,rawManagerFetch);
   const managerHttp=rawManagerHttp?details=>apiGovernor.request(details,rawManagerHttp):null;
-  const TU_VERSION='0.5.42.114-dev';
+  const TU_VERSION='0.5.42.115-dev';
   const TU_LOGO='__TU_LOGO_DATA_URL__';
   // Bundled tool directory: no external catalog, cache, or refresh requests.
   const registry={schemaVersion:1,categories:[{"id":"business","name":"Business Tools","icon":"▥","order":10},{"id":"games","name":"Games","icon":"♜","order":20},{"id":"single-player","name":"Single Player","icon":"▣","order":21,"parent":"games"},{"id":"multiplayer","name":"Multiplayer","icon":"♟","order":22,"parent":"games"},{"id":"chat","name":"Chat Tools","icon":"◉","order":30},{"id":"other","name":"War Tools","icon":"⚙","order":40}],modules:[{"id":"flight-game","name":"Flight Game","category":"single-player","version":"0.12.8","description":"Standalone Flight Game arcade module, playable anytime"},{"id":"stick-fighter","name":"Stick Fighter","category":"single-player","version":"0.2.7","description":"Standalone Stick Fighter arcade module, playable anytime"},{"id":"chat-archiver","name":"Chat Archiver","category":"chat","version":"0.1.8","description":"Archive Torn chat conversations"},{"id":"tic-tac-toe","name":"Tic-Tac-Toe","category":"multiplayer","version":"0.6.5","description":"Two-player Tic-Tac-Toe with named winners, green winning line, rematches and head-to-head history"},{"id":"torn-four","name":"Torn Four","category":"multiplayer","version":"0.2.5","description":"Connect Four: two-player multiplayer with private room codes"},{"id":"torn-fleet","name":"Torn Fleet","category":"multiplayer","version":"0.2.5","description":"Battleship: fleet placement and turn-based naval combat"},{"id":"torn-snake","name":"Slithering Streets","category":"single-player","version":"0.2.14","description":"Single-player Snake with touch controls and local high scores"},{"id":"chaos-marbles","name":"Chaos Marbles","category":"multiplayer","version":"0.2.5","description":"Online 2\u20134 player marble race with private player sessions, Waiting for Chaos staging, and game history"},{"id":"item-monitor","name":"Travel Assistant and Item Monitor","category":"business","version":"1.10.31-dev","description":"Item Monitor and Travel Assistant with D1 stock reporting, source diagnostics and stock estimation"},{"id":"war-hit-organizer","name":"War Organizer","category":"other","version":"0.3.28-dev","description":"Compact war target board, reservation controls, timer and local development settings"}]};
@@ -398,6 +398,11 @@
   const devToken=()=>sessionStorage.getItem(DEV_SESSION_KEY)||'';
   const scriptPlatform=()=>typeof nativeBridge?.callHandler==='function'||/torn[ -]?pda/i.test(navigator.userAgent)||typeof pageWindow.PDA_httpGet==='function'||typeof window.PDA_httpGet==='function'||typeof pageWindow.PDA_httpPost==='function'||typeof window.PDA_httpPost==='function'?'pda':'tampermonkey';
   let devAuthIssue='',devRenewalBlocked=false;
+  let monitorServiceReady=false,monitorServiceCheckedAt=0,monitorServicePromise=null;
+  async function checkMonitorService(){if(Date.now()-monitorServiceCheckedAt<30000)return monitorServiceReady;if(monitorServicePromise)return monitorServicePromise;monitorServicePromise=(async()=>{try{monitorServiceReady=(await devRequest('/health','GET',null,'')).tu_monitor===1;}catch{monitorServiceReady=false;}monitorServiceCheckedAt=Date.now();return monitorServiceReady;})().finally(()=>{monitorServicePromise=null;});return monitorServicePromise;}
+  const monitorClient=createMonitorClient({window,getContext:()=>({authorized:authorized(),playerId:getPlayer()?.id,build:TU_VERSION,platform:scriptPlatform()}),send:async body=>{if(!await checkMonitorService())throw Error('TU Monitor deployment is pending.');return devRequest('/api/monitor/submit','POST',body);},getPreference:name=>typeof GM_getValue==='function'&&typeof GM_setValue==='function'?GM_getValue(name,false)===true:localStorage.getItem(name)==='true',setPreference:(name,value)=>{if(typeof GM_getValue==='function'&&typeof GM_setValue==='function')GM_setValue(name,value);else localStorage.setItem(name,String(value));}});
+  monitorClient.start();
+
   function devAuthFailure(error){
     const status=error?.status;
     devAuthIssue=status===401||status===403?'Saved API key rejected. Replace it in TU Settings.':status===429?'Authentication rate-limited. Retry later.':status>=500||!status?'Authentication service unavailable. Retry later.':error?.message||'Session renewal failed.';
@@ -427,13 +432,13 @@
     const transport=async()=>{
       const gm=managerHttp;
       if(gm){
-        try{return await new Promise((resolve,reject)=>gm({method,url,headers,...(payload?{data:payload}:{}),timeout:20000,
+        try{return await new Promise((resolve,reject)=>gm({method,url,headers,...(path.startsWith('/api/monitor/')?{anonymous:true,redirect:'error'}:{}),...(payload?{data:payload}:{}),timeout:20000,
           onload:r=>{try{resolve({status:r.status||0,data:parse(r.responseText??r.response)})}catch{reject(Error('Invalid transport response'))}},
           onerror:()=>reject(Error('Request bridge failure')),ontimeout:()=>reject(Error('Request bridge timeout'))}));}
         catch{throw Error('Request bridge failed for '+method+' '+path+'. Reload Torn in PDA and retry; check the app network/bridge permissions.');}
       }
       // Standard fetch is a last resort on platforms with CORS support.
-      let response;try{response=await fetch(url,{method,headers,...(payload?{body:payload}:{}),cache:'no-store'});}catch(error){throw Error('Unable to reach DEV Worker (network/CORS). Check '+DEV_BASE+'/api/auth/agreement/current in a browser. '+(error?.message||''));}
+      let response;try{response=await fetch(url,{method,headers,...(payload?{body:payload}:{}),cache:'no-store',...(path.startsWith('/api/monitor/')?{credentials:'omit',redirect:'error'}:{})});}catch(error){throw Error('Unable to reach DEV Worker (network/CORS). Check '+DEV_BASE+'/api/auth/agreement/current in a browser. '+(error?.message||''));}
       return {status:response.status,data:await response.json().catch(()=>({}))};
     };
     const response=await transport();
@@ -443,7 +448,7 @@
       const renewed=await renewDevSession();
       return devRequest(path,method,body,renewed);
     }
-    if(!response.ok){if(path==='/api/auth/register'&&body?.api_key&&[401,403].includes(response.status))await apiGovernor.suspendVerification(body.api_key);if([401,403].includes(response.status)&&token&&token===devToken()){clearAuthorizationCache();publishAuthorization(false);}const error=Error(result.error||('Development server HTTP '+response.status));error.status=response.status;throw error;}
+    if(!response.ok){if(path==='/api/auth/register'&&body?.api_key&&[401,403].includes(response.status))await apiGovernor.suspendVerification(body.api_key);if([401,403].includes(response.status)&&token&&token===devToken()&&!path.startsWith('/api/monitor/')){clearAuthorizationCache();publishAuthorization(false);}const error=Error(result.error||('Development server HTTP '+response.status));error.status=response.status;throw error;}
     return result;
   }
   // Renew expired sessions using the user's saved Public Only key. Never accept terms automatically.
@@ -563,6 +568,7 @@
       active=id;observeTUWindows();
       tuNav.history.push('tu-pda-panel');tuNav.current=id;tuNav.minimized=false;tuNav.exited=false;
       await mod.activate(Object.freeze({mount:moduleHost, close:()=>{stopModule();panel.hidden=false;viewModule=null;render('modules');syncLauncher();},minimize:()=>{tuMinimize();syncLauncher();}}));
+      try{monitorClient.moduleOpened(id);}catch{}
       if(id==='war-hit-organizer')sessionStorage.setItem('tu:who:resume:v1',JSON.stringify({playerId:String(getPlayer()?.id||''),at:Date.now()}));
       if(id==='item-monitor')sessionStorage.setItem('tu:monitor:resume:v1',String(getPlayer()?.id||''));
       if(observationReady)scheduleWindowUpdate(true);return true;
@@ -644,7 +650,7 @@ __TU_COMPACT_UI_CSS__
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.114-dev</span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.115-dev</span></footer>';
   document.body.appendChild(panel);
   const headerBrand=panel.querySelector('.tu-logo');if(headerBrand){headerBrand.textContent='';headerBrand.classList.add('tu-brand-emblem');headerBrand.setAttribute('role','img');headerBrand.setAttribute('aria-label','Torn Utilities');}
   const identityLine=document.createElement('p');
@@ -861,7 +867,7 @@ __TU_COMPACT_UI_CSS__
          request:body=>devRequest('/api/auth/delete-data','POST',body,''),
          verify:async key=>{const info=checkedKeyInfo(await requestIdentity(key,{revalidate:true}),{extended:true});rememberVerifiedKey(key,info.level,info.playerId,{deletion:true});return info;},entries:readStoredKeys,
          stop:()=>{identityDeletionInProgress=true;credentials.set(VAULT_CLEARED,'1');stopModule();publishAuthorization(false);authGeneration++;clearAuthorizationCache();localStorage.removeItem(TU_TERMS_KEY);},
-         cleanup:async id=>{
+         cleanup:async id=>{monitorClient.clear();
           ffScouter.forget(id);try{const consent=JSON.parse(localStorage.getItem('tu:who:shared-consent:v1')||'null');if(consent?.playerId===String(id))localStorage.removeItem('tu:who:shared-consent:v1');localStorage.removeItem('tu:who:positions:v1:'+id);sessionStorage.removeItem('tu:who:ff-cache:v1:'+id);sessionStorage.removeItem('tu:who:resume:v1');}catch{}
           const keys=readStoredKeys().filter(entry=>entry.playerId===id).map(entry=>entry.key);await apiGovernor.forgetKeys(keys);credentials.eraseKeys(keys);
           clearPlayer();clearAuthorizationCache();sessionStorage.removeItem(IDENTITY_CACHE);localStorage.removeItem(TU_TERMS_KEY);localStorage.removeItem(LOGIN_ACCESS_KEY);
@@ -944,6 +950,14 @@ __TU_COMPACT_UI_CSS__
         });renderSaved();return;
       }
       if(settingsPage==='diagnostics'){
+      const uploads=document.createElement('label'),check=document.createElement('input');check.type='checkbox';check.checked=monitorClient.enabled();check.disabled=!check.checked;uploads.append(check,document.createTextNode(' Automatically send structured diagnostics and module openings to TU Monitor'));content.append(uploads);
+      const disclosure=document.createElement('p');disclosure.textContent='Optional diagnostic uploads include your TU identity, build/platform, module openings and structured workflow timing/results. TU admins can review these for 30 days and export redacted feedback/evidence for AI evaluation. No raw DOM, chat, credentials or FFScouter estimates/premium data are uploaded. Uploads retry while TU is open; turning this off clears queued uploads.';content.append(disclosure);
+      const uploadStatus=document.createElement('p');uploadStatus.setAttribute('role','status');uploadStatus.textContent=monitorClient.status();content.append(uploadStatus);check.onchange=event=>{try{if(event.isTrusted!==true){check.checked=monitorClient.enabled();return;}if(check.checked&&!monitorServiceReady){check.checked=false;return;}monitorClient.setEnabled(check.checked);uploadStatus.textContent=monitorClient.status();}catch{check.checked=false;uploadStatus.textContent='Sign in to enable automatic uploads.';}};
+      const sendPending=makeButton('Send pending diagnostics',async()=>{await monitorClient.flush(true);uploadStatus.textContent=monitorClient.status();});sendPending.disabled=true;content.append(sendPending);
+      const feedbackModule=document.createElement('select');feedbackModule.setAttribute('aria-label','Feedback module');for(const entry of [{id:'manager',name:'TU Manager'},...registry.modules]){const option=document.createElement('option');option.value=entry.id;option.textContent=entry.name;feedbackModule.append(option);}feedbackModule.value=diagnosticModule||'manager';const feedback=document.createElement('textarea');feedback.placeholder='Feedback for TU admins (no API keys or private player data)';feedback.maxLength=1500;feedback.setAttribute('aria-label','TU feedback');content.append(feedbackModule,feedback);
+      const submitFeedback=makeButton('Send feedback to TU Monitor',async()=>{submitFeedback.disabled=true;try{await monitorClient.feedback(feedbackModule.value,feedback.value);feedback.value='';uploadStatus.textContent='Feedback received by TU Monitor.';}catch{uploadStatus.textContent='Feedback not sent. Check your session/network and retry.';}finally{submitFeedback.disabled=!monitorServiceReady;}});submitFeedback.disabled=true;content.append(submitFeedback);
+      const monitorLink=document.createElement('a');monitorLink.target='_blank';monitorLink.rel='noopener noreferrer';monitorLink.textContent='TU Monitor deployment pending';content.append(monitorLink);uploadStatus.textContent='Checking TU Monitor availability…';void checkMonitorService().then(ready=>{if(!check.isConnected)return;check.disabled=!ready&&!monitorClient.enabled();sendPending.disabled=!ready;submitFeedback.disabled=!ready;uploadStatus.textContent=ready?monitorClient.status():'Server reporting is awaiting DEV deployment. Local diagnostics remain available.';monitorLink.textContent=ready?'Open TU Monitor (TU admins)':'TU Monitor deployment pending';if(ready)monitorLink.href=DEV_BASE+'/monitor';else monitorLink.removeAttribute('href');});
+
       if(diagnosticModule){const h=document.createElement('h4');h.textContent='Tool: '+(registry.modules.find(m=>m.id===diagnosticModule)?.name||diagnosticModule);content.append(h)}
       const buildDiagnostics=()=>({
         managerVersion:TU_VERSION,

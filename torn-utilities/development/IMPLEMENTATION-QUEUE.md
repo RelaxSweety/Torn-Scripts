@@ -204,3 +204,15 @@ click while preserving the armed fast path; keep Confirm travel available after
 verified boarding and permit immediate click-driven flight-page navigation
 without waiting on the native Continue countdown. No automatic gameplay or
 post-purchase reload. See [findings, changes, tests and limits](WAR-SNATCH-FIXES-20261112.md).
+
+## Timers, Tag Team and private TU Monitor — .115-dev
+
+TU 0.5.42.115-dev / War Organizer 0.3.29-dev / Item Monitor 1.12.56-dev.
+Standardized remaining timers to MM:SS. Added long-press admin Tag Team slots,
+purple multi-slot targets, name search and numeric level/FF sorting with personal
+BS/FF information in the Tag Team settings list. Private TU Monitor code provides
+user/activity and use-rate tabs, feedback, versioned admin review and AI exports.
+Client reporting is readiness-gated and off by default. **Monitor live deployment
+is blocked pending D1 Edit permission on the environment token; no migration or
+Worker change was applied.** Local diagnostics remain usable. See
+[behavior, private repository, tests and deployment boundary](TU-MONITOR-TAG-TEAM-20261113.md).

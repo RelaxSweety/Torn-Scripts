@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.12.55-dev
+// @version      1.12.56-dev
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -479,7 +479,7 @@ const travelDate=t=>{const d=new Date(t*1000),mode=localStorage.getItem('tu-time
 const travelMoney=v=>(v<0?'-$':'$')+Math.abs(Math.round(v)).toLocaleString();
 const travelMinutes=()=>Math.ceil(travelTimes[travel.country][{standard:0,airstrip:1,private:2,business:3}[travel.mode]]*(travel.book?.75/100:1));
 let travelAlerted=0;
-every(()=>{const t=travel.departure;if(!travel.armed||!t||travelAlerted===t)return;if(t-Date.now()/1000<=30&&t-Date.now()/1000>=-5){travelAlerted=t;travel.armed=false;travelSave();sound();alert('Travel Assistant: departure in 30 seconds')}},1000);
+every(()=>{const t=travel.departure;if(!travel.armed||!t||travelAlerted===t)return;if(t-Date.now()/1000<=30&&t-Date.now()/1000>=-5){travelAlerted=t;travel.armed=false;travelSave();sound();alert('Travel Assistant: departure in 00:30')}},1000);
 function travelArrivalFallback(description){
  const now=Math.floor(Date.now()/1000);
  const text=String(description||'');
@@ -920,7 +920,7 @@ function travelUI(){
    const flight=model.flight;
    line(schedule,'Current travel status',flight.destination==='torn'?'Returning to Torn':'In flight'+(flight.destination?' to '+travelCountries[flight.destination]:''));
    line(schedule,'Estimated in-flight arrival',flight.arrival?date(flight.arrival):'Unavailable from Torn API');
-   if(flight.arrival)line(schedule,'Time remaining',Math.max(0,Math.ceil((flight.arrival-now)/60))+' minutes');
+   if(flight.arrival)line(schedule,'Time remaining',String(Math.floor(Math.max(0,Math.ceil(flight.arrival-now))/60)).padStart(2,'0')+':'+String(Math.max(0,Math.ceil(flight.arrival-now))%60).padStart(2,'0'));
    if(flight.destination==='torn'){
     line(schedule,'Stock on arrival','Returning to Torn — foreign stock forecast not applicable');
    }else if(flight.destination&&flight.destination!==travel.country){
