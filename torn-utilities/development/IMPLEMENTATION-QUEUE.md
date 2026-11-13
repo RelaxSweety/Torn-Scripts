@@ -237,3 +237,13 @@ submit an item action or bypass consumed/uncertain/pending locks. Intent persist
 across navigation. Older already-stuck waiting runs with unknown action history
 must be re-armed after updating. No service/database/agreement/production change.
 See [fix, regression evidence and acceptance limit](HOSPITALIZATION-RECOVERY-20261113.md).
+
+## Automatic module/version reporting — .118-dev
+
+TU 0.5.42.118-dev automatically reports authorized startup/build/platform and
+module opens/restores, ignoring old module-reporting off settings. There is no
+module opt-out switch; detailed diagnostics remain optional. Monitor shows each
+player's last reported TU build/platform and receipt time, or Unknown. Rapid
+authorized startup notifications/navigation are deduplicated. Existing auth,
+rate, privacy and erasure rules remain. No schema/agreement/production changes.
+See [behavior, version semantics and validation](AUTOMATIC-USAGE-VERSIONS-20261113.md).

@@ -19,7 +19,9 @@ async function boot(snapshot=null,{noKey=false,native=false,modern=false}={}){
  const metadata=()=>({agreement_version:control.version,agreement_number:1,agreement_date:'2026-11-05'});
  w.GM_xmlhttpRequest=o=>{requests.push({method:o.method,path:new URL(o.url).pathname});queueMicrotask(()=>{
   let data={},status=200;
-  if(o.url.endsWith('/api/auth/agreement/current'))data={agreement:metadata(),content:control.body};
+  if(o.url.endsWith('/health'))data={tu_monitor:1};
+  else if(o.url.includes('/api/monitor/'))data={ok:true};
+  else if(o.url.endsWith('/api/auth/agreement/current'))data={agreement:metadata(),content:control.body};
   else if(o.url.endsWith('/api/auth/register')){control.registers++;control.status=200;data={token:'token-renewed',accessLevel:'public',playerId:42};}
   else if(o.url.endsWith('/api/auth/agreement')){
    if(o.method==='POST'){control.accepts++;control.accepted=true;data={ok:true};}

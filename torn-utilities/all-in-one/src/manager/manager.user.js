@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities DEV (All-in-One)
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.117-dev
+// @version      0.5.42.118-dev
 // @description  Integrated TU development bundle for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -50,7 +50,7 @@
   const rawManagerFetch=window.fetch.bind(window);
   const fetch=(input,options)=>apiGovernor.fetch(input,options,rawManagerFetch);
   const managerHttp=rawManagerHttp?details=>apiGovernor.request(details,rawManagerHttp):null;
-  const TU_VERSION='0.5.42.117-dev';
+  const TU_VERSION='0.5.42.118-dev';
   const TU_LOGO='__TU_LOGO_DATA_URL__';
   // Bundled tool directory: no external catalog, cache, or refresh requests.
   const registry={schemaVersion:1,categories:[{"id":"business","name":"Business Tools","icon":"▥","order":10},{"id":"games","name":"Games","icon":"♜","order":20},{"id":"single-player","name":"Single Player","icon":"▣","order":21,"parent":"games"},{"id":"multiplayer","name":"Multiplayer","icon":"♟","order":22,"parent":"games"},{"id":"chat","name":"Chat Tools","icon":"◉","order":30},{"id":"other","name":"War Tools","icon":"⚙","order":40}],modules:[{"id":"flight-game","name":"Flight Game","category":"single-player","version":"0.12.8","description":"Standalone Flight Game arcade module, playable anytime"},{"id":"stick-fighter","name":"Stick Fighter","category":"single-player","version":"0.2.7","description":"Standalone Stick Fighter arcade module, playable anytime"},{"id":"chat-archiver","name":"Chat Archiver","category":"chat","version":"0.1.8","description":"Archive Torn chat conversations"},{"id":"tic-tac-toe","name":"Tic-Tac-Toe","category":"multiplayer","version":"0.6.5","description":"Two-player Tic-Tac-Toe with named winners, green winning line, rematches and head-to-head history"},{"id":"torn-four","name":"Torn Four","category":"multiplayer","version":"0.2.5","description":"Connect Four: two-player multiplayer with private room codes"},{"id":"torn-fleet","name":"Torn Fleet","category":"multiplayer","version":"0.2.5","description":"Battleship: fleet placement and turn-based naval combat"},{"id":"torn-snake","name":"Slithering Streets","category":"single-player","version":"0.2.14","description":"Single-player Snake with touch controls and local high scores"},{"id":"chaos-marbles","name":"Chaos Marbles","category":"multiplayer","version":"0.2.5","description":"Online 2\u20134 player marble race with private player sessions, Waiting for Chaos staging, and game history"},{"id":"item-monitor","name":"Travel Assistant and Item Monitor","category":"business","version":"1.10.31-dev","description":"Item Monitor and Travel Assistant with D1 stock reporting, source diagnostics and stock estimation"},{"id":"war-hit-organizer","name":"War Organizer","category":"other","version":"0.3.28-dev","description":"Compact war target board, reservation controls, timer and local development settings"}]};
@@ -402,6 +402,8 @@
   async function checkMonitorService(){if(Date.now()-monitorServiceCheckedAt<30000)return monitorServiceReady;if(monitorServicePromise)return monitorServicePromise;monitorServicePromise=(async()=>{try{monitorServiceReady=(await devRequest('/health','GET',null,'')).tu_monitor===1;}catch{monitorServiceReady=false;}monitorServiceCheckedAt=Date.now();return monitorServiceReady;})().finally(()=>{monitorServicePromise=null;});return monitorServicePromise;}
   const monitorClient=createMonitorClient({window,getContext:()=>({authorized:authorized(),playerId:getPlayer()?.id,build:TU_VERSION,platform:scriptPlatform()}),send:async body=>{if(!await checkMonitorService())throw Error('TU Monitor deployment is pending.');return devRequest('/api/monitor/submit','POST',body);},getPreference:name=>{const value=typeof GM_getValue==='function'&&typeof GM_setValue==='function'?GM_getValue(name,null):localStorage.getItem(name);return value===null?null:value===true||value==='true';},onStatus:()=>{const node=document.getElementById('tu-monitor-status');if(node)node.textContent=monitorClient.status();},setPreference:(name,value)=>{if(typeof GM_getValue==='function'&&typeof GM_setValue==='function')GM_setValue(name,value);else localStorage.setItem(name,String(value));}});
   monitorClient.start();
+  const reportMonitorStartup=()=>{try{monitorClient.clientStarted();}catch{}};
+  pageWindow.addEventListener('tu-player-updated',reportMonitorStartup);pageWindow.addEventListener('tu-authorization-change',reportMonitorStartup);queueMicrotask(reportMonitorStartup);
 
   function devAuthFailure(error){
     const status=error?.status;
@@ -560,6 +562,7 @@
       // Minimized tools remain active; opening their card must restore their UI.
       // A resume hook preserves watchers, unsaved fields and armed actions.
       if(typeof mod.resume==='function')await mod.resume();
+      try{monitorClient.moduleOpened(id,'resume');}catch{}
       if(observationReady)scheduleWindowUpdate(true);return true;
     }
     stopModule();
@@ -604,7 +607,7 @@
     if(!authorized()){tuShow('tu-pda-panel');showAgreement();return true;}
     let id=tuNav.current;
     if(!tuRoot(id)&&active){id=({'item-monitor':'tuim-menu','flight-game':'tpfg-root','stick-fighter':'sff-root','war-hit-organizer':'tu-who-panel'}[active]||id);}
-    const shown=tuShow(tuRoot(id)?id:'tu-pda-panel');if(active==='war-hit-organizer'&&id==='tu-who-panel')registered.get(active)?.resume?.();return shown;
+    const wasMinimized=tuNav.minimized;const shown=tuShow(tuRoot(id)?id:'tu-pda-panel');if(shown&&wasMinimized&&active&&id!=='tu-pda-panel')try{monitorClient.moduleOpened(active,'resume');}catch{}if(active==='war-hit-organizer'&&id==='tu-who-panel')registered.get(active)?.resume?.();return shown;
   };
   pageWindow.TUWindowNavigation=Object.freeze({open:tuOpen,back:tuBack,minimize:tuMinimize,exit:tuExit,restore:tuRestore});
   const style = document.createElement('style');
@@ -650,7 +653,7 @@ __TU_COMPACT_UI_CSS__
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.117-dev</span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.118-dev</span></footer>';
   document.body.appendChild(panel);
   const headerBrand=panel.querySelector('.tu-logo');if(headerBrand){headerBrand.textContent='';headerBrand.classList.add('tu-brand-emblem');headerBrand.setAttribute('role','img');headerBrand.setAttribute('aria-label','Torn Utilities');}
   const identityLine=document.createElement('p');
@@ -954,20 +957,20 @@ __TU_COMPACT_UI_CSS__
       const card=(title)=>{const box=document.createElement('section');box.className='tu-diagnostic-card';const heading=document.createElement('h4');heading.textContent=title;box.append(heading);page.append(box);return box;};
       const reporting=card('TU Monitor reporting');
       const toggle=(label,checked)=>{const row=document.createElement('label');row.className='tu-diagnostic-toggle';const input=document.createElement('input');input.type='checkbox';input.checked=checked;input.setAttribute('aria-label',label);const text=document.createElement('span');text.textContent=label;row.append(input,text);reporting.append(row);return input;};
-      const usage=toggle('Report module use',monitorClient.usageEnabled()),check=toggle('Send detailed workflow diagnostics',monitorClient.enabled());
-      const help=document.createElement('p');help.className='tu-diagnostic-help';help.textContent='Module reporting is on by default and records module openings. Detailed workflow diagnostics are optional.';reporting.append(help);
+      const automatic=document.createElement('p');automatic.className='tu-diagnostic-status';automatic.textContent='Module-use and TU version reporting: Automatic';reporting.append(automatic);const check=toggle('Send detailed workflow diagnostics',monitorClient.enabled());
+      const help=document.createElement('p');help.className='tu-diagnostic-help';help.textContent='TU automatically reports its version at startup and records module opens and restores for authorized users. Detailed workflow diagnostics are optional.';reporting.append(help);
       const uploadStatus=document.createElement('p');uploadStatus.id='tu-monitor-status';uploadStatus.className='tu-diagnostic-status';uploadStatus.setAttribute('role','status');uploadStatus.textContent=monitorClient.status();reporting.append(uploadStatus);
       const change=(input,action,read)=>event=>{try{if(event.isTrusted!==true){input.checked=read();return;}action(input.checked);uploadStatus.textContent=monitorClient.status();}catch{input.checked=read();uploadStatus.textContent='Settings could not be saved. Check your TU session.';}};
-      usage.onchange=change(usage,value=>monitorClient.setUsageEnabled(value),()=>monitorClient.usageEnabled());check.onchange=change(check,value=>monitorClient.setEnabled(value),()=>monitorClient.enabled());
+      check.onchange=change(check,value=>monitorClient.setEnabled(value),()=>monitorClient.enabled());
       const actions=document.createElement('div');actions.className='tu-diagnostic-actions';reporting.append(actions);const sendPending=makeButton('Send pending reports',async()=>{await monitorClient.flush(true);uploadStatus.textContent=monitorClient.status();});sendPending.disabled=true;actions.append(sendPending);
       const monitorLink=document.createElement('a');monitorLink.className='tu-diagnostic-link';monitorLink.target='_blank';monitorLink.rel='noopener noreferrer';monitorLink.textContent='Checking Monitor…';actions.append(monitorLink);
-      const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent='What is sent and retained';const disclosure=document.createElement('p');disclosure.textContent='TU identity, build/platform and module openings go to TU Monitor. Detailed diagnostics additionally include structured workflow timing/results. TU admins can review these for 30 days and export redacted feedback/evidence for AI evaluation. Raw DOM, chat, credentials and FFScouter estimates/premium data are excluded. Turning off a reporting option clears its unsent reports.';details.append(summary,disclosure);reporting.append(details);
+      const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent='What is sent and retained';const disclosure=document.createElement('p');disclosure.textContent='TU identity, build/platform, client starts and module opens/restores go to TU Monitor automatically. Detailed diagnostics additionally include structured workflow timing/results. TU admins can review these for 30 days and export redacted feedback/evidence for AI evaluation. Raw DOM, chat, credentials and FFScouter estimates/premium data are excluded. Turning off detailed diagnostics clears its unsent workflow reports; automatic module/version reporting continues.';details.append(summary,disclosure);reporting.append(details);
       const feedbackCard=card('Send feedback'),moduleLabel=document.createElement('label');moduleLabel.textContent='Module';const feedbackModule=document.createElement('select');feedbackModule.setAttribute('aria-label','Feedback module');for(const entry of [{id:'manager',name:'TU Manager'},...registry.modules]){const option=document.createElement('option');option.value=entry.id;option.textContent=entry.name;feedbackModule.append(option);}feedbackModule.value=diagnosticModule||'manager';moduleLabel.append(feedbackModule);feedbackCard.append(moduleLabel);
       const feedbackLabel=document.createElement('label');feedbackLabel.textContent='Feedback';const feedback=document.createElement('textarea');feedback.placeholder='Describe the issue or suggestion. Do not include API keys.';feedback.maxLength=1500;feedback.rows=4;feedback.setAttribute('aria-label','TU feedback');feedbackLabel.append(feedback);feedbackCard.append(feedbackLabel);
       const feedbackStatus=document.createElement('p');feedbackStatus.className='tu-diagnostic-status';feedbackStatus.setAttribute('role','status');
       const submitFeedback=makeButton('Send feedback',async()=>{submitFeedback.disabled=true;try{await monitorClient.feedback(feedbackModule.value,feedback.value);feedback.value='';feedbackStatus.textContent='Feedback received by TU Monitor.';}catch{feedbackStatus.textContent='Not sent. Check your session/network and retry.';}finally{submitFeedback.disabled=!monitorServiceReady;}});submitFeedback.disabled=true;feedbackCard.append(submitFeedback,feedbackStatus);
       const localCard=card('Local diagnostics');
-      void checkMonitorService().then(ready=>{if(!usage.isConnected)return;sendPending.disabled=!ready;submitFeedback.disabled=!ready;uploadStatus.textContent=ready?monitorClient.status():'Monitor is unavailable. Reports will retry while TU is open.';monitorLink.textContent=ready?'Open TU Monitor':'Monitor unavailable';if(ready)monitorLink.href=DEV_BASE+'/monitor';else monitorLink.removeAttribute('href');});
+      void checkMonitorService().then(ready=>{if(!check.isConnected)return;sendPending.disabled=!ready;submitFeedback.disabled=!ready;uploadStatus.textContent=ready?monitorClient.status():'Monitor is unavailable. Reports will retry while TU is open.';monitorLink.textContent=ready?'Open TU Monitor':'Monitor unavailable';if(ready)monitorLink.href=DEV_BASE+'/monitor';else monitorLink.removeAttribute('href');});
 
       if(diagnosticModule){const h=document.createElement('h4');h.textContent='Tool: '+(registry.modules.find(m=>m.id===diagnosticModule)?.name||diagnosticModule);content.append(h)}
       const buildDiagnostics=()=>({

@@ -16,11 +16,14 @@ async function boot({sandbox=false,authorized=true,accepted=true,access='public'
  w.HTMLElement.prototype.getClientRects=function(){return this.hidden||this.style.display==='none'?[]:[{width:300,height:400}]};
  w.HTMLElement.prototype.setPointerCapture=()=>{};
  w.HTMLCanvasElement.prototype.getContext=function(){return new Proxy({canvas:this,measureText:()=>({width:10}),createLinearGradient:()=>({addColorStop(){}})},{get(t,k){return t[k]??(()=>{})},set(t,k,v){t[k]=v;return true}})};
- // Resource-lifecycle checks isolate module timers from the independent reporting retry scheduler. Default-on delivery is tested separately.
- w.localStorage.setItem('tu:monitor:usage:v1:4539436','false');
+ // Advance the synthetic clock between openings so automatic delivery completes
+ // immediately instead of leaving the independent retry scheduler pending.
+ let reportClock=0;const realNow=w.Date.now.bind(w.Date);w.Date.now=()=>realNow()+reportClock;w.__advanceReportClock=()=>{reportClock+=61000;};
  if(authorized){w.localStorage.setItem('tu:identity:public-only-key:v1','abcdef0123456789');w.localStorage.setItem('tu:agreement:accepted','test-v1');w.sessionStorage.setItem('tu:dev:auth:session:v1','mock-session');}
  const response=url=>{
  requests.push(url);
+ if(url.endsWith('/health'))return {tu_monitor:1};
+ if(url.includes('/api/monitor/'))return {ok:true};
  if(url.endsWith('/api/auth/agreement/current'))return {agreement:{agreement_version:'test-v1',agreement_number:1,agreement_date:'2026-11-05'},content:'# Published agreement\n\nComplete fixture agreement.'};
  if(url.endsWith('/api/auth/register'))return {token:'mock-session',accessLevel:access,playerId:4539436};
  if(url.endsWith('/api/auth/agreement'))return {accepted,agreement:{agreement_version:'test-v1',agreement_number:1,agreement_date:'2026-11-05'}};
@@ -57,12 +60,12 @@ for(const sandbox of [false,true]){
   if(['single-player','multiplayer'].includes(tool.category)){openCard('Games');openCard(tool.category==='single-player'?'Single Player':'Multiplayer')}
   else openCard(tool.category==='business'?'Business Tools':tool.category==='chat'?'Chat Tools':'War Tools');
   const timerCount=intervals.size;
-  openCard(tool.name);await tick();
+  w.__advanceReportClock();openCard(tool.name);await tick();
   if(errors.length)console.log(tool.id,errors);
   assert.equal(api.isActive(tool.id),true,'Activate '+tool.id);checks++;
   api.closeActiveModule();await tick();assert.equal(api.isActive(tool.id),false,'Deactivate '+tool.id);checks++;
   assert.equal(intervals.size,timerCount,'Interval cleanup '+tool.id);checks++;
-  openCard(tool.name);await tick();assert.equal(api.isActive(tool.id),true,'Reopen '+tool.id);checks++;
+  w.__advanceReportClock();openCard(tool.name);await tick();assert.equal(api.isActive(tool.id),true,'Reopen '+tool.id);checks++;
   const ids=[...w.document.querySelectorAll('[id]')].map(e=>e.id);if(new Set(ids).size!==ids.length)console.log(ids.filter((id,i)=>ids.indexOf(id)!==i));assert.equal(new Set(ids).size,ids.length,'Duplicate windows '+tool.id);checks++;
   api.closeActiveModule();await tick();assert.equal(intervals.size,timerCount,'Repeated interval cleanup '+tool.id);checks++;
 

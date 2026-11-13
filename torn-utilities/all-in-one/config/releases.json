@@ -1,5 +1,20 @@
 [
   {
+    "version": "0.5.42.118-dev",
+    "date": "2026-11-13",
+    "securityBundle": true,
+    "changes": {
+      "Features": [
+        "Automatically report client version/startup and module opens/restores for authorized users, regardless of old reporting-off settings",
+        "Display each player\u2019s last reported TU version and receipt time in TU Monitor"
+      ],
+      "Fixes": [
+        "Remove the module-use opt-out switch while keeping detailed diagnostics independently optional",
+        "Deduplicate rapid same-tab startup reports and preserve retry/authorization limits"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.117-dev",
     "date": "2026-11-13",
     "securityBundle": true,

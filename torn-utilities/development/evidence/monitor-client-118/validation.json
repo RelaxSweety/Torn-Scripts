@@ -1,0 +1,22 @@
+{
+  "build": "0.5.42.118-dev",
+  "synthetic_only": true,
+  "viewports": [
+    "desktop",
+    "portrait",
+    "landscape"
+  ],
+  "checks": [
+    "automatic startup/version before opening any tool",
+    "old off flags ignored",
+    "module opens and launcher restores upload automatically",
+    "diagnostics separately off",
+    "trusted diagnostic opt-in",
+    "no module opt-out; detailed diagnostics independently optional",
+    "automatic status update",
+    "safe dark full-width forms under conflicting host CSS",
+    "no horizontal overflow",
+    "no DOM/FF/credentials in uploads",
+    "service unavailable preserves local tools"
+  ]
+}
