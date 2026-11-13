@@ -217,3 +217,13 @@ statements succeeded, .115 health advertises readiness, and anonymous data/expor
 requests return 401.** Automatic reporting remains per-user opt-in; real-user
 authenticated acceptance remains unverified. Local diagnostics remain usable. See
 [behavior, private repository, tests and deployment boundary](TU-MONITOR-TAG-TEAM-20261113.md).
+
+## Diagnostics layout and default module counts — .116-dev
+
+TU 0.5.42.116-dev. Diagnostics uses compact vertically stacked reporting,
+feedback and local-tool cards with scoped dark full-width inputs. Module-use
+reporting defaults on for authorized users; explicit saved off settings survive.
+Detailed workflow diagnostics have a separate optional switch. Reporting status
+updates after delivery, and no timer runs without queued work. Monitor wording
+now covers reporting-enabled clients. No production/agreement/schema changes.
+See [behavior and validation](DIAGNOSTICS-REPORTING-20261113.md).

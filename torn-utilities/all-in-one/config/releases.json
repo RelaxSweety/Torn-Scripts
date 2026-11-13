@@ -1,5 +1,20 @@
 [
   {
+    "version": "0.5.42.116-dev",
+    "date": "2026-11-13",
+    "securityBundle": true,
+    "changes": {
+      "Features": [
+        "Module-use reporting on by default for authorized users, with saved off choices preserved",
+        "Separate optional detailed workflow diagnostics from module-use counts"
+      ],
+      "Fixes": [
+        "Reformat Diagnostics into compact mobile cards with full-width feedback inputs and readable controls",
+        "Refresh upload status after automatic delivery; avoid idle upload polling"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.115-dev",
     "date": "2026-11-13",
     "securityBundle": true,

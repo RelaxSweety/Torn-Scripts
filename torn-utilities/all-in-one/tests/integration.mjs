@@ -16,6 +16,8 @@ async function boot({sandbox=false,authorized=true,accepted=true,access='public'
  w.HTMLElement.prototype.getClientRects=function(){return this.hidden||this.style.display==='none'?[]:[{width:300,height:400}]};
  w.HTMLElement.prototype.setPointerCapture=()=>{};
  w.HTMLCanvasElement.prototype.getContext=function(){return new Proxy({canvas:this,measureText:()=>({width:10}),createLinearGradient:()=>({addColorStop(){}})},{get(t,k){return t[k]??(()=>{})},set(t,k,v){t[k]=v;return true}})};
+ // Resource-lifecycle checks isolate module timers from the independent reporting retry scheduler. Default-on delivery is tested separately.
+ w.localStorage.setItem('tu:monitor:usage:v1:4539436','false');
  if(authorized){w.localStorage.setItem('tu:identity:public-only-key:v1','abcdef0123456789');w.localStorage.setItem('tu:agreement:accepted','test-v1');w.sessionStorage.setItem('tu:dev:auth:session:v1','mock-session');}
  const response=url=>{
  requests.push(url);

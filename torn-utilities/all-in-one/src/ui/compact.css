@@ -116,3 +116,25 @@
 #tu-who-panel .who-ff-fields input{width:100%;min-width:0}
 #tu-who-panel .who-ff-consent{display:flex;gap:8px;align-items:flex-start;line-height:1.4}
 #tu-who-panel .who-ff-consent input{min-width:20px;min-height:20px;flex-shrink:0}
+
+/* Diagnostics owns its forms so Torn/PDA page styles cannot create inline rows. */
+#tu-pda-panel .tu-diagnostics-page{display:grid;gap:10px;width:100%;min-width:0;margin-top:10px}
+#tu-pda-panel .tu-diagnostic-card{display:flex;flex-direction:column;gap:10px;min-width:0;padding:12px;border:1px solid #665638;border-radius:8px;background:#151e24}
+#tu-pda-panel .tu-diagnostic-card h4{font:600 15px/1.3 system-ui!important;color:#f1ce72;margin:0!important}
+#tu-pda-panel .tu-diagnostic-card p{font:400 12px/1.45 system-ui!important;margin:0!important;overflow-wrap:anywhere}
+#tu-pda-panel .tu-diagnostic-card label{display:flex;flex-direction:column;gap:5px;font:400 13px/1.35 system-ui!important;margin:0!important;min-width:0}
+#tu-pda-panel .tu-diagnostic-card label.tu-diagnostic-toggle{display:flex!important;flex-direction:row;align-items:center;gap:9px;min-height:36px}
+#tu-pda-panel .tu-diagnostic-toggle input[type=checkbox]{flex:0 0 20px!important;width:20px!important;height:20px!important;min-height:20px!important;margin:0!important;padding:0!important;accent-color:#d9b552}
+#tu-pda-panel .tu-diagnostic-card :is(select,textarea){display:block!important;box-sizing:border-box!important;width:100%!important;min-width:0!important;max-width:100%!important;margin:0!important;padding:9px!important;border:1px solid #53646e!important;border-radius:5px!important;background:#26343d!important;color:#edf1f3!important;font:400 14px/1.4 system-ui!important;float:none!important}
+#tu-pda-panel .tu-diagnostic-card select{height:42px!important;min-height:42px!important}
+#tu-pda-panel .tu-diagnostic-card textarea{min-height:100px!important;height:100px;resize:vertical}
+#tu-pda-panel .tu-diagnostic-card button,#tu-pda-panel .tu-diagnostic-link{display:flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:40px!important;margin:0!important;padding:8px 10px!important;border-radius:5px!important;font:600 12px/1.3 system-ui!important;text-align:center;white-space:normal}
+#tu-pda-panel .tu-diagnostic-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:stretch}
+#tu-pda-panel .tu-diagnostic-link{color:#f1ce72!important;background:#28343b;text-decoration:none!important;border:1px solid #665638}
+#tu-pda-panel .tu-diagnostic-link:not([href]){opacity:.6}
+#tu-pda-panel .tu-diagnostic-status{color:#a9d7bb}
+#tu-pda-panel .tu-diagnostic-help,#tu-pda-panel .tu-diagnostic-card details{color:#b8c5cd}
+#tu-pda-panel .tu-diagnostic-card summary{cursor:pointer;font:400 12px/1.4 system-ui}
+#tu-pda-panel .tu-diagnostic-card details p{padding-top:8px}
+@media(pointer:coarse){#tu-pda-panel .tu-diagnostic-card button,#tu-pda-panel .tu-diagnostic-link{min-height:44px!important}#tu-pda-panel .tu-diagnostic-card label.tu-diagnostic-toggle{min-height:44px}}
+#tu-pda-panel .tu-content:has(>.tu-diagnostics-page)>h3{font:600 18px/1.3 system-ui!important;margin:10px 0 0!important}
