@@ -227,3 +227,13 @@ Detailed workflow diagnostics have a separate optional switch. Reporting status
 updates after delivery, and no timer runs without queued work. Monitor wording
 now covers reporting-enabled clients. No production/agreement/schema changes.
 See [behavior and validation](DIAGNOSTICS-REPORTING-20261113.md).
+
+## Post-landing hospitalization recovery — .117-dev
+
+TU 0.5.42.117-dev / Item Monitor 1.12.57-dev. Restore Hospitalize after a transient
+hospital observation clears, preserving an unattempted plan only. Requires
+verified same-player foreign status and known below-threshold stock; does not
+submit an item action or bypass consumed/uncertain/pending locks. Intent persists
+across navigation. Older already-stuck waiting runs with unknown action history
+must be re-armed after updating. No service/database/agreement/production change.
+See [fix, regression evidence and acceptance limit](HOSPITALIZATION-RECOVERY-20261113.md).

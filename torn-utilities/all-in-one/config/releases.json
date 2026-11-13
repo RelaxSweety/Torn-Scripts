@@ -1,5 +1,17 @@
 [
   {
+    "version": "0.5.42.117-dev",
+    "date": "2026-11-13",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Restore Hospitalize after a transient hospital reading clears on landing, only for an unattempted plan",
+        "Preserve consumed-item and uncertain-action locks; recovery requires a fresh click",
+        "Re-arm older stuck waiting runs after updating when their prior item-use history is unknown"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.116-dev",
     "date": "2026-11-13",
     "securityBundle": true,

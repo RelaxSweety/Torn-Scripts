@@ -1,0 +1,17 @@
+{
+  "build": "0.5.42.117-dev",
+  "synthetic_only": true,
+  "viewports": [
+    "desktop",
+    "portrait",
+    "landscape"
+  ],
+  "checks": [
+    "outbound flight",
+    "transient hospital indicator during foreign-page transition",
+    "hospitalization plan suspended",
+    "non-hospitalized abroad restores ready Hospitalize",
+    "one recovery event",
+    "zero gameplay action starts"
+  ]
+}
