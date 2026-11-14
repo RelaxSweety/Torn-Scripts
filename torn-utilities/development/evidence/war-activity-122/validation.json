@@ -1,0 +1,17 @@
+{
+  "build": "0.5.42.122-dev",
+  "synthetic_only": true,
+  "viewports": [
+    "desktop",
+    "portrait",
+    "landscape"
+  ],
+  "checks": [
+    "online/offline/idle/unknown activity filters",
+    "both activity sort directions",
+    "combined Okay filter",
+    "own/opposing factions",
+    "compact control row without overflow",
+    "minimize/launcher and full reload restore selection"
+  ]
+}

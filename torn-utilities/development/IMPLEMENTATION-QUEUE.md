@@ -269,3 +269,10 @@ TU .121 / Item Monitor 1.12.58-dev permits blank prices for every item. Blank
 quantity/price alerts on purchase availability. Verified shop/market scoping,
 exact identity matching and navigation cleanup prevent unrelated-page alarms.
 [Behavior and validation](ITEM-MONITOR-SCOPE-20261114.md). No service changes.
+
+## War activity filter and sort — .122-dev
+
+TU .122 / War Organizer .32 adds independent Online/Idle/Offline/Unknown filtering
+and Online first / Offline first sorting for both factions, with per-viewer
+selection persistence and a compact fixed control row. No service changes.
+[Behavior and validation](WAR-ACTIVITY-20261114.md).

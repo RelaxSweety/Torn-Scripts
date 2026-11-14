@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.122-dev",
+    "date": "2026-11-14",
+    "securityBundle": true,
+    "changes": {
+      "Features": [
+        "Filter both faction lists by Online, Idle, Offline or Unknown activity independently of existing status/search/FF filters",
+        "Sort Online first or Offline first, with Unknown last and names breaking ties; persist activity selection"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.121-dev",
     "date": "2026-11-14",
     "securityBundle": true,
