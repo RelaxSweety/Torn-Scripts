@@ -1,0 +1,16 @@
+{
+  "build": "0.5.42.121-dev",
+  "synthetic_only": true,
+  "viewports": [
+    "desktop",
+    "portrait",
+    "landscape"
+  ],
+  "checks": [
+    "blank price and quantity save for foreign/store/market",
+    "blank thresholds produce availability highlights and audio",
+    "similar non-listing text excluded",
+    "navigation clears highlights and cancels audio",
+    "non-market mutation/poll cannot restart alerts"
+  ]
+}

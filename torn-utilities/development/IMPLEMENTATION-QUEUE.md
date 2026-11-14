@@ -262,3 +262,10 @@ No production/agreement change. See [behavior and validation](WAR-ACCESS-TIMERS-
 TU .120 / War Organizer .31 replaces retired loader.php attack links with page.php
 in both client and DEV shared service; legacy service responses are normalized by
 the new client. [Findings and validation](WAR-ATTACK-ENDPOINT-20261114.md).
+
+## Optional prices and Item Monitor page scope — .121-dev
+
+TU .121 / Item Monitor 1.12.58-dev permits blank prices for every item. Blank
+quantity/price alerts on purchase availability. Verified shop/market scoping,
+exact identity matching and navigation cleanup prevent unrelated-page alarms.
+[Behavior and validation](ITEM-MONITOR-SCOPE-20261114.md). No service changes.

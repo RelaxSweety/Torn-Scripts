@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.121-dev",
+    "date": "2026-11-14",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Optional price and quantity for every monitored item; blank thresholds alert on purchase availability",
+        "Limit monitoring to supported shop/market pages and verified item listings; stop unrelated-page alarms and clear stale highlights"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.120-dev",
     "date": "2026-11-14",
     "securityBundle": true,
