@@ -276,3 +276,10 @@ TU .122 / War Organizer .32 adds independent Online/Idle/Offline/Unknown filteri
 and Online first / Offline first sorting for both factions, with per-viewer
 selection persistence and a compact fixed control row. No service changes.
 [Behavior and validation](WAR-ACTIVITY-20261114.md).
+
+## Activity sorts use descending FF — .123-dev
+
+TU .123 / War Organizer .33 uses numeric FF highest-to-lowest inside each activity
+group for Online first and Offline first. Missing FF stays last within its group;
+FF arrivals refresh the order. [Behavior and tests](WAR-ACTIVITY-FF-20261114.md).
+No service changes.

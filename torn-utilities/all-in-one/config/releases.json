@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.123-dev",
+    "date": "2026-11-14",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Activity sorts now use highest-to-lowest numeric FF within each activity group, missing FF last and names breaking ties",
+        "Reapply activity/FF ordering when personal FF estimates arrive or refresh"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.122-dev",
     "date": "2026-11-14",
     "securityBundle": true,
