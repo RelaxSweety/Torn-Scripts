@@ -15,7 +15,7 @@ const userDB={prepare(sql){return {values:[],bind(...values){this.values=values;
  }
  if(sql.includes('FROM tu_agreement_registry WHERE agreement_number='))return {...publication.agreement,content:publication.content,is_current:1};
  if(sql.includes('FROM tu_agreement_registry WHERE is_current='))return {agreement_number:publication.agreement.agreement_number};
- if(sql.includes('FROM tu_module_permissions')){assert.equal(this.values[0],actor);return {allowed:permission};}
+ if(sql.includes('FROM tu_module_permissions')){assert.equal(this.values[0],actor);return permission===null?null:{allowed:permission};}
  if(sql.includes('FROM tu_sessions WHERE id=? AND torn_id=?')){assert.equal(this.values[1],actor);return null;}
  throw Error('Unexpected fixture SQL: '+sql);
  },async run(){writes.push({sql,values:this.values});return {meta:{changes:1}};},async all(){return {results:[]};}};}};
@@ -31,7 +31,7 @@ try{
  for(const mode of ['pending','suspended','revoked']){status=mode;assert.equal((await run('/api/rooms','POST',{})).status,mode==='pending'?403:401);}
  status='active';expired=true;assert.equal((await run('/api/rooms','POST',{})).status,401);expired=false;
  revoked=true;assert.equal((await run('/api/rooms','POST',{})).status,401);revoked=false;
- permission=0;assert.equal((await run('/api/rooms','POST',{})).status,403);permission=1;
+ permission=0;assert.equal((await run('/api/rooms','POST',{})).status,403);permission=1;env.TU_AUTO_APPROVE_USERS='true';permission=null;assert.equal((await run('/api/auth/module-access?module_id=war-hit-organizer')).status,200,'Temporary auto-approved users get normal module access');permission=0;assert.equal((await run('/api/auth/module-access?module_id=war-hit-organizer')).status,403,'Explicit module denial survives');permission=null;assert.equal((await run('/api/auth/module-access?module_id=unlisted-module')).status,403);delete env.TU_AUTO_APPROVE_USERS;permission=1;
  accepted=false;assert.equal((await run('/api/rooms','POST',{})).status,403);accepted=true;
  dbUnavailable=true;const unavailable=await run('/api/rooms','POST',{});assert.equal(unavailable.status,503);assert.ok(!(await unavailable.text()).includes('PRIVATE_DB_ERROR'));dbUnavailable=false;
  assert.equal(forwarded.length,0,'Rejected authorization never reaches a game object');

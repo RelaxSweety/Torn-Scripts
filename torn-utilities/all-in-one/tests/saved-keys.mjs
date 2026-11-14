@@ -44,7 +44,7 @@ let local;
   b.settings();assert.equal(b.row(A).querySelector('strong').textContent,'Public Only (TU login)','Stale global access flag must not mislabel active key');
   assert.equal(b.w.document.querySelectorAll('[data-tu-key-entry]').length,3,'Legacy stores recovered and deduplicated');
   assert.ok(b.row(B).textContent.includes('Access level unverified'),'Legacy role label is not trusted');
-  b.button(b.row(B),'Recheck access level').click();await tick();assert.equal(b.row(B).querySelector('strong').textContent,'Public Only');
+  b.button(b.row(B),'Verify key').click();await tick();assert.equal(b.row(B).querySelector('strong').textContent,'Public Only');
   await b.save(C);await b.save(D);await b.save(B);await b.save(B);
   assert.equal(b.w.document.querySelectorAll('[data-tu-key-entry]').length,4,'All validated keys saved separately; duplicates excluded');
   assert.equal(b.w.localStorage.getItem(VAULT),A,'Adding a key must not replace login');assert.equal(b.w.localStorage.getItem(WHO),C,'Saving another Limited key preserves selected War key');

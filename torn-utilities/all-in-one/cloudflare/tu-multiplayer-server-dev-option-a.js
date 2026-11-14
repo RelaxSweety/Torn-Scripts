@@ -180,12 +180,14 @@ async function handleAuth(req, env, url, authorizationContext = null) {
       const previous = await db.prepare("SELECT account_status FROM tu_users WHERE torn_id=?").bind(identity.id).first();
       if(!previous&&body.manual!==true)return respond({error:'Enter an API key manually and accept the current agreement to register',code:'MANUAL_REGISTRATION_REQUIRED'},409);
       if (previous?.account_status === "suspended" || previous?.account_status === "revoked") return respond({ error: "Account restricted" }, 403);
-      await db.prepare("INSERT INTO tu_users(torn_id,username,account_status,verified_at,created_at,updated_at) VALUES(?,?,'pending',?,?,?) ON CONFLICT(torn_id) DO UPDATE SET username=excluded.username,verified_at=excluded.verified_at,updated_at=excluded.updated_at").bind(identity.id, identity.username, t, t, t).run();
+      const initialStatus=env.TU_AUTO_APPROVE_USERS==='true'?'active':'pending';
+      await db.prepare("INSERT INTO tu_users(torn_id,username,account_status,verified_at,created_at,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(torn_id) DO UPDATE SET username=excluded.username,verified_at=excluded.verified_at,updated_at=excluded.updated_at").bind(identity.id, identity.username, initialStatus, t, t, t).run();
+      if(initialStatus==='active')await db.prepare("UPDATE tu_users SET account_status='active',updated_at=? WHERE torn_id=? AND account_status='pending' AND role='user'").bind(t,identity.id).run();
       const secret = crypto.randomUUID() + "." + crypto.randomUUID(), hash2 = await digest(secret), id = crypto.randomUUID(), expiry = t + 86400;
       const created = await db.prepare("INSERT INTO tu_sessions(id,torn_id,token_hash,platform,created_at,expires_at) SELECT ?,torn_id,?,?,?,? FROM tu_users WHERE torn_id=? AND account_status NOT IN ('suspended','revoked')").bind(id, hash2, body.platform, t, expiry, identity.id).run();
       if (!created.meta?.changes) return respond({error:'Account restricted'},403);
       await audit(db, "auth.register", identity.id, identity.id);
-      return respond({ token: secret, expires_at: expiry, verified: true, accessLevel: identity.accessLevel, playerId: identity.id, player: { torn_id: identity.id, username: identity.username, account_status: previous?.account_status || "pending" } }, 201);
+      return respond({ token: secret, expires_at: expiry, verified: true, accessLevel: identity.accessLevel, playerId: identity.id, player: { torn_id: identity.id, username: identity.username, account_status: initialStatus==='active'?'active':previous?.account_status||'pending' } }, 201);
     } catch {
       return respond({ error: "Registration unavailable" }, 503);
     }
@@ -197,6 +199,7 @@ async function handleAuth(req, env, url, authorizationContext = null) {
   try {
     const session = await db.prepare("SELECT s.id,s.torn_id,s.expires_at,u.username,u.faction_id,u.account_status,u.role FROM tu_sessions s JOIN tu_users u ON u.torn_id=s.torn_id WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?").bind(hash, now()).first();
     if (!session || session.account_status === "suspended" || session.account_status === "revoked") return respond({ error: "Unauthorized" }, 401);
+    if(session.account_status==='pending'&&env.TU_AUTO_APPROVE_USERS==='true'){const promoted=await db.prepare("UPDATE tu_users SET account_status='active',updated_at=? WHERE torn_id=? AND account_status='pending' AND role='user'").bind(now(),session.torn_id).run();if(promoted.meta?.changes){session.account_status='active';await audit(db,'auth.dev-autoapprove',null,session.torn_id);}}
     if (path === "/api/auth/agreement") {
       const ledger = env.FOREIGN_DB;
       if (!ledger) return respond({ error: "Agreement database is not configured" }, 503);
@@ -301,7 +304,8 @@ async function handleAuth(req, env, url, authorizationContext = null) {
       if (!env.FOREIGN_DB) return respond({ allowed: false, reason: "Agreement database unavailable" }, 503);
       if (!currentAgreement(await latestAgreement(env.FOREIGN_DB, session.torn_id), (await publishedAgreement(env)).agreement)) return respond({ allowed: false, reason: "Current agreement not accepted" }, 403);
       const permission = await db.prepare("SELECT allowed FROM tu_module_permissions WHERE torn_id=? AND module_id=?").bind(session.torn_id, moduleId).first();
-      const allowed = session.role === "admin" || permission?.allowed === 1;
+      const knownModule=["flight-game","stick-fighter","chat-archiver","tic-tac-toe","torn-four","torn-fleet","torn-snake","chaos-marbles","item-monitor","war-hit-organizer"].includes(moduleId);
+      const allowed = session.role === "admin" || permission?.allowed === 1 || (!permission&&knownModule&&env.TU_AUTO_APPROVE_USERS==='true');
       if (allowed && authorizationContext) authorizationContext.player = { id: String(session.torn_id), name: session.username };
       return respond({ allowed, module_id: moduleId, reason: allowed ? "Authorized" : "Module permission not granted" }, allowed ? 200 : 403);
     }
@@ -618,7 +622,13 @@ async function requireModuleAccess(req, env, moduleId, authorizationContext) {
   const checkUrl = new URL("/api/auth/module-access?module_id=" + encodeURIComponent(moduleId), req.url);
   const result = await handleAuth(new Request(checkUrl, { method: "GET", headers: { authorization: req.headers.get("authorization") || "" } }), env, checkUrl, authorizationContext);
   if (result.status === 200) return null;
-  return json({ error: "Module access denied", module_id: moduleId, authorization_status: result.status }, result.status);
+  let denied={};try{denied=await result.json();}catch{}
+  const reason=denied.reason;let code='TU_ACCESS_UNAVAILABLE',message='TU access verification is unavailable. Retry later.';
+  if(result.status===401){code='TU_SESSION_REQUIRED';message='Your TU session must be verified. Reopen TU to sign in.';}
+  else if(reason==='Account not active'){code='TU_ACCOUNT_PENDING';message='Your TU account is awaiting approval. Contact a TU administrator.';}
+  else if(reason==='Module permission not granted'){code='TU_MODULE_DISABLED';message='Access to this module is disabled for your TU account. Contact a TU administrator.';}
+  else if(reason==='Current agreement not accepted'){code='TU_AGREEMENT_REQUIRED';message='Review and accept the current TU agreement in Settings.';}
+  return json({error:message,code,module_id:moduleId,authorization_status:result.status},result.status);
 }
 __name(requireModuleAccess, "requireModuleAccess");
 var json = /* @__PURE__ */ __name((v, s = 200) => new Response(JSON.stringify(v), { status: s, headers: { "content-type": "application/json", "access-control-allow-origin": "*", "cache-control": "no-store" } }), "json");

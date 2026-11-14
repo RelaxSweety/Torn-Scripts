@@ -71,6 +71,7 @@
   ],
   "vars": {
     "TU_DELETION_ENABLED": "true",
-    "LEGACY_IDENTITY_ROOMS": "[]"
+    "LEGACY_IDENTITY_ROOMS": "[]",
+    "TU_AUTO_APPROVE_USERS": "true"
   }
 }

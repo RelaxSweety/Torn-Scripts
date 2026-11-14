@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU War Organizer
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.3.29-dev
+// @version      0.3.30-dev
 // @description  Compact War Organizer target board and reservation design preview
 // @match        https://www.torn.com/*
 // @grant        none
@@ -292,10 +292,14 @@ function warSettings(parent){
  el('div',parent,'Opposing faction','who-field-label');picker(parent);
  const faction=field(parent,'Opposing faction ID',warDraft.enemyFactionId||'','number');faction.min='1';faction.disabled=!writable;faction.oninput=()=>warDraft.enemyFactionId=faction.value;
  const limit=field(parent,'Reservation Limit (targets per player, 1–10)',warDraft.reservationLimit,'number');limit.min='1';limit.max='10';limit.step='1';limit.disabled=!writable;limit.oninput=()=>warDraft.reservationLimit=Number(limit.value);
- const timer=field(parent,'Reservation Timer (1–30 seconds before hospital release)',warDraft.reservationTimer,'number');timer.min='1';timer.max='30';timer.step='1';timer.disabled=!writable;timer.oninput=()=>warDraft.reservationTimer=Number(timer.value);
+ const timerBox=el('fieldset',parent,undefined,'who-timer-editor');el('legend',timerBox,'Reservation Timer before hospital release');
+ const presets=dropdown(timerBox,'Quick selection',[['','Custom'],...[1,5,10,15,30,60,120,180,300,600].map(n=>[String(n),formatCountdown(n)])],String(warDraft.reservationTimer));presets.setAttribute('aria-label','Reservation timer preset');presets.disabled=!writable;
+ const timeRow=el('div',timerBox,undefined,'who-timer-fields'),minutes=field(timeRow,'Minutes',Math.floor(warDraft.reservationTimer/60),'number'),secondsInput=field(timeRow,'Seconds',warDraft.reservationTimer%60,'number');minutes.min='0';minutes.max='10';secondsInput.min='0';secondsInput.max='59';for(const input of [minutes,secondsInput]){input.step='1';input.disabled=!writable;}minutes.setAttribute('aria-label','Reservation minutes');secondsInput.setAttribute('aria-label','Reservation seconds');
+ const timerHint=el('small',timerBox);const updateTimer=()=>{const m=minutes.value===''?NaN:Number(minutes.value),s=secondsInput.value===''?NaN:Number(secondsInput.value);warDraft.reservationTimer=Number.isInteger(m)&&m>=0&&m<=10&&Number.isInteger(s)&&s>=0&&s<=59?m*60+s:NaN;presets.value=String(warDraft.reservationTimer);timerHint.textContent=warDraft.reservationTimer>=1&&warDraft.reservationTimer<=600?'Window: '+formatCountdown(warDraft.reservationTimer):'Choose 00:01 through 10:00.';};minutes.oninput=secondsInput.oninput=updateTimer;presets.onchange=()=>{if(!presets.value)return;const n=Number(presets.value);minutes.value=String(Math.floor(n/60));secondsInput.value=String(n%60);updateTimer();};updateTimer();
+
  const forfeit=dropdown(parent,'Attack Forfeit Time',[['0','None'],...Array.from({length:60},(_,i)=>[String(i+1),formatCountdown(i+1)])],String(warDraft.attackForfeit));forfeit.disabled=!writable;forfeit.onchange=()=>warDraft.attackForfeit=Number(forfeit.value);
  el('p',parent,'The forfeit countdown starts when the service first confirms Okay status. Expired reservations are removed by the service. Changing the forfeit time restarts active countdowns. Changing the opposing faction clears its reservations and Tag Team slots.','who-hint');
- const saveButton=btn(parent,'Save War Settings',event=>{if(!Number.isInteger(warDraft.reservationLimit)||warDraft.reservationLimit<1||warDraft.reservationLimit>10||!Number.isInteger(warDraft.reservationTimer)||warDraft.reservationTimer<1||warDraft.reservationTimer>30){alert('Use a reservation limit of 1–10 and timer of 1–30 seconds.');return;}void warAction('settings',{mode:warDraft.mode,expectedVersion:warDraft.expectedVersion,enemyFactionId:warDraft.enemyFactionId||null,reservationLimit:warDraft.reservationLimit,reservationTimer:warDraft.reservationTimer,attackForfeit:warDraft.attackForfeit},event);});saveButton.disabled=!writable;
+ const saveButton=btn(parent,'Save War Settings',event=>{if(!Number.isInteger(warDraft.reservationLimit)||warDraft.reservationLimit<1||warDraft.reservationLimit>10||!Number.isInteger(warDraft.reservationTimer)||warDraft.reservationTimer<1||warDraft.reservationTimer>600){alert('Use a reservation limit of 1–10 and timer from 00:01 to 10:00.');return;}void warAction('settings',{mode:warDraft.mode,expectedVersion:warDraft.expectedVersion,enemyFactionId:warDraft.enemyFactionId||null,reservationLimit:warDraft.reservationLimit,reservationTimer:warDraft.reservationTimer,attackForfeit:warDraft.attackForfeit},event);});saveButton.disabled=!writable;
  btn(parent,'Reload War Settings',async()=>{await refreshCoordination();warDraft=null;if(root)render();});
  for(const [menu,label] of [['admins','Player Admin Roles'],['tagteam','Tag Team'],['reset','Reset All Reservations']]){const action=btn(parent,label,()=>{settingsMenu=menu;render();if(menu==='tagteam')void refreshScouter();},'who-war-menu');action.disabled=!writable;}
 }
@@ -313,6 +317,7 @@ stylesheet=document.createElement('style');stylesheet.textContent=`
 #tu-who-panel .who-booking-sheet{position:absolute;z-index:12;inset:55px 10px 10px;background:#182229;border:1px solid #c3a14f;border-radius:8px;padding:12px;overflow:auto;box-shadow:0 4px 25px #000b}
 #tu-who-panel .who-booking-sheet>div{padding:9px 0;border-bottom:1px solid #6d5b35}
 #tu-who-panel .who-booking-sheet button{margin:4px;min-height:32px!important}
+#tu-who-panel .who-timer-editor{margin:10px 0;padding:8px;border:1px solid #66552f;border-radius:6px}#tu-who-panel .who-timer-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}#tu-who-panel .who-timer-editor legend{color:#f0ce77}
 #tu-who-panel .who-admin-star{color:#f0c75e;margin-right:3px}
 #tu-who-panel .who-attack-blocked{opacity:.65}
 #tu-who-panel .who-admin-row{display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid #66552f}
@@ -418,6 +423,6 @@ const beginGesture=(e,resize)=>{if(e.button!==undefined&&e.button!==0)return;if(
 root.addEventListener('pointerdown',e=>{if(e.target===grip)beginGesture(e,true);else if(e.target.closest('.who-header'))beginGesture(e,false)});
 root.addEventListener('touchmove',()=>{lastUserScroll=Date.now()},{passive:true});root.addEventListener('wheel',()=>{lastUserScroll=Date.now()},{passive:true});document.body.append(root);render();showOrganizer();startRoster();void refreshCoordination();poll=setInterval(()=>{if(!root||root.hidden||tab!=='targets')return;paintFlights();paintReservations();for(const clock of root.querySelectorAll('.who-countdown')){const remaining=seconds(Number(clock.dataset.releaseAt));if(remaining===null)continue;clock.textContent=formatCountdown(remaining);clock.style.color=remaining>0&&remaining<=state.reservationTimer?'#8fe0a8':'#f0b85c';}},1000);
 }
-function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.29-dev',activate,resume,deactivate:close})}
+function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.30-dev',activate,resume,deactivate:close})}
 if(window.TornUtilities)register();else window.addEventListener('torn-utilities-ready',register,{once:true});
 })();

@@ -247,3 +247,12 @@ player's last reported TU build/platform and receipt time, or Unknown. Rapid
 authorized startup notifications/navigation are deduplicated. Existing auth,
 rate, privacy and erasure rules remain. No schema/agreement/production changes.
 See [behavior, version semantics and validation](AUTOMATIC-USAGE-VERSIONS-20261113.md).
+
+## Temporary DEV approval and War timer/access correction — .119-dev
+
+TU 0.5.42.119-dev / War Organizer 0.3.30-dev. Temporary DEV auto-approval applies
+to regular registrations/pending users; explicit restrictions and War Admin roles
+remain enforced. Key-error handling distinguishes TU denial from actual Torn
+key errors and clears obsolete generic local flags. Reservation windows support
+00:01–10:00 through presets and Minutes/Seconds inputs, enforced server-side.
+No production/agreement change. See [behavior and validation](WAR-ACCESS-TIMERS-20261114.md).

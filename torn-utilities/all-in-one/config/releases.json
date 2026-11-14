@@ -1,5 +1,21 @@
 [
   {
+    "version": "0.5.42.119-dev",
+    "date": "2026-11-14",
+    "securityBundle": true,
+    "changes": {
+      "Features": [
+        "Reservation window from 00:01 through 10:00, with presets and minutes/seconds entry",
+        "Temporary DEV automatic approval and normal module access for regular users; War Admin roles remain restricted"
+      ],
+      "Fixes": [
+        "Distinguish TU account/module denial from Torn key failures",
+        "Only pause keys on confirmed Torn key error codes; clear legacy generic rejection flags",
+        "Rename saved-key recheck to Verify key for explicit recovery"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.118-dev",
     "date": "2026-11-13",
     "securityBundle": true,
