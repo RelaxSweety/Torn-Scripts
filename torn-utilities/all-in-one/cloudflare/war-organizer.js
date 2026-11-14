@@ -70,7 +70,7 @@ export async function handleWar(req,env,actor,{read:providerRead,readJson,now=()
    const ready=status==='Okay';entries.push({id:crypto.randomUUID(),playerId:String(actor.id),name:String(own.get(String(actor.id)).name||actor.name).slice(0,32),createdAt:now(),readyAt:ready?now():null,expiresAt:ready&&room.settings.attackForfeit?now()+room.settings.attackForfeit:null});room.reservations[target]=entries;return snapshot();
   }
   if(action==='release'||action==='boot'){const entry=entries.find(entry=>entry.id===body.reservationId);if(!entry)return snapshot();if(action==='release'&&entry.playerId!==String(actor.id))return reply({error:'Only your own reservation can be released'},403);room.reservations[target]=entries.filter(value=>value.id!==entry.id);return snapshot();}
-  if(action==='attack'){if(entries.length&&(!mine||mine.id!==body.reservationId))return reply({error:'This target is reserved. A reservation of your own is required'},403);if(member.status?.state!=='Okay')return reply({error:'Target is not currently Okay'},409);await saveRoom(storage,faction,room);return reply({attackUrl:'https://www.torn.com/loader.php?sid=attack&user2ID='+target,serverTime:now()});}
+  if(action==='attack'){if(entries.length&&(!mine||mine.id!==body.reservationId))return reply({error:'This target is reserved. A reservation of your own is required'},403);if(member.status?.state!=='Okay')return reply({error:'Target is not currently Okay'},409);await saveRoom(storage,faction,room);return reply({attackUrl:'https://www.torn.com/page.php?sid=attack&user2ID='+target,serverTime:now()});}
   return reply({error:'Unsupported action'},400);
  }catch{return reply({error:'War verification/service unavailable. Retry later.'},503);}
 }

@@ -256,3 +256,9 @@ remain enforced. Key-error handling distinguishes TU denial from actual Torn
 key errors and clears obsolete generic local flags. Reservation windows support
 00:01–10:00 through presets and Minutes/Seconds inputs, enforced server-side.
 No production/agreement change. See [behavior and validation](WAR-ACCESS-TIMERS-20261114.md).
+
+## Torn attack endpoint — .120-dev
+
+TU .120 / War Organizer .31 replaces retired loader.php attack links with page.php
+in both client and DEV shared service; legacy service responses are normalized by
+the new client. [Findings and validation](WAR-ATTACK-ENDPOINT-20261114.md).
