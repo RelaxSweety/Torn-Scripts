@@ -600,9 +600,9 @@ function foreignShopDiagnostic(){
 }
 function foreignShopCountry(){
  const shops=foreignShopTables();if(!shops.length)return null;
- const pageText=[document.title,document.querySelector('main')?.innerText?.slice(0,1200)||'',...document.querySelectorAll('h1,h2,h3,[class*="country"],[class*="location"]')].map(e=>typeof e==='string'?e:(e.getClientRects().length?text(e):'')).join(' ').toLowerCase();
+ const pageText=[document.title,document.querySelector('main')?.innerText?.slice(0,1200)||'',...document.querySelectorAll('h1,h2,h3,h4,[class*="country"],[class*="location"]')].map(e=>typeof e==='string'?e:(e.getClientRects().length?text(e):'')).join(' ').toLowerCase();
  const detected=Object.keys(travelAliases).find(code=>travelAliases[code].some(alias=>pageText.includes(alias)));
- return detected||(travelAliases[travel.country]?travel.country:null);
+ return detected||null;
 }
 let stockCatalogMap=null,stockCatalogPending=null,stockCatalogIds=null;
 let stockReportStatus='Waiting for foreign shop';
@@ -653,7 +653,7 @@ function foreignShopSnapshot(){
    if(!nameCell||!stockCell||!costCell)continue;
    const id=foreignItemId(nameCell);if(!id||seen.has(id))continue;
    const quantityLabel=text(stockCell).replace(/stock/ig,'').replace(/,/g,'').trim();
-   const quantityMatch=quantityLabel.match(/\b(\d+)\b/);
+   const quantityMatch=/^(sold out|out of stock)$/i.test(quantityLabel)?['0','0']:quantityLabel.match(/^(\d+)$/);
    if(!quantityMatch)continue;
    const quantity=Number(quantityMatch[1]);
    const priceMatch=text(costCell).match(/\$\s*([\d,]+)/);
@@ -777,33 +777,19 @@ async function reportForeignShop(){
   const snap=foreignShopSnapshot();
   if(!snap?.rows.length)return;
   const signature=visibleInventorySignature(snap);
-  if(lastVisibleInventory===null){
-   lastVisibleInventory=signature;
-   setStockReportStatus('Inventory baseline captured · waiting for visible changes');
-   return;
-  }
-  if(signature===lastVisibleInventory)return;
-  const observed_at=Math.floor(Date.now()/1000);
-  const rows=snap.rows.slice(0,50);
-  const batch={country:snap.country,observed_at,items:rows.map(({item_id,quantity,unit_price})=>({item_id,quantity,unit_price}))};
-  lastVisibleInventory=signature;
-  lastVisibleUploadAt=Date.now();
-  markStockArchived(rows,observed_at);
-  try{
-   await deliverStockBatch(batch);
-   confirmStockMarks(batch);
-   setStockReportStatus('Inventory changed: '+rows.length+' observations acknowledged · '+load(stockQueueKey,[]).length+' older batches pending');
-   if(load(stockQueueKey,[]).length)retryStockQueue();
-  }catch(e){
-   storeStockSnapshot(batch);
-   setStockReportStatus('Changed inventory: delivery failed ('+e.message+') · saved '+rows.length+' observations locally · '+load(stockQueueKey,[]).length+' pending batches');
-  }
- }catch(e){setStockReportStatus('Archive error: '+e.message);console.warn('[TU Stock Reporter]',e)}
+  if(signature===lastVisibleInventory&&Date.now()-lastVisibleUploadAt<60000)return;
+  const observed_at=Math.floor(Date.now()/1000),rows=snap.rows;
+  if(load(stockQueueKey,[]).length+Math.ceil(rows.length/50)>500)throw Error('Upload queue full');
+  for(let i=0;i<rows.length;i+=50)storeStockSnapshot({country:snap.country,observed_at,items:rows.slice(i,i+50).map(({item_id,quantity,unit_price})=>({item_id,quantity,unit_price}))});
+  lastVisibleInventory=signature;lastVisibleUploadAt=Date.now();markStockArchived(rows,observed_at);
+  try{await flushStockQueue();setStockReportStatus('Stock evidence saved · '+load(stockQueueKey,[]).length+' batches pending');}
+  catch{setStockReportStatus('Delivery pending · observations saved for retry');}
+ }catch(e){setStockReportStatus('Archive error: '+e.message);console.warn('[TU Stock Reporter] Observation not saved')}
  finally{stockReportingBusy=false}
 }
 every(reportForeignShop,1000);
-let travelWindow=null,travelEpoch=0,travelDataWindow=null,travelDataModel=null;
-function travelClose(){travelEpoch++;travelWindow?.remove();travelWindow=null;travelDataWindow?.remove();travelDataWindow=null;travelDataModel=null}
+let travelWindow=null,travelEpoch=0,travelDataWindow=null,travelDataModel=null,travelProjectionTimer=null;
+function travelClose(){clearInterval(travelProjectionTimer);travelProjectionTimer=null;travelEpoch++;travelWindow?.remove();travelWindow=null;travelDataWindow?.remove();travelDataWindow=null;travelDataModel=null}
 function travelDataRender(){if(!travelDataWindow?.isConnected)return;const area=travelDataWindow.querySelector('.tuim-data-body');if(!area)return;area.replaceChildren();const model=travelDataModel;if(!model){E('small',area,'Waiting for travel data...');return}const card=E('div',area);card.className='tuim-travel-card';const lineData=(label,value)=>{const row=E('div',card);row.className='tuim-travel-line';E('span',row,label);E('strong',row,String(value))};lineData('Server detected restock events',model.pred?.observed_events??'Unavailable');if(model.metrics){const m=model.metrics;lineData('History observations sampled',m.points+' (latest 200 requested)');lineData('Real Time Reporting',model.realTimeReportingTotal!=null?model.realTimeReportingTotal:m.sources.dom);lineData('API/YATA observations (identified)',m.sources.api);lineData('Unknown-source observations',m.sources.other);lineData('Stock increases in sampled history',m.increases);lineData('Depletion intervals used',m.intervals);if(m.points>0)E('small',area,'Real Time Reporting counts all stored app-submitted observations for this item in D1. Other source counts reflect only the latest sampled history. Restock events and forecasts may use additional history.')}else E('small',area,'History metrics unavailable')}
 // Enforce hidden state regardless of module CSS display rules.
 (function(){const id='tuim-window-visibility';if(document.getElementById(id))return;const st=E('style',document.head||document.documentElement);st.id=id;st.textContent='#tuim-menu[hidden],#tuim-panel[hidden],#tuim-travel-window[hidden],#tuim-data-window[hidden],#tuim-catalog[hidden]{display:none!important}';})();
@@ -884,7 +870,7 @@ function travelUI(){
    B(actions,'Refresh',refresh);
    B(actions,'Copy diagnostics',async()=>{try{await navigator.clipboard.writeText(output.value)}catch(e){output.focus();output.select()}});
   });
-  E('small',details,'Optional and off by default. When enabled and a supported foreign item shop is open, TU reads visible item IDs, inventory quantities, prices, country and observation timestamps when visible inventory changes, no more than once every five seconds. These are sent to the TU server to improve stock, depletion and restock forecasts. Player information is not transmitted. An orange check indicates pending server delivery; green indicates a server acknowledgment. Failed uploads are retained locally for retry. Reporting stops when the shop is not visible or you disable it. Data may still be associated with network metadata handled by the hosting provider.');
+  E('small',details,'Optional and off by default. When enabled and a supported foreign item shop is open, TU reads visible item IDs, inventory quantities, prices, country and observation timestamps on opening the shop, on visible inventory changes (at most every five seconds), and once a minute while visible and focused. These are sent to the TU server to improve stock, depletion and restock forecasts. Player information is not transmitted. An orange check indicates pending server delivery; green indicates a server acknowledgment. Failed uploads are retained locally for retry. Reporting stops when the shop is not visible or you disable it. Data may still be associated with network metadata handled by the hosting provider.');
   E('small',panel,stockReportingEnabled()?'DOM observations: orange = queued, green = D1 accepted. API/YATA observations are separate server-sourced data.':'DOM reporting disabled; server API/YATA data is separate');
   const status=E('small',panel,stockReportingEnabled()?stockReportStatus:'Reporting disabled');status.id='tuim-stock-report-status';
  }
@@ -909,10 +895,10 @@ function travelUI(){
     line(schedule,'Arrival if departing now',date(arrivalNow));
     line(schedule,'Travel opportunity',arrivalNow<=end?'Arrival within forecast window':'Unlikely to arrive before forecast window ends');
    }else{
-    line(schedule,'Next recommended departure','Next forecast unavailable');
+    line(schedule,'Next recommended departure','Precise timing unavailable');
    }
   }else{
-   line(schedule,'Recommended departure',date(model.depart));
+   line(schedule,'Recommended departure',model.depart?date(model.depart):'Timing uncertain');
    line(schedule,'Flight duration',model.minutes+' minutes');
    line(schedule,'Estimated arrival',date(model.arrive));
   }
@@ -944,9 +930,10 @@ function travelUI(){
    }
   }else if(model.flight?.error)E('small',schedule,'Live flight status unavailable: '+model.flight.error);
   line(schedule,'Predicted restock window',forecast?date(start)+' – '+date(end):'Insufficient data');
-  line(schedule,'Forecast confidence score',forecast?Math.round(travelNum(model.pred.confidence)*100)+'% (not a probability)':'Unavailable');
+  line(schedule,'Historical interval coverage',model.pred?.validation?.samples?Math.round(model.pred.validation.coverage*100)+'% · '+model.pred.validation.samples+' prior forecasts':'Not yet validated');
+  line(schedule,'Timing precision',model.pred?.precision_target_met?'15-minute target supported':model.pred?.reason||'Timing uncertain');
   if(model.metrics){
-   const m=model.metrics;
+   const m=model.pred?.model_version==='stock-cycle-v3'?{estimate:model.pred.estimated_current_stock,confidence:'Cycle-based'}:model.metrics;
    line(schedule,'Estimated current stock',m.estimate==null?'Unavailable — insufficient recent depletion data':m.estimate+' items · '+m.confidence+' confidence (heuristic)');
   }
   if(missed&&end>now&&arrivalNow<=end)E('small',schedule,'Original departure has passed. Departing now may still reach the predicted window; stock is not guaranteed.');
@@ -1000,11 +987,22 @@ function travelUI(){
   const metrics=stockHistoryMetrics(history),latest=metrics.latest,buy=Number(latest?.unit_price)>0?Number(latest.unit_price):NaN,sell=market?travelMarket(market):null;
   const qty=cap;
   const gross=sell&&Number.isFinite(buy)?sell-buy:NaN,fee=sell?travelNum(travel.fee)/100*sell:NaN,net=gross-fee,grossHaul=net*cap,travelCost=travel.mode==='standard'?2*travelCosts[travel.country]:0,haul=grossHaul-travelCost,fullHaul=haul,cash=buy*cap,proceeds=(sell-fee)*cap;
-  const depart=pred?.status==='experimental'?pred.expected_start_at-(minutes+travelNum(travel.buffer))*60:null;
+  const depart=pred?.status==='experimental'&&pred.precision_target_met?pred.expected_at-(minutes+travelNum(travel.buffer))*60:null;
   travel.departure=depart&&depart>Date.now()/1000+30?depart:0;travel.armed=false;travelSave();
-  show({minutes,depart,arrive:depart?depart+minutes*60:Date.now()/1000+minutes*60,realTimeReportingTotal:Number.isFinite(Number(history?.real_time_reporting_total))?Number(history.real_time_reporting_total):null,flight,stock:{quantity:latest?.quantity,observed_at:latest?.source_observed_at},metrics,pred,buy,sell,gross,fee,net,haul,grossHaul,travelCost,fullHaul,cash,proceeds,qty,issues});
+  show({country:travel.country,item:travel.item,minutes,depart,arrive:depart?depart+minutes*60:Date.now()/1000+minutes*60,realTimeReportingTotal:Number.isFinite(Number(history?.real_time_reporting_total))?Number(history.real_time_reporting_total):null,flight,stock:{quantity:latest?.quantity,observed_at:latest?.source_observed_at},metrics,pred,buy,sell,gross,fee,net,haul,grossHaul,travelCost,fullHaul,cash,proceeds,qty,issues});
   info.textContent=issues.length?'Partial API data · See warnings':'Updated '+new Date().toLocaleTimeString();
  }
+ let projectionBusy=false;
+ clearInterval(travelProjectionTimer);travelProjectionTimer=setInterval(async()=>{
+  if(projectionBusy||!w.isConnected||w.hidden||w.style.display==='none'||document.hidden||!document.hasFocus()||!travel.item||travelDataModel?.country!==travel.country||travelDataModel?.item!==travel.item)return;
+  projectionBusy=true;const ticket=serial,country=travel.country,id=travel.item;
+  try{const pred=await travelGet('https://tu-multiplayer-server.tuserver.workers.dev/api/foreign/prediction?country='+encodeURIComponent(country)+'&item_id='+encodeURIComponent(id));
+   if(ticket!==serial||!w.isConnected)return;
+   const model=travelDataModel,depart=pred.precision_target_met?pred.expected_at-(model.minutes+travelNum(travel.buffer))*60:null;
+   if(!depart){travel.departure=0;travel.armed=false;travelSave();}
+   show({...model,pred,depart,arrive:depart?depart+model.minutes*60:Date.now()/1000+model.minutes*60,stock:{quantity:pred.latest_quantity,observed_at:pred.latest_observed_at}});
+  }catch{if(ticket===serial&&w.isConnected)show({...travelDataModel,pred:null,depart:null});}finally{projectionBusy=false;}
+ },15000);
  country.onchange=()=>{travel.country=country.value;travel.item='';travelSave();populate()};
  mode.onchange=()=>{travel.mode=mode.value;travelSave();refresh()};
  item.onchange=()=>{travel.item=item.value;travelSave();refresh()};

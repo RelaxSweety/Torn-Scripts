@@ -1,3 +1,4 @@
+import {loadStockPrediction,invalidateStockPrediction} from './foreign-prediction.js';
 import {handleWar} from './war-organizer.js';
 import {createIdentityCoordinator,trackIdentityRoom,eraseRoomIdentity} from './identity-deletion.js';
 import { SubmissionBudget } from './submission-budget.js';
@@ -365,6 +366,7 @@ async function submitForeignSnapshot(req, env) {
     const bucket = Math.floor(observed / 10) * 10;
     const statements = rows.map((x) => db.prepare("INSERT OR IGNORE INTO foreign_direct_observations(country,item_id,observed_bucket,quantity,unit_price,received_at) VALUES(?,?,?,?,?,?)").bind(country, x.id, bucket, x.quantity, x.price, now2));
     await db.batch(statements);
+    invalidateStockPrediction(db,country,rows.map(x=>x.id));
     return reply({ ok: true, accepted: rows.map((x) => x.id), observed_at: observed, delayed: now2 - observed > 300 }, 201);
   } catch {
     return reply({ error: "Observation storage unavailable" }, 503);
@@ -480,9 +482,10 @@ async function foreignOverview(env) {
     const statuses = { experimental: 0, insufficient_data: 0 };
     const reasons = {};
     for (const [country, items] of Object.entries(byCountry)) for (const item of items) {
-      const prediction = estimateRestock(eventsByItem.get(country + ":" + item.item_id) || [], now2);
+      const prediction = await loadStockPrediction(db,country,item.item_id,now2);
       item.prediction_status = prediction.status;
       item.prediction_reason = prediction.reason || null;
+      item.precision_target_met=prediction.precision_target_met;item.model_version=prediction.model_version;
       item.observed_events = prediction.observed_events;
       item.usable_intervals = prediction.usable_intervals;
       if (prediction.status === "experimental") {
@@ -493,7 +496,7 @@ async function foreignOverview(env) {
       statuses[prediction.status] = (statuses[prediction.status] || 0) + 1;
       if (prediction.reason) reasons[prediction.reason] = (reasons[prediction.reason] || 0) + 1;
     }
-    return ok({ generated_at: now2, source: "yata+tu_dom", time_unit: "unix_seconds", prediction_threshold: 4, summary: { countries: Object.keys(byCountry).length, items: mergedRows.length, observations, restock_occurrences: occurrences, threshold_met_items: eligible, prediction_statuses: statuses, insufficient_reasons: reasons }, locations: Object.entries(byCountry).map(([country, items]) => ({ country, items })), note: "Observed stock increases are not confirmed restocks. Experimental confidence is a heuristic, not a calibrated probability." });
+    return ok({ generated_at: now2, source: "yata+tu_dom", time_unit: "unix_seconds", prediction_threshold: 4, summary: { countries: Object.keys(byCountry).length, items: mergedRows.length, observations, restock_occurrences: occurrences, threshold_met_items: eligible, prediction_statuses: statuses, insufficient_reasons: reasons }, locations: Object.entries(byCountry).map(([country, items]) => ({ country, items })), note: "Observed stock increases are not confirmed restocks. Forecast coverage is measured on prior stock cycles; it is not a future guarantee." });
   } catch {
     return bad("Stock overview query failed", 503);
   }
@@ -520,14 +523,17 @@ async function handleForeignApi(request, env, url) {
       return ok({ country, item_id: id, points, count: points.length, source: "yata+tu_dom", time_unit: "unix_seconds" });
     }
     if (path === "/api/foreign/restocks" || path === "/api/foreign/prediction") {
+     if(path.endsWith("prediction")){
+      const leadRaw = url.searchParams.get("lead_seconds") || "0";
+      if (!/^\d+$/.test(leadRaw) || Number(leadRaw) > 86400) return bad("lead_seconds must be between 0 and 86400");
+      const prediction = await loadStockPrediction(db,country,id);
+      return new Response(JSON.stringify({country,item_id:id,...prediction}),{headers:{"content-type":"application/json","access-control-allow-origin":"*","cache-control":"no-store"}});
+     }
       const { results } = await db.prepare("SELECT previous_observed_at,detected_observed_at,quantity_before,quantity_after,confidence FROM foreign_restock_events WHERE country=? AND item_id=? ORDER BY detected_observed_at DESC LIMIT ?").bind(country, id, path.endsWith("prediction") ? 100 : limit).all();
       const direct = await directEvents(db, country, id);
       const events = [...results.map((x) => ({ ...x, source: "yata" })), ...direct].sort((a, b) => a.detected_observed_at - b.detected_observed_at);
       if (path.endsWith("restocks")) return ok({ country, item_id: id, events: events.slice(-limit), count: Math.min(limit, events.length), source: "yata+tu_dom", time_unit: "unix_seconds", note: "Events represent observed quantity increases, not confirmed restocks" });
-      const leadRaw = url.searchParams.get("lead_seconds") || "0";
-      if (!/^\d+$/.test(leadRaw) || Number(leadRaw) > 86400) return bad("lead_seconds must be between 0 and 86400");
-      const prediction = estimateRestock(events, Math.floor(Date.now() / 1e3), Number(leadRaw));
-      return ok({ country, item_id: id, ...prediction, generated_at: Math.floor(Date.now() / 1e3), source: "yata+tu_dom" });
+
     }
     return bad("Not found", 404);
   } catch {
@@ -590,6 +596,7 @@ async function collectForeignStock(env) {
       const result = await db.prepare("INSERT OR IGNORE INTO foreign_stock_observations(country,item_id,quantity,unit_price,provider,source_observed_at,collected_at) VALUES(?,?,?,?,?,?,?)").bind(country, id, qty, Number.isSafeInteger(price) && price >= 0 ? price : null, "yata", observed, now2).run();
       if (!result.meta?.changes) continue;
       inserted++;
+      invalidateStockPrediction(db,country,[id]);
       if (prior && qty > prior.quantity) {
         await db.prepare(`INSERT OR IGNORE INTO foreign_restock_events(country,item_id,provider,previous_observed_at,detected_observed_at,quantity_before,quantity_after,confidence)
     VALUES(?,?,?,?,?,?,?,'observed_increase')`).bind(country, id, "yata", prior.source_observed_at, observed, prior.quantity, qty).run();

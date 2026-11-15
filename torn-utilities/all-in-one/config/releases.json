@@ -1,5 +1,15 @@
 [
   {
+    "version": "0.5.42.125-dev",
+    "date": "2026-11-15",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "DOM stock-cycle forecasts and live refresh"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.124-dev",
     "date": "2026-11-15",
     "securityBundle": true,

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities DEV (All-in-One)
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.124-dev
+// @version      0.5.42.125-dev
 // @description  Integrated TU development bundle for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -28,8 +28,6 @@
   window.addEventListener('error',event=>uiTrace('runtime-error',event.error?.name||'Error'));
   window.addEventListener('unhandledrejection',event=>uiTrace('unhandled-rejection',event.reason?.name||'Error'));
 
-  // Tampermonkey GM-enabled scripts use an isolated window. Publish the TU API on
-  // the page window so separately installed @grant none modules can register.
   const pageWindow=typeof unsafeWindow!=='undefined'?unsafeWindow:window;
   const nativeBridge=pageWindow.flutter_inappwebview||window.flutter_inappwebview;
   const rawManagerHttp=typeof nativeBridge?.callHandler==='function'?details=>{
@@ -50,19 +48,16 @@
   const rawManagerFetch=window.fetch.bind(window);
   const fetch=(input,options)=>apiGovernor.fetch(input,options,rawManagerFetch);
   const managerHttp=rawManagerHttp?details=>apiGovernor.request(details,rawManagerHttp):null;
-  const TU_VERSION='0.5.42.124-dev';
+  const TU_VERSION='0.5.42.125-dev';
   const TU_LOGO='__TU_LOGO_DATA_URL__';
-  // Bundled tool directory: no external catalog, cache, or refresh requests.
   const registry={schemaVersion:1,categories:[{"id":"business","name":"Business Tools","icon":"▥","order":10},{"id":"games","name":"Games","icon":"♜","order":20},{"id":"single-player","name":"Single Player","icon":"▣","order":21,"parent":"games"},{"id":"multiplayer","name":"Multiplayer","icon":"♟","order":22,"parent":"games"},{"id":"chat","name":"Chat Tools","icon":"◉","order":30},{"id":"other","name":"War Tools","icon":"⚙","order":40}],modules:[{"id":"flight-game","name":"Flight Game","category":"single-player","version":"0.12.8","description":"Standalone Flight Game arcade module, playable anytime"},{"id":"stick-fighter","name":"Stick Fighter","category":"single-player","version":"0.2.7","description":"Standalone Stick Fighter arcade module, playable anytime"},{"id":"chat-archiver","name":"Chat Archiver","category":"chat","version":"0.1.8","description":"Archive Torn chat conversations"},{"id":"tic-tac-toe","name":"Tic-Tac-Toe","category":"multiplayer","version":"0.6.5","description":"Two-player Tic-Tac-Toe with named winners, green winning line, rematches and head-to-head history"},{"id":"torn-four","name":"Torn Four","category":"multiplayer","version":"0.2.5","description":"Connect Four: two-player multiplayer with private room codes"},{"id":"torn-fleet","name":"Torn Fleet","category":"multiplayer","version":"0.2.5","description":"Battleship: fleet placement and turn-based naval combat"},{"id":"torn-snake","name":"Slithering Streets","category":"single-player","version":"0.2.14","description":"Single-player Snake with touch controls and local high scores"},{"id":"chaos-marbles","name":"Chaos Marbles","category":"multiplayer","version":"0.2.5","description":"Online 2\u20134 player marble race with private player sessions, Waiting for Chaos staging, and game history"},{"id":"item-monitor","name":"Travel Assistant and Item Monitor","category":"business","version":"1.10.31-dev","description":"Item Monitor and Travel Assistant with D1 stock reporting, source diagnostics and stock estimation"},{"id":"war-hit-organizer","name":"War Organizer","category":"other","version":"0.3.28-dev","description":"Compact war target board, reservation controls, timer and local development settings"}]};
   const versionCompare=(a,b)=>{const parse=value=>{const match=String(value).match(/^(\d+(?:\.\d+)*)(?:-([\w.-]+))?$/);if(!match)throw Error('Unsupported version format');return {parts:match[1].split('.').map(Number),pre:match[2]||''};};const x=parse(a),y=parse(b);for(let i=0;i<Math.max(x.parts.length,y.parts.length);i++)if((x.parts[i]||0)!==(y.parts[i]||0))return (x.parts[i]||0)-(y.parts[i]||0);if(x.pre===y.pre)return 0;if(!x.pre)return 1;if(!y.pre)return -1;return x.pre.localeCompare(y.pre,undefined,{numeric:true});};
-  // Lifecycle API: modules register inert factories; only this manager calls activate().
   const registered = new Map();
   let active = null,observationReady=false;
   const moduleHost = document.createElement('div');
   moduleHost.id = 'tu-pda-module-host';
   moduleHost.hidden = true;
   document.body.appendChild(moduleHost);
-  // v0.3 storage: synchronous, namespaced, JSON values; available to independently installed modules.
   const DATA_PREFIX='tu:data:v1:';
   const VALID_ID=/^[a-z0-9-]{1,64}$/;
   const VALID_KEY=/^[a-zA-Z0-9_.-]{1,100}$/;
@@ -120,7 +115,6 @@
     }
     return pending.length;
   }
-  // Credentials use private userscript storage where the verified host supports it.
   const VAULT='tu:identity:public-only-key:v1',VAULT_CLEARED='tu:identity:login-cleared:v1';
   const LOGIN_ACCESS_KEY='tu:identity:login-access-level:v1';
   const AUTH_CACHE='tu:dev:authorization-cache:v1',IDENTITY_CACHE='tu:dev:identity-cache:v1',AGREEMENT_CACHE='tu:dev:agreement-content:v1';
@@ -171,7 +165,6 @@
     if(!Number.isSafeInteger(playerId)||playerId<=0)throw Error('Torn did not return a valid key owner');
     return {level,playerId:String(playerId)};
   }
-  // Explicit user-provided Public Only key; never persisted or broadcast.
   let playerInfo=null,identityStatus='Enter your Public Only or Limited Access API key',identityBusy=null,authGeneration=0;
   const getPlayer=()=>playerInfo?Object.freeze({...playerInfo}):null;
   let automaticIdentityAttempted=false;
@@ -218,7 +211,6 @@
       finally{identityBusy=null;}
     })();return identityBusy;
   }
-  // Restore identity once per page load. Never send the stored key to modules.
   function cacheIdentity(){
     if(playerInfo&&devToken())sessionStorage.setItem(IDENTITY_CACHE,JSON.stringify({token:devToken(),checkedAt:Date.now(),player:playerInfo}));
   }
@@ -351,7 +343,6 @@
     isActive(id) { return active === id; }
   });
   Object.defineProperty(pageWindow, 'TornUtilities', {value:api, configurable:false, writable:false});
-  // Share the integrated tool API with both the page and userscript sandbox.
   if(window!==pageWindow)try{Object.defineProperty(window,'TornUtilities',{value:api,configurable:true});}catch(error){console.warn('[TU] Sandbox API bridge unavailable',error);}
   pageWindow.dispatchEvent(new Event('torn-utilities-ready'));
   if(window!==pageWindow)window.dispatchEvent(new Event('torn-utilities-ready'));
@@ -359,7 +350,6 @@
   let currentDevAgreement=null;
   let currentDevAgreementContent='';
 
-  // DEVELOPMENT BUILD ONLY. This code is not deployed from main.
   const DEV_BASE='https://tu-multiplayer-server-dev.tuserver.workers.dev';
   function applyAgreementMetadata(a){
     if(!a||typeof a.agreement_version!=='string'||!a.agreement_version.trim())throw Error('Current DEV agreement version unavailable');
@@ -453,7 +443,6 @@
     if(!response.ok){if(path==='/api/auth/register'&&body?.api_key&&result.code==='TORN_KEY_REJECTED'&&[1,2,10,13,18].includes(result.torn_error_code))await apiGovernor.suspendVerification(body.api_key,result.torn_error_code);if([401,403].includes(response.status)&&token&&token===devToken()&&!path.startsWith('/api/monitor/')){clearAuthorizationCache();publishAuthorization(false);}const error=Error(result.error||('Development server HTTP '+response.status));error.status=response.status;throw error;}
     return result;
   }
-  // Renew expired sessions using the user's saved Public Only key. Never accept terms automatically.
   let devRenewal=null;
   async function renewDevSession(){
     if(devRenewal)return devRenewal;
@@ -547,7 +536,6 @@
   ];
   const hasAgreement=()=>!!devToken()&&!!TU_TERMS_VERSION&&localStorage.getItem(TU_TERMS_KEY)===TU_TERMS_VERSION;
   let currentTab='modules',settingsPage=null,diagnosticModule=null;
-  // Internal tool factories load on first activation.
   function stopModule() {
     if (!active) return;
     const id=active;if(id==='war-hit-organizer')sessionStorage.removeItem('tu:who:resume:v1');if(id==='item-monitor')sessionStorage.removeItem('tu:monitor:resume:v1'); active=null;observeTUWindows();
@@ -585,7 +573,6 @@
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch {}
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch {} };
-  // TU unified window navigation (test release).
   const tuNav={history:[],current:'tu-pda-panel',minimized:true,exited:true};
   const tuRoots=['tu-pda-panel','tu-who-panel','tuim-menu','tuim-panel','tuim-catalog','tuim-travel-window','tuim-data-window','tca-panel','tca-playbar','tpfg-root','tpfg-manager','tpfg-prompt','sff-root','tu-diagnostics-window'];
   const tuRoot=id=>document.getElementById(id);
@@ -653,7 +640,7 @@ __TU_COMPACT_UI_CSS__
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.124-dev</span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.125-dev</span></footer>';
   document.body.appendChild(panel);
   const headerBrand=panel.querySelector('.tu-logo');if(headerBrand){headerBrand.textContent='';headerBrand.classList.add('tu-brand-emblem');headerBrand.setAttribute('role','img');headerBrand.setAttribute('aria-label','Torn Utilities');}
   const identityLine=document.createElement('p');
@@ -741,7 +728,6 @@ __TU_COMPACT_UI_CSS__
     dialog.append(agreementBar,scrollBody);
 
   }
-  // Script update check is informational: PDA manages installed script replacement.
   const tuScriptPath='torn-utilities/releases/dev/torn-utilities-dev.user.js';
   const tuScriptUrl='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/releases/dev/torn-utilities-dev.user.js';
   let tuUpdateStatus='Not checked';
@@ -1060,9 +1046,7 @@ __TU_COMPACT_UI_CSS__
     if(!readSavedKey()||!localStorage.getItem(TU_TERMS_KEY))publishAuthorization(false);
     else void restoreDevSession({force:true});
   });
-  // Do not interrupt first-run API requests with an immediate alert.
   window.addEventListener('torn-utilities-ready',()=>render(currentTab));
-  // Tool factories remain inert until Open is pressed.
 
   const isVisible=id=>{
     const el=document.getElementById(id);
@@ -1088,8 +1072,6 @@ __TU_COMPACT_UI_CSS__
   panel.querySelector('.tu-close').setAttribute('aria-label','Exit');
   panel.querySelector('.tu-close').addEventListener('click',()=>{tuExit();syncLauncher();});
   panel.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => {if(!authorized()&&b.dataset.tab!=='about'){showAgreement();return;}if(b.dataset.tab==='modules')goModules();else render(b.dataset.tab);}));
-  // Shared floating-window support for TU module panels.
-  // Persist each TU window's user-selected size and position independently.
   const floatIds=['tu-diagnostics-window','tuim-menu','tuim-panel','tuim-catalog','tca-panel','tu-pda-panel','sff-root','tpfg-manager','tpfg-root','tpfg-prompt'];
   const floatingSetup=new WeakSet(),floatingResizeObservers=new Map();
   const FLOAT_KEY='tu:window-layout:v1:';
@@ -1151,7 +1133,6 @@ __TU_COMPACT_UI_CSS__
     const end=e=>{if(drag?.id===e.pointerId){drag=null;remember()}};
     bar.addEventListener('pointerup',end);bar.addEventListener('pointercancel',end);
   };
-  // Enforce one visible TU window when a module reveals a new panel.
   let tuWindowSyncing=false;
   const tuReconcileWindows=()=>{
     if(tuWindowSyncing||tuNav.minimized||tuNav.exited)return;
@@ -1184,8 +1165,6 @@ __TU_COMPACT_UI_CSS__
     }
   };
   enhanceFloating();tuEnhanceHeaders();
-  // Torn updates its page frequently. Ignore unrelated changes and perform TU
-  // visibility/layout work at most once per frame, never once per mutation batch.
   const windowIds=new Set([...tuRoots,...floatIds,moduleHost.id,'tu-agreement-overlay']);
   const windowSelector=[...windowIds].map(id=>'#'+id).join(',');
   const headerSelector='header,.tu-header,.tuim-header,.tuim-travel-header,.tuac-header';
@@ -1235,7 +1214,6 @@ __TU_COMPACT_UI_CSS__
   observationReady=true;observeTUWindows();
   document.addEventListener('visibilitychange',()=>{observeTUWindows();if(!document.hidden&&(active||!panel.hidden))scheduleWindowUpdate(true);});
   syncLauncher();
-  // Restore the original draggable launcher with compact dimensions.
   launcher.setAttribute('aria-label','Open Torn Utilities; drag to reposition');
   launcher.style.width='34px';
   launcher.style.height='34px';
@@ -1256,7 +1234,6 @@ __TU_COMPACT_UI_CSS__
     window.addEventListener('click',launcherTapGuard,{capture:true,passive:false});
     launcherTapGuardTimer=setTimeout(()=>{window.removeEventListener('click',launcherTapGuard,true);launcherTapGuard=null;launcherTapGuardTimer=null;},500);
   };
-  // Keep the launcher mounted through pointer release; activate only on click.
   for(const type of ['pointerdown','pointerup','pointermove','pointercancel','mousedown','mouseup','touchstart','touchend','touchcancel','dblclick'])launcher.addEventListener(type,event=>event.stopPropagation());
   launcher.addEventListener('click',event=>{
     event.preventDefault();event.stopImmediatePropagation();
