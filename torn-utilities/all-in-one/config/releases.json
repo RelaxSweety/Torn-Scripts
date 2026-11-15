@@ -1,5 +1,15 @@
 [
   {
+    "version": "0.5.42.124-dev",
+    "date": "2026-11-15",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Cross-page travel ETA/actions and unprotected-arrival warning"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.123-dev",
     "date": "2026-11-14",
     "securityBundle": true,

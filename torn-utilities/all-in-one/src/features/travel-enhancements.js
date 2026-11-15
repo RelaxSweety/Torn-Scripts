@@ -1,6 +1,4 @@
-// Shared source embedded only into the lazy Travel Assistant factory.
-// No gameplay requests: actions delegate once to a visible, automatically matched native control.
-export function createTravelEnhancements({document,window,getItems,getContext,getSnapshot,getRows,matchRow,getSetup=()=>({}),storeSetup=()=>{},screenAlertEnabled=()=>false,getFilterContainer=row=>row,onArmed=()=>{},executeAction=null,filterEnabled,onNotice,storeRun=()=>{},restoreRun=null,now=()=>Date.now(),hospitalAudio=null,getDestinationETA=()=>null,getHospitalCountdown=()=>null}) {
+export function createTravelEnhancements({document,window,getItems,getContext,getSnapshot,getRows,matchRow,getSetup=()=>({}),storeSetup=()=>{},screenAlertEnabled=()=>false,getFilterContainer=row=>row,onArmed=()=>{},executeAction=null,filterEnabled,onNotice,storeRun=()=>{},restoreRun=null,now=()=>Date.now(),hospitalAudio=null,getDestinationETA=()=>null,getHospitalCountdown=()=>null,isTravelPage=()=>true,navigateTravel=()=>window.location.assign('https://www.torn.com/page.php?sid=travel')}) {
  const hiddenRows=new Map(),TTL=Number.MAX_SAFE_INTEGER,STOCK_TTL=30000;
  let departurePrompt=null;
  let run=restoreRun?{...restoreRun,expiresAt:Number.MAX_SAFE_INTEGER}:null,busy=false,active=false,hud=null,action=null,lastNotice='',statusTimer=null,statusAttempts=0,drag=null,suppressClickUntil=0,warningCancel=null,countdownTimer=null,countdownBase='',countdownShown=false,clockReadPending=false;if(run?.capacityLedger){run.capacityLedger={...run.capacityLedger,valid:false,reason:'page-refreshed'};}if(run){delete run.purchaseRefreshPending;delete run.purchaseDisplayRefreshDone;}const clockReads=new WeakSet();let extraHosp=null,hospitalShown=false,alarmDeadline=null,hospitalRemaining=false;
@@ -23,8 +21,6 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
    const hide=!getItems().some(w=>matchRow(row,w)),target=getFilterContainer(row)||row;
    if(hiddenRows.has(row)&&(!hide||hiddenRows.get(row)!==target))showRow(row);
    if(hide&&!hiddenRows.has(row)){
-    // Collapse the layout-owning container too: hiding a nested row alone leaves
-    // the foreign shop's fixed-height LI in the list, producing empty slots.
     for(const e of new Set([row,target])){e.classList.add('tu-monitor-filter-hidden');e.dataset.tuMonitorFiltered='1';}
     hiddenRows.set(row,target);
    }
@@ -33,7 +29,6 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
  function findControl(kind,s){
   const candidates=[...document.querySelectorAll('button,a,input[type=submit],input[type=button],[role=button]')].filter(e=>visible(e)&&!e.disabled&&e.getAttribute('aria-disabled')!=='true');
   const matches=candidates.filter(e=>kind==='heal'?run?.medical&&s.medicalMatches?.(e,run.medical):kind==='buy'?s.buyMatches?.(e,run?.watchKey):s.returnMatches?.(e));
-  // Multiple matches are ambiguous: never guess which gameplay action to submit.
   return matches.length===1?matches[0]:null;
  }
  function clearStatusTimer(){if(statusTimer!==null)window.clearTimeout(statusTimer);statusTimer=null;}
@@ -50,14 +45,39 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
  const sameTrip=s=>run&&active&&run.expiresAt>now()&&String(s.ownerId)===run.ownerId&&s.country===run.country;
  const outbound=s=>sameTrip(s)&&s.traveling&&!s.returning&&s.hospitalized!==true;
  const validRun=s=>sameTrip(s)&&!s.traveling;
+ let landedWarning=null,arrivalReadPending=false,arrivalReads=0,arrivalReadAt=0,lastSnapshot=null;
+ const destinationName=()=>({mex:'Mexico',cay:'Cayman Islands',can:'Canada',haw:'Hawaii',uni:'United Kingdom',arg:'Argentina',swi:'Switzerland',jap:'Japan',chi:'China',uae:'United Arab Emirates',sou:'South Africa'}[run?.country]||String(run?.country||'destination').replace(/\b[a-z]/g,c=>c.toUpperCase()));
+ function flightETA(){
+  if(!run)return null;const s=lastSnapshot||{},live=getDestinationETA();
+  if(String(s.ownerId)!==run.ownerId||s.returning||s.country&&s.country!==run.country)return null;
+  if(live?.outbound&&Number.isFinite(live.arrival)&&live.arrival>0&&run.destinationArrival!==live.arrival){run.destinationArrival=live.arrival;persist();}
+  if(!s.traveling&&s.status&& !['Traveling','Hospital'].includes(s.status))return null;
+  if(!s.traveling&&s.status==='Hospital'&&run.destinationArrival<=now())return null;
+  if(Number.isFinite(run.destinationArrival)&&now()-run.destinationArrival<86400000)return {outbound:true,arrival:run.destinationArrival,remainingSeconds:Math.max(0,Math.ceil((run.destinationArrival-now())/1000))};
+  return s.traveling&&!s.returning?{outbound:true,remainingSeconds:null}:live?.outbound?live:null;
+ }
+ function landingWarning(s){
+  const show=run&&run.stage!=='complete'&&sameTrip(s)&&!s.traveling&&!s.returning&&s.status==='Abroad'&&s.hospitalized===false&&!run.landedWarningDismissed;
+  if(!show){landedWarning?.remove();landedWarning=null;return;}
+  if(landedWarning)return;
+  const expected=run,box=document.createElement('section');landedWarning=box;box.id='tu-landed-unprotected';box.setAttribute('role','alert');box.style.cssText='position:fixed;top:12px;left:12px;right:12px;z-index:2147483644;padding:16px;background:#ffd44d;color:#111;border:4px solid white;border-radius:8px;text-align:center;font:bold 18px system-ui';
+  const label=document.createElement('strong');label.textContent='You have Landed Unprotected';box.append(label);
+  for(const [text,showTravel] of [['Ignore',false],['Show Me',true]]){const button=document.createElement('button');button.type='button';button.textContent=text;button.style.cssText='margin:8px;padding:10px 16px;font:inherit';button.onclick=event=>{event.stopPropagation();if(run!==expected)return;if(showTravel){navigateTravel();return;}run.landedWarningDismissed=true;persist();box.remove();landedWarning=null;};box.append(button);}
+  document.body.append(box);
+ }
+ function verifyArrival(eta){
+  if(!run||!eta?.outbound||eta.remainingSeconds!==0||arrivalReadPending||arrivalReads>=3||now()<arrivalReadAt||!focused())return;
+  const expected=run;arrivalReadPending=true;arrivalReads++;arrivalReadAt=now()+15000;
+  Promise.resolve().then(()=>getContext()).catch(()=>{}).finally(()=>{arrivalReadPending=false;if(run===expected)refresh();});
+ }
  function stopCountdown(){if(countdownTimer!==null)window.clearInterval(countdownTimer);countdownTimer=null;}
  function paintCountdown(){
   if(!action||!run)return;const end=Number(run.hospitalUntil),known=Number.isFinite(end)&&end>0,nativeSeconds=hospitalShown?getHospitalCountdown():null,seconds=known?(Number.isSafeInteger(nativeSeconds)&&nativeSeconds>=0?nativeSeconds:Math.max(0,Math.ceil((end-now())/1000))):null;
   const time=known?String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0'):'time unavailable';
   const extra=!!(hospitalShown&&hospitalRemaining&&['waiting','heal'].includes(run.stage));
   if(extraHosp){extraHosp.hidden=!extra;extraHosp.style.display=extra?'block':'none';const extraText='+ Hosp?\nHosp Time: '+time;if(extraHosp.textContent!==extraText)extraHosp.textContent=extraText;extraHosp.disabled=busy||!focused();positionExtra();}
-  const eta=getDestinationETA();const etaText=eta?.outbound?'\nDest ETA: '+(Number.isFinite(eta.remainingSeconds)?String(Math.floor(Math.max(0,Math.ceil(eta.remainingSeconds))/60)).padStart(2,'0')+':'+String(Math.max(0,Math.ceil(eta.remainingSeconds))%60).padStart(2,'0'):'unavailable'):'';action.dataset.destinationETASeconds=Number.isFinite(eta?.remainingSeconds)?String(eta.remainingSeconds):'';
-  const text=countdownBase+etaText+(countdownShown&&!extra?'\nHosp Time: '+time:'');if(action.textContent!==text){action.textContent=text;action.setAttribute('aria-label',text.replace('\n','. ')+'; drag to reposition');}
+  const eta=flightETA();verifyArrival(eta);landingWarning(lastSnapshot||{});const etaText=eta?.outbound?'\nETA: '+(Number.isFinite(eta.remainingSeconds)?String(Math.floor(Math.max(0,Math.ceil(eta.remainingSeconds))/60)).padStart(2,'0')+':'+String(Math.max(0,Math.ceil(eta.remainingSeconds))%60).padStart(2,'0'):'unavailable'):'';action.dataset.destinationETASeconds=Number.isFinite(eta?.remainingSeconds)?String(eta.remainingSeconds):'';
+  const text=(eta?.outbound?'Traveling to '+destinationName():countdownBase)+etaText+(eta?.outbound&&run.stage==='hospitalize'?'\nHospitalize Me':'')+(countdownShown&&!extra?'\nHosp Time: '+time:'');if(action.textContent!==text){action.textContent=text;action.setAttribute('aria-label',text.replace('\n','. ')+'; drag to reposition');}
   const audioStatus=hospitalAudio?.status?.()||{};
   action.dataset.hospitalWarningSeconds=String(Math.max(1,Number(run.hospitalWarningSeconds)||60));action.dataset.hospitalAlarmEnabled=String(!!run.hospitalAlarm);action.dataset.hospitalAlarmSound=run.hospitalAlarmSound||'siren';action.dataset.hospitalAlarmVolume=String(audioStatus.volume??run.hospitalAlarmVolume??60);action.dataset.hospitalAudioState=audioStatus.contextState||'unknown';action.dataset.hospitalAudioSupported=typeof audioStatus.supported==='boolean'?String(audioStatus.supported):'unknown';action.dataset.hospitalSelectedCount=String(hospitalItems().length);action.dataset.hospitalCarriedCount=hospitalInventoryKnown?String(hospitalCarriedCount):'';action.dataset.hospitalExtraReason=!hospitalShown?'not-hospitalized':!hospitalItems().length?'no-selected-hospitalization-items':!hospitalInventoryKnown?'travel-inventory-unavailable':!hospitalCarriedCount?'selected-items-not-carried':!hospitalRemaining?'foreign-page-or-trip-not-ready':busy||!['waiting','heal'].includes(run.stage)?'action-pending-or-stage-not-ready':!focused()?'page-not-focused':'available';
   const threshold=Math.max(1,Number(run.hospitalWarningSeconds)||60),urgent=hospitalShown&&known&&seconds<=threshold&&seconds>0;
@@ -65,10 +85,9 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   if(hospitalShown&&known&&seconds<=threshold&&seconds>0&&run.hospitalAlarm&&alarmDeadline!==end){alarmDeadline=end;action.dataset.hospitalAlarmDispatchedUntil=String(end);emit('hospital-alarm',{remainingSeconds:seconds,threshold,volume:Number(action.dataset.hospitalAlarmVolume),sound:run.hospitalAlarmSound||'siren'});hospitalAudio?.play?.({volume:run.hospitalAlarmVolume??60,sound:run.hospitalAlarmSound||'siren'});}
   const previousThresholdState=action.dataset.hospitalThresholdState;action.dataset.hospitalAlarmDispatchedUntil=alarmDeadline?String(alarmDeadline):'';action.dataset.hospitalThresholdState=!hospitalShown?'not-hospitalized':!known?'time-unavailable':seconds===0?'expired':urgent?'at-or-below-limit':'above-limit';
   if(previousThresholdState!==action.dataset.hospitalThresholdState)emit('hospital-threshold',{reason:action.dataset.hospitalThresholdState,remainingSeconds:seconds,threshold,enabled:!!run.hospitalAlarm});
-  // Audio duration/mute controls own the playback lifetime.
  }
  function positionExtra(){if(!extraHosp||!action||extraHosp.hidden)return;const r=action.getBoundingClientRect(),h=extraHosp.getBoundingClientRect().height||64;extraHosp.style.left=Math.max(0,Math.min(r.left,window.innerWidth-(extraHosp.offsetWidth||180)))+'px';extraHosp.style.top=Math.max(0,r.top>=h+8?r.top-h-8:Math.min(window.innerHeight-h,r.bottom+8))+'px';}
- function updateCountdown(text,show,s){if(s.hospitalClock)run.hospitalClock=s.hospitalClock;if(Number.isFinite(s.hospitalUntil)&&s.hospitalUntil>0&&run.hospitalUntil!==s.hospitalUntil){run.hospitalUntil=s.hospitalUntil;persist();}const layoutChanged=countdownBase!==text||countdownShown!==show;countdownBase=text;countdownShown=show;hospitalShown=!!(s.hospitalized===true||s.hospitalized==null&&run.hospitalizedConfirmed);action.dataset.hospitalClockVisible=String(show);action.dataset.hospitalUntil=Number(run.hospitalUntil)>0?String(run.hospitalUntil):'';action.dataset.hospitalClockSource=run.hospitalClock?.source||(run.hospitalUntil?'restored-deadline':'unavailable');action.dataset.hospitalClockReason=run.hospitalClock?.reason||'';action.dataset.hospitalClockLookup=run.hospitalClockLookup||'not-requested';action.dataset.hospitalProfileState=run.hospitalClock?.profileState||'';action.dataset.hospitalProfileUntilPresent=String(!!run.hospitalClock?.profileUntilPresent);action.style.whiteSpace='pre-line';paintCountdown();if(layoutChanged&&action.style.top)clampPosition();if((hospitalShown&&Number(run.hospitalUntil)>0||getDestinationETA()?.outbound)&&!document.hidden){if(countdownTimer===null)countdownTimer=window.setInterval(()=>{if(document.hidden){stopCountdown();return;}paintCountdown();},1000);}else stopCountdown();}
+ function updateCountdown(text,show,s){if(s.hospitalClock)run.hospitalClock=s.hospitalClock;if(Number.isFinite(s.hospitalUntil)&&s.hospitalUntil>0&&run.hospitalUntil!==s.hospitalUntil){run.hospitalUntil=s.hospitalUntil;persist();}const layoutChanged=countdownBase!==text||countdownShown!==show;countdownBase=text;countdownShown=show;hospitalShown=!!(s.hospitalized===true||s.hospitalized==null&&run.hospitalizedConfirmed);action.dataset.hospitalClockVisible=String(show);action.dataset.hospitalUntil=Number(run.hospitalUntil)>0?String(run.hospitalUntil):'';action.dataset.hospitalClockSource=run.hospitalClock?.source||(run.hospitalUntil?'restored-deadline':'unavailable');action.dataset.hospitalClockReason=run.hospitalClock?.reason||'';action.dataset.hospitalClockLookup=run.hospitalClockLookup||'not-requested';action.dataset.hospitalProfileState=run.hospitalClock?.profileState||'';action.dataset.hospitalProfileUntilPresent=String(!!run.hospitalClock?.profileUntilPresent);action.style.whiteSpace='pre-line';paintCountdown();if(layoutChanged&&action.style.top)clampPosition();if((hospitalShown&&Number(run.hospitalUntil)>0||flightETA()?.outbound)&&!document.hidden){if(countdownTimer===null)countdownTimer=window.setInterval(()=>{if(document.hidden){stopCountdown();return;}paintCountdown();},1000);}else stopCountdown();}
  async function extendHospital(event){
   if(!event?.isTrusted||!run||busy||!focused()||!validRun(getSnapshot())||getSnapshot().hospitalized!==true||!['waiting','heal'].includes(run.stage)||!hasHospitalItem()){emit('click-blocked',{action:'extend-hospital',reason:action?.dataset.hospitalExtraReason||'not-armed-or-untrusted'});return false;}
   if(!executeAction?.enabled()){notice('Native inventory controls are unavailable.');return false;}
@@ -84,12 +103,13 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   run.stage='complete';delete run.stepLabel;clearStatusTimer();executeAction?.cancel?.();departurePrompt?.remove();departurePrompt=null;persist();emit('return-flight-confirmed');notice('Return flight to Torn confirmed. Snatch and Run completed.');return true;
  }
  function refresh(){
-  if(!action)return;finishReturnFlight(getSnapshot());const hide=!run||run.stage==='complete';action.dataset.hospitalSettingsActive=String(!hide);if(action.hidden!==hide)action.hidden=hide;const display=hide?'none':'block';if(action.style.display!==display)action.style.display=display;if(!run||hide){if(run?.stage==='complete'){action.textContent='Return flight booked';action.dataset.snatchStage='complete';}extraHosp?.setAttribute('hidden','');if(extraHosp)extraHosp.style.display='none';hospitalAudio?.stop?.();stopCountdown();document.getElementById('tu-snatch-screen-alert')?.remove();return;}
-  const s=getSnapshot();hospitalRemaining=(s.hospitalized===true||s.hospitalized==null&&run.hospitalizedConfirmed)&&validRun(s)&&hasHospitalItem();screenAlert(s);const kind=run.stage,waiting=kind==='waiting',pending=kind.endsWith('-pending');
+  if(!action)return;const s=getSnapshot();lastSnapshot=s;landingWarning(s);finishReturnFlight(s);const hide=!run||run.stage==='complete';action.dataset.hospitalSettingsActive=String(!hide);if(action.hidden!==hide)action.hidden=hide;const display=hide?'none':'block';if(action.style.display!==display)action.style.display=display;if(!run||hide){if(run?.stage==='complete'){action.textContent='Return flight booked';action.dataset.snatchStage='complete';}extraHosp?.setAttribute('hidden','');if(extraHosp)extraHosp.style.display='none';hospitalAudio?.stop?.();stopCountdown();document.getElementById('tu-snatch-screen-alert')?.remove();return;}
+  hospitalRemaining=(s.hospitalized===true||s.hospitalized==null&&run.hospitalizedConfirmed)&&validRun(s)&&hasHospitalItem();screenAlert(s);const kind=run.stage,waiting=kind==='waiting',pending=kind.endsWith('-pending');
   const minimum=Math.max(1,Number(getItems().find(w=>w.key===run.watchKey)?.minQty)||1);
   const continueReady=active&&kind==='return-continue'&&run.returnBookingConfirmed&&String(s.ownerId)===run.ownerId;
   const stockAvailable=continueReady?true:kind==='hospitalize'?outbound(s)||Number.isFinite(s.quantity)&&s.quantity<minimum&&s.hospitalized===false:kind==='return'||(['buy','destroy'].includes(kind)?s.quantity>=minimum:!Number.isFinite(s.quantity)||s.quantity>=minimum);
-  const ready=!!(stockAvailable&&(continueReady||validRun(s)||kind==='hospitalize'&&outbound(s))&&focused()&&!busy&&!waiting&&!pending&&(kind!=='destroy'||s.hospitalized===false)&&['hospitalize','heal','destroy','buy','return','return-continue'].includes(kind)&&(['return','return-continue','hospitalize'].includes(kind)||now()-run.stockAt<(kind==='heal'?120000:STOCK_TTL)));
+  const navigateReady=!isTravelPage()&&active&&focused()&&!busy&&!pending&&String(s.ownerId)===run.ownerId;
+  const ready=navigateReady||!!(stockAvailable&&(continueReady||validRun(s)||kind==='hospitalize'&&outbound(s))&&focused()&&!busy&&!waiting&&!pending&&(kind!=='destroy'||s.hospitalized===false)&&['hospitalize','heal','destroy','buy','return','return-continue'].includes(kind)&&(['return','return-continue','hospitalize'].includes(kind)||now()-run.stockAt<(kind==='heal'?120000:STOCK_TTL)));
   const reason=ready?'ready':!active?'tool-inactive':run.expiresAt<=now()?'run-expired':String(s.ownerId)!==run.ownerId?'player-unavailable-or-changed':s.country!==run.country?'destination-unavailable-or-changed':document.hidden?'page-hidden':!document.hasFocus()?'page-not-focused':busy?'action-busy':waiting?'waiting-for-stock':pending?'confirmation-pending':s.returning&&s.traveling?'return-flight':s.traveling&&kind!=='hospitalize'?'in-flight':!stockAvailable?'stock-or-hospital-status-unavailable':'state-or-stock-not-ready';
   action.dataset.readinessReason=reason;
   const text=kind==='return-continue'?'Confirm travel':kind==='departure-choice'?'Choose departure option':waiting?'Waiting for available stock':kind==='hospitalize'?'Hospitalize Me':pending?(kind==='hospitalize-pending'?'Confirming hospitalization':kind==='heal-pending'?'Confirming healing':kind==='buy-pending'?'Confirming purchase':kind==='destroy-pending'?'Destroying travel inventory':'Booking return flight'):kind==='complete'?'Return flight booked':kind==='destroy'?'Destroy Selected Items':kind==='buy'?'Purchase Max':kind==='heal'?'Heal from Hospital':'Return to Torn';
@@ -124,11 +144,11 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   if(capacity&&capacity.free===0){run.stage='return';return;}
   run.departureCapacity=capacity||null;run.stage='departure-choice';
  }
- function disarm(reason='Snatch and Run canceled'){departurePrompt?.remove();departurePrompt=null;hospitalAudio?.stop?.();alarmDeadline=null;emit('cancel',{message:reason});clearStatusTimer();executeAction?.cancel();executeAction?.forget?.();busy=false;run=null;persist();notice(reason);refresh();}
+ function disarm(reason='Snatch and Run canceled'){landedWarning?.remove();landedWarning=null;arrivalReads=0;arrivalReadAt=0;departurePrompt?.remove();departurePrompt=null;hospitalAudio?.stop?.();alarmDeadline=null;emit('cancel',{message:reason});clearStatusTimer();executeAction?.cancel();executeAction?.forget?.();busy=false;run=null;persist();notice(reason);refresh();}
  async function arm({watchKey,hospital,medical=null,destroyInventory=false,destroyAccepted=false,destroyItems=[],planHospitalize=false,hospitalization=null,medicals=null,hospitalizations=null,hospitalWarningSeconds=60,hospitalAlarm=false,hospitalAlarmVolume=60,hospitalAlarmSound='siren'}={}){
   if(!active||!focused())throw Error('Open Travel Assistant on the actively viewed foreign page');
   const watch=getItems().find(w=>w.key===watchKey&&w.category==='Foreign');if(!watch)throw Error('Select a monitored foreign item');
-  hospitalAudio?.unlock?.();const s=await getContext();
+  hospitalAudio?.unlock?.();const s=await getContext();arrivalReads=0;arrivalReadAt=0;
   if(!active||!focused())throw Error('Travel Assistant was closed or the page lost focus; arm again');
   if(!s.country||!s.ownerId||!['Abroad','Hospital','Traveling'].includes(s.status)||s.returning)throw Error('A confirmed foreign destination or current foreign location is required');
   medicals=selections(medicals,medical);hospitalizations=selections(hospitalizations,hospitalization);medical=medicals[0]||null;hospitalization=hospitalizations[0]||null;
@@ -154,8 +174,6 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   if(s.ownerId==null){refresh();return;}
   if(String(s.ownerId)!==run.ownerId){disarm('Player changed; arm again');return;}
   if(run.stage==='hospitalize'&&s.hospitalized===true){run.hospitalizationResumeEligible=!!(run.planHospitalize&&!run.hospitalizationAttempted&&!run.hospitalizedConfirmed&&!s.directItemConsumed&&!s.directItemUncertain);run.stage='waiting';persist();}
-  // A hospital observation can be transient during landing. Restore only an
-  // unattempted plan, never a consumed, pending or uncertain item operation.
   if(run.stage==='waiting'&&run.hospitalizationResumeEligible===true&&run.planHospitalize&&!run.hospitalizationAttempted&&!run.hospitalizedConfirmed&&!s.directItemConsumed&&!s.directItemUncertain&&!busy&&s.hospitalized===false&&!s.returning&&validRun(s)&&focused()&&Number.isFinite(s.quantity)&&s.quantity>=0&&s.quantity<Math.max(1,Number(run.minimumQty)||1)&&hospitalItems().length){run.hospitalizationResumeEligible=false;run.stage='hospitalize';run.hospitalUntil=null;run.hospitalClock=null;run.hospitalClockLookup='not-requested';persist();emit('hospitalize-restored',{reason:'status-cleared',quantity:s.quantity});}
 
   if(['hospitalize','waiting'].includes(run.stage)&&Number.isFinite(s.quantity)&&s.quantity>=Math.max(1,Number(run.minimumQty)||1)&&validRun(s)&&focused()){run.stockAt=now();run.stage=s.hospitalized?'heal':afterHeal();persist();emit('stock-ready',{quantity:s.quantity});}
@@ -212,6 +230,7 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
  }
  function act(event){
   if(!event?.isTrusted||busy||!run)return false;
+  if(!isTravelPage()){if(active&&focused()&&String(getSnapshot().ownerId)===run.ownerId){persist();navigateTravel();return true;}return false;}
   const s=getSnapshot(),kind=run.stage;
   if(kind==='hospitalize'&&outbound(s))return hospitalizeBeforeLanding();
   if(kind==='return-continue'){if(!run.returnBookingConfirmed||String(s.ownerId)!==run.ownerId||!focused())return false;return nativeAct(kind,{event});}
@@ -280,7 +299,6 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
   active=true;if(run?.stage==='hospitalize'&&!run.hospitalization?.name){run.planHospitalize=false;run.stage='waiting';persist();}if(run?.destroyInventory&&!run.destroyItems?.length)disarm('Select and confirm destruction items, then arm again');if(!action){
    action=document.createElement('button');action.id='tu-snatch-run';action.type='button';action.style.cssText='position:fixed;bottom:12px;left:12px;max-width:calc(100vw - 24px);z-index:2147483643;color:#fff;border:2px solid;border-radius:8px;padding:12px 18px;font:bold 15px system-ui;opacity:1;cursor:grab;touch-action:none;user-select:none';
    action.setAttribute('aria-label','Snatch and Run action; drag to reposition');
-   // Keep TU taps inside TU: Torn treats an outside tap as dismissal of its native confirmation.
    for(const type of ['pointerdown','pointerup','mousedown','mouseup','touchstart','touchend','dblclick'])action.addEventListener(type,event=>event.stopPropagation());
    action.onclick=event=>{event?.stopPropagation?.();if(now()<suppressClickUntil){event?.preventDefault?.();event?.stopPropagation?.();emit('click-blocked',{reason:'drag-release'});return false;}if(action.getAttribute('aria-disabled')==='true'){emit('click-blocked',{reason:'not-ready'});return false;}return act(event);};
    action.addEventListener('pointerdown',event=>{if(event.button!==0&&event.pointerType==='mouse')return;const rect=action.getBoundingClientRect();drag={id:event.pointerId,x:event.clientX,y:event.clientY,left:rect.left,top:rect.top,moved:false};action.setPointerCapture?.(event.pointerId);});
@@ -290,7 +308,7 @@ export function createTravelEnhancements({document,window,getItems,getContext,ge
    const warningStyle=document.createElement('style');warningStyle.textContent='@keyframes tu-hospital-warning{0%,49%{filter:brightness(1)}50%,100%{filter:brightness(.4)}}';document.head.append(warningStyle);warningStyle.id='tu-hospital-warning-style';
    extraHosp=document.createElement('button');extraHosp.id='tu-snatch-extra-hosp';extraHosp.type='button';extraHosp.style.cssText='position:fixed;z-index:2147483643;white-space:pre-line;background:#a82525;color:white;border:2px solid #ec8585;border-radius:8px;padding:10px 16px;font:bold 15px system-ui;max-width:calc(100vw - 24px)';extraHosp.onclick=event=>{event.stopPropagation();return extendHospital(event);};for(const type of ['pointerdown','pointerup','mousedown','mouseup','touchstart','touchend'])extraHosp.addEventListener(type,event=>event.stopPropagation());document.body.append(extraHosp);
    document.body.append(action);hud=action;try{const position=JSON.parse(window.localStorage.getItem(positionKey)||'null');if(Number.isFinite(position?.x)&&Number.isFinite(position?.y))clampPosition(position.x,position.y);}catch{}window.addEventListener('resize',resizeButton);
-  }refresh();if(run?.stage==='departure-choice')showDepartureChoice();if(run)scheduleStatus();
+  }refresh();if(run&&!isTravelPage()){const expected=run;Promise.resolve().then(()=>getContext()).catch(()=>{}).finally(()=>{if(run===expected)refresh();});}if(run?.stage==='departure-choice')showDepartureChoice();if(run)scheduleStatus();
  }
 
  function update(){applyFilter();check();if(hud)hud.hidden=!run||run.stage==='complete';}
