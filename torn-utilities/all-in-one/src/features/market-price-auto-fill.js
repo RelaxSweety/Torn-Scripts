@@ -1998,6 +1998,13 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         return maximum;
     }
 
+    // Torn may move the native selection outside the price/info container or rename its wrappers.
+    function rowSelection(row){
+        const host=row?.closest('[data-tmf-item-id]')||row;
+        const inputs=[...(host?.querySelectorAll('input[type=checkbox]')||[])].filter(input=>input.closest('[data-tmf-item-id]')===host&&!input.closest('.tmf-icons,.tmf-settings-overlay'));
+        return inputs.length===1?inputs[0]:null;
+    }
+
     async function applyQuantity(target, action, category, isAuto,quantityOverride=null,reservationKey=null){
         let parentRow = findParentByCondition(target, (el) => el.matches?.('[class*=info],[data-market-fields]')||el.hasAttribute?.('data-tmf-item-id'));
         if (parentRow == null){
@@ -2024,7 +2031,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         if (quantityInputs.length === 0){
             // Single-copy rows (most clothing) carry a checkbox instead of an amount input,
             // so their maximum is 1 by definition.
-            let checkbox = parentRow.querySelector('[class^=checkboxWrapper] > [class^=checkboxContainer] [type=checkbox]');
+            let checkbox = rowSelection(host);
             if (checkbox == null){
                 if(restriction!==null)throw Error('Cannot identify the protected item selection safely.');
                 return 'ok';
@@ -2041,7 +2048,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
                 checkbox.click();
             }
             await new Promise(resolve=>window.setTimeout(resolve,160));
-            const accepted=parentRow.querySelector('input[type=checkbox]');
+            const accepted=rowSelection(host);
             if(!accepted?.isConnected||accepted.checked!==(action==='fill'))throw Error('Torn did not accept the item selection. Retry this row.');
             return 'ok';
         }
@@ -2702,7 +2709,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
     function marketRowReady(row){
         const button=row?.querySelector('.silmaril-market-filler-button');if(!button)return false;
         const prices=priceFields(button),quantities=[...row.querySelectorAll('[class*=amountInputWrapper] input.input-money,[data-market-quantity]')];
-        const selection=row.querySelector('[class^=checkboxWrapper] > [class^=checkboxContainer] input[type=checkbox]');
+        const selection=rowSelection(row);
         if(!prices.length&&!quantities.length&&selection&&!selection.checked&&!selection.disabled){const raw=[...row.querySelectorAll('[class*=priceInputWrapper] input.input-money')];return !!raw.length&&raw.every(input=>!input.readOnly);}
         return !!prices.length&&[...prices,...quantities].every(input=>!input.disabled&&!input.readOnly);
     }
@@ -5504,7 +5511,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
     }
     async function clearRow(target){
         const row=target.closest('[data-tmf-item-id]');await writeInputs(priceFields(target),'');
-        if(getCurrentPage()===pages.AddItems){const inputs=row?.querySelectorAll('[class*=amountInputWrapper] input.input-money,[data-market-quantity]');if(inputs?.length)await writeInputs(inputs,'');else{const checkbox=row?.querySelector('input[type=checkbox]');if(checkbox?.checked){checkbox.click();await new Promise(r=>window.setTimeout(r,160));if(row.querySelector('input[type=checkbox]')?.checked)throw Error('Torn did not accept clearing the item selection.');}}}
+        if(getCurrentPage()===pages.AddItems){const inputs=row?.querySelectorAll('[class*=amountInputWrapper] input.input-money,[data-market-quantity]');if(inputs?.length)await writeInputs(inputs,'');else{const checkbox=rowSelection(row);if(checkbox?.checked){checkbox.click();await new Promise(r=>window.setTimeout(r,160));if(rowSelection(row)?.checked)throw Error('Torn did not accept clearing the item selection.');}}}
         if(target.getAttribute('data-action-flag')==='clear')switchActionFlag(target);
     }
     async function guardedFill(target,id,popup,options={}){

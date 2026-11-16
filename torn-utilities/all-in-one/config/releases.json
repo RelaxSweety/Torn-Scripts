@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.135-dev",
+    "date": "2026-11-16",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Identify native item-selection checkboxes across the whole owning row without relying on generated checkbox wrapper classes",
+        "Use the same unambiguous selection detection for Fill, Fill List readiness, verification and Clear"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.134-dev",
     "date": "2026-11-16",
     "securityBundle": true,

@@ -266,3 +266,9 @@ TU and Testing and Diagnostics both identify 0.5.42.133-dev.
 Manual and analytics Fill now use stable per-row retention reservations, like Fill List. Keeping one individually selectable item no longer protects every copy independently. Repeated fills of the retained row reuse its reservation. Ambiguous duplicate identities fail safely. Analytics price application also validates the captured item ID correctly. Regression coverage includes two checkbox rows of the same restricted item, repeat attempts and the subsequent Fill List run. Actual Lead Pipe PDA markup remains unverified.
 
 Validation: `npm run build`, full `npm test`, generated-script syntax checks and alias/snapshot comparisons passed. The expanded restriction fixture additionally exercised analytics Fill; a separate run without native item UIDs passed. Live PDA/Tampermonkey interaction is unverified.
+
+## 0.5.42.135-dev — weapon selection detection
+
+The reported toast identifies failure to locate a protected row selection. Selection previously required generated checkboxWrapper/checkboxContainer classes inside the info container. Fill, queue readiness, verification and Clear now share a row-scoped native-checkbox lookup, reject ambiguous selections, and allow renamed wrappers or placement outside info. Regression fixtures cover three individually selectable copies with Keep 1 and renamed controls outside info: one retained and two selected. This is simulated DOM coverage; the screenshot does not provide actual PDA markup, so live verification remains required.
+
+Validation: build and full regression suite passed, plus the expanded focused fixture covering Clear and ambiguous-control refusal. Generated TU/diagnostics syntax and DEV alias/snapshot equality checks passed. No live listings were submitted.
