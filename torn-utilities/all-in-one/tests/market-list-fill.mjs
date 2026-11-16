@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import {JSDOM} from 'jsdom';
+import {createMarketPriceAutoFill} from '../src/features/market-price-auto-fill.js';
+import {setMarketInput} from '../src/features/market-input.js';
+import {readItemStockQuantity} from '../src/features/item-stock-quantity.js';
+const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const dom=new JSDOM('<body><form id="item-market-root"></form><div id="mount"></div></body>',{url:'https://www.torn.com/page.php?sid=ItemMarket#/addListing',pretendToBeVisual:true});
+const w=dom.window,d=w.document,market=d.getElementById('item-market-root');
+w.HTMLElement.prototype.getClientRects=function(){let el=this;while(el){if(el.hidden||el.style.display==='none')return [];el=el.parentElement;}return [{}];};
+const row=(id,name,max,manual='')=>`<div class="itemRowWrapper_test" data-item-id="${id}"><span class="itemName_test">${name}</span><div class="info_test"><div class="amountInputWrapper_test"><div class="input-money-group"><input class="input-money" max="${max}" value="${manual}"></div></div><div class="priceInputWrapper_test"><div class="input-money-group"><input class="input-money"></div></div></div></div>`;
+const footer=()=>{const el=d.createElement('footer');el.innerHTML='<label for="torn-fill"><input id="torn-fill" type="checkbox">Fill</label><button type="submit">List items</button>';return el;};
+market.innerHTML=row(206,'Xanax',12)+row(207,'Plushie',8)+row(208,'Excluded item',5)+row(206,'Xanax duplicate stack',3)+row(209,'Skipped item',4,'2')+row(210,'Manual quantity',10,'2');market.append(footer());
+let submissions=0,requests=0;market.onsubmit=e=>{submissions++;e.preventDefault();};
+w.localStorage.setItem('tu:market-fill:price-delta','=1');w.localStorage.setItem('tu:market-fill:quantity-mode','max-2');w.localStorage.setItem('tu:market-fill:favourites','["207"]');w.localStorage.setItem('tu:market-fill:excluded','["208"]');w.localStorage.setItem('tu:market-fill:item-formulas','{"209":{"quantity":"skip"}}');
+const tool=createMarketPriceAutoFill({window:w,manager:{isAuthorized:()=>true,requestMarketPriceData:async()=>{requests++;throw Error('Fixed prices must not request data');}},setMarketInput,readItemStockQuantity});
+try{
+ tool.setEnabled(true);await wait(80);tool.activate({mount:d.getElementById('mount')});
+ const star=id=>d.querySelector(`.tmf-fav[data-tmf-item-id="${id}"]`),favoriteInput=d.querySelector('[aria-label="Favorites item IDs"]'),excludedInput=d.querySelector('[aria-label="Excluded item IDs"]');
+ assert.equal(favoriteInput.value,'207');assert.equal(excludedInput.value,'208');assert.match(d.querySelector('[data-tu-favorite-entries="Favorites"]').textContent,/Plushie/);
+ star(206).click();assert.ok(favoriteInput.value.includes('206'),'Row favorite immediately appears in existing settings');assert.ok(d.querySelector('[data-tu-favorite-entries="Favorites"] [data-item-id="206"]'));
+ star(206).click();assert.ok(!favoriteInput.value.includes('206'));assert.ok(excludedInput.value.includes('206'),'Exclusion immediately appears');star(206).click();assert.ok(!excludedInput.value.includes('206'));
+ favoriteInput.value='207,208';favoriteInput.dispatchEvent(new w.Event('input'));[...d.querySelectorAll('button')].find(el=>el.textContent==='Save Favorites').click();assert.equal(excludedInput.value,'','Manual favorites save removes conflicting exclusions');assert.equal(star(208).textContent,'★');star(208).click();assert.equal(star(208).textContent,'⊘');assert.ok(!favoriteInput.value.includes('208'));
+ const oldFooter=market.querySelector('footer');oldFooter.replaceWith(footer());await wait(80);
+ assert.equal(market.querySelectorAll('[data-tu-fill-list]').length,1,'Footer remount creates one current control');assert.equal(d.getElementById('torn-fill').closest('label').nextElementSibling.className,'tu-market-list-controls','Dollar control sits beside native Fill');
+ const button=market.querySelector('[data-tu-fill-list]');assert.equal(button.textContent,'$');button.click();
+ for(let i=0;i<150&&tool.diagnostics().listFill.active;i++)await wait(100);
+ assert.equal(tool.diagnostics().listFill.active,false,'Current-list run completes without watching future lists');
+ const rows=[...market.querySelectorAll('.silmaril-market-filler-processed')],qty=el=>el.querySelector('[class*=amountInputWrapper] input').value,price=el=>el.querySelector('[class*=priceInputWrapper] input.input-money').value;
+ assert.deepEqual(rows.map(qty),['12','8','','3','2','2'],'Neutral, favorite and duplicate rows reach max; excluded/skip remain unchanged; manual quantity wins');
+ assert.deepEqual(rows.map(price),['1','1','','1','','1']);assert.equal(submissions,0,'Fill never submits');assert.equal(d.getElementById('torn-fill').checked,false,'Native Fill checkbox is not toggled');assert.equal(requests,0);
+ d.querySelector('[aria-label="Remove 207 from Favorites"]').click();assert.equal(favoriteInput.value,'');assert.equal(star(207).textContent,'☆');assert.deepEqual(JSON.parse(w.localStorage.getItem('tu:market-fill:favourites')),[]);
+ tool.setEnabled(false);assert.equal(d.querySelector('[data-tu-fill-list]'),null,'Disable removes list control');
+ console.log('Market list fill passed: adjacent footer placement/remount, current-list max queue, duplicate rows, exclusions/skip/manual preservation, no submission, live named favorites/exclusions, normalized persistence and removal.');
+}finally{tool.stop();w.close();}

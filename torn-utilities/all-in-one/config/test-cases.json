@@ -822,7 +822,7 @@
       "id": "market-fill.queue",
       "section": "market-fill",
       "label": "Favorites queue and cancellation",
-      "instructions": "Fill All must populate fields only. One failed row must not stop other favorites. Stop prevents pending writes. Excluded items remain untouched.",
+      "instructions": "Fill All must populate fields only. One failed row must not stop other favorites. Stop prevents pending writes. Excluded items remain untouched. Verify the $ button beside native Fill fills the current list to max, including neutral items and separate stacks, skips exclusions/skip rules, preserves manual amounts, and can Stop. Never submit listings during this check.",
       "kind": "manual",
       "critical": true,
       "platforms": [
@@ -834,7 +834,7 @@
       "id": "market-fill.settings",
       "section": "market-fill",
       "label": "Settings persistence and disable",
-      "instructions": "Change defaults, category/item overrides, favorites/exclusions. Reload. Verify enable persistence and disable removes controls and stops pending requests.",
+      "instructions": "Change defaults, category/item overrides, favorites/exclusions. Reload. Verify enable persistence and disable removes controls and stops pending requests. Keep the Favorites view open while changing row stars. Verify named favorites/exclusions, counts, ID editors and Remove actions synchronize immediately and persist.",
       "kind": "manual",
       "critical": true,
       "platforms": [

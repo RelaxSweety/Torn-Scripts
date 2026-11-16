@@ -173,3 +173,31 @@ export agree automatically on future builds. Version mismatch guidance asks user
 to update both scripts rather than downgrade TU. Strict per-build acceptance
 isolation remains. Update both the unified TU script and the existing diagnostic
 script through their established DEV URLs; production is unchanged.
+
+## Current-list control and live Favorites in .131
+
+The .130 PDA report confirms accepted input values, a successful pricing response,
+16 identified market rows and no recorded errors. It reports stale Favorites and
+Excluded module lists. The settings snapshot is replaced with live named lists,
+synchronized ID editors and remove actions. Row star transitions update an already
+open module immediately. Saved string IDs are normalized to numeric IDs; saving
+one list removes conflicting membership in the other. Names are cached from
+visible item rows; unseen items remain identifiable by item ID.
+
+The new $ button is inserted beside the native Fill box when that control is
+identified. Otherwise it remains at the current market list bottom, then relocates
+when the native control mounts. It is not a floating launcher. It fills maximum
+quantities and configured prices for current mounted rows without requiring
+favorites. Excluded items and skip rules are untouched, manually entered quantities
+are preserved, and already-filled rows are skipped. The explicit max action
+overrides other non-skip quantity rules; the existing favorites command retains
+its configured quantity rules. Separate rows/stacks of one item are processed
+individually. No listing is submitted and Torn's own Fill checkbox is not toggled.
+The button becomes Stop while the paced queue runs, with progress beside it.
+List mode finishes after its snapshot rather than watching future lists.
+
+Automated tests cover footer adjacency/remounts, all-list max, duplicate IDs,
+exclusions/skip/manual amounts, no form submission, live names/list synchronization,
+legacy ID types and persistence. Actual native PDA footer placement remains an
+acceptance check; its detected placement is included in the diagnostic export.
+Both TU and Testing and Diagnostics update together as 0.5.42.131-dev.

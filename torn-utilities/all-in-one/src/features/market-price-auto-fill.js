@@ -26,7 +26,10 @@ SOFTWARE.
 export function createMarketPriceAutoFill({window,manager,setMarketInput,readItemStockQuantity}){
 
  let lastQuantityEvidence=null;
+ let autoFillMode='favorites',rowQueueSequence=0;const rowQueueIds=new WeakMap();
+ const itemNames=new Map();
  const document=window.document,localStorage=window.localStorage;
+ try{for(const [id,name] of Object.entries(JSON.parse(localStorage.getItem('tu:market-fill:item-names')||'{}')))if(/^\d+$/.test(id)&&typeof name==='string')itemNames.set(Number(id),name.slice(0,80));}catch{}
  const Event=window.Event,MutationObserver=window.MutationObserver;
  const requestAnimationFrame=window.requestAnimationFrame.bind(window);
  const enabledKey='tu:market-fill:enabled';let enabled=localStorage.getItem(enabledKey)==='true';
@@ -385,11 +388,12 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         if(!enabled||!runtimeActive||!manager.isAuthorized()||!automaticControls&&!showRequested)return;
         currentPage = getCurrentPage();
         if (currentPage == pages.Other) {
-            return;
+            document.querySelector('.tu-market-list-controls')?.remove();return;
         }
         document.querySelectorAll('#item-market-root [class*=priceInputWrapper],#item-market-root [data-market-price-wrapper]').forEach(x=>AddFillButton(x));
+        attachListFillControl();
         if (autoFillActive) {
-            enqueueVisibleFavourites();
+            if(autoFillMode!=='list')enqueueVisibleFavourites();
         }
     }
 
@@ -456,6 +460,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         wrapperParent.classList.add('silmaril-market-filler-processed');
         let itemId = getRowItemId(wrapperParent);
         if(!Number.isSafeInteger(Number(itemId))||Number(itemId)<=0)return;
+        rememberMarketName(Number(itemId),wrapperParent);
         const span = document.createElement('span');
         span.className = 'silmaril-market-filler-button input-money-symbol';
         span.style.position = "relative";
@@ -500,7 +505,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
                     e.preventDefault();
                     e.stopPropagation();
                     cycleItemState(itemIdNum);
-                    if (autoFillActive && favourites.has(itemIdNum)){
+                    if (autoFillActive && autoFillMode!=='list' && favourites.has(itemIdNum)){
                         enqueueFavouriteRow(wrapperParent);
                     }
                 });
@@ -540,7 +545,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
             moneyGroup.prepend(span);
             fitFillSquare(span, moneyGroup);
             if (autoFillActive){
-                enqueueFavouriteRow(wrapperParent);
+                if(autoFillMode!=='list')enqueueFavouriteRow(wrapperParent);
             }
         } else {
             moneyGroup.prepend(span);
@@ -1989,13 +1994,14 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         return maximum;
     }
 
-    async function applyQuantity(target, action, category, isAuto){
+    async function applyQuantity(target, action, category, isAuto,quantityOverride=null){
         let parentRow = findParentByCondition(target, (el) => el.matches?.('[class*=info],[data-market-fields]')||el.hasAttribute?.('data-tmf-item-id'));
         if (parentRow == null){
             return 'ok';
         }
         let host = target.closest('[data-tmf-item-id]');
-        let mode = getEffectiveQuantity(category, host != null ? host.dataset.tmfItemId : null);
+        let configured=getEffectiveQuantity(category,host!=null?host.dataset.tmfItemId:null);
+        let mode=['skip','none','0'].includes(String(configured).trim().toLowerCase())?configured:quantityOverride||configured;
         let quantityInputs = parentRow.querySelectorAll('[class^=amountInputWrapper] .input-money-group > .input-money');
         if (quantityInputs.length === 0){
             // Single-copy rows (most clothing) carry a checkbox instead of an amount input,
@@ -2021,6 +2027,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
             return 'ok';
         }
 
+        if(quantityOverride&&['skip','none','0'].includes(String(mode).trim().toLowerCase()))return 'skipped';
         let hasUserAmount = quantityInputs[0].value.length !== 0 && parseInt(quantityInputs[0].value) >= 1;
         if (action == 'clear'){
             await setQuantityInputs(quantityInputs, hasUserAmount ? '' : 0);
@@ -2066,7 +2073,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
 
     // showPopup=false is the auto-fill path: no prices popup, no input changes on
     // API errors. Returns "ok" | "rate-limited" | "invalid-key" | "error".
-    async function performFill(target, itemId, showPopup,epoch=operationEpoch){
+    async function performFill(target, itemId, showPopup,epoch=operationEpoch,options={}){
         let priceInputs = priceFields(target);
         const popup = showPopup ? document.querySelector('.silmaril-market-filler-popup') : null;
         if (popup) {
@@ -2122,7 +2129,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
 
         let action = target.getAttribute('data-action-flag');
         if(action==='clear'){await clearRow(target);return 'ok';}
-        let mine = action == 'fill' && settingsUseMine() ? await readStackForMine(target, itemId) : null;
+        let mine = action == 'fill' && settingsUseMine() ? await readStackForMine(target, itemId,options.quantityOverride) : null;
         let session = newSession(itemId);
         let pricing = await fetchPricingForItem(itemId, { mine: mine, session: session });
         if(epoch!==operationEpoch||!enabled||!runtimeActive||!manager.isAuthorized()||!target.isConnected)throw Error('Fill cancelled or row changed.');
@@ -2154,7 +2161,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         // listings) rows carry a remove-amount input instead — touching it would be wrong,
         // and the missing containers used to throw and abort the Fill All loop.
         if (getCurrentPage() == pages.AddItems){
-            let quantityStatus = await applyQuantity(target, action, pricing.category, !showPopup);
+            let quantityStatus = await applyQuantity(target, action, pricing.category, !showPopup,options.quantityOverride);
             if (quantityStatus === 'skipped'){
                 // Nothing is being listed, so leave the price (and the button state) alone.
                 return 'skipped';
@@ -2177,7 +2184,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
 
     // The stack [mine+] compares against: on Add Items, the amount typed in the row or what the
     // quantity mode will list; on Your Items, the amount already listed. Null when unreadable.
-    async function readStackForMine(target, itemId){
+    async function readStackForMine(target, itemId,quantityOverride=null){
         if (getCurrentPage() == pages.AddItems){
             let parentRow = findParentByCondition(target, (el) => el.matches?.('[class*=info],[data-market-fields]')||el.hasAttribute?.('data-tmf-item-id'));
             if (parentRow == null){
@@ -2194,7 +2201,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
             }
             let maxQuantity = await discoverMaxQuantity(quantityInputs, parentRow,{nativeFallback:true});
             let cached = getCachedCategory(parseInt(itemId, 10));
-            let listed = resolveQuantity(maxQuantity, getEffectiveQuantity(cached != null ? cached.type : null, itemId));
+            let listed = resolveQuantity(maxQuantity, quantityOverride||getEffectiveQuantity(cached != null ? cached.type : null, itemId));
             return listed ?? maxQuantity;
         }
         let row = findParentByCondition(target, (el) => el.hasAttribute?.('data-tmf-item-id')||el.matches?.('[data-item-id],[data-itemid],[class*=itemRowWrapper],tr,[role=row]'));
@@ -2301,7 +2308,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
     function loadFavourites(){
         try {
             let stored = JSON.parse(localStorage.getItem(favouritesStorageKey) ?? "[]");
-            return new Set(Array.isArray(stored) ? stored : []);
+            return new Set((Array.isArray(stored)?stored:[]).map(Number).filter(n=>Number.isSafeInteger(n)&&n>0&&n<1000000));
         } catch (error) {
             console.warn('[TU Market Price Auto Fill] Operation failed; check configuration.');
             return new Set();
@@ -2310,12 +2317,13 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
 
     function saveFavourites(){
         localStorage.setItem(favouritesStorageKey, JSON.stringify([...favourites]));
+        refreshFavoriteViews();
     }
 
     function loadExcluded(){
         try {
             let stored = JSON.parse(localStorage.getItem(excludedStorageKey) ?? "[]");
-            return new Set(Array.isArray(stored) ? stored : []);
+            return new Set((Array.isArray(stored)?stored:[]).map(Number).filter(n=>Number.isSafeInteger(n)&&n>0&&n<1000000));
         } catch (error) {
             console.warn('[TU Market Price Auto Fill] Operation failed; check configuration.');
             return new Set();
@@ -2324,6 +2332,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
 
     function saveExcluded(){
         localStorage.setItem(excludedStorageKey, JSON.stringify([...excluded]));
+        refreshFavoriteViews();
     }
 
     function getItemState(itemId){
@@ -2639,7 +2648,54 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         }
     }
 
+    function fillQueueKey(row){
+        if(autoFillMode!=='list')return 'favorite:'+row.dataset.tmfItemId;
+        if(!rowQueueIds.has(row))rowQueueIds.set(row,++rowQueueSequence);
+        return 'list:'+rowQueueIds.get(row);
+    }
+
+    function rememberMarketName(id,row){
+        const name=(typeof row==='string'?row:rowItemName(row))?.trim().slice(0,80);
+        if(!name||itemNames.get(id)===name)return;
+        itemNames.set(id,name);if(itemNames.size>1024)itemNames.delete(itemNames.keys().next().value);
+        localStorage.setItem('tu:market-fill:item-names',JSON.stringify(Object.fromEntries(itemNames)));refreshFavoriteViews();
+    }
+
+    function refreshFavoriteViews(){
+        for(const section of document.querySelectorAll('[data-tu-favorite-section]'))section.querySelector('summary').textContent='Favorites & Excluded ('+favourites.size+' / '+excluded.size+')';
+        for(const box of document.querySelectorAll('[data-tu-favorite-summary]')){
+            box.replaceChildren();
+            for(const [name,items] of [['Favorites',favourites],['Excluded',excluded]]){
+                const title=document.createElement('strong');title.textContent=name+' ('+items.size+')';box.append(title);
+                const list=document.createElement('ul');list.dataset.tuFavoriteEntries=name;box.append(list);
+                if(!items.size){const empty=document.createElement('li');empty.textContent='None selected';list.append(empty);}
+                for(const id of [...items].sort((a,b)=>a-b)){const li=document.createElement('li');li.dataset.itemId=String(id);const label=document.createElement('span');label.textContent=(itemNames.get(id)||'Item')+' ['+id+']';const remove=document.createElement('button');remove.type='button';remove.textContent='Remove';remove.setAttribute('aria-label','Remove '+id+' from '+name);remove.onclick=()=>{items.delete(id);saveFavourites();saveExcluded();};li.append(label,remove);list.append(li);}
+            }
+        }
+        for(const input of document.querySelectorAll('[data-tu-favorite-input]'))if(input.dataset.dirty!=='1')input.value=[...(input.dataset.tuFavoriteInput==='Favorites'?favourites:excluded)].join(', ');
+        for(const star of document.querySelectorAll('.tmf-fav[data-tmf-item-id]')){const state=getItemState(Number(star.dataset.tmfItemId));const text=state==='favourite'?'★':state==='excluded'?'⊘':'☆';if(star.textContent!==text)renderFavIcon(star,state);}
+    }
+
+    function attachListFillControl(){
+        const market=document.getElementById('item-market-root');
+        if(!market||currentPage!==pages.AddItems){document.querySelector('.tu-market-list-controls')?.remove();return;}
+        let bar=market.querySelector('.tu-market-list-controls');
+        const native=[...market.querySelectorAll('input,button,label,[role=checkbox]')].filter(el=>{
+            if(el.closest('[data-tmf-item-id],.tu-market-list-controls')||!el.getClientRects().length)return false;
+            const words=[el.getAttribute('aria-label'),el.getAttribute('title'),el.getAttribute('name'),el.getAttribute('id'),el.getAttribute('placeholder'),el.value,el.tagName==='LABEL'||el.tagName==='BUTTON'?el.textContent:null,...[...(el.labels||[])].map(l=>l.textContent)].filter(Boolean);
+            return words.some(word=>/^\s*fill(?:\s+(?:all(?:\s+(?:items|prices|quantities))?|prices?|items|quantit(?:y|ies)))?\s*$/i.test(word)||/^(?:fill[-_]?all|auto[-_]?fill)$/i.test(word));
+        });
+        const anchor=native.at(-1),target=anchor?.closest('label')||anchor;
+        if(!bar){bar=document.createElement('span');bar.className='tu-market-list-controls';bar.style.cssText='display:inline-flex;align-items:center;gap:6px;margin:5px;vertical-align:middle';const button=document.createElement('button');button.type='button';button.dataset.tuFillList='1';button.style.cssText='min-width:32px;min-height:32px;background:#28343b;color:#edcc76;border:1px solid #806a3e;border-radius:5px;font:bold 18px system-ui;touch-action:manipulation';button.onclick=event=>{event.preventDefault();event.stopPropagation();if(autoFillActive){operationEpoch++;stopAutoFill();requestController.abort();requestController=new window.AbortController();}else startAutoFill('list');};const status=document.createElement('small');status.dataset.tuFillListStatus='1';status.setAttribute('role','status');bar.append(button,status);}
+        if(target){if(target.nextElementSibling!==bar)target.after(bar);bar.dataset.placement='native-fill-adjacent';}
+        else{if(bar.parentElement!==market)market.append(bar);bar.dataset.placement='list-bottom';}
+        updateAutoFillUI();
+    }
+
     function updateAutoFillUI(){
+        const listButton=document.querySelector('[data-tu-fill-list]'),listStatus=document.querySelector('[data-tu-fill-list-status]');
+        if(listButton){const label=autoFillActive?'Stop filling':'Fill current list to maximum';const icon=autoFillActive?'■':'$';if(listButton.textContent!==icon)listButton.textContent=icon;listButton.setAttribute('aria-label',label);listButton.title=label+'; excluded and skip items are left untouched. Fields only; review before submitting.';}
+        if(listStatus){const text=autoFillActive?autoFillDoneIds.size+' / '+(autoFillDoneIds.size+autoFillQueuedIds.size):'Fill list';if(listStatus.textContent!==text)listStatus.textContent=text;}
         let bar = document.querySelector(".tmf-fillall-bar");
         if (bar != null) {
             bar.querySelector(".tmf-fillall-btn").value = autoFillActive ? "Stop fill" : "Fill All ★";
@@ -2669,8 +2725,11 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         }, 4000);
     }
 
-    function startAutoFill(){
-        if (favourites.size === 0){
+    function startAutoFill(mode='favorites'){
+        if(!enabled||!runtimeActive||!manager.isAuthorized())return;
+        if(autoFillActive){notice(Error('Stop the current fill run before starting another.'));return;}
+        autoFillMode=mode;
+        if (autoFillMode==='favorites'&&favourites.size === 0){
             showToast('No favourites set yet — tap the ☆ star next to an item first, then use Fill All.');
             return;
         }
@@ -2699,11 +2758,11 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         if (!autoFillActive) {
             return;
         }
-        let itemId = parseInt(wrapper.dataset.tmfItemId, 10);
-        if (!favourites.has(itemId) || excluded.has(itemId) || autoFillDoneIds.has(itemId) || autoFillQueuedIds.has(itemId)) {
+        let itemId = parseInt(wrapper.dataset.tmfItemId, 10),key=fillQueueKey(wrapper);
+        if (!wrapper.getClientRects().length||autoFillMode==='favorites'&&!favourites.has(itemId) || excluded.has(itemId) || autoFillDoneIds.has(key) || autoFillQueuedIds.has(key)) {
             return;
         }
-        autoFillQueuedIds.add(itemId);
+        autoFillQueuedIds.add(key);
         autoFillQueue.push(wrapper);
         runAutoFillLoop();
     }
@@ -2713,31 +2772,33 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
             return;
         }
         autoFillLoopRunning = true;
+        const queueEpoch=operationEpoch;
         try {
-            while (autoFillActive && autoFillQueue.length > 0) {
+            while (autoFillActive && autoFillQueue.length > 0 && queueEpoch===operationEpoch) {
                 let wrapper = autoFillQueue.shift();
-                let itemId = parseInt(wrapper.dataset.tmfItemId, 10);
-                if (!wrapper.isConnected || !favourites.has(itemId) || excluded.has(itemId)) {
+                let itemId = parseInt(wrapper.dataset.tmfItemId, 10),key=fillQueueKey(wrapper);
+                if (!wrapper.isConnected || autoFillMode==='favorites'&&!favourites.has(itemId) || excluded.has(itemId)) {
                     // Row unmounted or unfavourited meanwhile; the observer re-queues it
                     // if it shows up again.
-                    autoFillQueuedIds.delete(itemId);
+                    autoFillQueuedIds.delete(key);
                     continue;
                 }
                 let fillBtn = wrapper.querySelector(".silmaril-market-filler-button");
                 if (fillBtn == null || fillBtn.getAttribute('data-action-flag') !== 'fill') {
                     // Already filled (button is in "clear" state) — count as done.
-                    autoFillQueuedIds.delete(itemId);
-                    autoFillDoneIds.add(itemId);
+                    autoFillQueuedIds.delete(key);
+                    autoFillDoneIds.add(key);
                     continue;
                 }
                 let status;
                 try {
-                    status = await guardedFill(fillBtn, itemId, false);
+                    status = await guardedFill(fillBtn, itemId, false,{quantityOverride:autoFillMode==='list'?'max':null});
                 } catch (error) {
                     // A single row with unexpected DOM must not abort the whole run.
                     console.warn('[TU Market Price Auto Fill] Operation failed; check configuration.');
                     status = "error";
                 }
+                if(queueEpoch!==operationEpoch)break;
                 if (status === "rate-limited") {
                     autoFillQueue.unshift(wrapper); // retry the same row after the pause
                     await sleep(randomBetween(RATE_LIMIT_PAUSE_MIN_MS, RATE_LIMIT_PAUSE_MAX_MS));
@@ -2748,15 +2809,17 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
                     stopAutoFill();
                     break;
                 }
-                autoFillQueuedIds.delete(itemId);
-                autoFillDoneIds.add(itemId);
+                autoFillQueuedIds.delete(key);
+                autoFillDoneIds.add(key);
                 if (status !== "ok" && status !== "skipped") {
                     console.warn("[TU Market Price Auto Fill] Fill All skipped item " + itemId + " after error.");
                 }
+                updateAutoFillUI();
                 await sleep(randomBetween(FILL_COOLDOWN_MIN_MS, FILL_COOLDOWN_MAX_MS));
             }
         } finally {
             autoFillLoopRunning = false;
+            if(queueEpoch===operationEpoch&&autoFillMode==='list'&&!autoFillQueue.length){autoFillActive=false;updateAutoFillUI();}
         }
         // Rows enqueued while the loop was winding down (e.g. during the last cooldown)
         if (autoFillActive && autoFillQueue.length > 0) {
@@ -5341,15 +5404,15 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         if(getCurrentPage()===pages.AddItems){const inputs=row?.querySelectorAll('[class*=amountInputWrapper] input.input-money,[data-market-quantity]');if(inputs?.length)await writeInputs(inputs,'');else{const checkbox=row?.querySelector('input[type=checkbox]');if(checkbox?.checked){checkbox.click();await new Promise(r=>window.setTimeout(r,160));if(row.querySelector('input[type=checkbox]')?.checked)throw Error('Torn did not accept clearing the item selection.');}}}
         if(target.getAttribute('data-action-flag')==='clear')switchActionFlag(target);
     }
-    async function guardedFill(target,id,popup){
+    async function guardedFill(target,id,popup,options={}){
         if(!enabled||!runtimeActive||!manager.isAuthorized()||!target.isConnected||busy.has(target))return 'skipped';
         busy.add(target);const row=target.closest('[data-tmf-item-id]');
         const original=[...(row?.querySelectorAll('input:not([type=button])')||[])].map(input=>({input,value:input.value,checked:input.type==='checkbox'?input.checked:null}));
-        try{const result=await performFill(target,id,popup);if(!['ok','skipped'].includes(result)&&popup)notice(Error('Price unavailable. Existing values were preserved; check API status or your formula and retry.'));return result;}
+        try{const result=await performFill(target,id,popup,operationEpoch,options);if(!['ok','skipped'].includes(result)&&popup)notice(Error('Price unavailable. Existing values were preserved; check API status or your formula and retry.'));return result;}
         catch(error){lastInput=String(error?.message||'').includes('quantity is unknown')?'Available quantity not detected':'Update failed';for(const old of original){if(old.input.isConnected)try{if(old.checked!==null){if(old.input.checked!==old.checked)old.input.click();}else if(old.input.value!==old.value)await setMarketInput(old.input,old.value);}catch{}}notice(error);return error?.status===429?'rate-limited':'error';}
         finally{busy.delete(target);}
     }
-    function setEnabled(on){operationEpoch++;enabled=!!on;localStorage.setItem(enabledKey,String(enabled));if(enabled&&runtimeActive&&manager.isAuthorized()){requestController=new window.AbortController();observer.observe(document.body,observerConfig);scheduleScan();}else{stopAutoFill();requestController.abort();observer.disconnect();document.querySelectorAll('.silmaril-market-filler-button,.tmf-icons').forEach(x=>x.remove());document.querySelectorAll('.silmaril-market-filler-processed').forEach(x=>{x.classList.remove('silmaril-market-filler-processed');delete x.dataset.tmfItemId;});hideAllFillPopups();closeAnalytics();closeOwnFormula();}}
+    function setEnabled(on){operationEpoch++;enabled=!!on;localStorage.setItem(enabledKey,String(enabled));if(enabled&&runtimeActive&&manager.isAuthorized()){requestController=new window.AbortController();observer.observe(document.body,observerConfig);scheduleScan();}else{stopAutoFill();requestController.abort();observer.disconnect();document.querySelector('.tu-market-list-controls')?.remove();document.querySelectorAll('.silmaril-market-filler-button,.tmf-icons').forEach(x=>x.remove());document.querySelectorAll('.silmaril-market-filler-processed').forEach(x=>{x.classList.remove('silmaril-market-filler-processed');delete x.dataset.tmfItemId;});hideAllFillPopups();closeAnalytics();closeOwnFormula();}}
     function showSettings(context){
         if(context?.mount){
             let frame=context.mount.querySelector('#tu-market-fill-window');
@@ -5365,8 +5428,9 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         const action=(parent,text,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=text;b.onclick=fn;parent.append(b);return b;};
         action(general,'Fill All favorites',()=>{if(enabled)startAutoFill();else notice(Error('Enable this tool first.'));});action(general,'Stop / Cancel',()=>{operationEpoch++;stopAutoFill();requestController.abort();requestController=new window.AbortController();});
         action(general,'Clear filled rows',async()=>{for(const b of document.querySelectorAll('.silmaril-market-filler-button[data-action-flag=clear]'))try{await guardedFill(b,Number(b.closest('[data-tmf-item-id]')?.dataset.tmfItemId),false);}catch(e){notice(e);}});
-        const favorites=section('Favorites');const lists=document.createElement('p');lists.textContent='Favorites: '+[...favourites].join(', ')+' · Excluded: '+[...excluded].join(', ');favorites.append(lists);
-        for(const [name,set,save] of [['Favorites',favourites,saveFavourites],['Excluded',excluded,saveExcluded]]){const input=document.createElement('input');input.type='text';input.setAttribute('aria-label',name+' item IDs');input.value=[...set].join(', ');favorites.append(input);action(favorites,'Save '+name,()=>{const ids=input.value.split(/[ ,]+/).filter(Boolean).map(Number);if(ids.some(n=>!Number.isSafeInteger(n)||n<1||n>=1000000)){notice(Error('Enter valid item IDs separated by commas.'));return;}set.clear();ids.forEach(n=>set.add(n));save();scheduleScan();});}
+        const favorites=section('Favorites');favorites.dataset.tuFavoriteSection='1';const lists=document.createElement('div');lists.dataset.tuFavoriteSummary='1';favorites.append(lists);
+        for(const [name,set,save] of [['Favorites',favourites,saveFavourites],['Excluded',excluded,saveExcluded]]){const input=document.createElement('input');input.type='text';input.setAttribute('aria-label',name+' item IDs');input.dataset.tuFavoriteInput=name;input.value=[...set].join(', ');input.oninput=()=>{input.dataset.dirty='1';};favorites.append(input);action(favorites,'Save '+name,()=>{const ids=input.value.split(/[ ,]+/).filter(Boolean).map(Number);if(ids.some(n=>!Number.isSafeInteger(n)||n<1||n>=1000000)){notice(Error('Enter valid item IDs separated by commas.'));return;}set.clear();const other=name==='Favorites'?excluded:favourites;ids.forEach(n=>{set.add(n);other.delete(n);});input.dataset.dirty='0';saveFavourites();saveExcluded();scheduleScan();});}
+        refreshFavoriteViews();
         const analytics=section('Analytics');analytics.append('Use the chart on each row to compare market and bazaar prices, fees, net proceeds, stack sizes, source age and formula decisions. Tap a listing to fill its price. Display options appear below.');
         const diagnostic=section('Diagnostics'),report=document.createElement('pre');report.style.whiteSpace='pre-wrap';diagnostic.append(report);action(diagnostic,'Run safe checks',()=>{report.textContent=JSON.stringify(diagnostics(),null,2);});
         const credits=document.createElement('small');credits.textContent='Based on Torn Market Filler v3.2.0 by Silmaril [2665762]. MIT © 2026 Ramin Quluzade. Integrated and adapted for TU.';settingsMount.append(credits);
@@ -5383,7 +5447,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         const list=document.createElement('pre');list.style.whiteSpace='pre-wrap';rules.append(list);const paint=()=>{list.textContent=Object.entries(itemFormulas).map(([id,rule])=>id+': '+(rule.price||'inherit price')+' / '+(rule.quantity||'inherit quantity')).join('\n')||'No individual item overrides.';};paint();
         action(rules,'Save item rule',()=>{const n=Number(id.value);if(!Number.isSafeInteger(n)||n<1||n>=1000000){notice(Error('Enter a valid item ID.'));return;}const f=formula.value.trim(),q=quantity.value.trim();if(f&&settingProblem(f)||q&&!isKnownQuantityMode(q)){notice(Error('Check the item price formula and quantity rule.'));return;}if(!f&&!q)delete itemFormulas[n];else itemFormulas[n]={...(f?{price:f}:{}),...(q?{quantity:q}:{})};saveItemFormulas();renderOwnFormulaIcons(n);paint();});
     }
-    function diagnostics(){const frame=document.getElementById('tu-market-fill-window');return {enabled,initialized:true,settingsWindow:{present:!!frame,hidden:frame?.hidden??null,display:frame?window.getComputedStyle(frame).display:null,position:frame?window.getComputedStyle(frame).position:null,hasTUEmblem:!!frame?.querySelector('[data-tu-brand-emblem]'),hasNavigation:!!frame?.querySelector('[data-tu-nav-controls]')},itemMarket:/sid=ItemMarket/i.test(window.location.search),rows:document.querySelectorAll('.silmaril-market-filler-processed').length,quantity:lastQuantityEvidence,input:lastInput,network:lastNetwork,api:'TU-managed Public Only / Limited Access; live API tests require user action',platform:/Torn.?PDA/i.test(window.navigator.userAgent)?'PDA (actual Android/iOS interaction unverified)':'Browser (actual Tampermonkey interaction unverified)',checks:[{name:'Fixed formula',result:fixedPrice('=1')===1?'PASS':'FAIL'},{name:'Live input / popup / queue',result:'SKIP',reason:'No live listing fields are changed by diagnostics.'},{name:'Android / iOS / Tampermonkey device',result:'WARN',reason:'Requires actual host acceptance testing.'}],errors:[...errors]};}
+    function diagnostics(){const frame=document.getElementById('tu-market-fill-window');return {enabled,initialized:true,favorites:[...favourites],excluded:[...excluded],listFill:{present:!!document.querySelector('[data-tu-fill-list]'),placement:document.querySelector('.tu-market-list-controls')?.dataset.placement||null,active:autoFillActive,mode:autoFillMode},settingsWindow:{present:!!frame,hidden:frame?.hidden??null,display:frame?window.getComputedStyle(frame).display:null,position:frame?window.getComputedStyle(frame).position:null,hasTUEmblem:!!frame?.querySelector('[data-tu-brand-emblem]'),hasNavigation:!!frame?.querySelector('[data-tu-nav-controls]')},itemMarket:/sid=ItemMarket/i.test(window.location.search),rows:document.querySelectorAll('.silmaril-market-filler-processed').length,quantity:lastQuantityEvidence,input:lastInput,network:lastNetwork,api:'TU-managed Public Only / Limited Access; live API tests require user action',platform:/Torn.?PDA/i.test(window.navigator.userAgent)?'PDA (actual Android/iOS interaction unverified)':'Browser (actual Tampermonkey interaction unverified)',checks:[{name:'Fixed formula',result:fixedPrice('=1')===1?'PASS':'FAIL'},{name:'Live input / popup / queue',result:'SKIP',reason:'No live listing fields are changed by diagnostics.'},{name:'Android / iOS / Tampermonkey device',result:'WARN',reason:'Requires actual host acceptance testing.'}],errors:[...errors]};}
     window.addEventListener('tu-runtime-active',event=>{runtimeActive=event.detail?.active===true;setEnabled(enabled);});
     window.addEventListener('tu-authorization-change',()=>{if(!manager.isAuthorized()){operationEpoch++;stopAutoFill();requestController.abort();observer.disconnect();}else if(enabled&&runtimeActive){requestController=new window.AbortController();observer.observe(document.body,observerConfig);scheduleScan();}});
     const tuStyle=document.createElement('style');tuStyle.textContent='#tu-market-fill-window{position:fixed;z-index:2147483644;top:6vh;left:4vw;width:min(92vw,540px);height:min(84dvh,780px);max-width:100vw;max-height:100dvh;overflow:auto;background:#101417;color:#eee;border:1px solid #c49a46;border-radius:10px;font:12px/1.4 system-ui;box-sizing:border-box}#tu-market-fill-window[hidden]{display:none!important}#tu-market-fill-window>header{display:flex;align-items:center;gap:6px;position:sticky;top:0;padding:8px;background:#101417;color:#f1ce72;z-index:3;border-bottom:1px solid #806a3e}#tu-market-fill-window .tu-market-fill-body{padding:10px}#tu-market-fill-window button{background:#28343b;color:#edcc76;border:1px solid #806a3e;border-radius:5px;min-height:28px;padding:4px 7px;font:inherit}#tu-market-fill-window input{box-sizing:border-box;max-width:100%;background:#283239;color:#eee;border:1px solid #57616a;padding:6px}#tu-market-fill-window details{margin:8px 0;border:1px solid #39434a;padding:7px;border-radius:5px}#tu-market-fill-window summary{font-weight:bold;color:#d6b65c;min-height:26px}#tu-market-fill-window label{display:block;padding:4px 0}#tu-market-fill-window small{display:block;color:#aeb8bd}'+'[data-tu-embedded="1"].tmf-settings-overlay{position:static!important;display:block!important;padding:0!important;background:none!important;overflow:visible!important}[data-tu-embedded="1"]>.tmf-modal{max-width:none!important;width:100%!important;background:#101417!important;border:0!important;padding:6px!important;font:inherit!important}.tmf-settings-overlay .tmf-modal-key,.tmf-settings-overlay .tmf-modal-key-reveal{display:none!important}.tmf-fillall-bar,.tmf-viewport-border{display:none!important}.silmaril-market-filler-popup,.tmf-ana,.tmf-own-box{max-width:calc(100vw - 12px)!important;max-height:85dvh!important;overflow:auto!important;box-sizing:border-box}.silmaril-market-filler-button,.tmf-fav,.tmf-own,.tmf-ana-btn{touch-action:manipulation;user-select:none;-webkit-user-select:none;min-height:28px}.tmf-modal-tabs{flex-wrap:wrap}';document.head.append(tuStyle);

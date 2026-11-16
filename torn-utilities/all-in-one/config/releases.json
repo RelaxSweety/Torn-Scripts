@@ -1,5 +1,20 @@
 [
   {
+    "version": "0.5.42.131-dev",
+    "date": "2026-11-16",
+    "securityBundle": true,
+    "changes": {
+      "Features": [
+        "Add a dollar-sign current-list maximum Fill control beside the native Torn Fill box, with pacing, progress and Stop",
+        "Show live named Favorites and Excluded lists in TU with synchronized row stars, editors and removal"
+      ],
+      "Fixes": [
+        "Fill every eligible row in the current list, including separate stacks of the same item, while preserving exclusions, skip rules and manual quantities",
+        "Normalize stored item IDs and keep favorites and exclusions mutually exclusive"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.130-dev",
     "date": "2026-11-16",
     "securityBundle": true,
