@@ -288,3 +288,15 @@ The .136 user capture establishes Lead Pipe base ID 401 and three individual wea
 The regression fixture uses the captured control IDs, weapon UIDs and damage values: save Keep 1, manually fill only surplus copies, reorder rows without moving the protected reservation, Clear and Fill List while preserving anonymity, and never submit a listing. Actual PDA execution of this fix remains unverified until tested.
 
 Validation: build, full regression suite, and final captured-layout Lead Pipe fixture passed. Generated TU/diagnostics syntax and DEV alias/snapshot comparisons passed. Live PDA acceptance remains pending; no live listings were submitted.
+
+## 0.5.42.138-dev — automatic list discovery and price latency
+
+Removed the row getClientRects gate and the native MAX visibility gate. Fill List processes mounted controls regardless of off-screen layout. It automatically surveys the nearest scroll container (or document) from top to bottom, preserving the starting scroll position on completion/cancellation. Queued rows retain existing remount/identity safeguards. Missing/unready rows are revisited without manual scrolling, with a 30-second no-progress bound, a 160-step survey cap, and explicit unresolved-row diagnostics instead of indefinite waiting. No listings are submitted.
+
+The previous random 600–1000 ms yield applied after every row, including cached/fixed/skip cases. It is now 120 ms; fresh transport calls alone are paced at >=1000 ms for Torn and >=500 ms for bazaar reads, with existing cache, global TU governor, rate-limit handling and cancellation retained. Input acceptance verification remains unchanged (two 80 ms checks per written field and 160 ms for selection); cold category overrides can still need a second read. Diagnostics export source-read count/elapsed time, last row time, cooldown and unresolved reasons. No live-device speed claim is made.
+
+Regression coverage includes off-screen zero-rectangle controls, three virtual pages without manual scroll, original-position restoration, cancellation, weapon anonymity/retention, row recycling, fresh-request pacing, cache fast paths and cancellation before transport.
+
+The captured Torn markup also contains hidden mirror inputs. Quantity/price writes and queue readiness now ignore hidden mirrors, preserving the full two-pass verification on editable fields while avoiding duplicate hidden-field writes and disabled-mirror stalls. The virtual-list fixture includes disabled hidden mirrors. Redundant source comments were shortened to retain the existing 1.45 MB unified-build budget.
+
+Validation: build and full regression suite passed. After the hidden-mirror changes, the affected automatic-list, pricing/input, restrictions/remount, weapon-selection, list-fill, request-pacing and diagnostics tests were rerun and passed. Generated TU/diagnostics syntax and DEV alias/snapshot equality checks passed. Automatic scrolling and performance on real PDA/iOS/Android remain unverified until acceptance testing.

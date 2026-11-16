@@ -1,6 +1,6 @@
 // Read-only endpoints; credentials are supplied only for api.torn.com.
 export function createMarketRequest({window,http,pdaGet,fetch,getKey,authorized,now=()=>Date.now()}){
- const cache=new Map();let bazaarPause=0;
+ const cache=new Map(),nextSend={torn:0,bazaar:0};let bazaarPause=0;
  async function read(kind,id,{signal}={}){
   if(!authorized())throw Error('Open TU and verify your session and agreement.');
   if(!['market','items','bazaar','bazaar-all'].includes(kind)||(!Number.isSafeInteger(Number(id))||Number(id)<=0)&&kind!=='bazaar-all')throw Error('Invalid item or price source.');
@@ -13,6 +13,10 @@ export function createMarketRequest({window,http,pdaGet,fetch,getKey,authorized,
   const url=third?'https://weav3r.dev/api/marketplace'+(kind==='bazaar-all'?'':'/'+id):kind==='items'?'https://api.torn.com/torn/'+id+'?selections=items':'https://api.torn.com/v2/market?id='+id+'&selections=itemMarket';
   const headers={Accept:'application/json',...(!third?{Authorization:'ApiKey '+key}:{})};
   if(signal?.aborted)throw Error('Fill cancelled.');
+  // Pace fresh transport requests only. Cached and fixed-price rows do not pay this wait.
+  const source=third?'bazaar':'torn',delay=Math.max(0,nextSend[source]-now());nextSend[source]=Math.max(now(),nextSend[source])+(third?500:1000);
+  if(delay)await new Promise((resolve,reject)=>{const abort=()=>{window.clearTimeout(timer);signal?.removeEventListener('abort',abort);reject(Error('Fill cancelled.'));};const timer=window.setTimeout(()=>{signal?.removeEventListener('abort',abort);resolve();},delay);signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)abort();});
+  if(signal?.aborted||!authorized()||!third&&getKey()!==key)throw Error('TU session or key changed; request cancelled.');
   const response=await new Promise((resolve,reject)=>{
    let handle,controller,settled=false;
    const finish=(error,value)=>{if(settled)return;settled=true;window.clearTimeout(timer);signal?.removeEventListener('abort',abort);error?reject(error):resolve(value);};

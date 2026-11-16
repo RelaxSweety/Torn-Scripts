@@ -1,5 +1,20 @@
 [
   {
+    "version": "0.5.42.138-dev",
+    "date": "2026-11-16",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Fill mounted rows without a visibility gate; automatically traverse the scrollable Item Market list and restore position after completion or cancellation",
+        "Retry pending controls without manual scrolling and report unresolved rows after a bounded wait"
+      ],
+      "Performance": [
+        "Replace the fixed 600\u20131000 ms per-row delay with 120 ms; pace only fresh network requests and retain cache fast paths",
+        "Export price-source and row timing counters to identify device/network delays"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.137-dev",
     "date": "2026-11-16",
     "securityBundle": true,
