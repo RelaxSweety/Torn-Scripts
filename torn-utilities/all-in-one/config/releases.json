@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.134-dev",
+    "date": "2026-11-16",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Share restricted-copy reservations across manual Fill, analytics Fill and Fill List so individually selectable surplus copies can be sold while retaining the requested count",
+        "Use the captured item identity when applying an analytics price"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.133-dev",
     "date": "2026-11-16",
     "securityBundle": true,

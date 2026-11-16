@@ -2009,6 +2009,8 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         let quantityInputs = parentRow.querySelectorAll('[class^=amountInputWrapper] .input-money-group > .input-money');
         const restriction=excluded.has(Number(host?.dataset.tmfItemId))?restrictionKeep(Number(host.dataset.tmfItemId)):null;
         if(restriction==='all')return 'skipped';
+        // Manual and analytics Fill must share the same per-row reservations as Fill List.
+        if(restriction!==null&&!reservationKey){reservationKey=fillQueueKey(host,true);if(!reservationKey)throw Error('Cannot identify duplicate item rows safely. Refresh the item list and retry.');}
         if(restriction!==null&&quantityInputs.length){
             const max=await discoverMaxQuantity(quantityInputs,parentRow,{nativeFallback:true}),allowed=restrictedAllowance(Number(host.dataset.tmfItemId),max,reservationKey);
             if(allowed<1)return 'skipped';
@@ -2689,8 +2691,8 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         const held=key?[...restrictionLedger].reduce((n,[other,entry])=>n+(other!==key&&entry.id===id?entry.keep:0),0):0;
         const keep=Math.min(maximum,Math.max(0,rule-held));if(key)restrictionLedger.set(key,{id,keep});return Math.max(0,maximum-keep);
     }
-    function fillQueueKey(row){
-        const id=Number(getRowItemId(row));if(autoFillMode!=='list')return 'favorite:'+id;
+    function fillQueueKey(row,individual=false){
+        const id=Number(getRowItemId(row));if(!individual&&autoFillMode!=='list')return 'favorite:'+id;
         for(const attr of ['data-item-uid','data-listing-id','data-row-id','data-index','aria-rowindex']){const value=row.getAttribute(attr);if(value!==null&&value!=='')return 'list:'+id+':'+attr+':'+value;}
         const peers=[...document.querySelectorAll('.silmaril-market-filler-processed')].filter(el=>Number(getRowItemId(el))===id);
         if(!initialPeerCounts.has(id))initialPeerCounts.set(id,peers.length);
@@ -3913,7 +3915,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
     // the quantity goes in too and the square flips to Clear. A listing click sets the price only.
     async function applyAnalyticsPrice(price, withQuantity){
         const target=analyticsRow?.target;if(!target||busy.has(target))return;
-        const row=target.closest('[data-tmf-item-id]');if(Number(getRowItemId(row))!==Number(id)){scheduleScan();return 'row-changed';}if(fullyRestricted(Number(id)))return 'skipped';
+        const row=target.closest('[data-tmf-item-id]'),id=analyticsRow.itemId;if(Number(getRowItemId(row))!==Number(id)){scheduleScan();return 'row-changed';}if(fullyRestricted(Number(id)))return 'skipped';
         busy.add(target);
         const saved=[...(row?.querySelectorAll('input:not([type=button])')||[])].map(input=>({input,value:input.value,checked:input.type==='checkbox'?input.checked:null}));
         try{await applyAnalyticsPriceUnsafe(price,withQuantity);}catch(error){for(const item of saved)if(item.input.isConnected)try{if(item.checked!==null){if(item.input.checked!==item.checked)item.input.click();}else if(item.input.value!==item.value)await setMarketInput(item.input,item.value);}catch{}notice(error);}finally{busy.delete(target);}

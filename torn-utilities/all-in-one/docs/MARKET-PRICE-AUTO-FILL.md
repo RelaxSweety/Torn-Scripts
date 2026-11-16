@@ -260,3 +260,9 @@ Tests cover alphabetical ordering, case-insensitive multi-keyword and ID search,
 draft retention, hidden-item batch saving, one bottom Save, validation without
 partial persistence, All drafts, removal and existing restriction/fill workflows.
 TU and Testing and Diagnostics both identify 0.5.42.133-dev.
+
+## 0.5.42.134-dev — individual-copy retention
+
+Manual and analytics Fill now use stable per-row retention reservations, like Fill List. Keeping one individually selectable item no longer protects every copy independently. Repeated fills of the retained row reuse its reservation. Ambiguous duplicate identities fail safely. Analytics price application also validates the captured item ID correctly. Regression coverage includes two checkbox rows of the same restricted item, repeat attempts and the subsequent Fill List run. Actual Lead Pipe PDA markup remains unverified.
+
+Validation: `npm run build`, full `npm test`, generated-script syntax checks and alias/snapshot comparisons passed. The expanded restriction fixture additionally exercised analytics Fill; a separate run without native item UIDs passed. Live PDA/Tampermonkey interaction is unverified.
