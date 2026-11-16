@@ -1,0 +1,5340 @@
+/*
+Based on Torn Market Filler v3.2.0 by Silmaril [2665762]
+Source: https://github.com/SOLiNARY/torn-scripts/tree/main/trade/market-filler
+MIT License
+
+Copyright (c) 2026 Ramin Quluzade
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+export function createMarketPriceAutoFill({window,manager,setMarketInput}){
+
+ const document=window.document,localStorage=window.localStorage;
+ const Event=window.Event,MutationObserver=window.MutationObserver;
+ const requestAnimationFrame=window.requestAnimationFrame.bind(window);
+ const enabledKey='tu:market-fill:enabled';let enabled=localStorage.getItem(enabledKey)==='true';
+ let settingsMount=null,requestController=new window.AbortController(),busy=new WeakSet(),errors=[],lastInput='Not tested',lastNetwork='Not requested',operationEpoch=0,runtimeActive=true,automaticControls=localStorage.getItem('tu:market-fill:auto-controls')!=='false',showRequested=false;
+ // Import only non-secret original preferences once; never overwrite TU settings.
+ for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key?.startsWith('silmaril-torn-market-filler-')){const dest=key.replace('silmaril-torn-market-filler-','tu:market-fill:');if(localStorage.getItem(dest)===null)localStorage.setItem(dest,localStorage.getItem(key));}}
+    'use strict';
+
+    // Keep in sync with @version above — it keys the "What's new" popup.
+    const SCRIPT_VERSION = "3.2.0";
+
+    const itemUrl = "https://api.torn.com/torn/{itemId}?selections=items&key={apiKey}&comment=MarketFiller";
+    const marketUrl = "https://api.torn.com/v2/market/{itemId}?selections=itemMarket&key={apiKey}&comment=MarketFiller";
+    const marketUrlV2 = "https://api.torn.com/v2/market?id={itemId}&selections=itemMarket&key={apiKey}&comment=MarketFiller";
+    // weav3r.dev aggregates live player-bazaar listings. Public and needs no API key, but it is
+    // a third-party host, and a request the Torn page issues itself has to satisfy both Torn's
+    // Content-Security-Policy and weav3r's CORS headers — which is why a plain fetch to it never
+    // got off the ground. Every weav3r call therefore goes through the userscript manager's
+    // cross-origin transport (see requestJson), which runs outside the page and is bound by
+    // neither. weav3r is also shared across every consumer at 100 req/min, so responses are
+    // cached client-side too.
+    const weav3rItemUrl = "https://weav3r.dev/api/marketplace/{itemId}";
+    const weav3rAllUrl = "https://weav3r.dev/api/marketplace";
+
+    // Which endpoint a formula's price comes from.
+    const SOURCE_ITEM_MARKET = "itemmarket";  // Torn item market listings, an hourly snapshot (default)
+    const SOURCE_MARKET_VALUE = "items";      // Torn market value, i.e. [market]
+    const SOURCE_BAZAAR = "bazaar";           // weav3r player bazaars, i.e. [bazaar...]
+    const SOURCE_FIXED = "fixed";             // a set price, i.e. =1: nothing to read at all
+
+    // weav3r serves its own cache with a 30-180s TTL, so re-asking sooner than this only burns
+    // rate limit. The bulk snapshot covers every item at once and backs [bazaar:avg].
+    const WEAV3R_ITEM_TTL_MS = 60 * 1000;
+    const WEAV3R_ALL_TTL_MS = 60 * 1000;
+    // Listings the crawler has not re-checked recently may already be sold; they are dropped
+    // unless that would empty the list, in which case stale data beats no data.
+    const WEAV3R_STALE_LISTING_MS = 30 * 60 * 1000;
+    // A listing this far below the bazaar average is an outlier, not competition.
+    const BAZAAR_SANITY_FLOOR_RATIO = 0.25;
+    // How long a single weav3r call may hang before the row gives up and falls back to Torn.
+    const WEAV3R_TIMEOUT_MS = 15 * 1000;
+    // A Fill All run hits the same weav3r failure on every row; one notice a minute explains the
+    // failed rows without burying the page in toasts.
+    const WEAV3R_NOTICE_THROTTLE_MS = 60 * 1000;
+    let weav3rItemCache = new Map();
+    let weav3rAllCache = null;
+    let lastWeav3rNoticeTs = 0;
+    let showPricesPopup = localStorage.getItem("tu:market-fill:show-prices-popup") ?? '1';
+    showPricesPopup = Boolean(parseInt(showPricesPopup));
+    let priceDeltaRaw = localStorage.getItem("tu:market-fill:price-delta") ?? localStorage.getItem("silmaril-torn-bazaar-filler-price-delta") ?? '-1[0]';
+    // How many units to list per item: "max" (all of them), "max-N" (keep N back), a fixed
+    // number, or "skip"/"0" to never list. Defaults to "max" — the behaviour before this existed.
+    let quantityModeRaw = localStorage.getItem("tu:market-fill:quantity-mode") ?? 'max';
+    let apiKey = "TU-managed-key";
+
+    let GM_addStyle = function (s) {
+        let style = document.createElement("style");
+        style.type = "text/css";
+        style.innerHTML = s;
+        document.head.appendChild(style);
+    };
+    GM_addStyle(`#item-market-root [class^=addListingWrapper] [class^=panels] [class^=priceInputWrapper]>.input-money-group>.input-money,#item-market-root [class^=viewListingWrapper] [class^=priceInputWrapper]>.input-money-group>.input-money{font-size:smaller!important;border-bottom-left-radius:0!important;border-top-left-radius:0!important}.silmaril-market-filler-popup{background:var(--tooltip-bg-color);padding:12px 18px;border-radius:8px;border:1px solid #888;box-shadow:0 4px 18px 0 #0009;color:var(--info-msg-font-color);z-index:99999;position:fixed;font-size:1em!important;line-height:1.5;pointer-events:auto}.silmaril-market-filler-popup-close{position:absolute;top:4px;right:7px;font-size:1em;color:#aaa;cursor:pointer}.silmaril-market-filler-popup-draggable{user-select:none;cursor:move}.tu-market-fill-popup-price{cursor:pointer}.tu-market-fill-popup-age{font-size:11px;line-height:1.3;opacity:.7;margin-top:6px}.tmf-fav{cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;font-size:16px;line-height:1;color:#888;align-self:center;margin-right:2px;user-select:none;-webkit-user-select:none}.tmf-fav.tmf-fav--on{color:gold;text-shadow:0 0 3px rgba(255,215,0,.7)}.tmf-fillall-bar{position:fixed;bottom:110px;right:16px;display:flex;align-items:center;gap:6px;padding:6px 8px;background:rgba(0,0,0,.55);border-radius:20px;z-index:999999;touch-action:none;transition:box-shadow .2s ease}.tmf-fillall-grip{cursor:grab;color:#bbb;font-size:14px;line-height:1;letter-spacing:-2px;min-width:12px;text-align:center;align-self:center;user-select:none;-webkit-user-select:none}.tmf-fillall-bar--dragging{cursor:grabbing;opacity:.92}.tmf-fillall-bar--dragging .tmf-fillall-grip{cursor:grabbing}.tmf-fillall-cog{cursor:pointer;flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.12);color:#ddd;font-size:13px;line-height:1;user-select:none;-webkit-user-select:none}.tmf-fillall-cog:hover{background:rgba(255,255,255,.28);color:#fff}.tmf-fillall-bar--min{padding:5px 7px;gap:4px}.tmf-fillall-bar--min .tmf-fillall-btn,.tmf-fillall-bar--min .tmf-fillall-cog{display:none}.tmf-fillall-bar--min .tmf-fillall-grip{font-size:16px}.tmf-autofill-dot{display:none;width:10px;height:10px;border-radius:50%;background:gold;box-shadow:0 0 4px gold;animation:tmfPulse 1s ease-in-out infinite}.tmf-fillall-bar--active .tmf-autofill-dot{display:inline-block}.tmf-fillall-bar--active{box-shadow:0 0 10px 2px rgba(255,215,0,.75)}@keyframes tmfPulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}.tmf-viewport-border{display:none;position:fixed;top:0;right:0;bottom:0;left:0;border:3px solid gold;box-shadow:inset 0 0 12px rgba(255,215,0,.6);pointer-events:none;z-index:999998}.tmf-viewport-border--active{display:block}.tmf-toast{position:fixed;bottom:158px;right:16px;max-width:280px;background:rgba(0,0,0,.85);color:#fff;padding:10px 14px;border-radius:8px;border:1px solid gold;font-size:13px;line-height:1.4;z-index:1000000;opacity:0;visibility:hidden;transition:opacity .3s,visibility .3s}.tmf-toast--visible{opacity:1;visibility:visible}.tmf-fav.tmf-fav--off{color:#ff6b6b;text-shadow:none}`);
+
+    // The settings tabs, the Display tab's switches, and the controls those switches hide.
+    GM_addStyle(`.input-money-group>.silmaril-market-filler-button+input.input-money{border-top-left-radius:0!important;border-bottom-left-radius:0!important}.input-money-group>.silmaril-market-filler-button{flex:none;align-self:flex-start}.tmf-sq-ico{position:absolute;left:50%;top:50%;width:11px;height:14px;margin:-7px 0 0 -5.5px;pointer-events:none;filter:drop-shadow(0 1px 0 #000)}.silmaril-market-filler-button:not([data-action-flag="clear"]) .tmf-sq-clear,.silmaril-market-filler-button[data-action-flag="clear"] .tmf-sq-fill{display:none}`);
+    GM_addStyle(`html.tmf-hide-fillall .tmf-fillall-bar,html.tmf-hide-fillall .tmf-viewport-border,html.tmf-hide-fav .tmf-fav,html.tmf-hide-own .tmf-own,html.tmf-hide-ana .tmf-ana-btn,html.tmf-hide-fav.tmf-hide-own.tmf-hide-ana .tmf-icons{display:none!important}.tmf-modal-tabs{display:flex;gap:2px;border-bottom:1px solid #444;margin:0 0 4px}.tmf-modal-tabs button{background:none;border:0;border-bottom:2px solid transparent;margin:0 0 -1px;padding:5px 12px;color:#aaa;font:inherit;font-weight:bold;cursor:pointer;box-shadow:none;height:auto;min-width:0}.tmf-modal-tabs button:hover{color:#ddd}.tmf-modal-tabs button[aria-selected=true]{color:#fff;border-bottom-color:#b5d56a}.tmf-modal-pane[hidden]{display:none!important}.tmf-modal-note{margin:8px 0 2px;font-size:12px;color:#9a9a9a}.tmf-modal .tmf-modal-toggle{display:flex;align-items:center;gap:8px;margin:12px 0 0;font-weight:bold;color:#cfcfcf;cursor:pointer}.tmf-modal-toggle input{width:auto;margin:0}.tmf-modal-hint{margin:2px 0 0 22px;font-size:11.5px;line-height:1.4;color:#9a9a9a}`);
+    GM_addStyle(`.tmf-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2147483000;justify-content:center;align-items:flex-start;overflow:auto;padding:24px 12px;box-sizing:border-box}.tmf-modal-overlay--open{display:flex}.tmf-modal{background:#1f1f1f;color:#e6e6e6;width:100%;max-width:420px;border:1px solid #666;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.6);padding:16px 18px;box-sizing:border-box;font-size:13px;line-height:1.5}.tmf-modal h3{margin:0 0 12px;font-size:15px;display:flex;justify-content:space-between;align-items:center;color:#fff}.tmf-modal-close{cursor:pointer;color:#bbb;font-size:22px;line-height:1}.tmf-modal label{display:block;margin:10px 0 3px;font-weight:bold;color:#cfcfcf}.tmf-modal input[type=text],.tmf-modal input[type=password]{width:100%;box-sizing:border-box;padding:7px 9px;border-radius:5px;border:1px solid #666;background:#111;color:#eee;font-size:13px}.tmf-modal-key{position:relative;display:flex;align-items:center}.tmf-modal-key input[type=text],.tmf-modal-key input[type=password]{padding-right:52px}.tmf-modal-key-reveal{position:absolute;right:7px;cursor:pointer;color:#bbb;font-size:11px;line-height:1;padding:3px 4px;user-select:none;-webkit-user-select:none}.tmf-modal-key-reveal:hover{color:#fff}.tmf-modal-toggle{display:flex;align-items:center;gap:8px;margin-top:10px;font-weight:bold;color:#cfcfcf}.tmf-modal-toggle input{width:auto}.tmf-modal-cats{margin-top:4px}.tmf-modal-cat-row{display:flex;gap:6px;margin-bottom:6px;align-items:center}.tmf-modal-cat-row .tmf-modal-cat-name{flex:1 1 55%}.tmf-modal-cat-row .tmf-modal-cat-formula{flex:1 1 45%}.tmf-modal-cat-del{cursor:pointer;color:#ff6b6b;font-size:20px;line-height:1;flex:0 0 auto;width:22px;text-align:center}.tmf-modal-addcat{margin-top:2px;cursor:pointer;background:#333;color:#eee;border:1px solid #666;border-radius:5px;padding:5px 10px;font-size:12px}.tmf-modal-resetcat{margin:2px 0 0 8px;cursor:pointer;background:#3a2a2a;color:#ddd;border:1px solid #774;border-radius:5px;padding:5px 10px;font-size:12px}.tmf-modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}.tmf-modal-actions button{cursor:pointer;padding:7px 16px;border-radius:5px;border:1px solid #666;background:#333;color:#eee;font-size:13px}.tmf-modal-save{background:#2e7d32!important;border-color:#2e7d32!important;color:#fff!important}.tmf-modal-cat-row input{min-width:0}.tmf-modal-cat-row .tmf-modal-cat-name{flex:1 1 38%}.tmf-modal-cat-row .tmf-modal-cat-formula{flex:1 1 32%}.tmf-modal-cat-row .tmf-modal-cat-qty{flex:1 1 30%}.tmf-modal-cat-head{display:flex;gap:6px;margin:0 0 4px;font-size:11px;color:#9a9a9a}.tmf-modal-cat-head span:nth-child(1){flex:1 1 38%}.tmf-modal-cat-head span:nth-child(2){flex:1 1 32%}.tmf-modal-cat-head span:nth-child(3){flex:1 1 30%}.tmf-modal-cat-head span:nth-child(4){flex:0 0 22px}.tmf-modal-clearexcl{margin:2px 0 0 8px;cursor:pointer;background:#3a2a2a;color:#ddd;border:1px solid #774;border-radius:5px;padding:5px 10px;font-size:12px}.tmf-modal-error{display:none;margin-top:12px;padding:8px 10px;border-radius:5px;background:#3a1f1f;border:1px solid #a34;color:#ffb3b3;font-size:12px;line-height:1.4}.tmf-modal input.tmf-modal-invalid{border-color:#ff6b6b;box-shadow:0 0 0 1px rgba(255,107,107,.45)}`);
+
+    GM_addStyle(`.tmf-changelog-release{margin:0 0 14px}.tmf-changelog-release:last-of-type{margin-bottom:0}.tmf-changelog-ver{display:flex;align-items:baseline;gap:8px;margin:0 0 6px}.tmf-changelog-ver b{color:#fff;font-size:13px}.tmf-changelog-date{color:#8a8a8a;font-size:11px;margin-left:auto}.tmf-changelog-badge{background:#2e7d32;color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;text-transform:uppercase;letter-spacing:.04em}.tmf-changelog-items{margin:0;padding-left:18px;color:#cfcfcf}.tmf-changelog-items li{margin:0 0 5px}.tmf-changelog-items code{background:#000;padding:1px 4px;border-radius:3px;color:#cfc}`);
+
+    GM_addStyle(`.tmf-settings-overlay [hidden]{display:none!important}.tmf-settings-overlay .tmf-modal code{background:#000;padding:1px 4px;border-radius:3px;color:#cfc;font-family:Consolas,Menlo,monospace;font-size:12px}.tmf-help-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin:0 0 8px;padding:6px 8px;background:#262626;border:1px solid #3a3a3a;border-radius:6px}.tmf-help-bar button,.tmf-wiz button,.tmf-sheet button{font-family:inherit;line-height:1.3;text-transform:none;box-shadow:none;height:auto;min-width:0;margin:0;cursor:pointer}.tmf-help-switch{display:inline-flex;align-items:center;gap:8px;background:none;border:0;padding:2px 0;color:#e6e6e6;font-size:12.5px}.tmf-help-track{position:relative;width:30px;height:17px;border-radius:9px;background:#555;flex:none;transition:background .15s}.tmf-help-track:after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:#ddd;transition:transform .15s}.tmf-help-switch[aria-checked="true"] .tmf-help-track{background:#2e7d32}.tmf-help-switch[aria-checked="true"] .tmf-help-track:after{transform:translateX(13px);background:#fff}.tmf-help-write{background:#333;border:1px solid #666;color:#eee;border-radius:5px;padding:5px 10px;font-size:12px}.tmf-help-write:hover{border-color:#999}.tmf-help-write[aria-expanded="true"]{border-color:#b5d56a;color:#fff}.tmf-wiz{margin:0 0 8px;border:1px solid #b5d56a;border-radius:6px;background:#262626;padding:8px 10px 10px;display:grid;gap:8px}.tmf-wiz-h{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:bold;color:#fff;font-size:12.5px}.tmf-wiz-h small{font-weight:normal;color:#9a9a9a;font-size:11px;margin-left:6px}.tmf-wiz-close{cursor:pointer;color:#bbb;font-size:20px;line-height:1}.tmf-wiz-qs{display:grid;gap:8px}.tmf-wiz-q{display:grid;gap:4px}.tmf-wiz-q>span{font-size:11.5px;color:#cfcfcf}.tmf-wiz-seg{display:flex;flex-wrap:wrap;gap:4px}.tmf-wiz-seg button{background:#333;border:1px solid #555;color:#ddd;border-radius:5px;padding:4px 8px;font-size:11.5px}.tmf-wiz-seg button:hover{border-color:#888}.tmf-wiz-seg button[aria-pressed="true"]{background:#2e7d32;border-color:#2e7d32;color:#fff}.tmf-wiz-out{display:grid;gap:5px;border-top:1px solid #333;padding-top:8px}.tmf-wiz-f{overflow-wrap:anywhere}.tmf-settings-overlay .tmf-wiz-f code{font-size:12.5px}.tmf-wiz-say{font-size:11.5px;color:#e6e6e6}.tmf-wiz-say b,.tmf-live-say b,.tmf-sheet-tried b{color:#b5d56a}.tmf-wiz-use{justify-self:start;background:#2e7d32;border:1px solid #2e7d32;color:#fff;border-radius:5px;padding:5px 12px;font-size:12px}.tmf-sheet{margin:0 0 4px;border:1px solid #3a3a3a;border-radius:6px;padding:6px 10px}.tmf-sheet>summary{cursor:pointer;font-weight:bold;color:#cfcfcf;font-size:12.5px;padding:2px 0}.tmf-sheet[open]>summary{margin-bottom:4px}.tmf-anat{display:flex;gap:6px;justify-content:center;margin:8px 0 4px;flex-wrap:wrap}.tmf-anat-part{display:grid;justify-items:center;gap:4px}.tmf-settings-overlay .tmf-anat-part code{font-size:17px;padding:3px 8px}.tmf-anat-brace{display:block;width:100%;height:7px;border:1px solid #9a9a9a;border-top:0;border-radius:0 0 4px 4px;box-sizing:border-box}.tmf-anat-part span{font-size:10.5px;color:#cfcfcf;text-align:center;max-width:150px;line-height:1.3}.tmf-anat-note{font-size:11px;color:#9a9a9a;text-align:center;margin:0 0 8px}.tmf-sheet-tabs{display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid #444;margin-bottom:4px}.tmf-sheet-tabs button{background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:5px 9px;font-size:12px;color:#aaa;border-radius:0}.tmf-sheet-tabs button:hover{color:#ddd}.tmf-sheet-tabs button[aria-selected="true"]{color:#fff;border-bottom-color:#b5d56a}.tmf-sheet-hint{font-size:10.5px;color:#9a9a9a;margin:4px 0 2px}.tmf-sheet-hint b{color:#cfcfcf;font-weight:normal}.tmf-sheet-row{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;align-items:baseline;width:100%;box-sizing:border-box;text-align:left;background:none;border:0;border-bottom:1px solid #2c2c2c;border-radius:0;padding:6px 4px;color:#e6e6e6;font-size:11.5px}.tmf-sheet-row:hover{background:#2a2a2a}.tmf-sheet-row code{overflow-wrap:anywhere}.tmf-sheet-row--wide{grid-template-columns:minmax(0,1fr)}.tmf-sheet-row--on{background:#2a2f1e;box-shadow:inset 3px 0 0 #b5d56a}.tmf-sheet-note{font-size:10.5px;color:#9a9a9a;margin:6px 0 0}.tmf-sheet-tried{margin-top:6px;font-size:11.5px;color:#e6e6e6;line-height:1.45}.tmf-sheet-tried:empty{display:none}.tmf-live{margin-top:6px;background:#262626;border:1px solid #3a3a3a;border-radius:6px;padding:8px 10px;display:grid;gap:6px;font-size:12px;line-height:1.4;text-align:left}.tmf-modal-cats .tmf-live{margin:0 0 6px}.tmf-live-h{display:flex;justify-content:space-between;gap:8px;font-size:10.5px;color:#9a9a9a;text-transform:uppercase;letter-spacing:.5px;font-weight:bold}.tmf-live-h span:last-child{text-transform:none;letter-spacing:0;font-weight:normal;text-align:right}.tmf-live-say{font-size:12.5px;color:#fff}.tmf-live-muted{font-size:11px;color:#9a9a9a}.tmf-live-foot{font-size:10.5px;color:#9a9a9a;border-top:1px solid #333;padding-top:5px}.tmf-live-err{padding:7px 9px;border-radius:5px;background:#3a1f1f;border:1px solid #a34;color:#ffb3b3;font-size:12px}.tmf-live-steps{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 10px;font-size:11.5px;margin:0}.tmf-live-steps dt{color:#9a9a9a;margin:0;font-weight:normal}.tmf-live-steps dd{margin:0;color:#e6e6e6;min-width:0}.tmf-live-steps b{color:#fff}.tmf-live-steps b.tmf-live-win{color:#b5d56a;font-size:13px}.tmf-live-tree{display:grid;gap:2px;font-size:11.5px}.tmf-live-tr{display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline;padding:3px 6px;border-radius:4px}.tmf-live-tr .p{font-weight:bold;color:#fff;white-space:nowrap}.tmf-live-tr .w{flex:1 1 100%;color:#9a9a9a;font-size:10.5px}.tmf-live-tr .op{color:#9a9a9a;font-family:monospace}.tmf-live-tr--win{background:#2a2f1e;box-shadow:inset 3px 0 0 #8fd08f}.tmf-live-tr--win .p{color:#b5d56a}.tmf-live-lad-h{font-size:10.5px;color:#bbb;text-transform:uppercase;letter-spacing:.5px;font-weight:bold}.tmf-live-lad{border-top:1px solid #333;font-size:11.5px}.tmf-live-lr{display:flex;gap:8px;align-items:center;padding:2px 6px;border-bottom:1px solid #2c2c2c;min-height:22px;box-sizing:border-box}.tmf-live-lr .p{width:78px;text-align:right;flex:none}.tmf-live-lr .q{width:52px;text-align:right;color:#bbb;flex:none}.tmf-live-lr .n{flex:1;min-width:0;color:#9a9a9a;font-size:10.5px}.tmf-live-lr--dim .p,.tmf-live-lr--dim .q{color:#777}.tmf-live-lr--pick{background:#24301c}.tmf-live-lr--pick .n{color:#b5d56a}.tmf-live-lr--you{background:#3a3414;border:1px solid #c9a227;border-radius:5px;color:#fff}.tmf-live-lr--you .n{color:#fff}.tmf-live-lr--gap{color:#777;font-size:10.5px;justify-content:center;min-height:18px}`);
+    GM_addStyle(`.tmf-own{cursor:pointer;position:relative;display:inline-flex;align-items:center;justify-content:center;width:18px;height:16px;margin-right:2px;color:#888;font:italic bold 14px/1 Georgia,"Times New Roman",serif;align-self:center;user-select:none;-webkit-user-select:none;z-index:99999}.tmf-own:hover{color:#fff}.tmf-own--on,.tmf-own--on:hover{color:#8fd08f}.tmf-own--on:after{content:"";position:absolute;top:-1px;right:-1px;width:5px;height:5px;border-radius:50%;background:#8fd08f;pointer-events:none}.tmf-own-box{position:absolute;z-index:2147482000;width:290px;max-width:calc(100vw - 16px);box-sizing:border-box;background:#1f1f1f;color:#e6e6e6;border:1px solid #888;border-radius:8px;box-shadow:0 8px 26px rgba(0,0,0,.8);padding:9px 11px 10px;font:12px/1.45 Arial,Helvetica,sans-serif;text-align:left}.tmf-own-box:before{content:"";position:absolute;top:-6px;left:var(--tmf-own-arrow,24px);width:10px;height:10px;background:#1f1f1f;border-left:1px solid #888;border-top:1px solid #888;transform:rotate(45deg)}.tmf-own-box [hidden]{display:none!important}.tmf-own-t{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:bold;color:#fff;font-size:12.5px;margin-bottom:6px}.tmf-own-t span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tmf-own-x{cursor:pointer;color:#bbb;font-size:20px;line-height:1;font-weight:normal;flex:none}.tmf-own-x:hover{color:#fff}.tmf-own-two{display:grid;grid-template-columns:minmax(0,1fr) 86px;gap:6px}.tmf-own-two label{display:block;margin:0;font-size:10px;font-weight:normal;color:#9a9a9a}.tmf-own-two input{display:block;width:100%;box-sizing:border-box;margin:2px 0 0;padding:6px 8px;height:auto;border-radius:5px;border:1px solid #666;background:#111;color:#eee;font:13px Consolas,Menlo,monospace}.tmf-own-two input::placeholder{color:#666}.tmf-own-two input.tmf-own-bad{border-color:#ff6b6b;box-shadow:0 0 0 1px rgba(255,107,107,.45)}.tmf-own-from{margin-top:5px;font-size:10.5px;color:#9a9a9a;line-height:1.4}.tmf-own-from code{background:#000;padding:1px 4px;border-radius:3px;color:#cfc;font:10.5px Consolas,Menlo,monospace}.tmf-own-err{margin-top:6px;padding:6px 8px;border-radius:5px;background:#3a1f1f;border:1px solid #a34;color:#ffb3b3;font-size:11px}.tmf-own-acts{display:flex;gap:6px;justify-content:flex-end;margin-top:8px}.tmf-own-acts button{cursor:pointer;padding:5px 12px;border-radius:5px;border:1px solid #666;background:#333;color:#eee;font:12px/1.3 Arial,Helvetica,sans-serif;height:auto;min-width:0;margin:0;box-shadow:none;text-transform:none}.tmf-own-acts .tmf-own-save{background:#2e7d32;border-color:#2e7d32;color:#fff}`);
+
+    // On a phone the three icons become a strip along the bottom of the item picture, so the name
+    // gets the room they took. The row is their positioning box, and its picture starts 1px in
+    // and is 60x30. A row without a picture keeps the wide-screen layout.
+    GM_addStyle(`.tmf-icons{display:inline-flex;align-items:center;flex:none;margin:0 6px 0 8px}@media (max-width:784px){[class*=itemRow]:has([class*=imageWrapper]){position:relative}[class*=itemRow]:has([class*=imageWrapper]) .tmf-icons{display:flex;position:absolute;left:1px;top:17px;width:60px;height:14px;margin:0;align-items:center;justify-content:space-evenly;background:rgba(20,20,20,.72);border-radius:3px;z-index:1}[class*=itemRow]:has([class*=imageWrapper]) .tmf-icons>.tmf-fav,[class*=itemRow]:has([class*=imageWrapper]) .tmf-icons>.tmf-own,[class*=itemRow]:has([class*=imageWrapper]) .tmf-icons>.tmf-ana-btn{width:18px;height:14px;margin:0;font-size:12px}[class*=itemRow]:has([class*=imageWrapper]) .tmf-icons>.tmf-own{font-size:13px}[class*=itemRow]:has([class*=imageWrapper]) .tmf-icons svg{width:12px;height:10px}}`);
+    GM_addStyle(`.tmf-ana-btn{cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:18px;color:#888;align-self:center;margin-right:2px;user-select:none;-webkit-user-select:none}.tmf-ana-btn:hover{color:#ddd}.tmf-ana-btn svg{display:block;width:14px;height:12px;fill:currentColor;pointer-events:none}.tmf-ana{display:none;position:fixed;top:60px;left:40px;width:540px;max-width:calc(100vw - 16px);max-height:calc(100vh - 24px);overflow:auto;background:#1f1f1f;color:#e6e6e6;border:1px solid #666;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.6);padding:12px 14px;box-sizing:border-box;font-size:12px;line-height:1.45;z-index:999999;text-align:left}.tmf-ana--open{display:block}@media (max-width:784px){.tmf-ana{top:auto!important;left:0!important;right:0;bottom:0;width:auto;max-width:none;max-height:85vh;border-radius:14px 14px 0 0;border-bottom:0}}.tmf-ana-head{display:flex;align-items:center;gap:10px;margin-bottom:8px;cursor:move;user-select:none;-webkit-user-select:none}@media (max-width:784px){.tmf-ana-head{cursor:default}}.tmf-ana-img{width:34px;height:34px;border-radius:4px;background:#2a2a2a;flex:none;object-fit:contain}.tmf-ana-title{display:flex;flex-direction:column;line-height:1.3;min-width:0}.tmf-ana-title b{font-size:15px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tmf-ana-title small{font-size:11px;color:#a5a5a5}.tmf-ana-hb{margin-left:auto;color:#bbb;font-size:16px;line-height:1;cursor:pointer;width:22px;text-align:center;flex:none}.tmf-ana-hb:hover{color:#fff}.tmf-ana-hb.tmf-ana-close{margin-left:0;font-size:22px}.tmf-ana-tabs{display:flex;gap:2px;border-bottom:1px solid #444;margin:0 0 8px}.tmf-ana-tab{padding:5px 12px;font-size:12px;color:#aaa;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer}.tmf-ana-tab:hover{color:#ddd}.tmf-ana-tab--on,.tmf-ana-tab--on:hover{color:#fff;border-bottom-color:#b5d56a}.tmf-ana-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:6px 0 8px}@media (max-width:784px){.tmf-ana-kpis{grid-template-columns:1fr 1fr}}.tmf-ana-kpi{background:#262626;border:1px solid #3a3a3a;border-radius:6px;padding:6px 8px;min-width:0}.tmf-ana-kpi .l{font-size:9.5px;color:#9a9a9a;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}.tmf-ana-kpi .v{font-size:15px;font-weight:bold;color:#fff;margin:2px 0 1px;white-space:nowrap}.tmf-ana-kpi .d{font-size:10.5px;color:#aaa;line-height:1.3}.tmf-ana-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:10.5px;color:#bbb;margin:2px 0 4px}.tmf-ana-legend span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}.tmf-ana-sw{display:inline-block;width:9px;height:9px;border-radius:2px}.tmf-ana-m{background:#3987e5}.tmf-ana-b{background:#d95926}.tmf-ana-src{width:16px;height:16px;border-radius:50%;font-size:9px;font-weight:bold;display:inline-grid;place-items:center;color:#fff;flex:none}.tmf-ana-src.tmf-ana-y{background:#c9a227;color:#1f1f1f;font-size:10px}.tmf-ana-sec{font-size:10.5px;color:#bbb;text-transform:uppercase;letter-spacing:.5px;margin:8px 0 4px;font-weight:bold}.tmf-ana-sec code{text-transform:none;letter-spacing:0}.tmf-ana-sec small{text-transform:none;letter-spacing:0;font-weight:normal;color:#8a8a8a;margin-left:4px}.tmf-ana-cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media (max-width:784px){.tmf-ana-cols{grid-template-columns:1fr}}.tmf-ana-band{margin:0 0 7px}.tmf-ana-bl{font-size:11px;color:#ddd;margin-bottom:2px}.tmf-ana-brow{display:flex;align-items:center;gap:6px;height:14px;margin:1px 0}.tmf-ana-bar{display:block;height:8px;border-radius:0 4px 4px 0;flex:none;max-width:46%}.tmf-ana-bv{font-size:10.5px;color:#aaa;white-space:nowrap}.tmf-ana-lad{margin:4px 0 2px;border-top:1px solid #333}.tmf-ana-lr{display:flex;align-items:center;gap:8px;padding:3px 6px;border-bottom:1px solid #2c2c2c;font-size:12px;min-height:25px;box-sizing:border-box}.tmf-ana-lr[data-price]{cursor:pointer}.tmf-ana-lr[data-price]:hover{background:#2a2a2a}.tmf-ana-lr .p{width:82px;text-align:right;color:#f0f0f0;flex:none}.tmf-ana-lr .q{width:56px;color:#bbb;text-align:right;flex:none}.tmf-ana-lr .n{flex:1;color:#999;font-size:10.5px;min-width:0;line-height:1.3}.tmf-ana-lr--you{background:#3a3414;border:1px solid #c9a227;border-radius:6px;margin:2px 0;color:#fff}.tmf-ana-lr--you .p,.tmf-ana-lr--you .n{color:#fff}.tmf-ana-lr--dim .p,.tmf-ana-lr--dim .q{color:#777}.tmf-ana-lr--more{min-height:22px;border-bottom:0}.tmf-ana-lr--hidden{display:none}.tmf-ana--all .tmf-ana-lr--hidden{display:flex}.tmf-ana--all .tmf-ana-showall{display:none}.tmf-ana-tag{display:inline-block;font-size:9.5px;padding:1px 6px;border-radius:8px;background:#2e7d32;color:#fff;white-space:nowrap;line-height:1.4;margin-right:4px}.tmf-ana-tag--gray{background:#444;color:#ccc}.tmf-ana-tag--blue{background:#1c5cab}.tmf-ana-hint{font-size:10.5px;color:#8a8a8a;margin:4px 0 2px}.tmf-ana-verdict{margin:8px 0 2px;padding:7px 9px;background:#262626;border-left:3px solid #c9a227;border-radius:0 6px 6px 0;font-size:11.5px;line-height:1.45;color:#ddd}.tmf-ana code{background:#000;padding:1px 4px;border-radius:3px;color:#cfc;font-size:10.5px}.tmf-ana a{color:#9cc25e;text-decoration:underline;cursor:pointer}.tmf-ana-foot{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:8px;border-top:1px solid #333}.tmf-ana-foot:empty{display:none}.tmf-ana-sum{flex:1;font-size:10.5px;color:#9a9a9a;line-height:1.3}.tmf-ana-foot button{cursor:pointer;padding:6px 12px;border-radius:5px;border:1px solid #666;background:#333;color:#eee;font-size:12px;white-space:nowrap}.tmf-ana-foot button.tmf-ana-apply{background:#2e7d32;border-color:#2e7d32;color:#fff}.tmf-ana-trace{margin:4px 0 0;font-size:11.5px}.tmf-ana-tr{display:flex;align-items:baseline;gap:8px;padding:3px 6px;border-radius:4px;flex-wrap:wrap;line-height:1.35}.tmf-ana-tr .op{color:#9a9a9a;font-family:monospace;font-size:12px}.tmf-ana-tr .r{font-weight:bold;color:#fff;white-space:nowrap}.tmf-ana-tr .why{color:#9a9a9a;font-size:10.5px;flex:1 1 100%;padding-left:2px}.tmf-ana-tr--win{background:#2a2f1e;border-left:3px solid #8fd08f}.tmf-ana-tr--win .r{color:#b5d56a}.tmf-ana-note{margin-top:6px;font-size:10.5px;color:#8a8a8a;border-top:1px solid #333;padding-top:6px}.tmf-ana-alert{margin:0 0 6px;padding:8px 10px;border-radius:6px;background:#3a2f1f;border:1px solid #a7792a;color:#ffd9a0;font-size:11.5px;line-height:1.4}.tmf-ana-skel{display:inline-block;height:8px;border-radius:4px;background:#333;margin:3px 0}.tmf-ana-muted{color:#8a8a8a;font-size:11px;margin:4px 0}`);
+
+    GM_addStyle(`.tmf-ana-ctl{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;margin:0 0 8px}.tmf-ana-ctlg{display:inline-flex;align-items:center;gap:6px}.tmf-ana-ctll{font-size:10.5px;color:#9a9a9a;text-transform:uppercase;letter-spacing:.5px}.tmf-ana-seg{display:inline-flex;border:1px solid #444;border-radius:12px;overflow:hidden}.tmf-ana-opt{padding:3px 10px;font-size:11px;line-height:1.5;color:#aaa;cursor:pointer;white-space:nowrap;user-select:none;-webkit-user-select:none}.tmf-ana-opt+.tmf-ana-opt{border-left:1px solid #444}.tmf-ana-opt:hover{color:#fff}.tmf-ana-opt--on,.tmf-ana-opt--on:hover{background:#b5d56a;color:#1f1f1f;font-weight:bold}.tmf-ana-opt em{font-style:normal;opacity:.65;margin-left:4px}.tmf-ana-lr .k{width:84px;text-align:right;color:#c9d8a6;flex:none}.tmf-ana-lr .k.tmf-ana-k0{color:#a8a8a8}.tmf-ana-lad--keep .tmf-ana-lr .k{font-weight:bold;color:#b5d56a}.tmf-ana-lad--keep .tmf-ana-lr .k.tmf-ana-k0{color:#f0f0f0}.tmf-ana-lad--keep .tmf-ana-lr .p{color:#9a9a9a}.tmf-ana-lad--keep .tmf-ana-lr--you .p{color:#e6d9a8}.tmf-ana-lr.tmf-ana-lh{min-height:20px;font-size:9.5px;text-transform:uppercase;letter-spacing:.5px}.tmf-ana-lad .tmf-ana-lh .p,.tmf-ana-lad .tmf-ana-lh .q,.tmf-ana-lad .tmf-ana-lh .k{color:#8a8a8a;font-weight:normal}.tmf-ana-lh .tmf-ana-src{visibility:hidden}.tmf-ana-where{margin:0 0 10px;padding:6px 9px 8px;background:#262626;border:1px solid #3a3a3a;border-radius:6px}.tmf-ana-where .tmf-ana-sec{margin:0 0 4px}.tmf-ana-wr{display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px;padding:3px 5px;border-radius:4px;font-size:12px}.tmf-ana-wr--win{background:#2a2f1e}.tmf-ana-wn{width:74px;color:#ddd}.tmf-ana-wl{color:#9a9a9a;min-width:92px}.tmf-ana-wa{color:#666}.tmf-ana-wk{font-weight:bold;color:#f0f0f0;min-width:100px}.tmf-ana-wr--win .tmf-ana-wk{color:#b5d56a}.tmf-ana-ws{margin-top:5px;font-size:11.5px;color:#ddd;line-height:1.45}@media (max-width:560px){.tmf-ana-lad .tmf-ana-lr{flex-wrap:wrap;row-gap:2px}.tmf-ana-lr .p{width:74px}.tmf-ana-lr .q{width:46px}.tmf-ana-lr .k{width:78px}.tmf-ana-lad .tmf-ana-lr .n{flex:1 1 100%;padding-left:24px}.tmf-ana-lad .tmf-ana-lr .n:empty{display:none}.tmf-ana-lad .tmf-ana-lr--more .n{padding-left:0}.tmf-ana-wa,.tmf-ana-wr .tmf-ana-tag{display:none}.tmf-ana-wn{width:66px}.tmf-ana-wl{min-width:0}.tmf-ana-wk{min-width:0;margin-left:auto}}`);
+
+    const lastSeenVersionKey = "tu:market-fill:last-seen-version";
+    // Newest release first. Everything a user could have skipped over is listed, so updating
+    // across several versions still shows the whole gap in one popup. A release marked
+    // `silent: true` is left out of that and never opens the popup by itself; it is listed
+    // only when the popup is opened from the menu. Leaving the flag off means false.
+    // Write every line for a player, not a developer: one short sentence, plain words,
+    // what changed for them rather than what changed in the code.
+    const CHANGELOG = [
+        {
+            version: "3.2.0",
+            date: "2026-11-11",
+            changes: [
+                'Start a price with = to set it outright: <code>=1</code> lists for exactly $1, as the default, for a category or for one item.',
+                'A set price also works as a floor: <code>max(-1[0], =1000)</code> undercuts by $1 but never goes below $1,000.'
+            ]
+        },
+        {
+            version: "3.1.1",
+            date: "2026-11-10",
+            changes: [
+                'Torn now updates item-market prices only about once an hour, so item analytics and the cheapest-listings popup show how old they are.'
+            ]
+        },
+        {
+            version: "3.1.0",
+            date: "2026-11-05",
+            changes: [
+                'On phones, the star, ƒ and chart icons now sit on a strip across the bottom of the item picture, so names get the room they took.'
+            ]
+        },
+        {
+            version: "3.0.1",
+            date: "2026-11-05",
+            silent: true,
+            changes: [
+                'The Fill button and the price box now line up at the corners, as in Bazaar Filler.'
+            ]
+        },
+        {
+            version: "3.0.0",
+            date: "2026-11-05",
+            changes: [
+                'The Fill button in the price box now shows a $, and turns into a × once the row is filled.',
+                'New Display tab in settings: show or hide the star, the ƒ, the chart icon, the lowest-prices popup and the Fill All button.'
+            ]
+        },
+        {
+            version: "2.3.2",
+            date: "2026-11-05",
+            silent: true,
+            changes: [
+                'On phones the star, ƒ and chart icons fold into a small square, so the item name has more room.'
+            ]
+        },
+        {
+            version: "2.3.1",
+            date: "2026-11-05",
+            silent: true,
+            changes: [
+                'The star, ƒ and chart icons now sit in one straight column, next to the RRP, on every row.'
+            ]
+        },
+        {
+            version: "2.3.0",
+            date: "2026-11-05",
+            changes: [
+                'New ƒ beside the star: give one item its own price and quantity formula, ahead of its category and your default. It turns green on items that have one.'
+            ]
+        },
+        {
+            version: "2.2.1",
+            date: "2026-11-05",
+            silent: true,
+            changes: [
+                'Settings: on phones, tapping a box such as Default quantity no longer opens the keyboard and closes it again.'
+            ]
+        },
+        {
+            version: "2.2.0",
+            date: "2026-11-02",
+            silent: true,
+            changes: [
+                'Item analytics: buttons above the price ladder show every listing, only the item market, or only bazaars.',
+                'Item-market listings now show what the seller keeps after the 5% fee, so they compare fairly with bazaar prices. Sort the ladder by that or by the listed price.',
+                'A new "Where to sell" box says whether the item market or a bazaar leaves you more right now, and by how much.'
+            ]
+        },
+        {
+            version: "2.1.0",
+            date: "2026-11-02",
+            changes: [
+                'New Cheatsheet at the top of Settings: every price code, sorted by topic, with what it means. Tap a row to put it in a field.',
+                'Live check explains whatever you type, in plain words and with the price it would fill on the last item you filled. Turn it off with the switch at the top.',
+                'New "Write it for me" button: answer four quick questions and it writes the price for you.'
+            ]
+        },
+        {
+            version: "2.0.0",
+            date: "2026-11-01",
+            changes: [
+                'New: a small <code>▂▅▇</code> icon next to the star opens item analytics. The cheapest item-market and bazaar listings sit on one price ladder with your price slotted in, with how many units are ahead of you and how the listings split by stack size.',
+                'Its Formula tab works your price setting out branch by branch: the listing each one read, the ones it skipped, and which one filled. The footer says what you keep after the market tax.',
+                'Click a listing in the popup to price $1 under it. Opened right after a fill, the popup reuses what the fill read and costs no extra request.'
+            ]
+        },
+        {
+            version: "1.2.0",
+            date: "2026-11-01",
+            changes: [
+                'New: undercut only the big stacks. <code>-1[100x+]</code> undercuts the cheapest listing of 100 or more, so a first page full of 1x and 2x sellers no longer drags your price down.',
+                '<code>-1[mine+]</code> undercuts the cheapest listing at least as big as the stack you are listing. <code>-1[2xmine+]</code> looks for one at least twice as big, <code>-1[0.5xmine+]</code> at least half.',
+                'Add <code>above</code> to skip sellers who are too cheap: <code>-1[mine+ above +5%[market]]</code> undercuts the first big stack that still leaves you 5% over market value.',
+                'The prices popup shows only the listings your formula counts. When none fit, the price is left as it is and a note says why.'
+            ]
+        },
+        {
+            version: "1.1.5",
+            date: "2026-10-20",
+            silent: true,
+            changes: [
+                'Minor updates now arrive quietly: they are listed here, but no longer open this popup on their own.'
+            ]
+        },
+        {
+            version: "1.1.0",
+            date: "2026-09-21",
+            changes: [
+                'New: price ranges. Put <code>min()</code> and <code>max()</code> inside each other to keep a price between a floor and a ceiling.',
+                '<code>min(max(-1[0], +10%[market]), -1[14])</code> undercuts the cheapest listing, but never goes below 10% over market value, and never above the 15th listing &minus; $1.',
+                'Handy when a big stack would otherwise make you the cheapest seller and you would rather sit further down the list.'
+            ]
+        },
+        {
+            version: "1.0.0",
+            date: "2026-09-07",
+            changes: [
+                'New: combine price sources. Write <code>-1[bazaar] | -1[0]</code> and both are priced, then the higher one is filled. Use it to put a floor under a source that sometimes goes cheap.',
+                'The same thing spelled out is <code>max(-1[bazaar], -1[0])</code>. Use <code>min(-1[bazaar], -1[0])</code> instead to fill the lower one and undercut whichever source is cheapest.',
+                'Settings now checks what you type. A price or quantity it cannot use is refused with a note saying which field is wrong and why, instead of being saved and failing on every item later.'
+            ]
+        },
+        {
+            version: "0.13.3",
+            date: "2026-09-07",
+            changes: [
+                'Fixed: the <code>[bazaar]</code> prices never worked at all. They do now.',
+                'Your userscript manager may ask for a new permission on this update. Say yes, or bazaar prices stay broken.',
+                'If you only use bazaar prices, the script no longer asks for a Torn API key it does not need.',
+                'A bazaar price that cannot be fetched now tells you why, instead of failing quietly.'
+            ]
+        },
+        {
+            version: "0.13.0",
+            date: "2026-09-02",
+            changes: [
+                'New: see what items go for in player bazaars, not just the item market. Put <code>[bazaar]</code> in your price setting for the cheapest bazaar listing. No API key needed.',
+                'Also <code>[bazaar:2]</code> for the 3rd cheapest, <code>[bazaar:avg]</code> for the average and <code>[bazaar:median]</code> for the middle price.',
+                'Useful for spotting when the item market has drifted away from what an item really sells for.',
+                'Sponsored, stale and silly-cheap listings are ignored, so one troll price cannot drag Fill All down.',
+                'The prices popup lists bazaar listings too, so you can see what you are pricing against.',
+                'An item with no bazaar price falls back to the item market instead of failing.',
+                'Fixed: a price with no discount, such as <code>[market]</code> on its own, no longer errors.',
+                'New: this popup. After an update it lists what changed, then stays quiet until the next one.'
+            ]
+        }
+    ];
+
+    const pages = { "AddItems": 10, "ViewItems": 20, "Other": 0};
+
+    // Favourites are deliberately stored under a market-filler-specific key,
+    // separate from the bazaar-filler favourites list.
+    const favouritesStorageKey = "tu:market-fill:favourites";
+    let favourites = loadFavourites();
+
+    // Excluded items are never touched by Fill All, and a manual Fill on one warns first.
+    // An item is either neutral, a favourite or excluded — never two of those at once.
+    const excludedStorageKey = "tu:market-fill:excluded";
+    let excluded = loadExcluded();
+
+    // Per-category price-delta overrides + a persistent item→category(type) cache.
+    // Item categories are immutable, so caching them avoids extra API calls when picking
+    // which price source a category's formula needs.
+    const categoryDeltasKey = "tu:market-fill:category-deltas";
+    // Per-category quantity overrides live in their own map so the existing delta entries keep
+    // their shape (a bare formula string) and upgrade without migration.
+    const categoryQuantitiesKey = "tu:market-fill:category-quantities";
+    const itemCategoryCacheKey = "tu:market-fill:item-categories";
+    // Item types are mostly immutable but Torn occasionally recategorises an item, so cached
+    // categories are re-verified from each response and forcibly refreshed once past this TTL.
+    const CATEGORY_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+    const SETTINGS_CATEGORIES = ["Melee","Primary","Secondary","Defensive","Temporary","Drug","Medical","Booster","Energy Drink","Alcohol","Candy","Enhancer","Clothing","Jewelry","Material","Flower","Plushie","Car","Supply Pack","Special","Collectible","Artifact","Tool","Other"];
+    // One item's own price and quantity, set from the ƒ icon on its row, keyed by item id. They
+    // win over the item's category and the defaults; a blank one falls through as before.
+    const itemFormulasKey = "tu:market-fill:item-formulas";
+    let itemFormulas = loadItemFormulas();
+
+    // Which of the script's extra row controls show. All of them do until the Display tab in
+    // settings turns one off. A class on <html> hides it, so rows added later follow too.
+    const displayKey = "tu:market-fill:display";
+    const DISPLAY_OPTIONS = [
+        { key: 'fav', hide: 'tmf-hide-fav', label: 'Favourite star', hint: 'The ☆ beside each item. Hidden, your favourites and exclusions still count for Fill All.' },
+        { key: 'own', hide: 'tmf-hide-own', label: 'Own formula (ƒ)', hint: 'The ƒ that gives one item its own formula. Hidden, the formulas you already set still apply.' },
+        { key: 'ana', hide: 'tmf-hide-ana', label: 'Item analytics', hint: 'The chart icon that opens the analytics popup.' },
+    ];
+    let display = loadDisplay();
+    applyDisplay();
+
+    function loadDisplay(){
+        try {
+            const saved = JSON.parse(localStorage.getItem(displayKey) ?? '{}');
+            return saved != null && typeof saved === 'object' ? saved : {};
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function shows(key){
+        return display[key] !== false;
+    }
+
+    function applyDisplay(){
+        DISPLAY_OPTIONS.forEach(function(option){
+            document.documentElement.classList.toggle(option.hide, !shows(option.key));
+        });
+    }
+    let categoryDeltas = loadCategoryDeltas();
+    let categoryQuantities = loadCategoryQuantities();
+    let itemCategoryCache = loadItemCategoryCache();
+
+    // "Fill All" auto-fill mode state. One activation fills each favourite item once;
+    // rows appearing later (category/tab switches) are picked up by the mutation observer.
+    const FILL_COOLDOWN_MIN_MS = 600;
+    const FILL_COOLDOWN_MAX_MS = 1000;
+    const RATE_LIMIT_PAUSE_MIN_MS = 3000;
+    const RATE_LIMIT_PAUSE_MAX_MS = 10000;
+    let autoFillActive = false;
+    let autoFillLoopRunning = false;
+    let autoFillQueue = [];
+    let autoFillQueuedIds = new Set();
+    let autoFillDoneIds = new Set();
+    let toastTimer = null;
+    // Set once Torn's chat z-index is detected, so our floating UI sits just below the
+    // chat (an open chat window covers it instead of the button overshadowing the chat).
+    let chatRelativeZBase = null;
+
+    // Draggable / minimisable Fill All bar. Position + minimised state persist across visits.
+    const fillAllStateKey = "tu:market-fill:fillall-pos";
+    const FILLALL_EDGE_SNAP_PX = 40;       // drop within this of an edge → clamp + minimise
+    const FILLALL_DRAG_THRESHOLD_PX = 6;   // movement before a press counts as a drag
+    const FILLALL_VIEWPORT_MARGIN_PX = 4;  // keep this gap from the edge when not snapped
+    let fillAllState = loadFillAllState();
+
+    let recentFilledInput = null;
+    let popupOffsetX = parseFloat(localStorage.getItem("tu:market-fill:popup-offset-x")) || 0;
+    let popupOffsetY = parseFloat(localStorage.getItem("tu:market-fill:popup-offset-y")) || 100;
+    let isDragging = false;
+    let dragStartX = 0, dragStartY = 0;
+    const marketTaxFactor = 1 - getCurrentMarketTax();
+    let currentPage = pages.Other;
+    let holdTimer;
+    const LOADING_THE_PRICES = 'Loading the prices...';
+    const isMobileView = window.innerWidth <= 784;
+    // Falling back to the body keeps the scan and the observer alive if the root is renamed
+    // or has not mounted yet; the row selectors below are specific enough to stay correct.
+    const observerTarget = document.querySelector("#item-market-root") ?? document.body;
+    const observerConfig = { attributes: false, childList: true, characterData: false, subtree: true };
+
+    // Debounced whole-root scan instead of matching specific mutation targets: rows on the
+    // Add Items and Your Items (view listings) pages mount at different depths (tab panels,
+    // list containers, pagination), and target-based matching silently missed the latter.
+    // AddFillButton is idempotent, so re-scanning already-processed rows is cheap.
+    let scanScheduled = false;
+    function scanAndInject() {
+        scanScheduled = false;
+        if(!enabled||!runtimeActive||!manager.isAuthorized()||!automaticControls&&!showRequested)return;
+        currentPage = getCurrentPage();
+        if (currentPage == pages.Other) {
+            return;
+        }
+        document.querySelectorAll('#item-market-root [class*=priceInputWrapper],#item-market-root [data-market-price-wrapper]').forEach(x=>AddFillButton(x));
+        if (autoFillActive) {
+            enqueueVisibleFavourites();
+        }
+    }
+
+    function scheduleScan() {
+        if (!scanScheduled) {
+            scanScheduled = true;
+            requestAnimationFrame(scanAndInject);
+        }
+    }
+
+    const observer = new MutationObserver(function(mutations) {
+        for (const m of mutations) {
+            const target=m.target.nodeType===1?m.target:m.target.parentElement;
+            if(!target?.closest('#item-market-root')&&![...m.addedNodes].some(n=>n.nodeType===1&&(n.id==='item-market-root'||n.querySelector('#item-market-root'))))continue;
+            if (m.addedNodes.length || m.removedNodes.length) {
+                scheduleScan();
+                return;
+            }
+        }
+    });
+    if(enabled)observer.observe(document.body, observerConfig);
+    // Tab switches (#/addListing ↔ #/viewListing) don't always leave rows unprocessed,
+    // but a scan on hashchange is cheap insurance against missed mutations.
+    window.addEventListener("hashchange", scheduleScan);
+    addCustomFillPopup();
+    // Fill All lives in the TU manager.
+    // Rows may already be in the DOM at script start (run-at: document-idle).
+    scheduleScan();
+
+    // Tell the user what an update changed, the first time they land on the market after it.
+    // TU owns release notifications.
+
+    // Keep the Fill All bar on-screen (and flush to its edge if minimised) after a resize/rotate.
+    window.addEventListener("resize", function() {
+        let bar = document.querySelector(".tmf-fillall-bar");
+        if (bar != null && fillAllState != null) {
+            applyFillAllState(bar);
+        }
+    });
+
+    // The icon inside the Fill square: a $ before a fill, and a × once the row is filled and the
+    // next tap clears it. Each square gets its own gradient ids, because a gradient shared by id
+    // stops drawing everywhere once the row that defines it is hidden.
+    function fillSquareIcon(){
+        const FILL_ICON_DOLLAR = 'M10.36 10.44Q10.36 12.06 9.27 12.96Q8.18 13.85 6.04 13.93V15.5H5.06V13.96Q3.14 13.89 2.06 13.05Q0.98 12.21 0.64 10.48L2.94 10.05Q3.11 11.07 3.62 11.54Q4.12 12.01 5.06 12.1V8.59Q5.04 8.57 4.93 8.55Q4.82 8.53 4.79 8.53Q3.33 8.2 2.59 7.74Q1.85 7.29 1.45 6.6Q1.05 5.9 1.05 4.9Q1.05 3.41 2.07 2.59Q3.1 1.77 5.06 1.7V0.5H6.04V1.7Q7.22 1.75 8 2.07Q8.79 2.4 9.27 3.03Q9.75 3.67 10.04 4.84L7.68 5.19Q7.54 4.41 7.15 3.99Q6.76 3.56 6.04 3.46V6.62L6.14 6.64Q6.4 6.64 7.72 7.07Q9.05 7.5 9.7 8.34Q10.36 9.18 10.36 10.44ZM5.06 3.42Q3.4 3.55 3.4 4.86Q3.4 5.25 3.54 5.51Q3.67 5.78 3.94 5.95Q4.2 6.12 5.06 6.4ZM8.03 10.48Q8.03 10.03 7.86 9.74Q7.7 9.46 7.39 9.28Q7.08 9.1 6.04 8.81V12.1Q8.03 11.97 8.03 10.48Z';
+        const FILL_ICON_CLEAR = 'M1.6 6 3 4.6l2.5 2.5L8 4.6 9.4 6 6.9 8.5l2.5 2.5L8 12.4 5.5 9.9 3 12.4 1.6 11l2.5-2.5z';
+        fillSquareIcon.count = (fillSquareIcon.count || 0) + 1;
+        const id = 'tmf-sq-' + fillSquareIcon.count;
+        const holder = document.createElement('span');
+        holder.innerHTML = '<svg class="tmf-sq-ico" viewBox="0 0 11 16" aria-hidden="true"><defs>' +
+            '<linearGradient id="' + id + 'g" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#eee"/><stop offset="1" stop-color="#9a9a9a"/></linearGradient>' +
+            '<linearGradient id="' + id + 'r" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ffb0b0"/><stop offset="1" stop-color="#d36a6a"/></linearGradient></defs>' +
+            '<path class="tmf-sq-fill" fill="url(#' + id + 'g)" d="' + FILL_ICON_DOLLAR + '"/>' +
+            '<path class="tmf-sq-clear" fill="url(#' + id + 'r)" d="' + FILL_ICON_CLEAR + '"/></svg>';
+        return holder.firstChild;
+    }
+
+    function AddFillButton(itemPriceElement){
+        if (itemPriceElement.querySelector('.silmaril-market-filler-button') != null){
+            return;
+        }
+        const wrapperParent = findParentByCondition(itemPriceElement, (el) => el.hasAttribute?.('data-tmf-item-id')||el.matches?.('[data-item-id],[data-itemid],[class*=itemRowWrapper],tr,[role=row]'));
+        if(!wrapperParent)return;
+        wrapperParent.classList.add('silmaril-market-filler-processed');
+        let itemId = getRowItemId(wrapperParent);
+        if(!Number.isSafeInteger(Number(itemId))||Number(itemId)<=0)return;
+        const span = document.createElement('span');
+        span.className = 'silmaril-market-filler-button input-money-symbol';
+        span.style.position = "relative";
+        span.setAttribute('data-action-flag', 'fill');
+        span.addEventListener('click', async function(e) { await handleFillClick(e, itemId) });
+        const input = document.createElement('input');
+        input.type = 'button';
+        input.className = 'wai-btn';
+        span.appendChild(input);
+        span.appendChild(fillSquareIcon());
+
+        const moneyGroup = itemPriceElement.querySelector('.input-money-group')||itemPriceElement;
+        const itemIdNum = parseInt(itemId, 10);
+        if (!isNaN(itemIdNum) && itemIdNum > 0){
+            wrapperParent.dataset.tmfItemId = itemIdNum;
+            // The row's controls container: RRP, the anonymous button, quantity and price.
+            const infoContainer = findParentByCondition(itemPriceElement, (el) => el.matches?.('[class*=info],[data-market-fields]')||el.hasAttribute?.('data-tmf-item-id'));
+            // The star, ƒ and chart icons share one holder placed after Torn's RRP block, so they
+            // line up in one column whatever the row shows (weapon stats make that block wider).
+            let favHost = moneyGroup;
+            if (infoContainer != null){
+                favHost = infoContainer.querySelector(':scope > .tmf-icons');
+                if (favHost == null){
+                    favHost = document.createElement('span');
+                    favHost.className = 'tmf-icons';
+                    const details = infoContainer.querySelector(':scope > [class*="additionalInfo"]');
+                    if (details != null){
+                        details.after(favHost);
+                    } else {
+                        infoContainer.prepend(favHost);
+                    }
+                }
+            }
+            // A re-render can remount the price wrapper while the row (and our star) survives;
+            // guard against stacking a second star on re-scan.
+            if (favHost.querySelector('.tmf-fav') == null){
+                const favBtn = document.createElement('span');
+                favBtn.className = 'tmf-fav';
+                renderFavIcon(favBtn, getItemState(itemIdNum));
+                favBtn.dataset.tmfItemId = itemIdNum;
+                favBtn.addEventListener('click', function(e){
+                    e.preventDefault();
+                    e.stopPropagation();
+                    cycleItemState(itemIdNum);
+                    if (autoFillActive && favourites.has(itemIdNum)){
+                        enqueueFavouriteRow(wrapperParent);
+                    }
+                });
+                favHost.prepend(favBtn);
+            }
+            // The ƒ icon, for this item's own formula, goes right after the star.
+            if (favHost.querySelector('.tmf-own') == null){
+                const ownBtn = ownFormulaIcon(itemIdNum, wrapperParent);
+                const star = favHost.querySelector('.tmf-fav');
+                if (star != null){
+                    star.after(ownBtn);
+                } else {
+                    favHost.prepend(ownBtn);
+                }
+            }
+            // The item analytics icon sits beside the star, outside the price box, so the price
+            // input keeps its width. Same re-scan guard as the star.
+            if (favHost.querySelector('.tmf-ana-btn') == null){
+                const anaBtn = document.createElement('span');
+                anaBtn.className = 'tmf-ana-btn';
+                anaBtn.title = 'Item analytics: market and bazaar listings, stack sizes, and what your formula picked';
+                anaBtn.innerHTML = ANALYTICS_ICON;
+                anaBtn.addEventListener('click', function(event){
+                    event.preventDefault();
+                    event.stopPropagation();
+                    // The price box can be remounted under a surviving row, so find Fill now.
+                    let fillSquare = wrapperParent.querySelector('.silmaril-market-filler-button') ?? span;
+                    openAnalytics({ itemId: itemId, host: wrapperParent, target: fillSquare, pageType: getCurrentPage() });
+                });
+                const star = favHost.querySelector('.tmf-own') ?? favHost.querySelector('.tmf-fav');
+                if (star != null){
+                    star.after(anaBtn);
+                } else {
+                    favHost.prepend(anaBtn);
+                }
+            }
+            moneyGroup.prepend(span);
+            fitFillSquare(span, moneyGroup);
+            if (autoFillActive){
+                enqueueFavouriteRow(wrapperParent);
+            }
+        } else {
+            moneyGroup.prepend(span);
+            fitFillSquare(span, moneyGroup);
+        }
+    }
+
+    // Torn sizes a money square for its own taller inputs, so on the item market the square and
+    // the price box would end at different heights. Give the square the price box's height and
+    // top offset, as Bazaar Filler does, so their corners meet. A row that isn't laid out yet is
+    // measured again on a later frame.
+    function fitFillSquare(square, group, tries){
+        const attempt = tries ?? 0;
+        const priceInput = group.querySelector(':scope > input.input-money:not([type=hidden])');
+        if (priceInput == null || !square.isConnected){
+            return;
+        }
+        const height = priceInput.getBoundingClientRect().height;
+        if (height === 0){
+            if (attempt < 30){
+                requestAnimationFrame(function(){ fitFillSquare(square, group, attempt + 1); });
+            }
+            return;
+        }
+        square.style.boxSizing = 'border-box';
+        square.style.height = height + 'px';
+        square.style.marginBottom = '0px';
+        // Then move it down or up by whatever still separates the two tops, whether Torn lays the
+        // group out with floats, flex or margins.
+        const shift = priceInput.getBoundingClientRect().top - square.getBoundingClientRect().top;
+        const marginTop = parseFloat(window.getComputedStyle(square).marginTop) || 0;
+        square.style.marginTop = Math.round((marginTop + shift) * 100) / 100 + 'px';
+    }
+
+    // Resolve a row's item id from whichever source the page provides: the info button's
+    // aria-controls id on Add Items rows, otherwise any item image in the row. The Your Items
+    // (view listings) rows don't reliably carry the aria-controls id, and dereferencing the
+    // missing button used to throw — killing button injection for the whole row.
+    // ---- An item's own formula ----------------------------------------------------------------
+    // The ƒ beside the star opens a small box under it with the item's own price and quantity.
+    // They win over the item's category and the defaults. The ƒ turns green while it has one.
+
+    let ownFormulaBox = null;
+
+    function ownFormulaIcon(itemId, row){
+        const icon = document.createElement('span');
+        icon.className = 'tmf-own';
+        icon.textContent = 'ƒ';
+        icon.dataset.tmfItemId = itemId;
+        renderOwnFormulaIcon(icon, itemId);
+        icon.addEventListener('click', function(event){
+            event.preventDefault();
+            event.stopPropagation();
+            if (ownFormulaBox != null && ownFormulaBox.icon === icon){
+                closeOwnFormula();
+            } else {
+                openOwnFormula(itemId, icon, row);
+            }
+        });
+        return icon;
+    }
+
+    function renderOwnFormulaIcon(icon, itemId){
+        let price = itemOwnPrice(itemId);
+        let quantity = itemOwnQuantity(itemId);
+        let on = price != null || quantity != null;
+        icon.classList.toggle('tmf-own--on', on);
+        icon.title = on
+            ? 'Own formula: ' + [price, quantity != null ? 'quantity ' + quantity : null].filter(Boolean).join(', ') + '. It wins over its category and the default'
+            : 'Give this item its own formula, ahead of its category and the default';
+    }
+
+    function renderOwnFormulaIcons(itemId){
+        document.querySelectorAll('.tmf-own[data-tmf-item-id="' + parseInt(itemId, 10) + '"]').forEach(function(icon){
+            renderOwnFormulaIcon(icon, itemId);
+        });
+    }
+
+    function rowItemName(row){
+        row = row.closest('li, [data-testid="sortable-item"], [class*="row"], [class*="itemRowWrapper"]') ?? row;
+        let image = row.querySelector('img[alt]:not([alt=""])');
+        if (image != null){
+            return image.alt.trim();
+        }
+        let label = row.querySelector('.t-overflow, [class*="name"], [class*="itemName"]');
+        let text = label == null ? '' : label.textContent.trim();
+        return text !== '' && text.length <= 60 ? text : null;
+    }
+
+    function openOwnFormula(itemId, icon, row){
+        closeOwnFormula();
+        let cached = getCachedCategory(parseInt(itemId, 10));
+        let category = cached != null ? cached.type : null;
+        let key = category == null ? null : String(category).trim().toLowerCase();
+        let fromCategory = key != null && (categoryDeltas[key] != null || categoryQuantities[key] != null);
+        let name = rowItemName(row);
+        const box = document.createElement('div');
+        box.className = 'tmf-own-box';
+        box.innerHTML =
+            '<div class="tmf-own-t"><span></span><span class="tmf-own-x" title="Close">&times;</span></div>' +
+            '<div class="tmf-own-two">' +
+                '<label>Price<input type="text" class="tmf-own-price" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></label>' +
+                '<label>Quantity<input type="text" class="tmf-own-qty" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></label>' +
+            '</div>' +
+            '<div class="tmf-own-from"></div>' +
+            '<div class="tmf-own-err" hidden></div>' +
+            '<div class="tmf-own-acts"><button type="button" class="tmf-own-clear">Clear</button><button type="button" class="tmf-own-save">Save</button></div>';
+        box.querySelector('.tmf-own-t span').textContent = name != null ? name + '\u2019s own formula' : 'This item\u2019s own formula';
+        let priceInput = box.querySelector('.tmf-own-price');
+        let qtyInput = box.querySelector('.tmf-own-qty');
+        let inheritedPrice = getEffectiveDelta(category);
+        let inheritedQty = getEffectiveQuantity(category);
+        priceInput.value = itemOwnPrice(itemId) ?? '';
+        qtyInput.value = itemOwnQuantity(itemId) ?? '';
+        priceInput.placeholder = inheritedPrice;
+        qtyInput.placeholder = inheritedQty;
+        box.querySelector('.tmf-own-from').innerHTML = 'Blank uses ' + (fromCategory ? escapeHtml(category) : 'the default') + ': <code>' +
+            escapeHtml(inheritedPrice) + '</code> · <code>' + escapeHtml(inheritedQty) + '</code>' + (category == null ? ', or its category once it has been filled' : '') + '.' +
+            ' A set price starts with =, so <code>=1</code> is exactly $1.';
+        document.body.appendChild(box);
+        ownFormulaBox = { box: box, icon: icon, itemId: itemId };
+        placeOwnFormula();
+
+        box.querySelector('.tmf-own-x').addEventListener('click', closeOwnFormula);
+        box.querySelector('.tmf-own-clear').addEventListener('click', function(){
+            priceInput.value = '';
+            qtyInput.value = '';
+            saveOwnFormula();
+        });
+        box.querySelector('.tmf-own-save').addEventListener('click', saveOwnFormula);
+        box.addEventListener('input', function(event){
+            event.target.classList.remove('tmf-own-bad');
+            box.querySelector('.tmf-own-err').hidden = true;
+        });
+        box.addEventListener('keydown', function(event){
+            if (event.key === 'Enter'){
+                event.preventDefault();
+                saveOwnFormula();
+            } else if (event.key === 'Escape'){
+                closeOwnFormula();
+            }
+        });
+        document.addEventListener('pointerdown', closeOwnFormulaOutside, true);
+        window.addEventListener('resize', placeOwnFormula);
+    }
+
+    // Under the ƒ, its arrow pointing at it, kept inside the screen.
+    function placeOwnFormula(){
+        if (ownFormulaBox == null){
+            return;
+        }
+        let box = ownFormulaBox.box;
+        let rect = ownFormulaBox.icon.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0){
+            return;
+        }
+        let width = box.offsetWidth;
+        let pageWidth = document.documentElement.clientWidth;
+        let centre = rect.left + rect.width / 2;
+        let left = Math.max(8, Math.min(centre - width + 28, pageWidth - width - 8));
+        box.style.left = (left + window.scrollX) + 'px';
+        box.style.top = (rect.bottom + window.scrollY + 9) + 'px';
+        box.style.setProperty('--tmf-own-arrow', Math.max(10, Math.min(width - 20, centre - left - 5)) + 'px');
+    }
+
+    function closeOwnFormulaOutside(event){
+        if (ownFormulaBox != null && !ownFormulaBox.box.contains(event.target) && event.target !== ownFormulaBox.icon){
+            closeOwnFormula();
+        }
+    }
+
+    function closeOwnFormula(){
+        if (ownFormulaBox == null){
+            return;
+        }
+        ownFormulaBox.box.remove();
+        ownFormulaBox = null;
+        document.removeEventListener('pointerdown', closeOwnFormulaOutside, true);
+        window.removeEventListener('resize', placeOwnFormula);
+    }
+
+    function saveOwnFormula(){
+        if (ownFormulaBox == null){
+            return;
+        }
+        let box = ownFormulaBox.box;
+        let itemId = ownFormulaBox.itemId;
+        let priceInput = box.querySelector('.tmf-own-price');
+        let qtyInput = box.querySelector('.tmf-own-qty');
+        let price = priceInput.value.trim();
+        let quantity = qtyInput.value.trim();
+        let err = box.querySelector('.tmf-own-err');
+        priceInput.classList.remove('tmf-own-bad');
+        qtyInput.classList.remove('tmf-own-bad');
+        let problem = price === '' ? null : settingProblem(price);
+        if (problem != null){
+            priceInput.classList.add('tmf-own-bad');
+            err.textContent = 'Price: ' + problem;
+            err.hidden = false;
+            return;
+        }
+        if (quantity !== '' && !isKnownQuantityMode(quantity)){
+            qtyInput.classList.add('tmf-own-bad');
+            err.textContent = 'Quantity: use max, max-1, a plain number, or skip.';
+            err.hidden = false;
+            return;
+        }
+        let key = String(parseInt(itemId, 10));
+        if (price === '' && quantity === ''){
+            delete itemFormulas[key];
+        } else {
+            itemFormulas[key] = {};
+            if (price !== ''){
+                itemFormulas[key].price = price;
+            }
+            if (quantity !== ''){
+                itemFormulas[key].quantity = quantity;
+            }
+        }
+        saveItemFormulas();
+        renderOwnFormulaIcons(itemId);
+        closeOwnFormula();
+    }
+
+    function getRowItemId(row){
+        if(!row)return -1;
+        const candidates=[row.getAttribute('data-item-id'),row.getAttribute('data-itemid')];
+        for(const el of row.querySelectorAll('[data-item-id],[data-itemid],[aria-controls],img')){
+            candidates.push(el.getAttribute('data-item-id'),el.getAttribute('data-itemid'));
+            const controls=el.getAttribute('aria-controls')||'';candidates.push(controls.match(/(?:item[-_]?info[-_]?|item[-_]?)(\d+)(?:\D|$)/i)?.[1]);
+            if(el.matches('[class*=viewInfo],[class*=Info],[class*=info],[aria-label*=info i]'))candidates.push(controls.match(/(?:^|[-_])(\d+)(?:[-_]|$)/)?.[1]);
+            const src=el.getAttribute('src')||'';candidates.push(src.match(/\/items\/(\d+)(?:[/.?_-]|$)/)?.[1]);
+        }
+        for(const value of candidates){if(!/^\d+$/.test(String(value||'')))continue;const id=Number(value);if(Number.isSafeInteger(id)&&id>0&&id<1000000)return id;}
+        return -1;
+    }
+
+    function stripDeltaBracket(formula){
+        // A set price is the price itself, with no change to apply on top of it.
+        if (fixedPrice(formula) != null){
+            return '';
+        }
+        // Trimmed, because Save accepts "-1 [0]" and the delta parser does not allow the space.
+        return formula.indexOf('[') == -1 ? formula : formula.substring(0, formula.indexOf('[')).trim();
+    }
+
+    // "=1" is a set price: exactly $1, whatever anyone else charges. "=$1" reads the same. Null
+    // for every other formula. Save makes sure it is at least $1.
+    function fixedPrice(formula){
+        let match = String(formula ?? '').trim().match(/^=\s*\$?\s*(\d+)$/);
+        return match == null ? null : parseInt(match[1], 10);
+    }
+
+    // The index of the ) that closes the ( at `open`, or -1 when nothing does.
+    function matchingParen(text, open){
+        let depth = 0;
+        for (let i = open; i < text.length; i++){
+            if (text.charAt(i) === '('){
+                depth++;
+            } else if (text.charAt(i) === ')'){
+                depth--;
+                if (depth === 0){
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    // Split on the separators that belong to this level only: the ones inside a nested
+    // min(...)/max(...) belong to that call, not to us.
+    // A comma inside a formula's [ ] is part of a stack size, like [1,000x+], not a separator.
+    function splitTopLevel(body){
+        let parts = [];
+        let depth = 0;
+        let squareDepth = 0;
+        let current = '';
+        for (let i = 0; i < body.length; i++){
+            let ch = body.charAt(i);
+            if (ch === '('){
+                depth++;
+            } else if (ch === ')'){
+                depth--;
+            } else if (ch === '['){
+                squareDepth++;
+            } else if (ch === ']'){
+                squareDepth--;
+            } else if ((ch === '|' || ch === ',') && depth <= 0 && squareDepth <= 0){
+                parts.push(current);
+                current = '';
+                continue;
+            }
+            current += ch;
+        }
+        parts.push(current);
+        return parts;
+    }
+
+    // A setting parses into a tree. A leaf is one formula, {kind:'formula'}; min(...) and
+    // max(...) are {kind:'combine'} nodes over the formulas — or over further calls — inside
+    // them. "a | b" and "max(a, b)" both mean the highest of a and b; "min(a, b)" means the
+    // lowest, to undercut whichever source is cheapest. Calls nest, so a price can be held
+    // inside a band: min(max(a, b), c) is never below b and never above c.
+    // Nothing here throws on a formula it cannot make sense of — a setting saved before Save
+    // started validating them still parses, as the one leaf it will later fail to price.
+    function parseSetting(setting){
+        return parseExpression(String(setting ?? '').trim(), 'max');
+    }
+
+    // One level: the terms between this level's separators, combined by `combine`. A single
+    // term needs no node of its own, since the highest — or lowest — of one thing is itself.
+    function parseExpression(body, combine){
+        let terms = splitTopLevel(body).map(function(term){ return term.trim(); })
+            .filter(function(term){ return term !== ''; });
+        if (terms.length === 0){
+            terms = [body.trim()];
+        }
+        if (terms.length === 1){
+            return parseTerm(terms[0]);
+        }
+        return {
+            kind: 'combine',
+            combine: combine,
+            children: terms.map(parseTerm)
+        };
+    }
+
+    // Either a min()/max() call wrapping another expression, or a plain formula.
+    function parseTerm(term){
+        let open = term.indexOf('(');
+        if (open !== -1){
+            let name = term.substring(0, open).trim().toLowerCase();
+            let close = matchingParen(term, open);
+            if ((name === 'min' || name === 'max') && close !== -1 && term.substring(close + 1).trim() === ''){
+                return parseExpression(term.substring(open + 1, close), name);
+            }
+        }
+        return { kind: 'formula', formula: term };
+    }
+
+    // Every formula in a setting, in the order it was written, whatever it is nested inside.
+    function collectFormulas(node){
+        if (node.kind === 'formula'){
+            return [node.formula];
+        }
+        let formulas = [];
+        for (let i = 0; i < node.children.length; i++){
+            formulas = formulas.concat(collectFormulas(node.children[i]));
+        }
+        return formulas;
+    }
+
+    function formulaBranches(setting){
+        return collectFormulas(parseSetting(setting));
+    }
+
+    // The branch a one-formula decision has to look at: which endpoint to try first, and
+    // whether a Torn key is needed at all.
+    function firstBranch(setting){
+        return formulaBranches(setting)[0];
+    }
+
+    // ---- Price sources ---------------------------------------------------------------------
+    // A formula names its source inside its bracket: no bracket or [n] is Torn's item market,
+    // [market] is Torn's market value, [bazaar...] is weav3r's player-bazaar data.
+    // A listing source can also say which listings count at all. [100x+] keeps stacks of 100
+    // or more, [mine+] stacks at least as big as the one being filled, [2xmine+] at least twice
+    // that. "above <formula>" at the end skips every listing that would put the price under
+    // that formula's price: -1[mine+ above +5%[market]]. Parts are joined with ":", in any
+    // order: [bazaar:1:100x+] is the 2nd cheapest bazaar listing of 100 or more.
+
+    // The item market will not take a bigger listing than this, so asking it for a bigger
+    // stack could never match anything.
+    const ITEM_MARKET_MAX_STACK = 9999;
+
+    // The ] that closes the [ at `open`, counting the brackets of an "above" limit inside it,
+    // or -1 when nothing closes it.
+    function matchingBracket(text, open){
+        let depth = 0;
+        for (let i = open; i < text.length; i++){
+            if (text.charAt(i) === '['){
+                depth++;
+            } else if (text.charAt(i) === ']'){
+                depth--;
+                if (depth === 0){
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    // What sits between a formula's brackets, or null when it has none.
+    function bracketBody(formula){
+        let open = formula.indexOf('[');
+        if (open == -1){
+            return null;
+        }
+        let close = matchingBracket(formula, open);
+        return close == -1 ? formula.substring(open + 1) : formula.substring(open + 1, close);
+    }
+
+    // A bracket is "<selector>" or "<selector> above <limit formula>". Split on the first
+    // "above" that is not inside the limit's own bracket.
+    function splitAbove(body){
+        let depth = 0;
+        for (let i = 0; i < body.length; i++){
+            let ch = body.charAt(i);
+            if (ch === '['){
+                depth++;
+            } else if (ch === ']'){
+                depth--;
+            } else if (depth === 0 && (i === 0 || /\s/.test(body.charAt(i - 1))) &&
+                       /^above(\s|$)/i.test(body.substring(i))){
+                return { selector: body.substring(0, i), limit: body.substring(i + 'above'.length).trim() };
+            }
+        }
+        return { selector: body, limit: null };
+    }
+
+    function bracketToken(formula){
+        let body = bracketBody(formula);
+        return body == null ? '' : splitAbove(body).selector.trim().toLowerCase();
+    }
+
+    // The formula after "above", or null when the bracket has no limit.
+    function aboveLimit(formula){
+        let body = bracketBody(formula);
+        return body == null ? null : splitAbove(body).limit;
+    }
+
+    function sourceOf(formula){
+        if (fixedPrice(formula) != null){
+            return SOURCE_FIXED;
+        }
+        let token = bracketToken(formula);
+        if (token === 'market'){
+            return SOURCE_MARKET_VALUE;
+        }
+        if (token === 'bazaar' || token.indexOf('bazaar:') == 0){
+            return SOURCE_BAZAAR;
+        }
+        return SOURCE_ITEM_MARKET;
+    }
+
+    // Every source a formula needs, its "above" limit included.
+    function sourcesOf(formula){
+        let limit = aboveLimit(formula);
+        return [sourceOf(formula)].concat(limit != null && limit !== '' ? sourcesOf(limit) : []);
+    }
+
+    // One part of a listing selector, or null when it is not one.
+    function readSelectorPart(part){
+        let match;
+        if (part === 'avg' || part === 'average'){
+            return { kind: 'avg' };
+        }
+        if (part === 'median'){
+            return { kind: 'median' };
+        }
+        if (/^\d+$/.test(part)){
+            return { kind: 'slot', index: parseInt(part, 10) };
+        }
+        if ((match = part.match(/^(\d[\d,]*)x\+$/)) != null){
+            return { size: 'fixed', minStack: parseInt(match[1].replace(/,/g, ''), 10) };
+        }
+        if ((match = part.match(/^(?:(\d+(?:\.\d+)?)x)?mine\+$/)) != null){
+            return { size: 'mine', factor: match[1] == null ? 1 : parseFloat(match[1]) };
+        }
+        return null;
+    }
+
+    // What a listing source reads: a listing slot, the median, or (bazaar only) the average,
+    // plus the smallest stack a listing must hold to count. Parts it cannot read are ignored
+    // here; Save refuses them before they get this far.
+    function listingSelector(formula){
+        let parts = bracketToken(formula).split(':').map(function(part){ return part.trim(); })
+            .filter(function(part){ return part !== ''; });
+        if (parts[0] === 'bazaar'){
+            parts.shift();
+        }
+        let selector = { kind: 'slot', index: 0, minStack: null, mineFactor: null };
+        parts.forEach(function(part){
+            let read = readSelectorPart(part);
+            if (read == null){
+                return;
+            }
+            if (read.kind != null){
+                selector.kind = read.kind;
+                if (read.kind === 'slot'){
+                    selector.index = read.index;
+                }
+            } else if (read.size === 'fixed'){
+                selector.minStack = read.minStack;
+            } else {
+                selector.mineFactor = read.factor;
+            }
+        });
+        return selector;
+    }
+
+    // Kept for the call sites that only care about the bazaar read kind.
+    function bazaarSelector(formula){
+        return listingSelector(formula);
+    }
+
+    function usesMine(formula){
+        return listingSelector(formula).mineFactor != null ||
+            (aboveLimit(formula) != null && usesMine(aboveLimit(formula)));
+    }
+
+    // The smallest stack a listing needs to count for this formula: null when any size counts,
+    // undefined when it depends on your stack and that is not known here.
+    function minimumStack(formula, mine, source){
+        let selector = listingSelector(formula);
+        let wanted = selector.minStack;
+        if (selector.mineFactor != null){
+            if (mine == null || !(mine > 0)){
+                return undefined;
+            }
+            wanted = Math.ceil(mine * selector.mineFactor);
+        }
+        if (wanted == null){
+            return null;
+        }
+        wanted = Math.max(1, wanted);
+        return source === SOURCE_ITEM_MARKET ? Math.min(wanted, ITEM_MARKET_MAX_STACK) : wanted;
+    }
+
+    // The listings a formula may read, after its stack size and "above" limit are applied.
+    // `context` carries your stack (`mine`) and the limit's price (`limit`). Returns
+    // {listings} or, when nothing is left, {unmatched: a sentence saying why}.
+    function eligibleListings(listings, formula, source, context){
+        let minimum = minimumStack(formula, context == null ? null : context.mine, source);
+        if (minimum === undefined){
+            return { unmatched: "your stack size could not be read here, so [" + bracketToken(formula) + "] has nothing to compare with" };
+        }
+        let limit = context == null ? null : context.limit;
+        let delta = stripDeltaBracket(formula);
+        let kept = listings.filter(function(listing){
+            if (minimum != null && Number(listing.amount ?? 1) < minimum){
+                return false;
+            }
+            return limit == null || performOperation(listing.price, delta) >= limit;
+        });
+        if (kept.length > 0){
+            return { listings: kept };
+        }
+        let why = "no listing";
+        if (minimum != null){
+            why += " of " + minimum.toLocaleString('en-US') + " or more";
+        }
+        if (limit != null){
+            why += " that keeps the price at or above $" + Math.round(limit).toLocaleString('en-US');
+        }
+        return { unmatched: why };
+    }
+
+    // When a bazaar formula falls back to the item market, its stack size and "above" limit
+    // carry over; which bazaar listing it read does not.
+    function itemMarketFallbackFormula(formula){
+        let parts = bracketToken(formula).split(':').map(function(part){ return part.trim(); })
+            .filter(function(part){
+                let read = readSelectorPart(part);
+                return read != null && read.size != null;
+            });
+        let limit = aboveLimit(formula);
+        if (parts.length === 0 && limit == null){
+            return stripDeltaBracket(formula);
+        }
+        return stripDeltaBracket(formula) + '[' + parts.join(':') + (limit == null ? '' : ' above ' + limit) + ']';
+    }
+
+    // Save's check of one bracket. Returns a sentence for the player, or null when it is fine.
+    function bracketProblem(formula){
+        let token = bracketToken(formula);
+        let limit = aboveLimit(formula);
+        if (token === 'market'){
+            return limit == null ? null : "[market] is one price, not a list, so there is nothing for 'above' to skip.";
+        }
+        let isBazaar = token === 'bazaar' || token.indexOf('bazaar:') === 0;
+        let parts = token.split(':').map(function(part){ return part.trim(); });
+        if (isBazaar){
+            parts.shift();
+        }
+        parts = parts.filter(function(part){ return part !== ''; });
+        let picks = 0;
+        let sizes = 0;
+        let average = false;
+        for (let i = 0; i < parts.length; i++){
+            let read = readSelectorPart(parts[i]);
+            if (read == null){
+                return isBazaar
+                    ? "[" + token + "] is not a bazaar source. Use [bazaar], [bazaar:2], [bazaar:avg], [bazaar:median] or [bazaar:100x+]."
+                    : "[" + token + "] is not a price source. Use [0], [median], [market], [bazaar], [100x+] or [mine+].";
+            }
+            if (read.kind === 'avg' && !isBazaar){
+                return "[" + token + "]: only bazaars have an average. Use [bazaar:avg].";
+            }
+            if (read.kind != null){
+                picks++;
+                average = average || read.kind === 'avg';
+            } else {
+                sizes++;
+                if (read.size === 'fixed' && !(read.minStack >= 1)){
+                    return "[" + parts[i] + "] needs a stack size of 1 or more, like [100x+].";
+                }
+                if (read.size === 'mine' && !(read.factor > 0)){
+                    return "[" + parts[i] + "] needs a number above 0 before x, like [2xmine+].";
+                }
+            }
+        }
+        if (picks > 1){
+            return "[" + token + "] picks a listing more than once. Use one of a number, median or avg.";
+        }
+        if (sizes > 1){
+            return "[" + token + "] has more than one stack size. Use one, like [100x+] or [mine+].";
+        }
+        if (average && (sizes > 0 || limit != null)){
+            return "[" + token + "]: the bazaar average is one price, so stack sizes and 'above' do not apply to it.";
+        }
+        if (limit != null){
+            if (limit === ''){
+                return "'above' needs a price after it, like [mine+ above +5%[market]].";
+            }
+            if (aboveLimit(limit) != null){
+                return "the price after 'above' cannot have an 'above' of its own.";
+            }
+            return formulaProblem(limit);
+        }
+        return null;
+    }
+
+    // True for both the item-market [median] and the bazaar [bazaar:median].
+    function isMedianFormula(formula){
+        return listingSelector(formula).kind === 'median';
+    }
+
+    // Which listing a slot-based formula wants, for either listing source.
+    function listingSlot(formula){
+        let selector = listingSelector(formula);
+        return selector.kind === 'slot' ? selector.index : 0;
+    }
+
+    // ---- Cross-origin transport -------------------------------------------------------------
+    // Torn's CSP and weav3r's CORS headers both police what the page itself issues, so weav3r
+    // has to be reached from outside the page. Every userscript manager offers a way to do that;
+    // they just disagree on its name. Detection is by typeof so an undeclared name never throws.
+
+    function crossOriginGet(url){
+        if (typeof GM_xmlhttpRequest === 'function'){
+            return gmGet(GM_xmlhttpRequest, url);
+        }
+        if (typeof GM !== 'undefined' && GM != null && typeof GM.xmlHttpRequest === 'function'){
+            return gmGet(GM.xmlHttpRequest.bind(GM), url);
+        }
+        // Torn PDA builds before GM_xmlhttpRequest support expose this instead.
+        if (typeof PDA_httpGet === 'function'){
+            return pdaGet(url);
+        }
+        return null;
+    }
+
+    // The name of the transport a call would use, for error messages that have to distinguish
+    // "weav3r said no" from "the browser never let us ask".
+    function crossOriginTransport(){
+        if (typeof GM_xmlhttpRequest === 'function'){
+            return 'GM_xmlhttpRequest';
+        }
+        if (typeof GM !== 'undefined' && GM != null && typeof GM.xmlHttpRequest === 'function'){
+            return 'GM.xmlHttpRequest';
+        }
+        if (typeof PDA_httpGet === 'function'){
+            return 'PDA_httpGet';
+        }
+        return 'fetch';
+    }
+
+    function gmGet(request, url){
+        return new Promise(function(resolve, reject){
+            request({
+                method: 'GET',
+                url: url,
+                headers: { 'Accept': 'application/json' },
+                timeout: WEAV3R_TIMEOUT_MS,
+                onload: function(response){
+                    resolve({ status: response.status, text: response.responseText ?? '' });
+                },
+                onerror: function(){ reject(new Error('network error')); },
+                onabort: function(){ reject(new Error('aborted')); },
+                ontimeout: function(){ reject(new Error('timed out')); }
+            });
+        });
+    }
+
+    // PDA_httpGet resolves to a response whose body is either already a string or behind a
+    // text() call, depending on the PDA build; both shapes are normalised here.
+    function pdaGet(url){
+        return Promise.resolve(PDA_httpGet(url)).then(function(response){
+            if (response == null){
+                throw new Error('empty PDA response');
+            }
+            let status = response.status ?? 200;
+            if (typeof response.responseText === 'string'){
+                return { status: status, text: response.responseText };
+            }
+            if (typeof response.text === 'function'){
+                return Promise.resolve(response.text()).then(function(text){
+                    return { status: status, text: String(text ?? '') };
+                });
+            }
+            return { status: status, text: String(response) };
+        });
+    }
+
+    // One entry point for every weav3r call: the manager's transport when there is one, plain
+    // fetch only as a last resort so a manager-less environment still gets to try.
+    async function requestJson(url){
+        const match=String(url).match(/^https:\/\/weav3r\.dev\/api\/marketplace(?:\/(\d+))?$/);
+        if(!match)throw Error('Unsupported bazaar endpoint.');
+        const data=await readPrice(match[1]?'bazaar':'bazaar-all',match[1]?Number(match[1]):0,{signal:requestController.signal});
+        return {status:200,ok:true,text:JSON.stringify(data)};
+    }
+
+    function parseJsonBody(text){
+        try {
+            return JSON.parse(text);
+        } catch (error) {
+            throw new Error('non-JSON response body');
+        }
+    }
+
+    // A failure on the plain-fetch path means the page, not weav3r, refused the call, and the
+    // two need very different fixes — so the message says which one the user is looking at.
+    function describeTransportFailure(error){
+        let reason = error == null ? 'unknown error' : (error.message ?? String(error));
+        if (crossOriginTransport() !== 'fetch'){
+            return reason;
+        }
+        return reason + ' (this userscript manager exposes no cross-origin request API, so the'
+            + ' call had to go through the page, where Torn\'s CSP and weav3r\'s CORS policy both'
+            + ' apply — update the script in your manager so its GM_xmlhttpRequest grant is'
+            + ' picked up)';
+    }
+
+    // Shape a weav3r failure like a Torn error payload so one set of handlers covers both.
+    // A 429 borrows Torn's rate-limit code, which already drives the Fill All back-off.
+    // A failed row on its own tells the user nothing, so the reason is logged and toasted too.
+    function weav3rError(status, message){
+        let text = "weav3r: " + message;
+        console.error("[TU Market Price Auto Fill] " + text);
+        if (Date.now() - lastWeav3rNoticeTs >= WEAV3R_NOTICE_THROTTLE_MS){
+            lastWeav3rNoticeTs = Date.now();
+            showToast('Bazaar prices unavailable — ' + text);
+        }
+        return { error: { code: status === 429 ? 5 : -1, error: text } };
+    }
+
+    async function fetchWeav3rItem(itemId){
+        let cached = weav3rItemCache.get(itemId);
+        if (cached != null && (Date.now() - cached.ts) < WEAV3R_ITEM_TTL_MS){
+            return cached.payload;
+        }
+        let payload;
+        try {
+            let response = await requestJson(weav3rItemUrl.replace("{itemId}", itemId));
+            if (!response.ok){
+                return weav3rError(response.status, "HTTP " + response.status);
+            }
+            payload = parseJsonBody(response.text);
+        } catch (error) {
+            return weav3rError(error?.status||0, describeTransportFailure(error));
+        }
+        // weav3r reports failures as a bare string, unlike Torn's {code, error} object.
+        if (payload == null || payload.error != null){
+            return weav3rError(0, payload == null ? "empty response" : String(payload.error));
+        }
+        weav3rItemCache.set(itemId, { ts: Date.now(), payload: payload });
+        return payload;
+    }
+
+    // The bulk snapshot carries every item's average at once, so a whole Fill All run on
+    // [bazaar:avg] costs a single request instead of one per row.
+    async function fetchWeav3rAll(){
+        if (weav3rAllCache != null && (Date.now() - weav3rAllCache.ts) < WEAV3R_ALL_TTL_MS){
+            return weav3rAllCache.byId;
+        }
+        let response = await requestJson(weav3rAllUrl);
+        if (!response.ok){
+            throw new Error("weav3r snapshot HTTP " + response.status);
+        }
+        let payload = parseJsonBody(response.text);
+        let byId = new Map();
+        (payload.items ?? []).forEach(function(item){ byId.set(item.item_id, item); });
+        weav3rAllCache = { ts: Date.now(), byId: byId };
+        return byId;
+    }
+
+    // The snapshot has no listings, so only an average request can be served from it; everything
+    // else needs the per-item endpoint. A snapshot failure just falls through to that endpoint.
+    async function fetchBazaarData(formula, itemId){
+        if (bazaarSelector(formula).kind === 'avg'){
+            try {
+                let row = (await fetchWeav3rAll()).get(itemId);
+                if (row != null){
+                    return { item_id: itemId, bazaar_average: row.bazaar_average, market_price: row.market_price, listings: [] };
+                }
+            } catch (error) {
+                console.warn("[TU Market Price Auto Fill] weav3r snapshot unavailable, using the per-item endpoint:", error);
+            }
+        }
+        return fetchWeav3rItem(itemId);
+    }
+
+    // Normalise weav3r listings to the {price, amount} shape GetPrice and the prices popup speak.
+    // The sponsored slot goes first — a paid placement must never set your price — then listings
+    // far under the average (outliers, not competition) and ones the crawler has not re-confirmed
+    // lately, unless dropping the stale ones would leave nothing at all.
+    // weav3r is a third party, so its fields are coerced to numbers before they reach the page:
+    // a listing whose price or quantity is not a finite number is dropped rather than rendered.
+    function normaliseBazaarListings(data){
+        let average = Number(data.bazaar_average);
+        let floor = Number.isFinite(average) ? average * BAZAAR_SANITY_FLOOR_RATIO : 0;
+        let usable = (data.listings ?? []).map(function(listing){
+            return {
+                price: Number(listing.price),
+                amount: Number(listing.quantity ?? 1),
+                sponsored: listing.sponsored,
+                lastChecked: Number(listing.last_checked ?? 0)
+            };
+        }).filter(function(listing){
+            return listing.sponsored !== 1 && Number.isFinite(listing.price) && Number.isFinite(listing.amount) && listing.price >= floor;
+        });
+        let fresh = usable.filter(function(listing){
+            return (Date.now() - listing.lastChecked * 1000) <= WEAV3R_STALE_LISTING_MS;
+        });
+        return (fresh.length > 0 ? fresh : usable).map(function(listing){
+            return { price: listing.price, amount: listing.amount };
+        });
+    }
+
+    // The PDA placeholder is not a key: an un-substituted '###PDA-APIKEY###' would only ever
+    // earn a code-2 error from Torn.
+    function hasUsableApiKey(){
+        return manager.isAuthorized();
+    }
+
+    // A bazaar-only setup never calls Torn, so it must never be asked for a key, and nor does a
+    // set price. Any other source among the active formulas — including the bare default —
+    // still needs one.
+    function needsTornApiKey(){
+        return [priceDeltaRaw].concat(Object.values(categoryDeltas), itemOwnPrices()).some(function(setting){
+            return formulaBranches(setting).some(function(branch){
+                return sourcesOf(branch).some(function(source){ return source !== SOURCE_BAZAAR && source !== SOURCE_FIXED; });
+            });
+        });
+    }
+
+    function buildTornPriceUrl(source, itemId){
+        return (source === SOURCE_MARKET_VALUE ? itemUrl : marketUrlV2)
+            .replace("{itemId}", itemId)
+            .replace("{apiKey}", apiKey);
+    }
+
+    // One item's reads for one fill, or for one analytics popup. A source several branches need
+    // is fetched once, and a popup opened right after a fill reads what the fill read instead of
+    // asking again. A fill always starts a fresh session; only the popup reuses one, and only
+    // while it is this fresh.
+    const SESSION_TTL_MS = 60 * 1000;
+    let itemSessions = new Map();
+    // The newest one: what the settings live check prices against.
+    let liveCheckSession = null;
+
+    function newSession(itemId){
+        let session = { itemId: itemId, ts: Date.now(), reads: new Map(), branches: new Map(), trace: null, mine: null, category: null };
+        itemSessions.set(String(itemId), session);
+        liveCheckSession = session;
+        return session;
+    }
+
+    function recentSession(itemId){
+        let session = itemSessions.get(String(itemId));
+        return session != null && (Date.now() - session.ts) <= SESSION_TTL_MS ? session : null;
+    }
+
+    function forgetSession(itemId){
+        itemSessions.delete(String(itemId));
+    }
+
+    // [bazaar:avg] is served from the bulk snapshot and every other bazaar read from the per-item
+    // endpoint; the two carry different fields, so they are remembered apart.
+    function readKey(source, formula){
+        return source === SOURCE_BAZAAR && bazaarSelector(formula).kind === 'avg' ? 'bazaar:avg' : source;
+    }
+
+    async function fetchForSource(source, formula, itemId, session){
+        if (session == null){
+            return fetchSource(source, formula, itemId);
+        }
+        let key = readKey(source, formula);
+        if (!session.reads.has(key)){
+            session.reads.set(key, fetchSource(source, formula, itemId));
+        }
+        return session.reads.get(key);
+    }
+
+    function fetchSource(source, formula, itemId){
+        // A set price reads nothing, so it costs no call.
+        if (source === SOURCE_FIXED){
+            return Promise.resolve({});
+        }
+        if (source === SOURCE_BAZAAR){
+            return fetchBazaarData(formula, itemId);
+        }
+        return readPrice(source===SOURCE_MARKET_VALUE?'items':'market',Number(itemId),{signal:requestController.signal});
+    }
+
+    // Maps a Torn API error payload to the popup-friendly {price, amount:0, status} object,
+    // or null when the response carries no error.
+    function mapApiError(data){
+        if (data.error == null){
+            return null;
+        }
+        switch (data.error.code){
+            case 2:
+                apiKey = null;
+                // TU owns key validation and storage.
+                console.warn('[TU Market Price Auto Fill] Key rejected. Use TU API Settings.');
+                return {"price": 'Wrong API key!', "amount": 0, "status": 'invalid-key'};
+            case 5:
+                console.warn('[TU Market Price Auto Fill] API rate limit reached.');
+                return {"price": 'Rate limited!', "amount": 0, "status": 'rate-limited'};
+            case 9:
+                console.warn("[TU Market Price Auto Fill] The API is temporarily disabled, please try again later");
+                return {"price": 'API is OFF!', "amount": 0, "status": 'error'};
+            default:
+                console.warn('[TU Market Price Auto Fill] Operation failed; check configuration.');
+                return {"price": data.error.error, "amount": 0, "status": 'error'};
+        }
+    }
+
+    // Turns a (non-error) response into the price shape consumed by GetPrice/GetPricesBreakdown:
+    // a {price, amount:1} object for a scalar source ([market], [bazaar:avg]), otherwise a
+    // listings array. Returns null when a bazaar source has nothing usable, which tells the
+    // caller to fall back to the item market.
+    function parsePrices(data, itemId, source, formula){
+        if (source === SOURCE_FIXED){
+            return {"price": fixedPrice(formula), "amount": 1};
+        }
+        if (source === SOURCE_MARKET_VALUE){
+            return {"price": data.items[itemId].market_value, "amount": 1};
+        }
+        if (source === SOURCE_BAZAAR){
+            if (bazaarSelector(formula).kind === 'avg'){
+                let average = Number(data.bazaar_average);
+                return data.bazaar_average == null || !Number.isFinite(average) ? null : {"price": average, "amount": 1};
+            }
+            let listings = normaliseBazaarListings(data);
+            return listings.length > 0 ? listings : null;
+        }
+        if (data.itemmarket.listings.length === 0){
+            return {"price": 'No listings!', "amount": 0, "status": 'error'};
+        }
+        if (data.itemmarket.listings[0].price == null){
+            console.warn("[TU Market Price Auto Fill] The API is temporarily disabled, please try again later");
+            return {"price": 'API is OFF!', "amount": 0, "status": 'error'};
+        }
+        // temporary hotfix to avoid wrong prices
+        if (data.itemmarket.item.id != itemId){
+            return {"price": 'API is BROKEN!', "amount": 0, "status": 'error'};
+        }
+        return data.itemmarket.listings;
+    }
+
+    // weav3r carries no item type, so a bazaar response can never teach us a category — the
+    // caller keeps its cached guess and re-learns from Torn at the next expiry.
+    function readCategoryFromData(data, itemId, source){
+        try {
+            if (source === SOURCE_MARKET_VALUE){
+                return (data.items && data.items[itemId]) ? (data.items[itemId].type ?? null) : null;
+            }
+            if (source === SOURCE_BAZAAR){
+                return null;
+            }
+            return (data.itemmarket && data.itemmarket.item) ? (data.itemmarket.item.type ?? null) : null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function loadItemFormulas(){
+        try {
+            let parsed = JSON.parse(localStorage.getItem(itemFormulasKey) ?? "{}");
+            return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+        } catch (error) {
+            console.warn('[TU Market Price Auto Fill] Invalid saved item rules.');
+            return {};
+        }
+    }
+
+    function saveItemFormulas(){
+        localStorage.setItem(itemFormulasKey, JSON.stringify(itemFormulas));
+    }
+
+    function itemFormulaOf(itemId){
+        let id = parseInt(itemId, 10);
+        return isNaN(id) ? null : (itemFormulas[String(id)] ?? null);
+    }
+
+    function itemOwnPrice(itemId){
+        let own = itemFormulaOf(itemId);
+        return own != null && typeof own.price === 'string' && own.price.trim() !== '' ? own.price.trim() : null;
+    }
+
+    function itemOwnQuantity(itemId){
+        let own = itemFormulaOf(itemId);
+        return own != null && typeof own.quantity === 'string' && own.quantity.trim() !== '' ? own.quantity.trim() : null;
+    }
+
+    function itemOwnPrices(){
+        return Object.keys(itemFormulas).map(itemOwnPrice).filter(function(price){ return price != null; });
+    }
+
+    // Resolve the formula to use for an item: its own formula if it has one, else a per-category override (matched on the item's
+    // type, case-insensitively) if set, otherwise the global default.
+    function getEffectiveDelta(category, itemId = null){
+        let own = itemOwnPrice(itemId);
+        if (own != null){
+            return own;
+        }
+        if (category != null){
+            let override = categoryDeltas[String(category).trim().toLowerCase()];
+            if (override != null && String(override).trim() !== ''){
+                return String(override).trim();
+            }
+        }
+        return priceDeltaRaw;
+    }
+
+    // Can a response already fetched for this item answer for this branch too?
+    function preloadMatches(preloaded, branch, source){
+        if (preloaded == null || preloaded.source !== source){
+            return false;
+        }
+        // The two bazaar reads differ: [bazaar:avg] comes from the bulk snapshot, every other
+        // selector from the per-item endpoint, so only a matching kind may reuse a response.
+        return source !== SOURCE_BAZAAR ||
+            (bazaarSelector(preloaded.formula).kind === 'avg') === (bazaarSelector(branch).kind === 'avg');
+    }
+
+    // Price one branch of a setting. `allowFallback` is off while several branches compete:
+    // the user has already named their own alternative, so a thin bazaar item should let the
+    // next branch answer instead of quietly spending a Torn call on the item market.
+    // `context.mine` is the stack being filled, for [mine+]. A formula with an "above" limit
+    // prices that limit first; a limit that prices nothing leaves the formula nothing to read.
+    async function priceBranch(branch, itemId, category, preloaded, allowFallback, context){
+        let session = context == null ? null : context.session;
+        let limitFormula = aboveLimit(branch);
+        let limit = null;
+        if (limitFormula != null){
+            let limitResult = await priceBranch(limitFormula, itemId, category, preloaded, false, context);
+            limit = limitResult.prices == null ? null : branchPrice(limitResult);
+            if (limit == null){
+                let unmatched = { prices: unmatchedPrices("the price after 'above' (" + limitFormula + ") could not be worked out"), formula: branch, category: category };
+                return recordBranch(session, branch, unmatched, null, limitFormula, null);
+            }
+        }
+        let result = await priceBranchListings(branch, itemId, category, preloaded, allowFallback, session);
+        // Every listing the source returned, before the bracket narrows them: the popup shows
+        // the ones that were passed over as well as the one that was read.
+        let listings = Array.isArray(result.prices) ? result.prices : null;
+        narrowToEligible(result, { mine: context == null ? null : context.mine, limit: limit });
+        return recordBranch(session, branch, result, listings, limitFormula, limit);
+    }
+
+    // Keep what a branch came to, and how, for the analytics popup; the result goes straight
+    // back to the caller untouched. `branch` is the formula as the setting spells it; after a
+    // bazaar fallback the result's own formula is the item-market one it was priced with.
+    function recordBranch(session, branch, result, listings, limitFormula, limit){
+        if (session == null){
+            return result;
+        }
+        let prices = result.prices;
+        let detail = {
+            formula: branch, source: sourceOf(result.formula), limitFormula: limitFormula, limit: limit,
+            fallback: sourceOf(branch) === SOURCE_BAZAAR && sourceOf(result.formula) !== SOURCE_BAZAAR,
+            listings: listings, price: null, basis: null, error: null, unmatched: null, nothing: prices == null
+        };
+        let status = getPricesStatus(prices);
+        if (prices == null){
+            // A bazaar branch weav3r had nothing for, left to the other branches.
+        } else if (status === 'unmatched'){
+            detail.unmatched = prices.why;
+        } else if (status !== 'ok'){
+            detail.error = String(prices.price);
+        } else {
+            detail.price = branchPrice(result);
+            if (!Array.isArray(prices)){
+                detail.basis = { value: prices.price };
+            } else {
+                let basisListing = isMedianFormula(result.formula) ? null : prices[Math.min(listingSlot(result.formula), prices.length - 1)];
+                detail.basis = basisListing != null
+                    ? { price: basisListing.price, amount: Number(basisListing.amount ?? 1), rank: listings.indexOf(basisListing) + 1, skipped: skippedBefore(listings, prices, basisListing) }
+                    : { median: getMedianPrice(prices), count: prices.length, skipped: listings.length - prices.length };
+            }
+        }
+        session.branches.set(branch, detail);
+        return result;
+    }
+
+    // How many listings the bracket passed over on its way to the one it read.
+    function skippedBefore(listings, eligible, basisListing){
+        return listings.slice(0, listings.indexOf(basisListing)).filter(function(listing){
+            return eligible.indexOf(listing) === -1;
+        }).length;
+    }
+
+    // A row the stack size or "above" limit left nothing to read from: the cell says why, and
+    // the row is left as it is rather than counted as an error.
+    function unmatchedPrices(why){
+        return {"price": why.charAt(0).toUpperCase() + why.slice(1), "amount": 0, "status": 'unmatched', "why": why};
+    }
+
+    // Keep only the listings the formula may read. The prices popup then lists those too, so
+    // it shows the sellers the price was actually set against.
+    function narrowToEligible(result, context){
+        if (result == null || !Array.isArray(result.prices)){
+            return result;
+        }
+        let eligible = eligibleListings(result.prices, result.formula, sourceOf(result.formula), context);
+        result.prices = eligible.unmatched != null ? unmatchedPrices(eligible.unmatched) : eligible.listings;
+        return result;
+    }
+
+    async function priceBranchListings(branch, itemId, category, preloaded, allowFallback, session){
+        let source = sourceOf(branch);
+        let data = preloadMatches(preloaded, branch, source)
+            ? preloaded.data
+            : await fetchForSource(source, branch, itemId, session);
+        let error = mapApiError(data);
+        if (error != null){
+            return { prices: error, formula: branch, category: category };
+        }
+        let prices = parsePrices(data, itemId, source, branch);
+        if (prices == null && !allowFallback){
+            return { prices: null, formula: branch, category: category };
+        }
+        return withBazaarFallback(prices, branch, source, itemId, category, session);
+    }
+
+    // What a branch would actually fill, or null when it errored or priced nothing. A formula
+    // stored before Save started validating them can still throw here, and that is one dead
+    // branch rather than a dead row.
+    function branchPrice(result){
+        try {
+            let price = GetPrice(result.prices, result.formula);
+            return typeof price === 'number' && isFinite(price) ? price : null;
+        } catch (error) {
+            console.warn("[TU Market Price Auto Fill] Formula '" + result.formula + "' could not be applied:", error);
+            return null;
+        }
+    }
+
+    // Walk the parsed setting and pick the winning branch: the highest under max(), the lowest
+    // under min(), with a nested call resolved to its own winner first. `priced` holds what
+    // every formula came out at; a formula that priced nothing sits the comparison out, and a
+    // call whose every formula priced nothing is null to the level above it.
+    function chooseBranch(node, priced){
+        if (node.kind === 'formula'){
+            let entry = priced.get(node.formula);
+            return (entry != null && entry.price != null) ? entry : null;
+        }
+        let best = null;
+        for (let i = 0; i < node.children.length; i++){
+            let candidate = chooseBranch(node.children[i], priced);
+            if (candidate == null){
+                continue;
+            }
+            if (best == null || (node.combine === 'min' ? candidate.price < best.price : candidate.price > best.price)){
+                best = candidate;
+            }
+        }
+        return best;
+    }
+
+    // Price every formula in a setting, then let the min()/max() tree pick which one fills. One
+    // formula takes exactly the path, and costs exactly the calls, it did before any of this,
+    // and a formula written twice in the same setting is still fetched once.
+    async function priceSetting(setting, itemId, category, preloaded, context){
+        let root = parseSetting(setting);
+        let formulas = collectFormulas(root);
+        if (root.kind === 'formula'){
+            return noteFill(context, setting, root, root.formula, await priceBranch(root.formula, itemId, category, preloaded, true, context));
+        }
+        let priced = new Map();
+        for (let i = 0; i < formulas.length; i++){
+            if (priced.has(formulas[i])){
+                continue;
+            }
+            let result = await priceBranch(formulas[i], itemId, category, preloaded, false, context);
+            let price = branchPrice(result);
+            if (price == null){
+                console.warn("[TU Market Price Auto Fill] '" + formulas[i] + "' priced nothing for item " + itemId + ".");
+            }
+            priced.set(formulas[i], { result: result, price: price, formula: formulas[i] });
+        }
+        let best = chooseBranch(root, priced);
+        if (best != null){
+            return noteFill(context, setting, root, best.formula, best.result);
+        }
+        // Nothing priced: re-run the first formula the ordinary way, so the row reports the same
+        // error — and gets the same item-market fallback — as a setting with no pipes at all.
+        return noteFill(context, setting, root, formulas[0], await priceBranch(formulas[0], itemId, category, preloaded, true, context));
+    }
+
+    // Remember how the row was priced, so the analytics popup can show the working.
+    function noteFill(context, setting, root, formula, result){
+        let session = context == null ? null : context.session;
+        if (session != null){
+            session.mine = context.mine ?? session.mine;
+            session.category = result.category ?? session.category;
+            session.trace = { setting: setting, root: root, winner: formula, resolved: session.branches.get(formula) ?? null };
+        }
+        return result;
+    }
+
+    // Fetch pricing for an item using the price source its (possibly per-category) formula needs.
+    // The item's category is read from the first response and cached; only the first ever fill of
+    // an item whose category overrides the source costs a second request.
+    // Returns {prices, formula, category} — the category also drives the quantity mode.
+    async function fetchPricingForItem(itemId, context){
+        try {
+            // No per-category overrides of either kind → category is irrelevant; behave like
+            // the default path.
+            if (Object.keys(categoryDeltas).length === 0 && !hasCategoryQuantityOverrides()){
+                return await priceSetting(getEffectiveDelta(null, itemId), itemId, null, null, context);
+            }
+
+            let cached = getCachedCategory(itemId);
+            let expired = cached == null || (Date.now() - cached.ts) > CATEGORY_TTL_MS;
+            let guessCategory = cached != null ? cached.type : null;
+            // Only the first branch decides which endpoint to try first; the rest are priced
+            // once the category is known.
+            let guessFormula = firstBranch(getEffectiveDelta(guessCategory, itemId));
+            // When stale/unknown, force the items endpoint so we definitively re-learn the type even
+            // if the chosen source omits it; otherwise guess from the cache to stay 1 call.
+            // Without a key that refresh can only fail, and failing it would take a bazaar-only
+            // setup down with it — so there we price from the guess and re-learn the type later.
+            let firstSource = (expired && hasUsableApiKey()) ? SOURCE_MARKET_VALUE : sourceOf(guessFormula);
+            let data = await fetchForSource(firstSource, guessFormula, itemId, context == null ? null : context.session);
+            let error = mapApiError(data);
+            if (error != null){
+                return { prices: error, formula: guessFormula, category: guessCategory };
+            }
+            let actualType = readCategoryFromData(data, itemId, firstSource);
+            let category = actualType != null ? actualType : guessCategory;
+            if (actualType != null && (cached == null || cached.type !== actualType || expired)){
+                cacheItemCategory(itemId, actualType);
+            }
+            return await priceSetting(getEffectiveDelta(category, itemId), itemId, category,
+                                { source: firstSource, formula: guessFormula, data: data }, context);
+        } catch (error) {
+            notice(error);
+            // The same shape as every other error, so the row shows "Failed!" rather than NaN.
+            return { prices: {"price": 'Failed!', "amount": 0, "status": error?.status===429?'rate-limited':'error'}, formula: priceDeltaRaw, category: null };
+        }
+    }
+
+    // A bazaar source weav3r cannot answer for this item falls back to Torn's item market rather
+    // than failing the row, so one thin item never stops a Fill All run. The delta, stack size
+    // and "above" limit carry over; which bazaar listing it read cannot.
+    async function withBazaarFallback(prices, formula, source, itemId, category, session){
+        if (prices != null){
+            return { prices: prices, formula: formula, category: category };
+        }
+        console.warn("[TU Market Price Auto Fill] No usable weav3r bazaar price for item " + itemId + "; using the item market.");
+        let fallbackFormula = itemMarketFallbackFormula(formula);
+        if (!hasUsableApiKey()){
+            // A bazaar-only setup was never asked for a key, so there is nothing to fall back
+            // with. Say that instead of spending a call on a guaranteed key error.
+            // Called for its logging and toast; the row needs the short cell label, not the payload.
+            weav3rError(0, "no price for item " + itemId + ", and no API key is set for the item-market fallback");
+            return { prices: {"price": 'No bazaar price!', "amount": 0, "status": 'error'}, formula: fallbackFormula, category: category };
+        }
+        let data = await fetchForSource(SOURCE_ITEM_MARKET, fallbackFormula, itemId, session);
+        let error = mapApiError(data);
+        if (error != null){
+            return { prices: error, formula: fallbackFormula, category: category };
+        }
+        return { prices: parsePrices(data, itemId, SOURCE_ITEM_MARKET, fallbackFormula), formula: fallbackFormula, category: category };
+    }
+
+    function GetPrice(prices, formula){
+        if (prices == null){
+            return 'No prices loaded';
+        }
+        if (prices.amount == 0){
+            return prices.price;
+        }
+        let priceDelta = stripDeltaBracket(formula);
+        // A scalar source ([market], [bazaar:avg]) arrives as one {price, amount} object rather
+        // than a listings array, so the shape decides — not the formula that produced it.
+        if (prices.price !== undefined) {
+            return Math.round(performOperation(prices.price, priceDelta));
+        }
+        if (isMedianFormula(formula)) {
+            return Math.round(performOperation(getMedianPrice(prices), priceDelta));
+        }
+        let slot = listingSlot(formula);
+        return Math.round(performOperation(prices[Math.min(slot, prices.length - 1)].price, priceDelta));
+    }
+
+    async function handleFillClick(event, itemId){
+        let target = event.currentTarget || event.target;
+        // A manual Fill on an excluded item still fills — the exclusion only governs Fill All —
+        // but it says so, so an accidental click on the wrong row is obvious straight away.
+        let itemIdNum = parseInt(itemId, 10);
+        if (!isNaN(itemIdNum) && excluded.has(itemIdNum) && target.getAttribute('data-action-flag') == 'fill'){
+            showToast("Heads up: this item is marked excluded (⊘). Filling it anyway because you clicked Fill.");
+        }
+        await guardedFill(target,itemId,true);
+    }
+
+    function hasCategoryQuantityOverrides(){
+        return Object.keys(categoryQuantities).length > 0;
+    }
+
+    function isMaxQuantityMode(mode){
+        let normalised = String(mode ?? 'max').trim().toLowerCase();
+        return normalised === '' || normalised === 'max';
+    }
+
+    // Only "max-N" needs to know how many of the item you actually own.
+    function needsRowMaximum(mode){
+        return /^max\s*-\s*\d+$/.test(String(mode ?? '').trim().toLowerCase());
+    }
+
+    function isKnownQuantityMode(mode){
+        let normalised = String(mode ?? '').trim().toLowerCase();
+        return isMaxQuantityMode(normalised) || normalised === 'skip' || normalised === 'none' ||
+            /^\d+$/.test(normalised) || needsRowMaximum(normalised);
+    }
+
+    // Resolve a quantity mode against a row's maximum. Returns a positive integer to list, or
+    // null when the row should be left completely untouched ("keep them all").
+    // Accepted syntax: "max", "max-N", a plain number, and "skip"/"none"/"0".
+    function resolveQuantity(maxQuantity, mode){
+        let normalised = String(mode ?? 'max').trim().toLowerCase();
+        let fixed = normalised.match(/^(\d+)$/);
+        let maxMinus = normalised.match(/^max\s*-\s*(\d+)$/);
+        if (normalised === 'skip' || normalised === 'none' || (fixed && parseInt(fixed[1], 10) === 0)){
+            return null;
+        }
+        if (fixed){
+            // A fixed amount doesn't need the row's maximum — Torn clamps anything too large.
+            let wanted = parseInt(fixed[1], 10);
+            return maxQuantity != null ? Math.min(wanted, maxQuantity) : wanted;
+        }
+        if (maxMinus){
+            if (maxQuantity == null){
+                console.warn("[TU Market Price Auto Fill] Row quantity unknown — leaving the row alone rather than risk listing a kept copy.");
+                return null;
+            }
+            let wanted = maxQuantity - parseInt(maxMinus[1], 10);
+            return wanted > 0 ? wanted : null;
+        }
+        if (!isMaxQuantityMode(normalised)){
+            console.warn("[TU Market Price Auto Fill] Unrecognised quantity mode '" + mode + "', using max.");
+        }
+        return maxQuantity;
+    }
+
+    // Same lookup as getEffectiveDelta, for the quantity mode.
+    function getEffectiveQuantity(category, itemId = null){
+        let own = itemOwnQuantity(itemId);
+        if (own != null){
+            return own;
+        }
+        if (category != null){
+            let override = categoryQuantities[String(category).trim().toLowerCase()];
+            if (override != null && String(override).trim() !== ''){
+                return String(override).trim();
+            }
+        }
+        return quantityModeRaw;
+    }
+
+    async function setQuantityInputs(inputs, value){
+        return writeInputs(inputs,value);
+    }
+
+    function nextFrame(){
+        return new Promise(function(resolve){
+            requestAnimationFrame(function(){ requestAnimationFrame(resolve); });
+        });
+    }
+
+    // Torn clamps the amount input to however many of the item you own, so writing an absurd
+    // value and reading it back is the most reliable way to learn the row's maximum. Falls back
+    // to the "xN" count in the row's own text if the clamp doesn't materialise.
+    async function discoverMaxQuantity(inputs,row){
+        const candidates=[...inputs].map(x=>x.getAttribute('max')).concat([row?.getAttribute('data-quantity'),row?.getAttribute('data-available'),row?.textContent?.match(/\bx\s?([\d,]+)/i)?.[1]]);
+        for(const value of candidates){if(value==null||value==='')continue;const n=Number(String(value).replaceAll(',',''));if(Number.isSafeInteger(n)&&n>0)return n;}
+        throw Error('Available quantity is unknown; enter the quantity manually.');
+    }
+
+    async function applyQuantity(target, action, category, isAuto){
+        let parentRow = findParentByCondition(target, (el) => el.matches?.('[class*=info],[data-market-fields]')||el.hasAttribute?.('data-tmf-item-id'));
+        if (parentRow == null){
+            return 'ok';
+        }
+        let host = target.closest('[data-tmf-item-id]');
+        let mode = getEffectiveQuantity(category, host != null ? host.dataset.tmfItemId : null);
+        let quantityInputs = parentRow.querySelectorAll('[class^=amountInputWrapper] .input-money-group > .input-money');
+        if (quantityInputs.length === 0){
+            // Single-copy rows (most clothing) carry a checkbox instead of an amount input,
+            // so their maximum is 1 by definition.
+            let checkbox = parentRow.querySelector('[class^=checkboxWrapper] > [class^=checkboxContainer] [type=checkbox]');
+            if (checkbox == null){
+                return 'ok';
+            }
+            if (action == 'fill'){
+                if (resolveQuantity(1, mode) === null){
+                    reportSkipped(mode, 1, isAuto);
+                    return 'skipped';
+                }
+                if (!checkbox.checked){
+                    checkbox.click();
+                }
+            } else if (checkbox.checked){
+                checkbox.click();
+            }
+            await new Promise(resolve=>window.setTimeout(resolve,160));
+            const accepted=parentRow.querySelector('input[type=checkbox]');
+            if(!accepted?.isConnected||accepted.checked!==(action==='fill'))throw Error('Torn did not accept the item selection. Retry this row.');
+            return 'ok';
+        }
+
+        let hasUserAmount = quantityInputs[0].value.length !== 0 && parseInt(quantityInputs[0].value) >= 1;
+        if (action == 'clear'){
+            await setQuantityInputs(quantityInputs, hasUserAmount ? '' : 0);
+            return 'ok';
+        }
+        if (hasUserAmount){
+            // An amount the user typed themselves wins over any quantity mode.
+            quantityInputs[0].dispatchEvent(new Event("input", {bubbles: true}));
+            return 'ok';
+        }
+        if (isMaxQuantityMode(mode) || !isKnownQuantityMode(mode)){
+            // Unparseable modes fall back to "max" rather than silently listing nothing.
+            if (!isKnownQuantityMode(mode)){
+                console.warn("[TU Market Price Auto Fill] Unrecognised quantity mode '" + mode + "', using max.");
+            }
+            await setQuantityInputs(quantityInputs, await discoverMaxQuantity(quantityInputs,parentRow));
+            return 'ok';
+        }
+        let maxQuantity = null;
+        try{maxQuantity=await discoverMaxQuantity(quantityInputs,parentRow);}catch(error){if(needsRowMaximum(mode))throw error;}
+        let resolved = resolveQuantity(maxQuantity, mode);
+        if (resolved === null){
+            await setQuantityInputs(quantityInputs, '');
+            reportSkipped(mode, maxQuantity, isAuto);
+            return 'skipped';
+        }
+        await setQuantityInputs(quantityInputs, resolved);
+        return 'ok';
+    }
+
+    function reportSkipped(mode, maxQuantity, isAuto){
+        let modeLabel = String(mode ?? 'max').trim();
+        console.info("[TU Market Price Auto Fill] Row left untouched — quantity mode '" + modeLabel +
+                     "' lists nothing out of " + (maxQuantity ?? "an unknown number") + ".");
+        if (!isAuto){
+            showToast("Nothing listed — quantity mode \"" + modeLabel + "\" keeps all " +
+                      (maxQuantity ?? "?") + " of this item.");
+        }
+    }
+
+    // showPopup=false is the auto-fill path: no prices popup, no input changes on
+    // API errors. Returns "ok" | "rate-limited" | "invalid-key" | "error".
+    async function performFill(target, itemId, showPopup,epoch=operationEpoch){
+        let priceInputs = priceFields(target);
+        const popup = showPopup ? document.querySelector('.silmaril-market-filler-popup') : null;
+        if (popup) {
+            recentFilledInput = priceInputs;
+            if (popupOffsetX === 0) {
+                const rect = target.getBoundingClientRect();
+                popupOffsetX = Math.max(10, rect.left - 300);
+                localStorage.setItem("tu:market-fill:popup-offset-x", popupOffsetX);
+            }
+
+            let left = popupOffsetX;
+            let top = popupOffsetY;
+
+            popup.style.display = showPricesPopup ? 'block' : 'none';
+            popup.style.visibility = 'hidden';
+            popup.style.left = `${left}px`;
+            popup.style.top = `${top}px`;
+            popup.querySelector('.silmaril-market-filler-popup-body').innerHTML = LOADING_THE_PRICES;
+
+            const popupRect = popup.getBoundingClientRect();
+            const viewportHeight = window.innerHeight;
+            const viewportWidth = window.innerWidth;
+
+            let clamped = false;
+            if (popupRect.right > viewportWidth) {
+                left = Math.max(0, viewportWidth - popupRect.width - 10);
+                clamped = true;
+            }
+            if (popupRect.left < 0) {
+                left = 10;
+                clamped = true;
+            }
+            if (popupRect.bottom > viewportHeight) {
+                top = Math.max(0, viewportHeight - popupRect.height - 10);
+                clamped = true;
+            }
+            if (popupRect.top < 0) {
+                top = 10;
+                clamped = true;
+            }
+
+            popup.style.left = `${left}px`;
+            popup.style.top = `${top}px`;
+            popup.style.visibility = 'visible';
+
+            if (clamped) {
+                popupOffsetX = left;
+                popupOffsetY = top;
+                localStorage.setItem("tu:market-fill:popup-offset-x", popupOffsetX);
+                localStorage.setItem("tu:market-fill:popup-offset-y", popupOffsetY);
+            }
+        }
+
+        let action = target.getAttribute('data-action-flag');
+        if(action==='clear'){await clearRow(target);return 'ok';}
+        let mine = action == 'fill' && settingsUseMine() ? await readStackForMine(target, itemId) : null;
+        let session = newSession(itemId);
+        let pricing = await fetchPricingForItem(itemId, { mine: mine, session: session });
+        if(epoch!==operationEpoch||!enabled||!runtimeActive||!manager.isAuthorized()||!target.isConnected)throw Error('Fill cancelled or row changed.');
+        let prices = pricing.prices;
+        let status = getPricesStatus(prices);
+
+        if (showPopup) {
+            // A set price read no listings, so there are none to show or click.
+            const breakdown = status === 'ok' && sourceOf(pricing.formula) === SOURCE_FIXED
+                ? money(prices.price) + ' is a set price, so no listings were read.'
+                : GetPricesBreakdown(prices);
+            // Thanks to Rosti [2840742] for the help with the prices popup component
+            showCustomFillPopup(target, breakdown + await marketAgeLine(session, pricing));
+        }
+        if (status === 'unmatched') {
+            // A stack size or "above" limit left no listing to read: leave the row as it is.
+            console.info("[TU Market Price Auto Fill] Item " + itemId + " left untouched: " + prices.why + ".");
+            if (showPopup) {
+                showToast("Price left as it is: " + prices.why + ".");
+            }
+            return 'skipped';
+        }
+        if (status !== 'ok') {
+            // Auto-fill: leave the row untouched so it can be retried or skipped.
+            return status;
+        }
+
+        // Quantity/checkbox handling only exists on the Add Items page. Your Items (view
+        // listings) rows carry a remove-amount input instead — touching it would be wrong,
+        // and the missing containers used to throw and abort the Fill All loop.
+        if (getCurrentPage() == pages.AddItems){
+            let quantityStatus = await applyQuantity(target, action, pricing.category, !showPopup);
+            if (quantityStatus === 'skipped'){
+                // Nothing is being listed, so leave the price (and the button state) alone.
+                return 'skipped';
+            }
+        }
+
+        let price = action == 'fill' ? GetPrice(prices, pricing.formula) : '';
+        if(action==='fill'&&(!Number.isSafeInteger(price)||price<1))throw Error('The formula did not produce a valid positive whole-dollar price.');
+        if(epoch!==operationEpoch)throw Error('Fill cancelled.');
+        await writeInputs(priceFields(target),price);
+        switchActionFlag(target);
+        return status;
+    }
+
+    function settingsUseMine(){
+        return [priceDeltaRaw].concat(Object.values(categoryDeltas), itemOwnPrices()).some(function(setting){
+            return formulaBranches(setting).some(usesMine);
+        });
+    }
+
+    // The stack [mine+] compares against: on Add Items, the amount typed in the row or what the
+    // quantity mode will list; on Your Items, the amount already listed. Null when unreadable.
+    async function readStackForMine(target, itemId){
+        if (getCurrentPage() == pages.AddItems){
+            let parentRow = findParentByCondition(target, (el) => el.matches?.('[class*=info],[data-market-fields]')||el.hasAttribute?.('data-tmf-item-id'));
+            if (parentRow == null){
+                return null;
+            }
+            let quantityInputs = parentRow.querySelectorAll('[class^=amountInputWrapper] .input-money-group > .input-money');
+            if (quantityInputs.length === 0){
+                // Single-copy rows carry a checkbox: there is only ever one to list.
+                return 1;
+            }
+            let typed = parseInt(String(quantityInputs[0].value).replace(/[^\d]/g, ''), 10);
+            if (!isNaN(typed) && typed >= 1){
+                return typed;
+            }
+            let maxQuantity = await discoverMaxQuantity(quantityInputs, parentRow);
+            let cached = getCachedCategory(parseInt(itemId, 10));
+            let listed = resolveQuantity(maxQuantity, getEffectiveQuantity(cached != null ? cached.type : null, itemId));
+            return listed ?? maxQuantity;
+        }
+        let row = findParentByCondition(target, (el) => el.hasAttribute?.('data-tmf-item-id')||el.matches?.('[data-item-id],[data-itemid],[class*=itemRowWrapper],tr,[role=row]'));
+        let match = row == null ? null : String(row.textContent).match(/\bx\s?(\d[\d,]*)/i);
+        let parsed = match == null ? NaN : parseInt(match[1].replace(/,/g, ''), 10);
+        return isNaN(parsed) || parsed < 1 ? null : parsed;
+    }
+
+    function getPricesStatus(prices){
+        if (Array.isArray(prices)){
+            return 'ok';
+        }
+        if (prices != null && typeof prices === 'object'){
+            return prices.amount === 0 ? (prices.status ?? 'error') : 'ok';
+        }
+        return 'error'; // anything unexpected
+    }
+
+    function hideAllFillPopups() {
+        document.querySelector('.silmaril-market-filler-popup').style.display = 'none';
+    }
+
+    // Item-market listings in the popup come from Torn's hourly snapshot, so it says how old
+    // they are. Bazaar listings, a single price and an error message get no line.
+    async function marketAgeLine(session, pricing){
+        if (!Array.isArray(pricing.prices) || sourceOf(pricing.formula) !== SOURCE_ITEM_MARKET){
+            return '';
+        }
+        let snapshot = marketSnapshotTime(await sessionData(session, SOURCE_ITEM_MARKET));
+        return snapshot == null ? '' : '<div class="tu-market-fill-popup-age" title="' + escapeHtml(MARKET_SNAPSHOT_TITLE) + '">Item market as of ' + ago(snapshot) + '</div>';
+    }
+
+    function showCustomFillPopup(targetElem, contentHTML) {
+        const popup = document.querySelector('.silmaril-market-filler-popup');
+        popup.querySelector('.silmaril-market-filler-popup-body').innerHTML = contentHTML;
+        clampPopup(popup);
+        popup.querySelectorAll('.tu-market-fill-popup-price').forEach(row => {
+            row.addEventListener('click', async (e) => {
+                try{await writeInputs(recentFilledInput,parseInt(e.currentTarget.getAttribute('data-price'))-1);}catch(error){notice(error);}
+            });
+        });
+    }
+
+    function clampPopup(popup){
+        const rect=popup.getBoundingClientRect(),left=Math.max(0,Math.min(parseFloat(popup.style.left)||0,Math.max(0,window.innerWidth-rect.width))),top=Math.max(0,Math.min(parseFloat(popup.style.top)||0,Math.max(0,window.innerHeight-rect.height)));
+        popup.style.left=left+'px';popup.style.top=top+'px';popupOffsetX=left;popupOffsetY=top;
+    }
+    function addCustomFillPopup(){
+        const popup=document.createElement('div');popup.className='silmaril-market-filler-popup';popup.style.cssText='display:none;left:'+popupOffsetX+'px;top:'+popupOffsetY+'px';
+        const close=document.createElement('button');close.type='button';close.textContent='×';close.className='silmaril-market-filler-popup-close';close.setAttribute('aria-label','Close market prices');close.onclick=()=>{popup.style.display='none';};
+        const head=document.createElement('b');head.textContent='Market prices';head.className='silmaril-market-filler-popup-draggable';head.style.touchAction='none';
+        const body=document.createElement('div');body.className='silmaril-market-filler-popup-body';popup.append(close,head,body);document.body.append(popup);
+        let drag=null;head.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse'&&e.button!==0)return;drag={id:e.pointerId,x:e.clientX,y:e.clientY,left:parseFloat(popup.style.left)||0,top:parseFloat(popup.style.top)||0};head.setPointerCapture?.(e.pointerId);e.preventDefault();});
+        head.addEventListener('pointermove',e=>{if(drag?.id!==e.pointerId)return;popup.style.left=drag.left+e.clientX-drag.x+'px';popup.style.top=drag.top+e.clientY-drag.y+'px';clampPopup(popup);});
+        const end=e=>{if(drag?.id!==e.pointerId)return;drag=null;localStorage.setItem('tu:market-fill:popup-offset-x',String(popupOffsetX));localStorage.setItem('tu:market-fill:popup-offset-y',String(popupOffsetY));};head.addEventListener('pointerup',end);head.addEventListener('pointercancel',end);
+        window.addEventListener('resize',()=>{if(popup.style.display!=='none')clampPopup(popup);});
+    }
+
+    function getItemIdFromString(string){
+        const match = string.match(/-(\d+)-/);
+        if (match) {
+            const number = match[1];
+            return number;
+        } else {
+            console.error("[TU Market Price Auto Fill] ItemId not found!");
+            return -1;
+        }
+    }
+
+    function getItemIdFromImage(image){
+        let numberPattern = /\/(\d+)\//;
+        let match = image.src.match(numberPattern);
+        if (match) {
+            return parseInt(match[1], 10);
+        } else {
+            console.error("[TU Market Price Auto Fill] ItemId not found!");
+            return -1;
+        }
+    }
+
+    function switchActionFlag(target){
+        switch (target.getAttribute('data-action-flag')){
+            case 'fill':
+                target.setAttribute('data-action-flag', 'clear');
+                break;
+            case 'clear':
+            default:
+                target.setAttribute('data-action-flag', 'fill');
+                break;
+        }
+    }
+
+    function findParentByCondition(element, conditionFn){
+        let currentElement = element;
+        while (currentElement !== null) {
+            if (conditionFn(currentElement)) {
+                return currentElement;
+            }
+            currentElement = currentElement.parentElement;
+        }
+        return null;
+    }
+
+    function loadFavourites(){
+        try {
+            let stored = JSON.parse(localStorage.getItem(favouritesStorageKey) ?? "[]");
+            return new Set(Array.isArray(stored) ? stored : []);
+        } catch (error) {
+            console.warn('[TU Market Price Auto Fill] Operation failed; check configuration.');
+            return new Set();
+        }
+    }
+
+    function saveFavourites(){
+        localStorage.setItem(favouritesStorageKey, JSON.stringify([...favourites]));
+    }
+
+    function loadExcluded(){
+        try {
+            let stored = JSON.parse(localStorage.getItem(excludedStorageKey) ?? "[]");
+            return new Set(Array.isArray(stored) ? stored : []);
+        } catch (error) {
+            console.warn('[TU Market Price Auto Fill] Operation failed; check configuration.');
+            return new Set();
+        }
+    }
+
+    function saveExcluded(){
+        localStorage.setItem(excludedStorageKey, JSON.stringify([...excluded]));
+    }
+
+    function getItemState(itemId){
+        if (excluded.has(itemId)) {
+            return 'excluded';
+        }
+        return favourites.has(itemId) ? 'favourite' : 'neutral';
+    }
+
+    // neutral → favourite → excluded → neutral. The three states are mutually exclusive.
+    function cycleItemState(itemId){
+        switch (getItemState(itemId)) {
+            case 'neutral':
+                favourites.add(itemId);
+                break;
+            case 'favourite':
+                favourites.delete(itemId);
+                excluded.add(itemId);
+                break;
+            default:
+                excluded.delete(itemId);
+                break;
+        }
+        saveFavourites();
+        saveExcluded();
+        let state = getItemState(itemId);
+        document.querySelectorAll('.tmf-fav[data-tmf-item-id="' + itemId + '"]').forEach(function(el){
+            renderFavIcon(el, state);
+        });
+    }
+
+    function renderFavIcon(el, state){
+        el.textContent = state === 'favourite' ? '★' : (state === 'excluded' ? '⊘' : '☆');
+        el.classList.toggle('tmf-fav--on', state === 'favourite');
+        el.classList.toggle('tmf-fav--off', state === 'excluded');
+        el.title = state === 'favourite'
+            ? 'Favourite — filled by Fill All. Click to exclude.'
+            : (state === 'excluded'
+               ? 'Excluded — never filled by Fill All, and a manual Fill warns first. Click to reset.'
+               : 'Click to mark as a favourite (used by Fill All).');
+    }
+
+    function loadFillAllState(){
+        try {
+            let raw = localStorage.getItem(fillAllStateKey);
+            if (!raw) {
+                return null;
+            }
+            let parsed = JSON.parse(raw);
+            if (parsed && typeof parsed.left === 'number' && typeof parsed.top === 'number') {
+                return parsed;
+            }
+        } catch (error) {
+            console.warn('[TU Market Price Auto Fill] Operation failed; check configuration.');
+        }
+        return null;
+    }
+
+    function saveFillAllState(){
+        localStorage.setItem(fillAllStateKey, JSON.stringify(fillAllState));
+    }
+
+    function setBarLeftTop(bar, left, top){
+        bar.style.right = 'auto';
+        bar.style.bottom = 'auto';
+        bar.style.left = left + 'px';
+        bar.style.top = top + 'px';
+    }
+
+    // Clamp the bar's top-left so it stays fully on-screen with a small margin.
+    function clampBarLeftTop(bar, left, top){
+        let maxLeft = Math.max(FILLALL_VIEWPORT_MARGIN_PX, window.innerWidth - bar.offsetWidth - FILLALL_VIEWPORT_MARGIN_PX);
+        let maxTop = Math.max(FILLALL_VIEWPORT_MARGIN_PX, window.innerHeight - bar.offsetHeight - FILLALL_VIEWPORT_MARGIN_PX);
+        return {
+            left: Math.min(Math.max(FILLALL_VIEWPORT_MARGIN_PX, left), maxLeft),
+            top: Math.min(Math.max(FILLALL_VIEWPORT_MARGIN_PX, top), maxTop)
+        };
+    }
+
+    // Nearest viewport edge if the bar is within the snap threshold of it (or past it), else null.
+    function nearestSnapEdge(bar){
+        let r = bar.getBoundingClientRect();
+        let distLeft = r.left;
+        let distRight = window.innerWidth - r.right;
+        let distTop = r.top;
+        let distBottom = window.innerHeight - r.bottom;
+        let min = Math.min(distLeft, distRight, distTop, distBottom);
+        if (min > FILLALL_EDGE_SNAP_PX) {
+            return null;
+        }
+        if (min === distLeft) { return 'left'; }
+        if (min === distRight) { return 'right'; }
+        if (min === distTop) { return 'top'; }
+        return 'bottom';
+    }
+
+    // Push the bar flush against the given edge, keeping its cross-axis position on-screen.
+    function snapBarToEdge(bar, edge){
+        let maxLeft = Math.max(0, window.innerWidth - bar.offsetWidth);
+        let maxTop = Math.max(0, window.innerHeight - bar.offsetHeight);
+        let r = bar.getBoundingClientRect();
+        let left = Math.min(Math.max(0, r.left), maxLeft);
+        let top = Math.min(Math.max(0, r.top), maxTop);
+        switch (edge) {
+            case 'left': left = 0; break;
+            case 'right': left = maxLeft; break;
+            case 'top': top = 0; break;
+            case 'bottom': top = maxTop; break;
+        }
+        setBarLeftTop(bar, left, top);
+    }
+
+    // Re-apply the persisted position/minimised state. Safe to call again on resize.
+    function applyFillAllState(bar){
+        if (fillAllState == null) {
+            return; // never moved — keep the default CSS anchor (bottom-right)
+        }
+        bar.classList.toggle('tmf-fillall-bar--min', !!fillAllState.minimised);
+        if (fillAllState.minimised && fillAllState.edge) {
+            setBarLeftTop(bar, fillAllState.left, fillAllState.top);
+            snapBarToEdge(bar, fillAllState.edge);
+        } else {
+            let clamped = clampBarLeftTop(bar, fillAllState.left, fillAllState.top);
+            setBarLeftTop(bar, clamped.left, clamped.top);
+        }
+    }
+
+    // Restore a minimised bar to its full size near where its handle sits.
+    function expandFillAllBar(bar){
+        bar.classList.remove('tmf-fillall-bar--min');
+        let r = bar.getBoundingClientRect();
+        let clamped = clampBarLeftTop(bar, r.left, r.top);
+        setBarLeftTop(bar, clamped.left, clamped.top);
+        fillAllState = { left: clamped.left, top: clamped.top, minimised: false, edge: null };
+        saveFillAllState();
+    }
+
+    // End of a drag gesture: snap + minimise when dropped near an edge, otherwise stay expanded.
+    function finishFillAllDrag(bar){
+        bar.classList.remove('tmf-fillall-bar--dragging');
+        let edge = nearestSnapEdge(bar);
+        if (edge) {
+            bar.classList.add('tmf-fillall-bar--min'); // changes size before we measure/snap
+            snapBarToEdge(bar, edge);
+            let r = bar.getBoundingClientRect();
+            fillAllState = { left: r.left, top: r.top, minimised: true, edge: edge };
+        } else {
+            bar.classList.remove('tmf-fillall-bar--min');
+            let r = bar.getBoundingClientRect();
+            let clamped = clampBarLeftTop(bar, r.left, r.top);
+            setBarLeftTop(bar, clamped.left, clamped.top);
+            fillAllState = { left: clamped.left, top: clamped.top, minimised: false, edge: null };
+        }
+        saveFillAllState();
+    }
+
+    // Whole-bar drag with click/drag disambiguation: a clean tap still triggers the button
+    // it landed on (or expands a minimised bar), while a drag moves the bar and suppresses the
+    // trailing click.
+    function attachFillAllDrag(bar){
+        let startX = 0, startY = 0, baseLeft = 0, baseTop = 0;
+        let candidate = false, dragging = false, suppressClick = false;
+
+        function begin(clientX, clientY){
+            candidate = true;
+            dragging = false;
+            let r = bar.getBoundingClientRect();
+            baseLeft = r.left;
+            baseTop = r.top;
+            startX = clientX;
+            startY = clientY;
+        }
+        function move(clientX, clientY){
+            if (!candidate) {
+                return;
+            }
+            let dx = clientX - startX, dy = clientY - startY;
+            if (!dragging) {
+                if (Math.abs(dx) + Math.abs(dy) < FILLALL_DRAG_THRESHOLD_PX) {
+                    return;
+                }
+                dragging = true;
+                bar.classList.add('tmf-fillall-bar--dragging');
+            }
+            setBarLeftTop(bar, baseLeft + dx, baseTop + dy);
+        }
+        function end(){
+            if (!candidate) {
+                return;
+            }
+            candidate = false;
+            if (dragging) {
+                dragging = false;
+                suppressClick = true;
+                finishFillAllDrag(bar);
+            } else if (bar.classList.contains('tmf-fillall-bar--min')) {
+                expandFillAllBar(bar);
+            }
+        }
+
+        bar.addEventListener('mousedown', function(e){ begin(e.clientX, e.clientY); });
+        document.addEventListener('mousemove', function(e){ if (candidate) { move(e.clientX, e.clientY); } });
+        document.addEventListener('mouseup', end);
+
+        bar.addEventListener('touchstart', function(e){ let t = e.touches[0]; begin(t.clientX, t.clientY); }, { passive: true });
+        document.addEventListener('touchmove', function(e){
+            if (!candidate) {
+                return;
+            }
+            let t = e.touches[0];
+            move(t.clientX, t.clientY);
+            if (dragging) {
+                e.preventDefault(); // stop the page scrolling while dragging
+            }
+        }, { passive: false });
+        document.addEventListener('touchend', end);
+        document.addEventListener('touchcancel', end);
+
+        // Capture-phase on the bar itself: runs before any child's own click handler, so the
+        // click that follows a drag never reaches Fill All or the settings cog. Listening on the
+        // bar (rather than each button) also clears the flag when a drag ends on the grip.
+        bar.addEventListener('click', function(e){
+            if (suppressClick) {
+                suppressClick = false;
+                e.stopImmediatePropagation();
+                e.preventDefault();
+            }
+        }, true);
+    }
+
+    function ensureFillAllUI(){
+        let bar = document.querySelector(".tmf-fillall-bar");
+        if (bar == null) {
+            bar = document.createElement('div');
+            bar.className = 'tmf-fillall-bar';
+            const grip = document.createElement('span');
+            grip.className = 'tmf-fillall-grip';
+            grip.textContent = '⠿';
+            grip.title = 'Drag to move; drop near an edge to minimise';
+            // Second way into the settings, next to the always-visible Fill All button —
+            // the press-and-hold on a row's fill button remains available too.
+            const cog = document.createElement('span');
+            cog.className = 'tmf-fillall-cog';
+            cog.textContent = '⚙';
+            cog.title = 'Open Market Filler settings';
+            const btn = document.createElement('input');
+            btn.type = 'button';
+            btn.className = 'torn-btn tmf-fillall-btn';
+            const dot = document.createElement('span');
+            dot.className = 'tmf-autofill-dot';
+            bar.append(grip, cog, btn, dot);
+            cog.addEventListener('click', function(event){
+                event.stopPropagation();
+                openSettingsModal();
+            });
+            btn.addEventListener('click', function(event){
+                event.stopPropagation();
+                if (autoFillActive) {
+                    stopAutoFill();
+                } else {
+                    startAutoFill();
+                }
+            });
+            document.body.appendChild(bar);
+            attachFillAllDrag(bar);
+            applyFillAllState(bar);
+        }
+        if (document.querySelector(".tmf-viewport-border") == null) {
+            const border = document.createElement('div');
+            border.className = 'tmf-viewport-border';
+            document.body.appendChild(border);
+        }
+        applyChatRelativeZIndex();
+        updateAutoFillUI();
+    }
+
+    // Torn's chat is a body-level overlay anchored bottom-right. Read its z-index and
+    // drop our floating UI just below it so an open chat window is never overshadowed.
+    function detectChatZIndex(){
+        let el = document.querySelector("#chatRoot");
+        while (el && el !== document.body) {
+            let z = parseInt(window.getComputedStyle(el).zIndex, 10);
+            if (!isNaN(z)) {
+                return z;
+            }
+            el = el.parentElement;
+        }
+        return null;
+    }
+
+    function applyChatRelativeZIndex(){
+        let bar = document.querySelector(".tmf-fillall-bar");
+        if (bar == null) {
+            return;
+        }
+        if (chatRelativeZBase == null) {
+            let chatZ = detectChatZIndex();
+            if (chatZ == null) {
+                // Chat may not have mounted yet; retry shortly without blocking.
+                setTimeout(applyChatRelativeZIndex, 1500);
+                return;
+            }
+            chatRelativeZBase = Math.max(chatZ - 1, 1);
+        }
+        bar.style.zIndex = chatRelativeZBase;
+        let border = document.querySelector(".tmf-viewport-border");
+        if (border != null) {
+            border.style.zIndex = Math.max(chatRelativeZBase - 1, 1);
+        }
+        let toast = document.querySelector(".tmf-toast");
+        if (toast != null) {
+            toast.style.zIndex = chatRelativeZBase;
+        }
+    }
+
+    function updateAutoFillUI(){
+        let bar = document.querySelector(".tmf-fillall-bar");
+        if (bar != null) {
+            bar.querySelector(".tmf-fillall-btn").value = autoFillActive ? "Stop fill" : "Fill All ★";
+            bar.classList.toggle("tmf-fillall-bar--active", autoFillActive);
+        }
+        let border = document.querySelector(".tmf-viewport-border");
+        if (border != null) {
+            border.classList.toggle("tmf-viewport-border--active", autoFillActive);
+        }
+    }
+
+    function showToast(message){
+        let toast = document.querySelector('.tmf-toast');
+        if (toast == null){
+            toast = document.createElement('div');
+            toast.className = 'tmf-toast';
+            document.body.appendChild(toast);
+            if (chatRelativeZBase != null) {
+                toast.style.zIndex = chatRelativeZBase;
+            }
+        }
+        toast.textContent = message;
+        toast.classList.add('tmf-toast--visible');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function(){
+            toast.classList.remove('tmf-toast--visible');
+        }, 4000);
+    }
+
+    function startAutoFill(){
+        if (favourites.size === 0){
+            showToast('No favourites set yet — tap the ☆ star next to an item first, then use Fill All.');
+            return;
+        }
+        checkApiKey();
+        autoFillActive = true;
+        autoFillQueue = [];
+        autoFillQueuedIds = new Set();
+        autoFillDoneIds = new Set();
+        updateAutoFillUI();
+        enqueueVisibleFavourites();
+        runAutoFillLoop();
+    }
+
+    function stopAutoFill(){
+        autoFillActive = false;
+        autoFillQueue = [];
+        autoFillQueuedIds.clear();
+        updateAutoFillUI();
+    }
+
+    function enqueueVisibleFavourites(){
+        document.querySelectorAll(".silmaril-market-filler-processed[data-tmf-item-id]").forEach(enqueueFavouriteRow);
+    }
+
+    function enqueueFavouriteRow(wrapper){
+        if (!autoFillActive) {
+            return;
+        }
+        let itemId = parseInt(wrapper.dataset.tmfItemId, 10);
+        if (!favourites.has(itemId) || excluded.has(itemId) || autoFillDoneIds.has(itemId) || autoFillQueuedIds.has(itemId)) {
+            return;
+        }
+        autoFillQueuedIds.add(itemId);
+        autoFillQueue.push(wrapper);
+        runAutoFillLoop();
+    }
+
+    async function runAutoFillLoop(){
+        if (autoFillLoopRunning) {
+            return;
+        }
+        autoFillLoopRunning = true;
+        try {
+            while (autoFillActive && autoFillQueue.length > 0) {
+                let wrapper = autoFillQueue.shift();
+                let itemId = parseInt(wrapper.dataset.tmfItemId, 10);
+                if (!wrapper.isConnected || !favourites.has(itemId) || excluded.has(itemId)) {
+                    // Row unmounted or unfavourited meanwhile; the observer re-queues it
+                    // if it shows up again.
+                    autoFillQueuedIds.delete(itemId);
+                    continue;
+                }
+                let fillBtn = wrapper.querySelector(".silmaril-market-filler-button");
+                if (fillBtn == null || fillBtn.getAttribute('data-action-flag') !== 'fill') {
+                    // Already filled (button is in "clear" state) — count as done.
+                    autoFillQueuedIds.delete(itemId);
+                    autoFillDoneIds.add(itemId);
+                    continue;
+                }
+                let status;
+                try {
+                    status = await guardedFill(fillBtn, itemId, false);
+                } catch (error) {
+                    // A single row with unexpected DOM must not abort the whole run.
+                    console.warn('[TU Market Price Auto Fill] Operation failed; check configuration.');
+                    status = "error";
+                }
+                if (status === "rate-limited") {
+                    autoFillQueue.unshift(wrapper); // retry the same row after the pause
+                    await sleep(randomBetween(RATE_LIMIT_PAUSE_MIN_MS, RATE_LIMIT_PAUSE_MAX_MS));
+                    continue;
+                }
+                if (status === "invalid-key") {
+                    console.error("[TU Market Price Auto Fill] Stopping Fill All: API key is invalid.");
+                    stopAutoFill();
+                    break;
+                }
+                autoFillQueuedIds.delete(itemId);
+                autoFillDoneIds.add(itemId);
+                if (status !== "ok" && status !== "skipped") {
+                    console.warn("[TU Market Price Auto Fill] Fill All skipped item " + itemId + " after error.");
+                }
+                await sleep(randomBetween(FILL_COOLDOWN_MIN_MS, FILL_COOLDOWN_MAX_MS));
+            }
+        } finally {
+            autoFillLoopRunning = false;
+        }
+        // Rows enqueued while the loop was winding down (e.g. during the last cooldown)
+        if (autoFillActive && autoFillQueue.length > 0) {
+            runAutoFillLoop();
+        }
+    }
+
+    function sleep(ms){
+        return new Promise(function(resolve){ setTimeout(resolve, ms); });
+    }
+
+    function randomBetween(min, max){
+        return min + Math.random() * (max - min);
+    }
+
+    function loadCategoryDeltas(){
+        try {
+            let parsed = JSON.parse(localStorage.getItem(categoryDeltasKey) ?? "{}");
+            return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+        } catch (error) {
+            console.warn('[TU Market Price Auto Fill] Operation failed; check configuration.');
+            return {};
+        }
+    }
+
+    function saveCategoryDeltas(){
+        localStorage.setItem(categoryDeltasKey, JSON.stringify(categoryDeltas));
+    }
+
+    function loadCategoryQuantities(){
+        try {
+            let parsed = JSON.parse(localStorage.getItem(categoryQuantitiesKey) ?? "{}");
+            return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+        } catch (error) {
+            console.warn('[TU Market Price Auto Fill] Operation failed; check configuration.');
+            return {};
+        }
+    }
+
+    function saveCategoryQuantities(){
+        localStorage.setItem(categoryQuantitiesKey, JSON.stringify(categoryQuantities));
+    }
+
+    function loadItemCategoryCache(){
+        try {
+            let parsed = JSON.parse(localStorage.getItem(itemCategoryCacheKey) ?? "{}");
+            return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+        } catch (error) {
+            return {};
+        }
+    }
+
+    // Returns the cached {type, ts} for an item, normalising legacy bare-string entries
+    // (which predate timestamps) to an immediately-stale ts so they get re-verified.
+    function getCachedCategory(itemId){
+        let entry = itemCategoryCache[itemId];
+        if (entry == null){
+            return null;
+        }
+        if (typeof entry === 'string'){
+            return { type: entry, ts: 0 };
+        }
+        if (typeof entry === 'object' && typeof entry.type === 'string'){
+            return { type: entry.type, ts: typeof entry.ts === 'number' ? entry.ts : 0 };
+        }
+        return null;
+    }
+
+    function cacheItemCategory(itemId, type){
+        itemCategoryCache[itemId] = { type: type, ts: Date.now() };
+        try {
+            localStorage.setItem(itemCategoryCacheKey, JSON.stringify(itemCategoryCache));
+        } catch (error) {
+            // Ignore storage quota errors; the in-memory cache still helps this session.
+        }
+    }
+
+    function clearItemCategoryCache(){
+        itemCategoryCache = {};
+        try {
+            localStorage.removeItem(itemCategoryCacheKey);
+        } catch (error) {
+            // Ignore storage errors; the in-memory cache is cleared regardless.
+        }
+    }
+
+    // ---- Item analytics popup -------------------------------------------------------------
+    // One floating panel, reused for every row. Overview: your price against market value and the
+    // cheapest of each source, how many units sit ahead of you, and listings by stack size.
+    // Listings: every item-market and bazaar listing on one price ladder with you slotted in,
+    // filtered to one source if you like, with what each sale keeps after the item-market fee.
+    // Both tabs open with "Where to sell": which place leaves you more for the same undercut.
+    // Formula: the setting worked out branch by branch. Opened right after a fill it reads what
+    // the fill read; opened cold it prices the row the same way without touching the inputs.
+    // The 5-cheapest prices popup that opens on Fill is a separate thing and stays as it is.
+
+    const ANALYTICS_ICON = '<svg viewBox="0 0 14 12" aria-hidden="true"><rect x="0" y="7" width="3.6" height="5" rx=".6"/><rect x="5.2" y="3.5" width="3.6" height="8.5" rx=".6"/><rect x="10.4" y="0" width="3.6" height="12" rx=".6"/></svg>';
+    const analyticsPosKey = "tu:market-fill:analytics-pos";
+    const analyticsFilterKey = "tu:market-fill:analytics-filter";
+    const analyticsOrderKey = "tu:market-fill:analytics-order";
+    const ANALYTICS_LADDER_ROWS = 12;
+    const STACK_BANDS = [[1, 9, '1–9'], [10, 99, '10–99'], [100, 999, '100–999'], [1000, Infinity, '1,000+']];
+    // The item market takes its fee off every sale and a bazaar takes nothing, so an item-market
+    // price only compares with a bazaar price once the fee is off. This script sells on the market.
+    const ANALYTICS_SOLD_ON = 'm';
+    let analyticsRow = null;       // the row the panel was opened from
+    let analyticsSession = null;   // the reads it is showing
+    let analyticsTab = 'overview';
+    let analyticsOpenSeq = 0;      // bumps on every open, so a slow read for an earlier row is dropped
+    // The Listings tab's source filter ('all', 'm', 'b') and ladder order ('keep', 'listed').
+    let analyticsFilter = ['all', 'm', 'b'].indexOf(localStorage.getItem(analyticsFilterKey)) !== -1 ? localStorage.getItem(analyticsFilterKey) : 'all';
+    let analyticsOrder = localStorage.getItem(analyticsOrderKey) === 'listed' ? 'listed' : 'keep';
+
+    // What a sale at this price leaves the seller: the item market takes its fee, a bazaar nothing.
+    function keptAfterSale(price, src){
+        return src === 'm' ? Math.round(price * marketTaxFactor) : price;
+    }
+
+    function feePercent(){
+        return Math.round((1 - marketTaxFactor) * 100);
+    }
+
+    function money(value){
+        return '$' + Math.round(value).toLocaleString('en-US');
+    }
+
+    function count(value){
+        return Math.round(value).toLocaleString('en-US');
+    }
+
+    function signedPercent(value, base){
+        if (!(base > 0)){
+            return '';
+        }
+        let percent = (value / base - 1) * 100;
+        return (percent >= 0 ? '+' : '−') + Math.abs(percent).toFixed(1) + '%';
+    }
+
+    function ordinal(n){
+        let suffixes = ['th', 'st', 'nd', 'rd'];
+        let v = n % 100;
+        return n + (suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0]);
+    }
+
+    // Since 2026-11-10 Torn serves item-market listings from a snapshot it refreshes about once
+    // an hour, and stamps the response with when it was taken. Milliseconds, or null without one.
+    function marketSnapshotTime(data){
+        let ts = data != null && data.itemmarket != null ? Number(data.itemmarket.cache_timestamp) : NaN;
+        return Number.isFinite(ts) && ts > 0 ? ts * 1000 : null;
+    }
+
+    const MARKET_SNAPSHOT_TITLE = 'Torn refreshes item-market listings about once an hour, so some of these may have sold since and newer ones may be missing.';
+
+    function ago(ts){
+        let seconds = Math.max(0, Math.round((Date.now() - ts) / 1000));
+        if (seconds < 5){
+            return 'just now';
+        }
+        if (seconds < 60){
+            return seconds + ' s ago';
+        }
+        let minutes = Math.round(seconds / 60);
+        return minutes < 60 ? minutes + ' min ago' : Math.round(minutes / 60) + ' h ago';
+    }
+
+    function capitalise(text){
+        return text.charAt(0).toUpperCase() + text.slice(1);
+    }
+
+    function describeError(data){
+        return data != null && data.error != null ? String(data.error.error ?? data.error) : 'no data';
+    }
+
+    function closestMatch(eventTarget, selector){
+        return eventTarget instanceof Element ? eventTarget.closest(selector) : null;
+    }
+
+    function ensureAnalyticsPanel(){
+        let panel = document.querySelector('.tmf-ana');
+        if (panel != null){
+            return panel;
+        }
+        panel = document.createElement('div');
+        panel.className = 'tmf-ana';
+        panel.innerHTML =
+            '<div class="tmf-ana-head">' +
+                '<img class="tmf-ana-img" alt="">' +
+                '<div class="tmf-ana-title"><b class="tmf-ana-name"></b><small class="tmf-ana-sub"></small></div>' +
+                '<span class="tmf-ana-hb tmf-ana-refresh" title="Read everything again">&#8635;</span>' +
+                '<span class="tmf-ana-hb tmf-ana-close" title="Close">&times;</span>' +
+            '</div>' +
+            '<div class="tmf-ana-tabs">' +
+                '<span class="tmf-ana-tab" data-tab="overview">Overview</span>' +
+                '<span class="tmf-ana-tab" data-tab="listings">Listings</span>' +
+                '<span class="tmf-ana-tab" data-tab="formula">Formula</span>' +
+            '</div>' +
+            '<div class="tmf-ana-body"></div>' +
+            '<div class="tmf-ana-foot"></div>';
+        document.body.appendChild(panel);
+        panel.querySelector('.tmf-ana-close').addEventListener('click', closeAnalytics);
+        panel.querySelector('.tmf-ana-refresh').addEventListener('click', function(){
+            if (analyticsRow != null){
+                forgetSession(analyticsRow.itemId);
+                openAnalytics(analyticsRow);
+            }
+        });
+        panel.querySelectorAll('.tmf-ana-tab').forEach(function(tab){
+            tab.addEventListener('click', function(){
+                analyticsTab = tab.dataset.tab;
+                renderAnalytics();
+            });
+        });
+        // The body is rebuilt on every tab change, so its clicks are handled here, once.
+        panel.querySelector('.tmf-ana-body').addEventListener('click', function(event){
+            let option = closestMatch(event.target, '.tmf-ana-opt');
+            if (option != null && panel.contains(option)){
+                if (option.dataset.anaFilter != null){
+                    analyticsFilter = option.dataset.anaFilter;
+                    localStorage.setItem(analyticsFilterKey, analyticsFilter);
+                } else if (option.dataset.anaOrder != null){
+                    analyticsOrder = option.dataset.anaOrder;
+                    localStorage.setItem(analyticsOrderKey, analyticsOrder);
+                }
+                renderAnalytics();
+                return;
+            }
+            let listing = closestMatch(event.target, '.tmf-ana-lr[data-price]');
+            if (listing != null && panel.contains(listing)){
+                applyAnalyticsPrice(parseInt(listing.dataset.price, 10) - 1, false);
+                return;
+            }
+            if (closestMatch(event.target, '.tmf-ana-showall') != null){
+                panel.classList.add('tmf-ana--all');
+                return;
+            }
+            let tabLink = closestMatch(event.target, '[data-goto]');
+            if (tabLink != null){
+                analyticsTab = tabLink.dataset.goto;
+                renderAnalytics();
+            }
+        });
+        panel.querySelector('.tmf-ana-foot').addEventListener('click', function(event){
+            if (closestMatch(event.target, '.tmf-ana-settings') != null){
+                openSettingsModal();
+                return;
+            }
+            let apply = closestMatch(event.target, '.tmf-ana-apply');
+            if (apply != null){
+                let price = parseInt(apply.dataset.price, 10);
+                if (!isNaN(price)){
+                    applyAnalyticsPrice(price, true);
+                }
+            }
+        });
+        attachAnalyticsDrag(panel);
+        return panel;
+    }
+
+    function loadAnalyticsPosition(){
+        try {
+            let parsed = JSON.parse(localStorage.getItem(analyticsPosKey) ?? 'null');
+            return parsed != null && typeof parsed.left === 'number' && typeof parsed.top === 'number' ? parsed : null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    // On a phone the panel is a bottom sheet and the stylesheet places it; elsewhere it opens
+    // where it was last dropped, or centred near the top the first time.
+    function applyAnalyticsPosition(panel){
+        if (isMobileView){
+            return;
+        }
+        let saved = loadAnalyticsPosition();
+        let left = saved != null ? saved.left : Math.max(8, (window.innerWidth - panel.offsetWidth) / 2);
+        let top = saved != null ? saved.top : 60;
+        setAnalyticsPosition(panel, left, top);
+    }
+
+    // Kept on screen: the header at least stays reachable however the window was resized.
+    function setAnalyticsPosition(panel, left, top){
+        let maxLeft = Math.max(0, window.innerWidth - panel.offsetWidth - 4);
+        let maxTop = Math.max(0, window.innerHeight - 60);
+        panel.style.left = Math.round(Math.min(Math.max(0, left), maxLeft)) + 'px';
+        panel.style.top = Math.round(Math.min(Math.max(0, top), maxTop)) + 'px';
+    }
+
+    function attachAnalyticsDrag(panel){
+        let head = panel.querySelector('.tmf-ana-head');
+        let dragging = null;
+        const start = function(event){
+            if (isMobileView || closestMatch(event.target, '.tmf-ana-hb') != null){
+                return;
+            }
+            let point = event.touches ? event.touches[0] : event;
+            dragging = { dx: point.clientX - panel.offsetLeft, dy: point.clientY - panel.offsetTop };
+            if (!event.touches){
+                event.preventDefault();
+            }
+        };
+        const move = function(event){
+            if (dragging == null){
+                return;
+            }
+            let point = event.touches ? event.touches[0] : event;
+            setAnalyticsPosition(panel, point.clientX - dragging.dx, point.clientY - dragging.dy);
+            if (event.cancelable){
+                event.preventDefault();
+            }
+        };
+        const end = function(){
+            if (dragging == null){
+                return;
+            }
+            dragging = null;
+            localStorage.setItem(analyticsPosKey, JSON.stringify({ left: panel.offsetLeft, top: panel.offsetTop }));
+        };
+        head.addEventListener('mousedown', start);
+        head.addEventListener('touchstart', start, { passive: true });
+        document.addEventListener('mousemove', move);
+        document.addEventListener('touchmove', move, { passive: false });
+        document.addEventListener('mouseup', end);
+        document.addEventListener('touchend', end);
+    }
+
+    function closeAnalytics(){
+        let panel = document.querySelector('.tmf-ana');
+        if (panel != null){
+            panel.classList.remove('tmf-ana--open');
+        }
+        analyticsRow = null;
+        analyticsSession = null;
+    }
+
+    // `row` is {itemId, host, target, pageType}: the row wrapper, the Fill square inside its price
+    // box (what every row lookup in this script hangs off), and which tab the row is on.
+    async function openAnalytics(row){
+        let panel = ensureAnalyticsPanel();
+        let seq = ++analyticsOpenSeq;
+        analyticsRow = row;
+        analyticsSession = recentSession(row.itemId);
+        analyticsTab = analyticsSession != null && analyticsSession.settled ? analyticsTab : 'overview';
+        panel.classList.add('tmf-ana--open');
+        panel.classList.remove('tmf-ana--all');
+        if (chatRelativeZBase != null){
+            panel.style.zIndex = chatRelativeZBase;
+        }
+        applyAnalyticsPosition(panel);
+        renderAnalytics();
+        checkApiKey();
+        let session = analyticsSession ?? newSession(row.itemId);
+        analyticsSession = session;
+        try {
+            session.failure = null;
+            if (session.mine == null){
+                // The stack you are listing: what you typed, else what the quantity mode would
+                // list. A fill only reads it when its setting needs it, so it is read here.
+                session.mine = await readStackForMine(row.target, row.itemId);
+            }
+            if (session.trace == null){
+                // A cold open prices the row exactly as Fill would, inputs untouched.
+                let pricing = await fetchPricingForItem(row.itemId, { mine: session.mine, session: session });
+                session.category = session.category ?? pricing.category;
+                if (session.trace == null && getPricesStatus(pricing.prices) !== 'ok'){
+                    // The first read failed before the setting was ever applied.
+                    session.failure = String(pricing.prices.price);
+                }
+            }
+            await readAllSources(session);
+        } catch (error) {
+            console.warn('[TU Market Price Auto Fill] Operation failed; check configuration.');
+            session.failure = error == null ? 'unknown error' : (error.message ?? String(error));
+        }
+        session.settled = true;
+        if (seq === analyticsOpenSeq){
+            renderAnalytics();
+        }
+    }
+
+    function rowImage(row){
+        return row.host.querySelector('[class*=viewInfoButton] img') ?? row.host.querySelector('img[src*="/items/"]');
+    }
+
+    // The item's name as the row shows it, with any "x567" count taken off the end.
+    function rowName(row){
+        let nameNode = row.host.querySelector('[class*="name"], [class*="title"]');
+        return nameNode == null ? '' : String(nameNode.textContent).replace(/\s*x\s?\d[\d,]*\s*$/i, '').trim();
+    }
+
+    // Whatever the setting reads, the popup shows both sources and the market value, so what the
+    // fill did not fetch is fetched now. Each read fails on its own without taking the others.
+    async function readAllSources(session){
+        let wanted = [[SOURCE_BAZAAR, '-1[bazaar]']];
+        if (hasUsableApiKey()){
+            wanted.push([SOURCE_ITEM_MARKET, '-1'], [SOURCE_MARKET_VALUE, '[market]']);
+        }
+        await Promise.all(wanted.map(function(pair){
+            return fetchForSource(pair[0], pair[1], session.itemId, session).catch(function(){ return null; });
+        }));
+    }
+
+    async function sessionData(session, key){
+        let pending = session.reads.get(key);
+        if (pending == null){
+            return null;
+        }
+        try {
+            return await pending;
+        } catch (error) {
+            return { error: { code: -1, error: error == null ? 'failed' : (error.message ?? String(error)) } };
+        }
+    }
+
+    // Everything the tabs draw from, in one shape: each source is either {listings…} or {error}.
+    async function analyticsModel(session, row){
+        let model = { itemId: row.itemId, name: null, type: session.category, mine: session.mine, you: null, market: null, value: null, bazaar: null, readAt: session.ts };
+        let marketData = await sessionData(session, SOURCE_ITEM_MARKET);
+        if (marketData != null){
+            if (marketData.error != null || marketData.itemmarket == null){
+                model.market = { error: describeError(marketData) };
+            } else {
+                let listings = (marketData.itemmarket.listings ?? []).map(function(listing){
+                    return { price: Number(listing.price), amount: Number(listing.amount ?? 1) };
+                }).filter(function(listing){
+                    return Number.isFinite(listing.price) && Number.isFinite(listing.amount);
+                }).sort(function(a, b){ return a.price - b.price; });
+                model.market = { listings: listings, snapshot: marketSnapshotTime(marketData) };
+                let item = marketData.itemmarket.item ?? {};
+                model.name = model.name ?? item.name ?? null;
+                model.type = model.type ?? item.type ?? null;
+            }
+        } else if (!hasUsableApiKey()){
+            model.market = { error: 'needs a Torn API key (Settings)' };
+        }
+        let itemsData = await sessionData(session, SOURCE_MARKET_VALUE);
+        if (itemsData != null){
+            let item = itemsData.error == null && itemsData.items != null ? itemsData.items[row.itemId] : null;
+            if (item == null){
+                model.value = { error: describeError(itemsData) };
+            } else {
+                model.value = { value: Number(item.market_value) };
+                model.name = item.name ?? model.name;
+                model.type = item.type ?? model.type;
+            }
+        } else if (!hasUsableApiKey()){
+            model.value = { error: 'needs a Torn API key' };
+        }
+        let bazaarData = await sessionData(session, SOURCE_BAZAAR);
+        if (bazaarData != null){
+            if (bazaarData.error != null){
+                model.bazaar = { error: describeError(bazaarData) };
+            } else {
+                let listings = normaliseBazaarListings(bazaarData).sort(function(a, b){ return a.price - b.price; });
+                let checked = (bazaarData.listings ?? []).map(function(listing){ return Number(listing.last_checked ?? 0); })
+                    .filter(function(ts){ return Number.isFinite(ts) && ts > 0; });
+                let average = Number(bazaarData.bazaar_average);
+                model.bazaar = {
+                    listings: listings,
+                    average: bazaarData.bazaar_average != null && Number.isFinite(average) ? average : null,
+                    ignored: (bazaarData.listings ?? []).length - listings.length,
+                    checked: checked.length > 0 ? Math.max.apply(null, checked) * 1000 : null
+                };
+                model.name = model.name ?? (typeof bazaarData.name === 'string' ? bazaarData.name : null);
+            }
+        }
+        let trace = session.trace;
+        if (trace != null && trace.resolved != null && typeof trace.resolved.price === 'number' && isFinite(trace.resolved.price)){
+            model.you = trace.resolved.price;
+        }
+        return model;
+    }
+
+    async function renderAnalytics(){
+        let panel = document.querySelector('.tmf-ana');
+        let row = analyticsRow;
+        let session = analyticsSession;
+        if (panel == null || row == null){
+            return;
+        }
+        let model = session == null ? null : await analyticsModel(session, row);
+        if (row !== analyticsRow || session !== analyticsSession){
+            return;
+        }
+        let image = rowImage(row);
+        panel.querySelector('.tmf-ana-img').src = image != null ? image.src : '';
+        panel.querySelector('.tmf-ana-name').textContent = (model != null && model.name) || rowName(row) || ('Item #' + row.itemId);
+        let sub = [];
+        if (model != null && model.type){
+            sub.push(model.type);
+        }
+        if (model != null && model.mine != null){
+            sub.push((row.pageType === pages.ViewItems ? 'listed ' : 'listing ') + count(model.mine));
+        }
+        panel.querySelector('.tmf-ana-sub').textContent = sub.join(' · ');
+        panel.querySelectorAll('.tmf-ana-tab').forEach(function(tab){
+            tab.classList.toggle('tmf-ana-tab--on', tab.dataset.tab === analyticsTab);
+        });
+        let body = panel.querySelector('.tmf-ana-body');
+        let foot = panel.querySelector('.tmf-ana-foot');
+        if (model == null || !session.settled){
+            body.innerHTML = renderSkeleton();
+            foot.innerHTML = '';
+            return;
+        }
+        if (analyticsTab === 'listings'){
+            body.innerHTML = renderListings(model, session);
+        } else if (analyticsTab === 'formula'){
+            body.innerHTML = renderFormula(model, session);
+        } else {
+            body.innerHTML = renderOverview(model, session);
+        }
+        foot.innerHTML = renderFoot(model, row);
+    }
+
+    function renderSkeleton(){
+        let tile = '<div class="tmf-ana-kpi"><span class="tmf-ana-skel" style="width:40%"></span><br><span class="tmf-ana-skel" style="width:70%;height:14px"></span><br><span class="tmf-ana-skel" style="width:60%"></span></div>';
+        let line = '<div class="tmf-ana-lr"><span class="tmf-ana-skel" style="width:16px;height:16px;border-radius:50%"></span><span class="tmf-ana-skel" style="width:30%"></span><span class="tmf-ana-skel" style="width:15%"></span></div>';
+        return '<div class="tmf-ana-kpis">' + tile.repeat(4) + '</div>' +
+            '<div class="tmf-ana-muted">Reading the item market, the market value and the bazaars…</div>' +
+            '<div class="tmf-ana-lad">' + line.repeat(6) + '</div>';
+    }
+
+    function renderAlert(html){
+        return '<div class="tmf-ana-alert">' + html + '</div>';
+    }
+
+    function renderKpi(label, value, detail, title){
+        return '<div class="tmf-ana-kpi"' + (title ? ' title="' + escapeHtml(title) + '"' : '') + '><div class="l">' + escapeHtml(label) + '</div><div class="v">' + escapeHtml(value) + '</div><div class="d">' + detail + '</div></div>';
+    }
+
+    // `filter` is the Listings tab's source filter; left out, both sources are named.
+    function renderLegend(filter){
+        return '<div class="tmf-ana-legend">' +
+            (filter !== 'b' ? '<span><i class="tmf-ana-sw tmf-ana-m"></i>Item market (Torn)</span>' : '') +
+            (filter !== 'm' ? '<span><i class="tmf-ana-sw tmf-ana-b"></i>Player bazaars (weav3r)</span>' : '') +
+            '</div>';
+    }
+
+    // Where to sell: the cheapest listing in each place undercut by $1, the item-market fee taken
+    // off, and which of the two leaves you more. Empty when either place has nothing to compare.
+    function renderWhere(model){
+        let market = model.market != null && model.market.listings != null ? model.market.listings : null;
+        let bazaar = model.bazaar != null && model.bazaar.listings != null ? model.bazaar.listings : null;
+        if (market == null || bazaar == null || market.length === 0 || bazaar.length === 0){
+            return '';
+        }
+        let undercut = function(price){ return price > 1 ? price - 1 : price; };
+        let places = [
+            { src: 'm', name: 'Item market', list: undercut(market[0].price) },
+            { src: 'b', name: 'Bazaar', list: undercut(bazaar[0].price) }
+        ];
+        places.forEach(function(place){ place.keep = keptAfterSale(place.list, place.src); });
+        let gap = places[0].keep - places[1].keep;
+        let best = gap > 0 ? 'm' : gap < 0 ? 'b' : null;
+        let line = function(place){
+            let win = place.src === best;
+            return '<div class="tmf-ana-wr' + (win ? ' tmf-ana-wr--win' : '') + '">' +
+                '<span class="tmf-ana-src tmf-ana-' + place.src + '">' + (place.src === 'm' ? 'M' : 'B') + '</span>' +
+                '<span class="tmf-ana-wn">' + place.name + '</span><span class="tmf-ana-wl">list ' + money(place.list) + '</span>' +
+                '<span class="tmf-ana-wa">→</span><span class="tmf-ana-wk">keep ' + money(place.keep) + '</span>' +
+                (win ? '<span class="tmf-ana-tag">pays more</span>' : '') + '</div>';
+        };
+        let say;
+        if (best == null){
+            say = 'Both leave you the same after the ' + feePercent() + '% item-market fee.';
+        } else {
+            say = (best === 'm' ? 'The item market' : 'A bazaar') + ' leaves you <b>' + money(Math.abs(gap)) + ' more</b> each after the ' + feePercent() + '% item-market fee' +
+                (model.mine != null && model.mine > 1 ? ', ' + money(Math.abs(gap) * model.mine) + ' for ' + count(model.mine) : '') + '. ' +
+                (best === ANALYTICS_SOLD_ON ? 'You are already listing where it pays more.'
+                    : ANALYTICS_SOLD_ON === 'b' ? 'You are filling a bazaar, so these would pay more on the item market.'
+                    : 'You are on the item market, so these would pay more in a bazaar.');
+        }
+        return '<div class="tmf-ana-where"><div class="tmf-ana-sec">Where to sell<small>the cheapest in each place, undercut by $1</small></div>' +
+            line(places[0]) + line(places[1]) + '<div class="tmf-ana-ws">' + say + '</div></div>';
+    }
+
+    function cheaperThan(listings, price){
+        return listings.filter(function(listing){ return listing.price < price; });
+    }
+
+    function unitsOf(listings){
+        return listings.reduce(function(sum, listing){ return sum + listing.amount; }, 0);
+    }
+
+    // The sentence a stack size or "above" limit left the row with, or null when it priced.
+    function traceUnmatched(session){
+        let resolved = session.trace == null ? null : session.trace.resolved;
+        return resolved != null && resolved.unmatched != null ? resolved.unmatched : null;
+    }
+
+    function traceError(session){
+        let resolved = session.trace == null ? null : session.trace.resolved;
+        return resolved != null && resolved.error != null ? resolved.error : null;
+    }
+
+    function renderOverview(model, session){
+        let html = '';
+        if (session.failure != null && session.trace != null){
+            html += renderAlert('Could not read everything: ' + escapeHtml(session.failure) + '.');
+        }
+        let unmatched = traceUnmatched(session);
+        if (unmatched != null){
+            html += renderAlert('<b>Price left as it is.</b> ' + escapeHtml(capitalise(unmatched)) + '. <a data-goto="formula">See the formula</a>');
+        } else if (session.trace == null || traceError(session) != null){
+            html += renderAlert('<b>Nothing priced.</b> ' + escapeHtml(traceError(session) ?? session.failure ?? 'the first read failed') + '. <a data-goto="formula">See the formula</a>');
+        }
+        html += renderWhere(model);
+        let value = model.value != null && model.value.value != null ? model.value.value : null;
+        let market = model.market != null && model.market.listings != null ? model.market.listings : null;
+        let bazaar = model.bazaar != null && model.bazaar.listings != null ? model.bazaar.listings : null;
+        let yourDetail = model.you == null ? 'nothing filled' : (value != null ? signedPercent(model.you, value) + ' vs market value' : 'from your setting');
+        let valueDetail = 'Torn' + (model.bazaar != null && model.bazaar.average != null ? ' · bazaar avg ' + money(model.bazaar.average) : '');
+        let cheapest = function(listings, source, sourceError){
+            if (listings == null){
+                return renderKpi('Cheapest ' + source, '—', escapeHtml(sourceError ?? 'not read'), sourceError);
+            }
+            if (listings.length === 0){
+                return renderKpi('Cheapest ' + source, '—', 'no listings');
+            }
+            let detail = '×' + count(listings[0].amount) + ' · ' +
+                (model.you != null ? 'you are #' + count(cheaperThan(listings, model.you).length + 1) + ' of ' + count(listings.length + 1) : count(listings.length) + ' listings');
+            if (source === 'market'){
+                detail += '<br>seller keeps ' + money(keptAfterSale(listings[0].price, 'm'));
+            }
+            return renderKpi('Cheapest ' + source, money(listings[0].price), detail);
+        };
+        html += '<div class="tmf-ana-kpis">' +
+            renderKpi('Your price', model.you == null ? '—' : money(model.you), escapeHtml(yourDetail) + (model.you != null ? '<br>you keep ' + money(keptAfterSale(model.you, 'm')) : '')) +
+            renderKpi('Market value', value == null ? '—' : money(value), escapeHtml(value == null ? (model.value != null ? model.value.error : 'not read') : valueDetail), value == null && model.value != null ? model.value.error : null) +
+            cheapest(market, 'market', model.market != null ? model.market.error : null) +
+            cheapest(bazaar, 'bazaar', model.bazaar != null ? model.bazaar.error : null) +
+            '</div>';
+        html += '<div class="tmf-ana-cols"><div>' + renderAhead(model, market, bazaar) + '</div><div>' + renderStacks(market, bazaar) + '</div></div>';
+        html += renderFreshness(model);
+        return html;
+    }
+
+    // When the popup read the item, and how old what it read is: Torn's item-market snapshot can
+    // be an hour or more older than the read itself.
+    function renderFreshness(model){
+        let parts = ['Read ' + ago(model.readAt)];
+        let snapshot = model.market != null ? model.market.snapshot : null;
+        if (snapshot != null){
+            parts.push('item-market listings as of ' + ago(snapshot));
+        }
+        if (model.bazaar != null && model.bazaar.checked != null){
+            parts.push('bazaar listings last checked ' + ago(model.bazaar.checked));
+        }
+        return '<div class="tmf-ana-hint"' + (snapshot != null ? ' title="' + escapeHtml(MARKET_SNAPSHOT_TITLE) + '"' : '') + '>' + escapeHtml(parts.join(' · ')) + '</div>';
+    }
+
+    function renderBarRow(cls, width, text){
+        return '<div class="tmf-ana-brow"><i class="tmf-ana-bar ' + cls + '" style="width:' + width + '%"></i><span class="tmf-ana-bv">' + escapeHtml(text) + '</span></div>';
+    }
+
+    // Units priced below you, and just above you, per source: what has to sell before yours does.
+    function renderAhead(model, market, bazaar){
+        let html = '<div class="tmf-ana-sec">Ahead of you</div>';
+        if (model.you == null){
+            return html + '<div class="tmf-ana-muted">No price to measure from yet.</div>';
+        }
+        let you = model.you;
+        let bands = [
+            { label: 'Cheaper than you', keep: function(listing){ return listing.price < you; } },
+            { label: 'Up to 1% above you (≤ ' + money(you * 1.01) + ')', keep: function(listing){ return listing.price >= you && listing.price <= you * 1.01; } },
+            { label: 'Up to 3% above you (≤ ' + money(you * 1.03) + ')', keep: function(listing){ return listing.price >= you && listing.price <= you * 1.03; } }
+        ].map(function(band){
+            return { label: band.label, m: market == null ? null : market.filter(band.keep), b: bazaar == null ? null : bazaar.filter(band.keep) };
+        });
+        let max = Math.max(1, ...bands.map(function(band){ return Math.max(band.m == null ? 0 : unitsOf(band.m), band.b == null ? 0 : unitsOf(band.b)); }));
+        let bar = function(listings, cls, name){
+            if (listings == null){
+                return renderBarRow(cls, 0, name + ' not read');
+            }
+            let units = unitsOf(listings);
+            let width = units === 0 ? 0 : Math.max(2, Math.round(units / max * 100));
+            return renderBarRow(cls, width, units === 0 ? '0' : count(units) + ' units · ' + count(listings.length) + (listings.length === 1 ? ' listing' : ' listings'));
+        };
+        html += renderLegend();
+        bands.forEach(function(band){
+            html += '<div class="tmf-ana-band"><div class="tmf-ana-bl">' + escapeHtml(band.label) + '</div>' + bar(band.m, 'tmf-ana-m', 'market') + bar(band.b, 'tmf-ana-b', 'bazaars') + '</div>';
+        });
+        return html;
+    }
+
+    // How the listings split by stack size: what [100x+] and [mine+] choose between.
+    function renderStacks(market, bazaar){
+        let html = '<div class="tmf-ana-sec">Listings by stack size<small>count · cheapest in the band</small></div>';
+        let bands = STACK_BANDS.map(function(band){
+            let keep = function(listing){ return listing.amount >= band[0] && listing.amount <= band[1]; };
+            return { label: band[2], m: market == null ? null : market.filter(keep), b: bazaar == null ? null : bazaar.filter(keep) };
+        });
+        let max = Math.max(1, ...bands.map(function(band){ return Math.max(band.m == null ? 0 : band.m.length, band.b == null ? 0 : band.b.length); }));
+        let bar = function(listings, cls, name){
+            if (listings == null){
+                return renderBarRow(cls, 0, name + ' not read');
+            }
+            let cheapest = listings.length === 0 ? '—' : money(Math.min.apply(null, listings.map(function(listing){ return listing.price; })));
+            return renderBarRow(cls, listings.length === 0 ? 0 : Math.max(2, Math.round(listings.length / max * 100)), count(listings.length) + ' · from ' + cheapest);
+        };
+        bands.forEach(function(band){
+            html += '<div class="tmf-ana-band"><div class="tmf-ana-bl">' + escapeHtml(band.label) + '</div>' + bar(band.m, 'tmf-ana-m', 'market') + bar(band.b, 'tmf-ana-b', 'bazaars') + '</div>';
+        });
+        return html;
+    }
+
+    // The listing a branch read, so the ladder can point at it.
+    function basisKey(detail){
+        return detail != null && detail.basis != null && detail.basis.price != null
+            ? (detail.source === SOURCE_BAZAAR ? 'b' : 'm') + ':' + detail.basis.price + ':' + detail.basis.amount
+            : null;
+    }
+
+    // A row of options the Listings tab switches between. `key` names the setting it changes.
+    function renderOptions(key, options, current){
+        return '<span class="tmf-ana-seg">' + options.map(function(option){
+            return '<span class="tmf-ana-opt' + (option[0] === current ? ' tmf-ana-opt--on' : '') + '" data-ana-' + key + '="' + option[0] + '">' +
+                option[1] + (option[2] != null ? '<em>' + count(option[2]) + '</em>' : '') + '</span>';
+        }).join('') + '</span>';
+    }
+
+    function renderListings(model, session){
+        let market = model.market != null && model.market.listings != null ? model.market.listings : null;
+        let bazaar = model.bazaar != null && model.bazaar.listings != null ? model.bazaar.listings : null;
+        if (market == null && bazaar == null){
+            return renderAlert('No listings could be read.' + (model.market != null && model.market.error ? ' ' + escapeHtml(model.market.error) + '.' : ''));
+        }
+        let filter = analyticsFilter;
+        let showMarket = filter !== 'b';
+        let showBazaar = filter !== 'm';
+        // The You keep column, and ordering by it, only earn their place when something on show
+        // pays the fee: an item-market listing, or your own price when this script sells there.
+        let fee = (showMarket && market != null && market.length > 0) || ANALYTICS_SOLD_ON === 'm';
+        let byKeep = fee && analyticsOrder === 'keep';
+        let html = '<div class="tmf-ana-ctl"><span class="tmf-ana-ctlg"><span class="tmf-ana-ctll">Show</span>' +
+            renderOptions('filter', [
+                ['all', 'All', (market ?? []).length + (bazaar ?? []).length],
+                ['m', 'Item market', market != null ? market.length : null],
+                ['b', 'Bazaar', bazaar != null ? bazaar.length : null]
+            ], filter) + '</span>' +
+            (fee ? '<span class="tmf-ana-ctlg"><span class="tmf-ana-ctll">Order by</span>' + renderOptions('order', [['keep', 'You keep'], ['listed', 'Listed price']], byKeep ? 'keep' : 'listed') + '</span>' : '') +
+            '</div>';
+        if (filter === 'all'){
+            html += renderWhere(model);
+        }
+        if (showMarket && market == null){
+            html += '<div class="tmf-ana-muted">Item market not read: ' + escapeHtml(model.market != null ? model.market.error : 'no data') + '.</div>';
+        }
+        if (showBazaar && bazaar == null){
+            html += '<div class="tmf-ana-muted">Bazaars not read: ' + escapeHtml(model.bazaar != null ? model.bazaar.error : 'no data') + '.</div>';
+        }
+        let rows = [];
+        if (showMarket){
+            (market ?? []).forEach(function(listing){ rows.push({ src: 'm', price: listing.price, amount: listing.amount }); });
+        }
+        if (showBazaar){
+            (bazaar ?? []).forEach(function(listing){ rows.push({ src: 'b', price: listing.price, amount: listing.amount }); });
+        }
+        rows.forEach(function(listing){ listing.keep = keptAfterSale(listing.price, listing.src); });
+        let rank = function(listing){ return byKeep ? listing.keep : listing.price; };
+        rows.sort(function(a, b){ return rank(a) - rank(b) || (a.src < b.src ? -1 : 1); });
+        // Tags: the listing the winning branch read, the ones its bracket skipped, and what the
+        // other branches read. A listing is tagged once, by the first branch to claim it.
+        let winner = session.trace != null ? session.branches.get(session.trace.winner) : null;
+        let tags = new Map();
+        let claim = function(key, tag){ if (key != null && !tags.has(key)){ tags.set(key, tag); } };
+        if (winner != null){
+            claim(basisKey(winner), '<span class="tmf-ana-tag">read by ' + escapeHtml(winner.formula) + '</span>');
+        }
+        session.branches.forEach(function(detail){
+            if (detail !== winner){
+                claim(basisKey(detail), '<span class="tmf-ana-tag tmf-ana-tag--blue">' + escapeHtml(detail.formula) + '</span>');
+            }
+        });
+        let skipped = function(listing){
+            if (winner == null || winner.price == null || (winner.source === SOURCE_BAZAAR ? 'b' : 'm') !== listing.src){
+                return null;
+            }
+            // "Skipped" only for listings the bracket passed over on its way to the one it read;
+            // the rest are just marked as ones it would never read.
+            let passedOver = winner.basis != null && winner.basis.price != null && listing.price < winner.basis.price ? 'skipped · ' : '';
+            let minimum = minimumStack(winner.formula, session.mine, winner.source);
+            if (typeof minimum === 'number' && listing.amount < minimum){
+                return passedOver + count(listing.amount) + ' under ' + count(minimum);
+            }
+            if (winner.limit != null && performOperation(listing.price, stripDeltaBracket(winner.formula)) < winner.limit){
+                return passedOver + 'under the limit';
+            }
+            return null;
+        };
+        let keepCell = function(value, src){
+            if (!fee){
+                return '';
+            }
+            let title = src === 'm' ? 'What the seller keeps after the ' + feePercent() + '% item-market fee' : 'A bazaar takes no fee';
+            return '<span class="k' + (src === 'm' ? '' : ' tmf-ana-k0') + '" title="' + title + '">' + money(value) + '</span>';
+        };
+        let lines = [];
+        let youPlaced = model.you == null;
+        let youKeep = model.you == null ? null : keptAfterSale(model.you, ANALYTICS_SOLD_ON);
+        let youRank = byKeep ? youKeep : model.you;
+        // Your rank counts listed prices on both sides: that is what a buyer compares.
+        let ranks = [];
+        if (model.you != null){
+            if (showBazaar && bazaar != null){ ranks.push('#' + count(cheaperThan(bazaar, model.you).length + 1) + ' among bazaars'); }
+            if (showMarket && market != null){ ranks.push('#' + count(cheaperThan(market, model.you).length + 1) + ' on the market'); }
+        }
+        let youLine = model.you == null ? '' :
+            '<div class="tmf-ana-lr tmf-ana-lr--you"><span class="tmf-ana-src tmf-ana-y">★</span><span class="p">' + money(model.you) + '</span><span class="q">' + (model.mine != null ? '×' + count(model.mine) : '') + '</span>' +
+            keepCell(youKeep, ANALYTICS_SOLD_ON) + '<span class="n">you' + (ranks.length ? ' · ' + escapeHtml(ranks.join(' · ')) : '') + '</span></div>';
+        rows.forEach(function(listing){
+            if (!youPlaced && rank(listing) > youRank){
+                lines.push(youLine);
+                youPlaced = true;
+            }
+            let key = listing.src + ':' + listing.price + ':' + listing.amount;
+            let tag = tags.get(key) ?? '';
+            if (tag !== ''){
+                tags.delete(key);
+            }
+            let why = skipped(listing);
+            let cls = 'tmf-ana-lr' + (why != null ? ' tmf-ana-lr--dim' : '');
+            let note = tag + (why != null ? '<span class="tmf-ana-tag tmf-ana-tag--gray">' + escapeHtml(why) + '</span>' : '');
+            lines.push('<div class="' + cls + '" data-price="' + listing.price + '" title="Click to price $1 under this listing">' +
+                '<span class="tmf-ana-src tmf-ana-' + listing.src + '">' + (listing.src === 'm' ? 'M' : 'B') + '</span>' +
+                '<span class="p">' + money(listing.price) + '</span><span class="q">×' + count(listing.amount) + '</span>' +
+                keepCell(listing.keep, listing.src) + '<span class="n">' + note + '</span></div>');
+        });
+        if (!youPlaced){
+            lines.push(youLine);
+        }
+        let shown = lines.map(function(line, index){
+            return index < ANALYTICS_LADDER_ROWS ? line : line.replace('class="tmf-ana-lr', 'class="tmf-ana-lr tmf-ana-lr--hidden');
+        });
+        let more = [];
+        if (rows.length === 0){
+            more.push(filter === 'm' ? 'No item-market listings' : filter === 'b' ? 'No bazaar listings' : 'No listings');
+        }
+        if (lines.length > ANALYTICS_LADDER_ROWS){
+            more.push(count(lines.length - ANALYTICS_LADDER_ROWS) + ' more · <a class="tmf-ana-showall">show all</a>');
+        }
+        if (showBazaar && model.bazaar != null && model.bazaar.ignored > 0){
+            more.push(count(model.bazaar.ignored) + ' bazaar ' + (model.bazaar.ignored === 1 ? 'listing' : 'listings') + ' ignored (sponsored, stale or far under the average)');
+        }
+        let head = fee ? '<div class="tmf-ana-lr tmf-ana-lh"><span class="tmf-ana-src"></span><span class="p">Listed</span><span class="q">Qty</span><span class="k">You keep</span><span class="n"></span></div>' : '';
+        html += renderLegend(filter) + '<div class="tmf-ana-lad' + (byKeep ? ' tmf-ana-lad--keep' : '') + '">' + head + shown.join('') +
+            (more.length ? '<div class="tmf-ana-lr tmf-ana-lr--more"><span class="n">' + more.join(' · ') + '</span></div>' : '') + '</div>' +
+            '<div class="tmf-ana-hint">Click a listing to price $1 under it.' + (fee ? ' You keep is the listed price minus the ' + feePercent() + '% item-market fee; a bazaar takes no fee.' : '') + '</div>' +
+            renderFreshness(model);
+        return html;
+    }
+
+    function deltaPhrase(delta){
+        let match = String(delta ?? '').trim().match(/^([-+]?)(\d+(?:\.\d+)?)(%)?$/);
+        if (match == null){
+            return '';
+        }
+        return (match[1] === '-' ? 'minus ' : 'plus ') + (match[3] ? match[2] + '%' : '$' + Number(match[2]).toLocaleString('en-US'));
+    }
+
+    // One sentence on what a branch read and did with it.
+    function describeBranch(detail, session){
+        if (detail == null){
+            return 'not priced';
+        }
+        if (detail.error != null){
+            return 'failed: ' + detail.error;
+        }
+        if (detail.unmatched != null){
+            return capitalise(detail.unmatched);
+        }
+        if (detail.source === SOURCE_FIXED){
+            return 'a set price, whatever the listings say';
+        }
+        if (detail.nothing || detail.basis == null){
+            return 'no usable bazaar price, so this branch sat out';
+        }
+        let sourceName = detail.source === SOURCE_BAZAAR ? 'bazaar' : 'item-market';
+        let basis = detail.basis;
+        let text;
+        if (basis.value != null){
+            text = (detail.source === SOURCE_MARKET_VALUE ? 'market value ' : 'bazaar average ') + money(basis.value);
+        } else if (basis.median != null){
+            text = 'median of ' + count(basis.count) + ' ' + sourceName + ' listings, ' + money(basis.median);
+        } else {
+            text = ordinal(basis.rank) + ' ' + sourceName + ' listing, ' + money(basis.price) + ' ×' + count(basis.amount);
+        }
+        if (basis.skipped > 0){
+            let minimum = minimumStack(detail.formula, session.mine, detail.source);
+            let under = typeof minimum === 'number' ? 'under ' + count(minimum) : 'under the limit';
+            if (typeof minimum === 'number' && detail.limit != null){
+                under += ' or the limit';
+            }
+            text += ', after skipping ' + count(basis.skipped) + ' ' + under;
+        }
+        if (detail.fallback){
+            text = 'no bazaar price, so the item market instead: ' + text;
+        }
+        let delta = deltaPhrase(stripDeltaBracket(detail.formula));
+        if (delta !== ''){
+            text += ', ' + delta;
+        }
+        if (detail.limitFormula != null && detail.limit != null){
+            text += ' · above ' + detail.limitFormula + ' = ' + money(detail.limit);
+        }
+        return text;
+    }
+
+    function traceNodeValue(node, session){
+        if (node.kind === 'formula'){
+            let detail = session.branches.get(node.formula);
+            return detail != null && typeof detail.price === 'number' && isFinite(detail.price) ? detail.price : null;
+        }
+        let best = null;
+        node.children.forEach(function(child){
+            let value = traceNodeValue(child, session);
+            if (value != null && (best == null || (node.combine === 'min' ? value < best : value > best))){
+                best = value;
+            }
+        });
+        return best;
+    }
+
+    // The setting as a tree: each formula with what it came to, the min()/max() around them
+    // with what they chose, the winning formula and the final answer marked.
+    function renderTraceNode(node, session, depth){
+        let indent = ' style="margin-left:' + (depth * 16) + 'px"';
+        if (node.kind === 'formula'){
+            let detail = session.branches.get(node.formula);
+            let win = node.formula === session.trace.winner;
+            let price = detail != null && typeof detail.price === 'number' ? money(detail.price) : '—';
+            return '<div class="tmf-ana-tr' + (win ? ' tmf-ana-tr--win' : '') + '"' + indent + '><code>' + escapeHtml(node.formula) + '</code><span class="r">' + price + '</span>' +
+                '<span class="why">' + escapeHtml(describeBranch(detail, session)) + (win && depth > 0 ? ' · filled' : '') + '</span></div>';
+        }
+        let value = traceNodeValue(node, session);
+        let html = '<div class="tmf-ana-tr"' + indent + '><span class="op">' + node.combine + '(</span></div>';
+        html += node.children.map(function(child){ return renderTraceNode(child, session, depth + 1); }).join('');
+        html += '<div class="tmf-ana-tr' + (depth === 0 && value != null ? ' tmf-ana-tr--win' : '') + '"' + indent + '><span class="op">) → <b>' + (value == null ? '—' : money(value)) + '</b></span>' +
+            '<span class="why">the ' + (node.combine === 'min' ? 'lowest' : 'highest') + ' of ' + node.children.length + (depth === 0 && value != null ? ' · filled' : '') + '</span></div>';
+        return html;
+    }
+
+    function renderFormula(model, session){
+        let trace = session.trace;
+        if (trace == null){
+            return renderAlert('<b>Nothing priced.</b> ' + escapeHtml(session.failure ?? 'The first read failed, so the setting was never applied') + '.');
+        }
+        let html = '';
+        let winner = session.branches.get(trace.winner);
+        let unmatched = traceUnmatched(session);
+        let error = traceError(session);
+        if (unmatched != null){
+            html += renderAlert('<b>Price left as it is.</b> ' + escapeHtml(capitalise(unmatched)) + '.');
+        } else if (error != null){
+            html += renderAlert('<b>Nothing priced.</b> ' + escapeHtml(error) + '.');
+        } else if (model.you != null){
+            let others = [];
+            session.branches.forEach(function(detail){
+                if (detail !== winner && collectFormulas(trace.root).indexOf(detail.formula) !== -1){
+                    others.push('<code>' + escapeHtml(detail.formula) + '</code> ' + (typeof detail.price === 'number' ? money(detail.price) : 'nothing'));
+                }
+            });
+            html += '<div class="tmf-ana-verdict"><b>Filled ' + money(model.you) + '</b> from <code>' + escapeHtml(trace.winner) + '</code>: ' + escapeHtml(describeBranch(winner, session)) + '.' +
+                (others.length ? ' The other ' + (others.length === 1 ? 'branch' : 'branches') + ': ' + others.join(', ') + '.' : '') + '</div>';
+        }
+        html += '<div class="tmf-ana-sec">Formula · <code>' + escapeHtml(trace.setting) + '</code>' +
+            (itemOwnPrice(model.itemId) === trace.setting ? '<small>this item\u2019s own</small>' : '') + '</div>';
+        html += '<div class="tmf-ana-trace">' + renderTraceNode(trace.root, session, 0) + '</div>';
+        return html;
+    }
+
+    // The item market takes its fee off what you sell for, so the footer says what you keep.
+    function renderFoot(model, row){
+        let html = '<span class="tmf-ana-sum">';
+        if (model.you != null){
+            let taxPercent = Math.round((1 - marketTaxFactor) * 100);
+            let net = Math.round(model.you * marketTaxFactor);
+            let parts = ['After the ' + taxPercent + '% market fee: ' + money(net) + ' each'];
+            if (model.mine != null && model.mine > 0){
+                parts.push(money(net * model.mine) + ' for ' + count(model.mine));
+            }
+            html += escapeHtml(parts.join(' · '));
+        }
+        html += '</span><button type="button" class="tmf-ana-settings">Settings</button>';
+        if (model.you != null && row.target.isConnected){
+            html += '<button type="button" class="tmf-ana-apply" data-price="' + model.you + '">' + escapeHtml('Fill ' + money(model.you)) + '</button>';
+        }
+        return html;
+    }
+
+    // Put a price from the popup into the row it was opened from, the way Fill does: on Add Items
+    // the quantity goes in too and the square flips to Clear. A listing click sets the price only.
+    async function applyAnalyticsPrice(price, withQuantity){
+        const target=analyticsRow?.target;if(!target||busy.has(target))return;
+        busy.add(target);const row=target.closest('[data-tmf-item-id]');
+        const saved=[...(row?.querySelectorAll('input:not([type=button])')||[])].map(input=>({input,value:input.value,checked:input.type==='checkbox'?input.checked:null}));
+        try{await applyAnalyticsPriceUnsafe(price,withQuantity);}catch(error){for(const item of saved)if(item.input.isConnected)try{if(item.checked!==null){if(item.input.checked!==item.checked)item.input.click();}else if(item.input.value!==item.value)await setMarketInput(item.input,item.value);}catch{}notice(error);}finally{busy.delete(target);}
+    }
+
+    async function applyAnalyticsPriceUnsafe(price, withQuantity){
+        let row = analyticsRow;
+        if (row == null || !row.target.isConnected){
+            showToast('That row is no longer on the page.');
+            return;
+        }
+        if (!(price > 0)){
+            return;
+        }
+        if (withQuantity && getCurrentPage() == pages.AddItems){
+            let category = analyticsSession != null ? analyticsSession.category : null;
+            if (await applyQuantity(row.target, 'fill', category, false) === 'skipped'){
+                return;
+            }
+        }
+        let priceInputs = priceFields(row.target);
+        if (priceInputs.length === 0){
+            showToast('Could not find the price box on this row.');
+            return;
+        }
+        await writeInputs(priceInputs,price);
+        if (withQuantity && row.target.getAttribute('data-action-flag') == 'fill'){
+            switchActionFlag(row.target);
+        }
+        showToast('Price set to ' + money(price) + '.');
+    }
+
+    // ---- "What's new" popup ----------------------------------------------------------------
+
+    function compareVersions(left, right){
+        let leftParts = String(left).split('.').map(function(part){ return parseInt(part, 10) || 0; });
+        let rightParts = String(right).split('.').map(function(part){ return parseInt(part, 10) || 0; });
+        for (let i = 0; i < Math.max(leftParts.length, rightParts.length); i++){
+            let difference = (leftParts[i] ?? 0) - (rightParts[i] ?? 0);
+            if (difference !== 0){
+                return difference < 0 ? -1 : 1;
+            }
+        }
+        return 0;
+    }
+
+    function maybeShowChangelog(){
+        let lastSeen;
+        try {
+            lastSeen = localStorage.getItem(lastSeenVersionKey);
+        } catch (error) {
+            return;
+        }
+        if (lastSeen === SCRIPT_VERSION){
+            return;
+        }
+        // No stored version means one of two things: a brand-new install, or — far more often,
+        // because this is the first release to carry the popup — a long-standing user whose key
+        // simply never existed. The two are indistinguishable from here, so the notes get shown
+        // rather than swallowed. Staying silent would hide this release from everyone who
+        // already had the script.
+        let unseen = lastSeen == null
+            ? CHANGELOG
+            : CHANGELOG.filter(function(release){ return compareVersions(release.version, lastSeen) > 0; });
+        // Silent releases wait for the menu: they never open the popup, and stay out of it when
+        // another release does.
+        unseen = unseen.filter(function(release){ return !release.silent; });
+        if (unseen.length === 0){
+            rememberChangelogSeen();
+            return;
+        }
+        openChangelogModal(unseen);
+    }
+
+    function rememberChangelogSeen(){
+        try {
+            localStorage.setItem(lastSeenVersionKey, SCRIPT_VERSION);
+        } catch (error) {
+            // A blocked localStorage only means the popup returns on the next page load.
+        }
+    }
+
+    // Entries are literals defined in this file, so their inline markup is intentional.
+    function renderChangelogRelease(release, index){
+        return '<div class="tmf-changelog-release">' +
+                   '<div class="tmf-changelog-ver"><b>v' + release.version + '</b>' +
+                       (index === 0 ? '<span class="tmf-changelog-badge">new</span>' : '') +
+                       '<span class="tmf-changelog-date">' + release.date + '</span>' +
+                   '</div>' +
+                   '<ul class="tmf-changelog-items">' +
+                       release.changes.map(function(change){ return '<li>' + change + '</li>'; }).join('') +
+                   '</ul>' +
+               '</div>';
+    }
+
+    function openChangelogModal(releases){
+        if (releases.length === 0){
+            return;
+        }
+        let overlay = document.querySelector('.tmf-changelog-overlay');
+        if (overlay == null){
+            overlay = document.createElement('div');
+            // Borrows the settings modal's chrome, so the popup needs no layout of its own.
+            overlay.className = 'tmf-modal-overlay tmf-changelog-overlay';
+            document.body.appendChild(overlay);
+        }
+        overlay.innerHTML =
+            '<div class="tmf-modal">' +
+                '<h3>Market Filler v' + SCRIPT_VERSION + ' — what&rsquo;s new' +
+                    '<span class="tmf-modal-close" title="Close">&times;</span>' +
+                '</h3>' +
+                releases.map(renderChangelogRelease).join('') +
+                '<div class="tmf-modal-actions">' +
+                    '<button type="button" class="tmf-changelog-settings">Open settings</button>' +
+                    '<button type="button" class="tmf-modal-save tmf-changelog-ok">Got it</button>' +
+                '</div>' +
+            '</div>';
+
+        overlay.querySelector('.tmf-modal-close').addEventListener('click', closeChangelogModal);
+        overlay.querySelector('.tmf-changelog-ok').addEventListener('click', closeChangelogModal);
+        overlay.querySelector('.tmf-changelog-settings').addEventListener('click', function(){
+            closeChangelogModal();
+            openSettingsModal();
+        });
+        overlay.addEventListener('click', function(event){ if (event.target === overlay){ closeChangelogModal(); } });
+        overlay.classList.add('tmf-modal-overlay--open');
+    }
+
+    // Dismissing by any route counts as read — the popup must never nag.
+    function closeChangelogModal(){
+        let overlay = document.querySelector('.tmf-changelog-overlay');
+        if (overlay != null){
+            overlay.classList.remove('tmf-modal-overlay--open');
+        }
+        rememberChangelogSeen();
+    }
+
+    // ---- Settings help: Cheatsheet, Live check, Write it for me -------------------------------
+    // Three ways into the price syntax, all inside the settings window. The Cheatsheet lists every
+    // code by topic and puts a tapped one into the field you were last in. The live check explains
+    // the field you are in, priced on the last item you filled, so it never makes a request of its
+    // own. "Write it for me" asks four questions and writes a formula for anyone who would rather
+    // not learn the syntax at all.
+
+    const liveCheckStorageKey = "tu:market-fill:live-check";
+    const cheatsheetOpenStorageKey = "tu:market-fill:cheatsheet-open";
+    const cheatsheetTabStorageKey = "tu:market-fill:cheatsheet-tab";
+    // How this script's help has always written "the cheapest item-market listing" after a delta.
+    const HELP_CHEAPEST = '[0]';
+    const LIVE_LADDER_LEAD_ROWS = 3;
+
+    // While the settings window is open: the field the live check explains, the last price and
+    // quantity fields used (where the Cheatsheet and "Write it for me" put what they write), and
+    // the last item's prices once they have been read back out of its session.
+    let settingsHelp = { field: null, lastPrice: null, lastQuantity: null, wizardTarget: null, answers: null, tried: null, tab: 1, data: null, loading: false, seq: 0 };
+
+    function isLiveCheckOn(){
+        return localStorage.getItem(liveCheckStorageKey) !== '0';
+    }
+
+    function cheatsheetTabs(){
+        let cheapest = '-1' + HELP_CHEAPEST;
+        return [
+            { name: 'Change', kind: 'price', rows: [
+                ['-1', '$1 less'], ['-5%', '5% less'], ['+10%', '10% more'], ['[0]', 'nothing in front: the price as it is'],
+                ['=1', 'a set price: exactly $1, whatever others charge']
+            ], note: 'With no brackets, the change applies to the cheapest item-market listing. A plain 1 means $1 more than it; =1 means $1.' },
+            { name: 'Start from', kind: 'price', rows: [
+                ['-1[0]', 'cheapest listing'], ['-1[1]', '2nd cheapest. Counting starts at 0'], ['-1[14]', '15th cheapest'],
+                ['-1[median]', 'middle price, by unit'], ['[market]', "Torn's market value"],
+                ['-1[bazaar]', 'cheapest player bazaar'], ['-1[bazaar:2]', '3rd cheapest bazaar'],
+                ['-5%[bazaar:avg]', 'bazaar average'], ['[bazaar:median]', 'middle bazaar price']
+            ], note: 'Bazaar prices come from weav3r.dev and need no API key.' },
+            { name: 'Stack size', kind: 'price', rows: [
+                ['-1[100x+]', 'only stacks of 100 or more'], ['-1[mine+]', 'only stacks at least as big as yours'],
+                ['-1[2xmine+]', 'only stacks twice yours or more'], ['-1[bazaar:100x+]', 'the same, for bazaars'],
+                ['-1[mine+ above +5%[market]]', 'and skip any that would put you under market value + 5%']
+            ], note: 'When no listing is big enough, Fill leaves the price as it is and says why.' },
+            { name: 'Combine', kind: 'price', wide: true, rows: [
+                ['-1[bazaar] | ' + cheapest, 'the higher of the two, so the second is a floor'],
+                ['max(-1[bazaar], ' + cheapest + ')', 'the same as |'],
+                ['min(-1[bazaar], ' + cheapest + ')', 'the lower of the two: undercut whichever is cheapest'],
+                ['min(max(' + cheapest + ', +10%[market]), -1[14])', 'keep the price between a floor and a ceiling'],
+                ['max(' + cheapest + ', =1000)', 'never below $1,000']
+            ], note: 'Put min() and max() inside each other as deep as you need.' },
+            { name: 'Quantity', kind: 'quantity', rows: [
+                ['max', 'all of them'], ['max-1', 'keep one back'], ['max-3', 'keep three back'], ['1', 'always list one'], ['skip', 'never list']
+            ], note: 'Category rows take the same codes. Leave one blank to use the default.' }
+        ];
+    }
+
+    function wizardQuestions(){
+        return [
+            { key: 'who', ask: 'Who do you want to beat?', options: [['market', 'Item market'], ['bazaar', 'Bazaars'], ['cheaper', 'Whichever is cheaper'], ['floor', 'Bazaars, not below item market']] },
+            { key: 'size', ask: 'Which sellers count?', options: [['any', 'Everyone'], ['100', 'Stacks of 100+'], ['mine', 'Stacks as big as mine']] },
+            { key: 'gap', ask: 'How far under them?', options: [['1', '$1 under'], ['5', '5% under'], ['second', '2nd in line']] },
+            { key: 'net', ask: 'Safety net', options: [['none', 'None'], ['value', 'Not below market value'], ['value10', 'Not below market value + 10%']] }
+        ];
+    }
+
+    function wizardFirstAnswers(){
+        return { who: 'market', size: 'any', gap: '1', net: 'none' };
+    }
+
+    // The formula four answers add up to. Every combination is one Save accepts.
+    function wizardFormula(answers){
+        let delta = answers.gap === '5' ? '-5%' : '-1';
+        let parts = [];
+        if (answers.gap === 'second'){
+            parts.push('1');
+        }
+        if (answers.size === '100'){
+            parts.push('100x+');
+        } else if (answers.size === 'mine'){
+            parts.push('mine+');
+        }
+        let market = parts.length > 0 ? delta + '[' + parts.join(':') + ']' : delta + HELP_CHEAPEST;
+        let bazaar = delta + '[bazaar' + (parts.length > 0 ? ':' + parts.join(':') : '') + ']';
+        let terms;
+        if (answers.who === 'market'){
+            terms = [market];
+        } else if (answers.who === 'bazaar'){
+            terms = [bazaar];
+        } else if (answers.who === 'cheaper'){
+            terms = ['min(' + bazaar + ', ' + market + ')'];
+        } else {
+            terms = [bazaar, market];
+        }
+        let floor = answers.net === 'value' ? '[market]' : answers.net === 'value10' ? '+10%[market]' : null;
+        if (floor != null){
+            terms.push(floor);
+        }
+        if (terms.length === 1){
+            return terms[0];
+        }
+        return floor == null ? terms.join(' | ') : 'max(' + terms.join(', ') + ')';
+    }
+
+    // ---- Plain words for a formula --------------------------------------------------------------
+
+    function helpParts(formula){
+        let source = sourceOf(formula);
+        let selector = listingSelector(formula);
+        let scalar = source === SOURCE_FIXED ? 'fixed' : source === SOURCE_MARKET_VALUE ? 'market' : (source === SOURCE_BAZAAR && selector.kind === 'avg' ? 'avg' : null);
+        return { kind: 'formula', formula: formula, source: source, sel: selector, delta: stripDeltaBracket(formula), limitFormula: aboveLimit(formula), scalar: scalar, fixed: fixedPrice(formula), price: null };
+    }
+
+    function helpSourceWord(source){
+        return source === SOURCE_BAZAAR ? 'bazaar' : 'item-market';
+    }
+
+    function helpWhich(selector){
+        if (selector.kind === 'median'){
+            return 'the median';
+        }
+        return selector.index === 0 ? 'the cheapest' : 'the ' + ordinal(selector.index + 1) + ' cheapest';
+    }
+
+    // "at least as big as yours", "of 100 or more", or null when any stack counts.
+    function helpStackTail(parts){
+        if (parts.sel.mineFactor != null){
+            return parts.sel.mineFactor === 1 ? 'at least as big as yours' : 'at least ' + parts.sel.mineFactor + '× yours';
+        }
+        if (parts.sel.minStack != null){
+            return 'of ' + count(minimumStack(parts.formula, null, parts.source)) + ' or more';
+        }
+        return null;
+    }
+
+    function helpDelta(delta){
+        let match = String(delta ?? '').trim().match(/^([-+]?)(\d+(?:\.\d+)?)(%)?$/);
+        if (match == null){
+            return null;
+        }
+        return { amount: match[3] ? match[2] + '%' : '$' + Number(match[2]).toLocaleString('en-US'), down: match[1] === '-' };
+    }
+
+    function formulaInWords(parts){
+        if (parts.scalar === 'fixed'){
+            return 'a set price of ' + money(parts.fixed);
+        }
+        let noun;
+        let tail = helpStackTail(parts);
+        if (parts.scalar != null){
+            noun = parts.scalar === 'market' ? 'market value' : 'the bazaar average';
+        } else if (parts.sel.kind === 'median'){
+            noun = 'the median ' + helpSourceWord(parts.source) + ' price' + (tail != null ? ' across stacks ' + tail : '');
+        } else {
+            noun = helpWhich(parts.sel) + ' ' + helpSourceWord(parts.source) + (tail != null ? ' stack ' + tail : ' listing');
+        }
+        if (parts.limitFormula != null && parts.limitFormula !== ''){
+            noun += ' that keeps you at or above ' + formulaInWords(helpParts(parts.limitFormula));
+        }
+        let delta = helpDelta(parts.delta);
+        return delta != null ? delta.amount + (delta.down ? ' under ' : ' over ') + noun : 'exactly ' + noun;
+    }
+
+    // min(a, b) reads as "a, but never above b" and max(a, b) as "a, but never below b".
+    function settingInWords(node){
+        if (node.kind === 'formula'){
+            return formulaInWords(helpParts(node.formula));
+        }
+        let head = settingInWords(node.children[0]);
+        let rest = node.children.slice(1).map(settingInWords).join(' or ');
+        return head + (head.indexOf(', but never') !== -1 ? ', and never ' : ', but never ') + (node.combine === 'max' ? 'below ' : 'above ') + rest;
+    }
+
+    function quantityInWords(mode, data){
+        let normalised = String(mode ?? '').trim().toLowerCase();
+        if (normalised === ''){
+            normalised = 'max';
+        }
+        if (data != null && data.mine != null){
+            let listed = resolveQuantity(data.mine, normalised);
+            if (listed == null){
+                return 'Leaves this item alone: nothing is listed.';
+            }
+            return 'Lists ' + count(listed) + ' of your ' + count(data.mine) + (listed === data.mine ? ', all of them.' : '.');
+        }
+        let minus = normalised.match(/^max\s*-\s*(\d+)$/);
+        if (normalised === 'max'){
+            return 'Lists all of them.';
+        }
+        if (normalised === 'skip' || normalised === 'none' || /^0+$/.test(normalised)){
+            return 'Leaves this item alone: nothing is listed.';
+        }
+        if (minus != null){
+            return 'Lists all but ' + (minus[1] === '1' ? 'one' : minus[1]) + ', and nothing when you have that many or fewer.';
+        }
+        return 'Lists ' + count(Number(normalised)) + ', or all of them when you have fewer.';
+    }
+
+    // ---- Pricing a setting on the last item filled --------------------------------------------
+    // The same reads, filters and rounding a Fill uses, run on what the last fill (or analytics
+    // popup) already read. A source that was never read leaves the check in words only.
+
+    async function loadLiveCheckData(){
+        let session = liveCheckSession;
+        if (session == null){
+            return null;
+        }
+        let model = await analyticsModel(session, { itemId: session.itemId });
+        let average = model.bazaar != null && model.bazaar.average != null ? model.bazaar.average : null;
+        if (average == null){
+            let snapshot = await sessionData(session, 'bazaar:avg');
+            let value = snapshot == null || snapshot.error != null ? NaN : Number(snapshot.bazaar_average);
+            average = snapshot != null && snapshot.bazaar_average != null && Number.isFinite(value) ? value : null;
+        }
+        let mine = Number(model.mine);
+        let value = model.value != null ? Number(model.value.value) : NaN;
+        return {
+            name: model.name || ('item #' + session.itemId),
+            mine: Number.isFinite(mine) && mine > 0 ? mine : null,
+            market: model.market != null && Array.isArray(model.market.listings) ? model.market.listings : null,
+            value: Number.isFinite(value) ? value : null,
+            bazaar: model.bazaar != null && Array.isArray(model.bazaar.listings) ? model.bazaar.listings : null,
+            average: average
+        };
+    }
+
+    // One formula, the way a Fill prices it. `alone` is true when it is the whole setting: only
+    // then does a bazaar with no listings fall back to the item market, as it does on a Fill.
+    function liveBranch(formula, data, alone){
+        let d = helpParts(formula);
+        if (d.scalar === 'fixed'){
+            d.price = d.fixed;
+            return d;
+        }
+        if (d.scalar != null){
+            d.base = d.scalar === 'market' ? data.value : data.average;
+            if (d.base == null){
+                d.missing = d.scalar === 'market' ? 'the market value' : 'the bazaar average';
+                return d;
+            }
+            d.price = Math.round(performOperation(d.base, d.delta));
+            return d;
+        }
+        let limit = null;
+        if (d.limitFormula != null){
+            let limitBranch = liveBranch(d.limitFormula, data, false);
+            if (limitBranch.missing != null){
+                d.missing = limitBranch.missing;
+                return d;
+            }
+            if (limitBranch.price == null){
+                d.unmatched = "the price after 'above' (" + d.limitFormula + ") could not be worked out";
+                return d;
+            }
+            limit = d.limit = limitBranch.price;
+        }
+        let used = formula;
+        let listings = null;
+        if (d.source === SOURCE_BAZAAR){
+            if (data.bazaar == null){
+                d.missing = 'the bazaar listings';
+                return d;
+            }
+            if (data.bazaar.length > 0){
+                listings = data.bazaar;
+            } else if (!alone){
+                d.nothing = true;
+                return d;
+            } else {
+                used = itemMarketFallbackFormula(formula);
+                d.fallback = true;
+                d.source = SOURCE_ITEM_MARKET;
+                d.sel = listingSelector(used);
+            }
+        }
+        if (listings == null){
+            if (data.market == null){
+                d.missing = 'the item-market listings';
+                return d;
+            }
+            if (data.market.length === 0){
+                d.error = 'there are no item-market listings';
+                return d;
+            }
+            listings = data.market;
+        }
+        if (usesMine(used) && data.mine == null){
+            d.missing = 'your stack size';
+            return d;
+        }
+        d.all = listings;
+        d.minimum = minimumStack(used, data.mine, d.source);
+        let eligible = eligibleListings(listings, used, d.source, { mine: data.mine, limit: limit });
+        if (eligible.unmatched != null){
+            d.unmatched = eligible.unmatched;
+            d.kept = [];
+            return d;
+        }
+        d.kept = eligible.listings;
+        if (d.sel.kind === 'median'){
+            d.base = getMedianPrice(d.kept);
+        } else {
+            let index = Math.min(d.sel.index, d.kept.length - 1);
+            d.pick = d.kept[index];
+            d.clamped = d.sel.index > index;
+            d.base = d.pick.price;
+            // Only the ones passed over on the way to it, as the analytics popup counts them.
+            d.skipped = listings.slice(0, listings.indexOf(d.pick)).filter(function(listing){
+                return d.kept.indexOf(listing) === -1;
+            }).length;
+        }
+        d.price = Math.round(performOperation(d.base, d.delta));
+        return d;
+    }
+
+    function liveNode(node, data, alone){
+        if (node.kind === 'formula'){
+            return liveBranch(node.formula, data, alone);
+        }
+        let children = node.children.map(function(child){ return liveNode(child, data, false); });
+        let price = null;
+        let win = -1;
+        children.forEach(function(child, index){
+            if (typeof child.price === 'number' && isFinite(child.price) &&
+                (price == null || (node.combine === 'min' ? child.price < price : child.price > price))){
+                price = child.price;
+                win = index;
+            }
+        });
+        return { kind: 'combine', combine: node.combine, children: children, price: price, win: win };
+    }
+
+    function liveMissing(result, found){
+        found = found ?? [];
+        if (result.kind === 'formula'){
+            if (result.missing != null && found.indexOf(result.missing) === -1){
+                found.push(result.missing);
+            }
+        } else {
+            result.children.forEach(function(child){ liveMissing(child, found); });
+        }
+        return found;
+    }
+
+    function wordsNode(node){
+        if (node.kind === 'formula'){
+            return helpParts(node.formula);
+        }
+        return { kind: 'combine', combine: node.combine, children: node.children.map(wordsNode), price: null, win: -1 };
+    }
+
+    function winningBranch(result){
+        if (result == null || result.kind === 'formula'){
+            return result;
+        }
+        return result.win >= 0 ? winningBranch(result.children[result.win]) : null;
+    }
+
+    // What a setting does: {problem} when Save would refuse it, otherwise its words and, when
+    // the last item's reads cover it, its priced tree.
+    function liveEvaluate(setting){
+        let problem = settingProblem(setting);
+        if (problem != null){
+            return { problem: problem };
+        }
+        let root = parseSetting(setting);
+        let check = { root: root, words: capitalise(settingInWords(root)), result: null, missing: [], price: null };
+        let data = settingsHelp.data;
+        if (data == null){
+            return check;
+        }
+        let result = liveNode(root, data, true);
+        if (root.kind !== 'formula' && result.price == null && liveMissing(result).length === 0){
+            // Nothing priced: a Fill then runs the first formula on its own, fallback and all.
+            result.rerun = liveBranch(collectFormulas(root)[0], data, true);
+            result.price = result.rerun.price;
+        }
+        check.missing = liveMissing(result);
+        if (check.missing.length === 0){
+            check.result = result;
+            check.price = result.price;
+        }
+        return check;
+    }
+
+    // ---- Live check rendering ---------------------------------------------------------------
+
+    function liveStepsHtml(rows){
+        return '<dl class="tmf-live-steps">' + rows.map(function(row){ return '<dt>' + row[0] + '</dt><dd>' + row[1] + '</dd>'; }).join('') + '</dl>';
+    }
+
+    function liveSteps(d, priced){
+        let rows = [];
+        if (d.scalar === 'fixed'){
+            rows.push(['Look at', 'nothing: the price is set, whatever anyone else charges']);
+            rows.push(['Price', '<b class="tmf-live-win">' + money(d.fixed) + '</b>']);
+            return liveStepsHtml(rows);
+        }
+        if (d.scalar != null){
+            rows.push(['Start from', (d.scalar === 'market' ? 'Torn market value' : 'the bazaar average') + (priced ? ' <b>' + money(d.base) + '</b>' : '')]);
+        } else {
+            let tail = helpStackTail(d);
+            let look = capitalise(helpSourceWord(d.source)) + ' listings';
+            if (tail != null){
+                look += ', stacks ' + tail + (priced && d.sel.mineFactor != null && typeof d.minimum === 'number' ? ' (' + count(d.minimum) + '+)' : '');
+            }
+            if (d.limitFormula != null){
+                look += ', only ones that keep you at or above <code>' + escapeHtml(d.limitFormula) + '</code>' + (priced && d.limit != null ? ' = ' + money(d.limit) : '');
+            }
+            if (priced && d.fallback){
+                look = 'No bazaar listings, so the item market: ' + look.charAt(0).toLowerCase() + look.slice(1);
+            }
+            rows.push(['Look at', look]);
+            if (priced && d.error != null){
+                rows.push(['Found', escapeHtml(capitalise(d.error)) + '.']);
+                return liveStepsHtml(rows);
+            }
+            if (priced && d.nothing){
+                rows.push(['Found', 'no usable bazaar price, so this one sits out.']);
+                return liveStepsHtml(rows);
+            }
+            if (priced && d.unmatched != null){
+                rows.push(['Found', 'nothing: ' + escapeHtml(d.unmatched) + '. Fill leaves the price as it is.']);
+                return liveStepsHtml(rows);
+            }
+            let pick;
+            if (d.sel.kind === 'median'){
+                pick = priced ? 'median of ' + count(d.kept.length) + ' listings, by unit: <b>' + money(d.base) + '</b>' : 'the median price, by unit';
+            } else {
+                pick = helpWhich(d.sel);
+                if (priced){
+                    pick += ': <b>' + money(d.pick.price) + '</b> ×' + count(d.pick.amount);
+                    if (d.clamped){
+                        pick += ' (there are only ' + count(d.kept.length) + ', so the last one)';
+                    }
+                    if (d.skipped > 0){
+                        pick += ', after skipping ' + count(d.skipped);
+                    }
+                }
+            }
+            rows.push(['Pick', capitalise(pick)]);
+        }
+        let delta = helpDelta(d.delta);
+        rows.push(['Change', delta != null ? (delta.down ? 'minus ' : 'plus ') + delta.amount : 'nothing']);
+        if (priced){
+            rows.push(['Price', '<b class="tmf-live-win">' + money(d.price) + '</b>']);
+        }
+        return liveStepsHtml(rows);
+    }
+
+    function liveTree(node, depth, onWinningPath, priced){
+        let indent = ' style="margin-left:' + (depth * 14) + 'px"';
+        if (node.kind === 'formula'){
+            let why = formulaInWords(node);
+            if (priced && node.unmatched != null){
+                why = capitalise(node.unmatched);
+            } else if (priced && node.nothing){
+                why = 'No usable bazaar price, so this one sits out';
+            } else if (priced && node.error != null){
+                why = capitalise(node.error);
+            } else {
+                why = capitalise(why);
+            }
+            let price = priced ? '<span class="p">' + (typeof node.price === 'number' ? money(node.price) : '—') + '</span>' : '';
+            return '<div class="tmf-live-tr' + (priced && onWinningPath ? ' tmf-live-tr--win' : '') + '"' + indent + '><code>' + escapeHtml(node.formula) + '</code>' + price + '<span class="w">' + escapeHtml(why) + '</span></div>';
+        }
+        let html = '<div class="tmf-live-tr"' + indent + '><span class="op">' + node.combine + '(</span></div>';
+        node.children.forEach(function(child, index){
+            html += liveTree(child, depth + 1, onWinningPath && index === node.win, priced);
+        });
+        html += '<div class="tmf-live-tr' + (priced && depth === 0 && node.win >= 0 ? ' tmf-live-tr--win' : '') + '"' + indent + '><span class="op">)</span>' +
+            (priced ? '<span class="p">' + (node.win >= 0 ? money(node.children[node.win].price) : '—') + '</span>' : '') +
+            '<span class="w">keeps the ' + (node.combine === 'min' ? 'lowest' : 'highest') + ' of ' + node.children.length + '</span></div>';
+        return html;
+    }
+
+    // The listings the winning formula read, with the one it picked, the ones it skipped, and
+    // where your price would sit among them. Only the rows that tell the story are shown.
+    function liveLadder(d, you, mine){
+        if (d == null || !Array.isArray(d.all) || typeof you !== 'number'){
+            return '';
+        }
+        let kept = d.kept ?? d.all;
+        let rows = d.all.map(function(listing){ return { listing: listing }; });
+        let ahead = d.all.filter(function(listing){ return listing.price <= you; }).length;
+        rows.splice(ahead, 0, { you: true });
+        let shown = new Set();
+        rows.forEach(function(row, index){
+            if (index < LIVE_LADDER_LEAD_ROWS || row.you || (row.listing != null && row.listing === d.pick)){
+                shown.add(index - 1);
+                shown.add(index);
+                shown.add(index + 1);
+            }
+        });
+        let html = '<div class="tmf-live-lad-h">' + (d.source === SOURCE_BAZAAR ? 'Bazaar' : 'Item-market') + ' listings</div><div class="tmf-live-lad">';
+        let hidden = 0;
+        rows.forEach(function(row, index){
+            if (!shown.has(index)){
+                hidden++;
+                return;
+            }
+            if (hidden > 0){
+                html += '<div class="tmf-live-lr tmf-live-lr--gap">' + count(hidden) + ' more</div>';
+                hidden = 0;
+            }
+            if (row.you){
+                html += '<div class="tmf-live-lr tmf-live-lr--you"><span class="p">' + money(you) + '</span><span class="q">' + (mine != null ? '×' + count(mine) : '') + '</span><span class="n">you · ' + ordinal(ahead + 1) + ' in line</span></div>';
+                return;
+            }
+            let listing = row.listing;
+            let picked = listing === d.pick;
+            let counted = kept.indexOf(listing) !== -1;
+            let note = picked ? 'picked' : '';
+            if (!counted){
+                note = typeof d.minimum === 'number' && Number(listing.amount ?? 1) < d.minimum ? 'skipped · under ' + count(d.minimum) : 'skipped · below the limit';
+            }
+            html += '<div class="tmf-live-lr' + (picked ? ' tmf-live-lr--pick' : '') + (!counted ? ' tmf-live-lr--dim' : '') + '"><span class="p">' + money(listing.price) + '</span><span class="q">×' + count(listing.amount ?? 1) + '</span><span class="n">' + note + '</span></div>';
+        });
+        if (hidden > 0){
+            html += '<div class="tmf-live-lr tmf-live-lr--gap">' + count(hidden) + ' more</div>';
+        }
+        return html + '</div>';
+    }
+
+    function liveExplain(check){
+        let priced = check.result != null;
+        let node = priced ? check.result : wordsNode(check.root);
+        let say = '<div class="tmf-live-say">' + escapeHtml(check.words) + (priced && check.price != null ? ' → <b>' + money(check.price) + '</b>' : '') + '.</div>';
+        if (node.kind === 'formula'){
+            return say + liveSteps(node, priced) + (priced ? liveLadder(node, node.price, settingsHelp.data.mine) : '');
+        }
+        let html = say + '<div class="tmf-live-tree">' + liveTree(node, 0, true, priced) + '</div>';
+        if (priced && node.rerun != null){
+            html += '<div class="tmf-live-muted">None of these priced, so a Fill runs <code>' + escapeHtml(node.rerun.formula) + '</code> on its own: ' +
+                (node.rerun.price != null ? money(node.rerun.price) : 'nothing') + '.</div>';
+        }
+        if (priced && check.price != null){
+            html += liveLadder(node.rerun ?? winningBranch(node), check.price, settingsHelp.data.mine);
+        }
+        return html;
+    }
+
+    function liveFoot(check){
+        let data = settingsHelp.data;
+        if (data == null){
+            return settingsHelp.loading ? '' : '<div class="tmf-live-foot">Fill an item, or open its analytics, to see prices here.</div>';
+        }
+        if (check != null && check.missing.length > 0){
+            return '<div class="tmf-live-foot">Your last fill, ' + escapeHtml(data.name) + ', did not read ' + escapeHtml(check.missing.join(' or ')) +
+                '. Opening that item\'s analytics reads them all.</div>';
+        }
+        return '<div class="tmf-live-foot">From your last fill. Nothing here calls the API.</div>';
+    }
+
+    function helpFieldKind(input){
+        if (input == null || input.classList == null){
+            return null;
+        }
+        if (input.classList.contains('tmf-modal-delta') || input.classList.contains('tmf-modal-cat-formula')){
+            return 'price';
+        }
+        if (input.classList.contains('tmf-modal-qty') || input.classList.contains('tmf-modal-cat-qty')){
+            return 'quantity';
+        }
+        return null;
+    }
+
+    function helpFieldName(input){
+        let kind = helpFieldKind(input);
+        let row = input.closest('.tmf-modal-cat-row');
+        if (row == null){
+            return kind === 'quantity' ? 'Default quantity' : 'Default price';
+        }
+        let name = row.querySelector('.tmf-modal-cat-name').value.trim();
+        return (name === '' ? 'New category' : name) + (kind === 'quantity' ? ' quantity' : ' price');
+    }
+
+    // A field that has since been removed with its category row hands over to the default one.
+    function helpInput(overlay, which){
+        let input = settingsHelp[which];
+        if (input == null || !input.isConnected){
+            input = overlay.querySelector(which === 'lastQuantity' ? '.tmf-modal-qty' : '.tmf-modal-delta');
+            settingsHelp[which] = input;
+        }
+        return input;
+    }
+
+    function renderLiveCheck(overlay){
+        let box = overlay.querySelector('.tmf-live');
+        let on = isLiveCheckOn();
+        overlay.querySelector('.tmf-help-switch').setAttribute('aria-checked', String(on));
+        if (!on){
+            box.hidden = true;
+            return;
+        }
+        let field = helpInput(overlay, 'field');
+        let anchor = field.closest('.tmf-modal-cat-row') ?? field;
+        if (anchor.nextElementSibling !== box){
+            anchor.insertAdjacentElement('afterend', box);
+        }
+        box.hidden = false;
+        let kind = helpFieldKind(field);
+        let text = field.value.trim();
+        let blank = '';
+        if (text === ''){
+            let row = field.closest('.tmf-modal-cat-row');
+            if (kind === 'quantity'){
+                text = row == null ? 'max' : (overlay.querySelector('.tmf-modal-qty').value.trim() || 'max');
+                blank = row == null ? 'Blank means <code>max</code>.' : 'Blank, so it uses the default quantity, <code>' + escapeHtml(text) + '</code>.';
+            } else {
+                text = row == null ? priceDeltaRaw : (overlay.querySelector('.tmf-modal-delta').value.trim() || priceDeltaRaw);
+                blank = row == null ? 'Blank keeps your saved price, <code>' + escapeHtml(text) + '</code>.' : 'Blank, so it uses the default price, <code>' + escapeHtml(text) + '</code>.';
+            }
+            blank = '<div class="tmf-live-muted">' + blank + '</div>';
+        }
+        let data = settingsHelp.data;
+        let where = data != null ? escapeHtml(data.name) + (data.mine != null ? ' · stack ' + count(data.mine) : '') : (settingsHelp.loading ? 'reading…' : 'no prices yet');
+        let html = '<div class="tmf-live-h"><span>Live check · ' + escapeHtml(helpFieldName(field)) + '</span><span>' + where + '</span></div>' + blank;
+        let bad = false;
+        if (kind === 'quantity'){
+            if (!isKnownQuantityMode(text)){
+                bad = true;
+                html += '<div class="tmf-live-err">Can\'t save this yet: use max, max-1, a plain number, or skip.</div>';
+            } else {
+                html += '<div class="tmf-live-say">' + escapeHtml(quantityInWords(text, data)) + '</div>';
+                if (data == null){
+                    html += liveFoot(null);
+                } else if (data.mine == null){
+                    html += liveFoot({ missing: ['your stack size'] });
+                }
+            }
+        } else {
+            let check = liveEvaluate(text);
+            if (check.problem != null){
+                bad = true;
+                html += '<div class="tmf-live-err">Can\'t save this yet: ' + escapeHtml(check.problem) + '</div>';
+            } else {
+                html += liveExplain(check);
+                // A plain number reads as "that much more than the cheapest", which is not
+                // always what was meant.
+                if (/^\d+$/.test(text)){
+                    html += '<div class="tmf-live-muted">For exactly ' + money(Number(text)) + ', write <code>=' + escapeHtml(text) + '</code>.</div>';
+                }
+                html += liveFoot(check);
+            }
+        }
+        field.classList.toggle('tmf-modal-invalid', bad);
+        box.innerHTML = html;
+    }
+
+    // ---- Cheatsheet -----------------------------------------------------------------------------
+
+    function cheatsheetTarget(overlay){
+        let tab = cheatsheetTabs()[settingsHelp.tab];
+        return helpInput(overlay, tab.kind === 'quantity' ? 'lastQuantity' : 'lastPrice');
+    }
+
+    function renderCheatsheet(overlay){
+        let tabs = cheatsheetTabs();
+        let tab = tabs[settingsHelp.tab];
+        overlay.querySelector('.tmf-sheet-tabs').innerHTML = tabs.map(function(each, index){
+            return '<button type="button" role="tab" data-tab="' + index + '" aria-selected="' + (index === settingsHelp.tab) + '">' + each.name + '</button>';
+        }).join('');
+        overlay.querySelector('.tmf-sheet-rows').innerHTML = tab.rows.map(function(row){
+            return '<button type="button" class="tmf-sheet-row' + (tab.wide ? ' tmf-sheet-row--wide' : '') + '" data-value="' + escapeHtml(row[0]) + '">' +
+                '<code>' + escapeHtml(row[0]) + '</code><span>' + escapeHtml(row[1]) + '</span></button>';
+        }).join('');
+        overlay.querySelector('.tmf-sheet-note').textContent = tab.note;
+        renderCheatsheetHint(overlay);
+    }
+
+    function renderCheatsheetHint(overlay){
+        let target = cheatsheetTarget(overlay);
+        overlay.querySelector('.tmf-sheet-hint').innerHTML = 'Tap a row to put it in <b>' + escapeHtml(helpFieldName(target)) + '</b>.';
+        let value = target.value.trim();
+        overlay.querySelectorAll('.tmf-sheet-row').forEach(function(row){
+            row.classList.toggle('tmf-sheet-row--on', row.dataset.value === value);
+        });
+    }
+
+    function renderCheatsheetTried(overlay){
+        let box = overlay.querySelector('.tmf-sheet-tried');
+        let tried = settingsHelp.tried;
+        if (tried == null || !tried.input.isConnected){
+            box.innerHTML = '';
+            return;
+        }
+        let html = 'Now in ' + escapeHtml(helpFieldName(tried.input)) + ': <code>' + escapeHtml(tried.value) + '</code>. ';
+        if (!isLiveCheckOn()){
+            html += 'Turn on Live check to see what it does.';
+        } else if (helpFieldKind(tried.input) === 'quantity'){
+            html += escapeHtml(quantityInWords(tried.value, settingsHelp.data));
+        } else {
+            let check = liveEvaluate(tried.value);
+            html += check.problem != null ? escapeHtml(check.problem) : escapeHtml(check.words) + (check.price != null ? ' → <b>' + money(check.price) + '</b>.' : '.');
+        }
+        box.innerHTML = html;
+    }
+
+    // ---- Write it for me ------------------------------------------------------------------------
+
+    function openWizard(overlay){
+        settingsHelp.wizardTarget = helpInput(overlay, 'lastPrice');
+        settingsHelp.answers = wizardFirstAnswers();
+        overlay.querySelector('.tmf-wiz-qs').innerHTML = wizardQuestions().map(function(question){
+            return '<div class="tmf-wiz-q"><span>' + question.ask + '</span><div class="tmf-wiz-seg" data-key="' + question.key + '">' +
+                question.options.map(function(option){
+                    return '<button type="button" data-value="' + option[0] + '" aria-pressed="' + (settingsHelp.answers[question.key] === option[0]) + '">' + option[1] + '</button>';
+                }).join('') + '</div></div>';
+        }).join('');
+        overlay.querySelector('.tmf-wiz').hidden = false;
+        overlay.querySelector('.tmf-help-write').setAttribute('aria-expanded', 'true');
+        renderWizard(overlay);
+    }
+
+    function closeWizard(overlay){
+        overlay.querySelector('.tmf-wiz').hidden = true;
+        overlay.querySelector('.tmf-help-write').setAttribute('aria-expanded', 'false');
+    }
+
+    function renderWizard(overlay){
+        let panel = overlay.querySelector('.tmf-wiz');
+        if (panel.hidden){
+            return;
+        }
+        let target = settingsHelp.wizardTarget;
+        if (target == null || !target.isConnected){
+            target = settingsHelp.wizardTarget = overlay.querySelector('.tmf-modal-delta');
+        }
+        overlay.querySelector('.tmf-wiz-for').textContent = 'for ' + helpFieldName(target);
+        let formula = wizardFormula(settingsHelp.answers);
+        let check = liveEvaluate(formula);
+        overlay.querySelector('.tmf-wiz-out').innerHTML =
+            '<div class="tmf-wiz-f"><code>' + escapeHtml(formula) + '</code></div>' +
+            '<div class="tmf-wiz-say">' + escapeHtml(check.words ?? check.problem) + (check.price != null ? ' → <b>' + money(check.price) + '</b> on ' + escapeHtml(settingsHelp.data.name) : '') + '.</div>' +
+            '<button type="button" class="tmf-wiz-use" data-value="' + escapeHtml(formula) + '">Use this in ' + escapeHtml(helpFieldName(target)) + '</button>';
+    }
+
+    // ---- Wiring ---------------------------------------------------------------------------------
+
+    function settingsHelpMarkup(){
+        return '<div class="tmf-help-bar">' +
+                '<button type="button" class="tmf-help-switch" role="switch" aria-checked="true"><span class="tmf-help-track"></span>Live check</button>' +
+                '<button type="button" class="tmf-help-write" aria-expanded="false">Write it for me</button>' +
+            '</div>' +
+            '<div class="tmf-wiz" hidden>' +
+                '<div class="tmf-wiz-h"><span>Write it for me<small class="tmf-wiz-for"></small></span><span class="tmf-wiz-close" title="Close">&times;</span></div>' +
+                '<div class="tmf-wiz-qs"></div>' +
+                '<div class="tmf-wiz-out"></div>' +
+            '</div>' +
+            '<details class="tmf-sheet">' +
+                '<summary>Cheatsheet</summary>' +
+                '<div class="tmf-anat">' +
+                    '<div class="tmf-anat-part"><code>-5%</code><i class="tmf-anat-brace"></i><span>how much to change it</span></div>' +
+                    '<div class="tmf-anat-part"><code>[bazaar:2]</code><i class="tmf-anat-brace"></i><span>which price to start from</span></div>' +
+                '</div>' +
+                '<p class="tmf-anat-note">Leave out the brackets to start from the cheapest item-market listing.</p>' +
+                '<div class="tmf-sheet-tabs" role="tablist"></div>' +
+                '<p class="tmf-sheet-hint"></p>' +
+                '<div class="tmf-sheet-rows" role="tabpanel"></div>' +
+                '<p class="tmf-sheet-note"></p>' +
+                '<div class="tmf-sheet-tried"></div>' +
+            '</details>';
+    }
+
+    // Put a value into a settings field for the player, without focusing it: on a phone that
+    // would pop the keyboard up over the very thing they are reading.
+    function helpPut(overlay, input, value){
+        input.value = value;
+        input.classList.remove('tmf-modal-invalid');
+        settingsHelp.field = input;
+        settingsHelp[helpFieldKind(input) === 'quantity' ? 'lastQuantity' : 'lastPrice'] = input;
+        renderLiveCheck(overlay);
+        renderCheatsheetHint(overlay);
+    }
+
+    // Focus lands in the middle of a tap, and redrawing the live check (or the cheatsheet hint)
+    // there can change the height of what sits above the tapped field, pulling the field out from
+    // under the finger. On a phone the tap then ends on the API key box instead, and Android shuts
+    // the keyboard it had just opened. So the redraw waits for the click that ends the tap, or
+    // half a second when focus came without one (Tab).
+    function afterTap(overlay, draw){
+        let timer = null;
+        let run = function(){
+            overlay.removeEventListener('click', run, true);
+            clearTimeout(timer);
+            setTimeout(draw, 0);
+        };
+        overlay.addEventListener('click', run, true);
+        timer = setTimeout(run, 500);
+    }
+
+    function attachSettingsHelp(overlay){
+        overlay.addEventListener('focusin', function(event){
+            let input = event.target;
+            if (input.classList != null && input.classList.contains('tmf-modal-cat-name')){
+                input = input.closest('.tmf-modal-cat-row').querySelector('.tmf-modal-cat-formula');
+            }
+            let kind = helpFieldKind(input);
+            if (kind == null){
+                return;
+            }
+            settingsHelp.field = input;
+            settingsHelp[kind === 'quantity' ? 'lastQuantity' : 'lastPrice'] = input;
+            afterTap(overlay, function(){
+                renderLiveCheck(overlay);
+                renderCheatsheetHint(overlay);
+            });
+        });
+        overlay.addEventListener('input', function(event){
+            if (event.target.classList.contains('tmf-modal-apikey')){
+                return;
+            }
+            renderLiveCheck(overlay);
+            renderCheatsheetHint(overlay);
+            renderWizard(overlay);
+        });
+        overlay.querySelector('.tmf-help-switch').addEventListener('click', function(){
+            localStorage.setItem(liveCheckStorageKey, isLiveCheckOn() ? '0' : '1');
+            renderLiveCheck(overlay);
+            renderCheatsheetTried(overlay);
+        });
+        overlay.querySelector('.tmf-help-write').addEventListener('click', function(){
+            if (overlay.querySelector('.tmf-wiz').hidden){
+                openWizard(overlay);
+            } else {
+                closeWizard(overlay);
+            }
+        });
+        overlay.querySelector('.tmf-wiz-close').addEventListener('click', function(){ closeWizard(overlay); });
+        overlay.querySelector('.tmf-wiz').addEventListener('click', function(event){
+            let use = event.target.closest('.tmf-wiz-use');
+            if (use != null){
+                let target = settingsHelp.wizardTarget;
+                helpPut(overlay, target, use.dataset.value);
+                closeWizard(overlay);
+                if (typeof target.scrollIntoView === 'function'){
+                    target.scrollIntoView({ block: 'nearest' });
+                }
+                return;
+            }
+            let option = event.target.closest('.tmf-wiz-seg button');
+            if (option == null){
+                return;
+            }
+            let segment = option.parentElement;
+            settingsHelp.answers[segment.dataset.key] = option.dataset.value;
+            segment.querySelectorAll('button').forEach(function(button){
+                button.setAttribute('aria-pressed', String(button === option));
+            });
+            renderWizard(overlay);
+        });
+        let sheet = overlay.querySelector('.tmf-sheet');
+        sheet.addEventListener('toggle', function(){
+            localStorage.setItem(cheatsheetOpenStorageKey, sheet.open ? '1' : '0');
+        });
+        overlay.querySelector('.tmf-sheet-tabs').addEventListener('click', function(event){
+            let button = event.target.closest('button[data-tab]');
+            if (button == null){
+                return;
+            }
+            settingsHelp.tab = parseInt(button.dataset.tab, 10);
+            localStorage.setItem(cheatsheetTabStorageKey, String(settingsHelp.tab));
+            renderCheatsheet(overlay);
+        });
+        overlay.querySelector('.tmf-sheet-rows').addEventListener('click', function(event){
+            let row = event.target.closest('.tmf-sheet-row');
+            if (row == null){
+                return;
+            }
+            let target = cheatsheetTarget(overlay);
+            helpPut(overlay, target, row.dataset.value);
+            settingsHelp.tried = { input: target, value: row.dataset.value };
+            renderCheatsheetTried(overlay);
+        });
+    }
+
+    // Before the fields are refilled: park the live check under the default price, where
+    // clearing the category list cannot take it with it, and forget the last window's state.
+    function resetSettingsHelp(overlay){
+        let box = overlay.querySelector('.tmf-live');
+        overlay.querySelector('.tmf-modal-delta').insertAdjacentElement('afterend', box);
+        settingsHelp.field = settingsHelp.lastPrice = overlay.querySelector('.tmf-modal-delta');
+        settingsHelp.lastQuantity = overlay.querySelector('.tmf-modal-qty');
+        settingsHelp.tried = null;
+        settingsHelp.data = null;
+        settingsHelp.loading = liveCheckSession != null;
+        settingsHelp.seq++;
+        closeWizard(overlay);
+        let tab = parseInt(localStorage.getItem(cheatsheetTabStorageKey) ?? '1', 10);
+        settingsHelp.tab = Number.isInteger(tab) && tab >= 0 && tab < cheatsheetTabs().length ? tab : 1;
+        overlay.querySelector('.tmf-sheet').open = localStorage.getItem(cheatsheetOpenStorageKey) === '1';
+    }
+
+    // Once the fields hold their values: draw everything, then price it on the last item.
+    function startSettingsHelp(overlay){
+        renderCheatsheet(overlay);
+        renderCheatsheetTried(overlay);
+        renderLiveCheck(overlay);
+        if (!settingsHelp.loading){
+            return;
+        }
+        let seq = settingsHelp.seq;
+        loadLiveCheckData().catch(function(error){
+            console.warn("[TU Market Price Auto Fill] Live check could not read the last fill:", error);
+            return null;
+        }).then(function(data){
+            if (seq !== settingsHelp.seq){
+                return;
+            }
+            settingsHelp.data = data;
+            settingsHelp.loading = false;
+            renderLiveCheck(overlay);
+            renderCheatsheetTried(overlay);
+            renderWizard(overlay);
+        });
+    }
+
+    // A category row was removed: whatever pointed at it moves back to the defaults.
+    function settingsHelpRowRemoved(){
+        let overlay = document.querySelector('.tmf-settings-overlay');
+        if (overlay == null){
+            return;
+        }
+        renderLiveCheck(overlay);
+        renderCheatsheetHint(overlay);
+        renderCheatsheetTried(overlay);
+        renderWizard(overlay);
+    }
+
+    function displayPaneMarkup(){
+        return '<div class="tmf-modal-note">Choose what the script adds to the page.</div>' +
+            DISPLAY_OPTIONS.map(function(option){
+                return '<label class="tmf-modal-toggle"><input type="checkbox" class="tmf-modal-show" data-show="' + option.key + '">' + option.label + '</label>' +
+                    '<div class="tmf-modal-hint">' + option.hint + '</div>';
+            }).join('') +
+            '<label class="tmf-modal-toggle"><input type="checkbox" class="tmf-modal-popup">Show lowest-prices popup</label>' +
+            '<div class="tmf-modal-hint">The list of the cheapest listings that opens when you press Fill.</div>' +
+            '';
+    }
+
+    function showSettingsPane(overlay, pane){
+        overlay.querySelectorAll('.tmf-modal-tabs [data-pane]').forEach(function(tab){
+            tab.setAttribute('aria-selected', String(tab.dataset.pane === pane));
+        });
+        overlay.querySelectorAll('.tmf-modal-pane').forEach(function(section){
+            section.hidden = section.dataset.pane !== pane;
+        });
+    }
+
+    function ensureSettingsModal(){
+        if (document.querySelector('.tmf-settings-overlay') != null){
+            return;
+        }
+        const overlay = document.createElement('div');
+        overlay.className = 'tmf-modal-overlay tmf-settings-overlay';
+        overlay.innerHTML =
+            '<div class="tmf-modal">' +
+                '<h3>Pricing Rules and Formula Assistance<span class="tmf-modal-close" title="Close">&times;</span></h3>' +
+                '<div class="tmf-modal-tabs" role="tablist">' +
+                    '<button type="button" role="tab" data-pane="prices" aria-selected="true">Prices</button>' +
+                    '<button type="button" role="tab" data-pane="display" aria-selected="false">Display</button>' +
+                '</div>' +
+                '<div class="tmf-modal-pane" data-pane="prices">' +
+                settingsHelpMarkup() +
+                '<label>Default price</label>' +
+                '<input type="text" class="tmf-modal-delta" placeholder="-1[0]">' +
+                '<div class="tmf-live" hidden></div>' +
+                '<label>Default quantity</label>' +
+                '<input type="text" class="tmf-modal-qty" placeholder="max">' +
+                '<label>API keys are managed in TU Settings</label>' +
+                '<div class="tmf-modal-key">' +
+                    '<input type="password" class="tmf-modal-apikey" placeholder="16-character key" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">' +
+                    '<span class="tmf-modal-key-reveal" title="Show the key">Show</span>' +
+                '</div>' +
+                '<label>Per-category overrides</label>' +
+                '<div class="tmf-modal-cat-head"><span>Category</span><span>Price</span><span>Quantity</span><span></span></div>' +
+                '<div class="tmf-modal-cats"></div>' +
+                '<button type="button" class="tmf-modal-addcat">+ Add category</button>' +
+                '<button type="button" class="tmf-modal-resetcat" title="Forget cached item categories. Use if Torn recategorised an item and a wrong discount is being applied.">Reset learned categories</button>' +
+                '<button type="button" class="tmf-modal-clearexcl" title="Un-exclude every item marked ⊘, including ones not currently on screen.">Clear exclusions</button>' +
+                '</div>' +
+                '<div class="tmf-modal-pane" data-pane="display" hidden>' + displayPaneMarkup() + '</div>' +
+                '<div class="tmf-modal-error"></div>' +
+                '<div class="tmf-modal-actions">' +
+                    '<button type="button" class="tmf-modal-cancel">Cancel</button>' +
+                    '<button type="button" class="tmf-modal-save">Save</button>' +
+                '</div>' +
+            '</div>' +
+            '<datalist id="tmf-modal-cat-list">' + SETTINGS_CATEGORIES.map(c => '<option value="' + c + '"></option>').join('') + '</datalist>';
+        document.body.appendChild(overlay);
+
+        overlay.querySelectorAll('.tmf-modal-tabs [data-pane]').forEach(function(tab){
+            tab.addEventListener('click', function(){ showSettingsPane(overlay, tab.dataset.pane); });
+        });
+        overlay.querySelector('.tmf-modal-close').addEventListener('click', closeSettingsModal);
+        overlay.querySelector('.tmf-modal-cancel').addEventListener('click', closeSettingsModal);
+        overlay.addEventListener('click', function(event){ if (event.target === overlay){ closeSettingsModal(); } });
+        overlay.querySelector('.tmf-modal-addcat').addEventListener('click', function(){ addCategoryRow('', '', ''); });
+        overlay.querySelector('.tmf-modal-resetcat').addEventListener('click', function(event){
+            clearItemCategoryCache();
+            let btn = event.target;
+            btn.textContent = 'Cleared ✓';
+            setTimeout(function(){ btn.textContent = 'Reset learned categories'; }, 1500);
+        });
+        overlay.querySelector('.tmf-modal-clearexcl').addEventListener('click', function(event){
+            excluded.clear();
+            saveExcluded();
+            document.querySelectorAll('.tmf-fav').forEach(function(el){
+                renderFavIcon(el, getItemState(parseInt(el.dataset.tmfItemId, 10)));
+            });
+            let btn = event.target;
+            btn.textContent = 'Cleared ✓';
+            setTimeout(function(){ btn.textContent = 'Clear exclusions'; }, 1500);
+        });
+        // The key is masked like a password so it cannot be read off a shared screen or a
+        // screenshot. "Show" is there for the times you do need to check it.
+        overlay.querySelector('.tmf-modal-key-reveal').addEventListener('click', function(event){
+            const keyInput = overlay.querySelector('.tmf-modal-apikey');
+            const hidden = keyInput.type === 'password';
+            keyInput.type = hidden ? 'text' : 'password';
+            event.target.textContent = hidden ? 'Hide' : 'Show';
+            event.target.title = hidden ? 'Hide the key' : 'Show the key';
+        });
+        overlay.querySelector('.tmf-modal-save').addEventListener('click', saveSettingsModal);
+        attachSettingsHelp(overlay);
+    }
+
+    function addCategoryRow(name, formula, quantity){
+        const list = document.querySelector('.tmf-modal-cats');
+        if (list == null){
+            return;
+        }
+        const row = document.createElement('div');
+        row.className = 'tmf-modal-cat-row';
+        row.innerHTML =
+            '<input type="text" class="tmf-modal-cat-name" list="tmf-modal-cat-list" placeholder="Category">' +
+            '<input type="text" class="tmf-modal-cat-formula" placeholder="-5%">' +
+            '<input type="text" class="tmf-modal-cat-qty" placeholder="max-1">' +
+            '<span class="tmf-modal-cat-del" title="Remove">&times;</span>';
+        row.querySelector('.tmf-modal-cat-name').value = name;
+        row.querySelector('.tmf-modal-cat-formula').value = formula;
+        row.querySelector('.tmf-modal-cat-qty').value = quantity;
+        row.querySelector('.tmf-modal-cat-del').addEventListener('click', function(){ row.remove(); settingsHelpRowRemoved(); });
+        list.appendChild(row);
+    }
+
+    function openSettingsModal(){
+        ensureSettingsModal();
+        const overlay = document.querySelector('.tmf-settings-overlay');
+        clearSettingsError(overlay);
+        resetSettingsHelp(overlay);
+        showSettingsPane(overlay, 'prices');
+        overlay.querySelectorAll('.tmf-modal-show').forEach(function(box){ box.checked = shows(box.dataset.show); });
+        overlay.querySelector('.tmf-modal-delta').value = priceDeltaRaw;
+        overlay.querySelector('.tmf-modal-qty').value = quantityModeRaw;
+        const keyInput = overlay.querySelector('.tmf-modal-apikey');
+        keyInput.value = '';keyInput.disabled=true;keyInput.placeholder='Managed in TU Settings → API Keys';keyInput.closest('.tmf-modal-key').hidden=true;
+        // However the key was left last time, it is masked again on every open.
+        keyInput.type = 'password';
+        const keyReveal = overlay.querySelector('.tmf-modal-key-reveal');
+        keyReveal.textContent = 'Show';
+        keyReveal.title = 'Show the key';
+        overlay.querySelector('.tmf-modal-popup').checked = showPricesPopup;
+        const list = overlay.querySelector('.tmf-modal-cats');
+        list.innerHTML = '';
+        // One row per category named by either map, so a category with only a quantity
+        // override still shows up.
+        let names = [...new Set(Object.keys(categoryDeltas).concat(Object.keys(categoryQuantities)))];
+        names.forEach(function(key){ addCategoryRow(key, categoryDeltas[key] ?? '', categoryQuantities[key] ?? ''); });
+        overlay.classList.add('tmf-modal-overlay--open');
+        if(settingsMount){settingsMount.append(overlay);overlay.dataset.tuEmbedded='1';}
+        startSettingsHelp(overlay);
+    }
+
+    function closeSettingsModal(){
+        const overlay = document.querySelector('.tmf-settings-overlay');
+        if (overlay != null){
+            overlay.classList.remove('tmf-modal-overlay--open');
+        }
+    }
+
+    // ---- Settings validation ----------------------------------------------------------
+    // Save refuses anything the filler could not act on later. A bad formula used to be stored
+    // happily and then fail every row that reached it, with nothing on screen to say why.
+
+    // A price formula is an optional discount ("-1", "+5", "-5%") followed by an optional
+    // source in brackets. Either half may be left out; a bare source means "as it stands".
+    function formulaProblem(branch){
+        let trimmed = branch.trim();
+        if (trimmed.charAt(0) === '='){
+            let fixed = fixedPrice(trimmed);
+            if (fixed == null){
+                return trimmed.indexOf('[') !== -1
+                    ? "a set price stands on its own, with nothing in [ ] after it. Write =1, not =1[0]."
+                    : "'" + trimmed + "' is not a set price. Write = and whole dollars, like =1 or =250000.";
+            }
+            return fixed >= 1 ? null : "a set price has to be at least $1.";
+        }
+        let open = branch.indexOf('[');
+        let delta = (open === -1 ? branch : branch.substring(0, open)).trim();
+        if (delta !== '' && !/^[-+]?\d+(\.\d+)?%?$/.test(delta)){
+            return "'" + delta + "' is not a discount. Use -1, +5, -5%, or nothing at all.";
+        }
+        if (open === -1){
+            return null;
+        }
+        let close = matchingBracket(branch, open);
+        if (close === -1){
+            return "'" + branch + "' is missing its closing ].";
+        }
+        if (branch.substring(close + 1).trim() !== ''){
+            return "'" + branch + "' has stray text after the ].";
+        }
+        return bracketProblem(branch);
+    }
+
+    // Whole setting: a lone formula, "a | b", or min(...)/max(...) around a list of them, which
+    // may themselves hold further calls. Blank is always fine, since it means "use the default".
+    function settingProblem(setting){
+        let raw = String(setting ?? '').trim();
+        if (raw === ''){
+            return null;
+        }
+        // Checked once up front so the term walk below can trust every ( to have its ).
+        let depth = 0;
+        for (let i = 0; i < raw.length; i++){
+            if (raw.charAt(i) === '('){
+                depth++;
+            } else if (raw.charAt(i) === ')'){
+                depth--;
+                if (depth < 0){
+                    return "there is a ) with no ( to open it.";
+                }
+            }
+        }
+        if (depth > 0){
+            return "min() and max() need a closing ).";
+        }
+        // "=1,000" would otherwise be read as =1 and a second formula, 000.
+        if (/=\s*\$?\s*\d{1,3}(,\d{3})+(?!\d)/.test(raw)){
+            return "write a set price without commas, like =1000. A comma separates formulas.";
+        }
+        return expressionProblem(raw);
+    }
+
+    // One level of a setting: the terms between its separators, each a call or a formula.
+    function expressionProblem(body){
+        let terms = splitTopLevel(body);
+        for (let i = 0; i < terms.length; i++){
+            let term = terms[i].trim();
+            if (term === ''){
+                return "there is an empty formula next to a separator.";
+            }
+            let open = term.indexOf('(');
+            if (open === -1){
+                let problem = formulaProblem(term);
+                if (problem != null){
+                    return problem;
+                }
+                continue;
+            }
+            let name = term.substring(0, open).trim().toLowerCase();
+            if (name !== 'min' && name !== 'max'){
+                return name === ''
+                    ? "a formula cannot start with (. Only min(...) and max(...) use brackets."
+                    : "'" + term.substring(0, open).trim() + "' is not a function. Only min(...) and max(...) use brackets.";
+            }
+            let close = matchingParen(term, open);
+            if (term.substring(close + 1).trim() !== ''){
+                return "'" + term + "' has stray text after the ). Separate formulas with | or ,.";
+            }
+            let inner = term.substring(open + 1, close);
+            if (inner.trim() === ''){
+                return "min() and max() need at least one formula between the brackets.";
+            }
+            let problem = expressionProblem(inner);
+            if (problem != null){
+                return problem;
+            }
+        }
+        return null;
+    }
+
+    function reportSettingsError(overlay, input, message){
+        let box = overlay.querySelector('.tmf-modal-error');
+        if (box != null){
+            box.textContent = message;
+            box.style.display = 'block';
+        }
+        input.classList.add('tmf-modal-invalid');
+        input.focus();
+        return false;
+    }
+
+    function clearSettingsError(overlay){
+        if (overlay == null){
+            return;
+        }
+        let box = overlay.querySelector('.tmf-modal-error');
+        if (box != null){
+            box.textContent = '';
+            box.style.display = 'none';
+        }
+        overlay.querySelectorAll('.tmf-modal-invalid').forEach(function(input){
+            input.classList.remove('tmf-modal-invalid');
+        });
+    }
+
+    // True when every field can be saved. Otherwise the first bad one is marked, the reason is
+    // shown, and the modal stays open so nothing the user typed is lost.
+    function validateSettingsModal(overlay){
+        clearSettingsError(overlay);
+        let deltaInput = overlay.querySelector('.tmf-modal-delta');
+        let deltaProblem = settingProblem(deltaInput.value);
+        if (deltaProblem != null){
+            return reportSettingsError(overlay, deltaInput, 'Default price: ' + deltaProblem);
+        }
+        let qtyInput = overlay.querySelector('.tmf-modal-qty');
+        if (qtyInput.value.trim() !== '' && !isKnownQuantityMode(qtyInput.value)){
+            return reportSettingsError(overlay, qtyInput, 'Default quantity: use max, max-1, a plain number, or skip.');
+        }
+        let keyInput = overlay.querySelector('.tmf-modal-apikey');
+        let key = keyInput.value.trim();
+        if (key !== '' && key.length !== 16){
+            return reportSettingsError(overlay, keyInput, 'Public API key: a Torn key is 16 characters long.');
+        }
+        let rows = overlay.querySelectorAll('.tmf-modal-cat-row');
+        for (let i = 0; i < rows.length; i++){
+            let nameInput = rows[i].querySelector('.tmf-modal-cat-name');
+            let formulaInput = rows[i].querySelector('.tmf-modal-cat-formula');
+            let rowQtyInput = rows[i].querySelector('.tmf-modal-cat-qty');
+            let name = nameInput.value.trim();
+            if (name === ''){
+                // An entirely blank row is dropped on save; only one carrying settings is a
+                // mistake worth stopping for.
+                if (formulaInput.value.trim() !== '' || rowQtyInput.value.trim() !== ''){
+                    return reportSettingsError(overlay, nameInput, 'This category row needs a category name.');
+                }
+                continue;
+            }
+            let rowProblem = settingProblem(formulaInput.value);
+            if (rowProblem != null){
+                return reportSettingsError(overlay, formulaInput, name + ' price: ' + rowProblem);
+            }
+            if (rowQtyInput.value.trim() !== '' && !isKnownQuantityMode(rowQtyInput.value)){
+                return reportSettingsError(overlay, rowQtyInput, name + ' quantity: use max, max-1, a plain number, or skip.');
+            }
+        }
+        return true;
+    }
+
+    function saveSettingsModal(){
+        const overlay = document.querySelector('.tmf-settings-overlay');
+        if (overlay == null){
+            return;
+        }
+        if (!validateSettingsModal(overlay)){
+            // The problem is on the Prices tab, which may not be the one showing.
+            showSettingsPane(overlay, 'prices');
+            const bad = overlay.querySelector('input.tmf-modal-invalid');
+            if (bad != null){
+                bad.focus();
+            }
+            return;
+        }
+        let shown = {};
+        overlay.querySelectorAll('.tmf-modal-show').forEach(function(box){ shown[box.dataset.show] = box.checked; });
+        display = shown;
+        localStorage.setItem(displayKey, JSON.stringify(display));
+        applyDisplay();
+        if (!shows('fillall') && autoFillActive){
+            stopAutoFill();
+        }
+        let deltaVal = overlay.querySelector('.tmf-modal-delta').value.trim();
+        if (deltaVal !== ''){
+            priceDeltaRaw = deltaVal;
+            localStorage.setItem("tu:market-fill:price-delta", priceDeltaRaw);
+        }
+        let qtyVal = overlay.querySelector('.tmf-modal-qty').value.trim();
+        quantityModeRaw = qtyVal === '' ? 'max' : qtyVal;
+        localStorage.setItem("tu:market-fill:quantity-mode", quantityModeRaw);
+        showPricesPopup = overlay.querySelector('.tmf-modal-popup').checked;
+        localStorage.setItem('tu:market-fill:show-prices-popup', showPricesPopup ? '1' : '0');
+        let map = Object.create(null);
+        let quantityMap = Object.create(null);
+        overlay.querySelectorAll('.tmf-modal-cat-row').forEach(function(row){
+            let name = row.querySelector('.tmf-modal-cat-name').value.trim().toLowerCase();
+            let formula = row.querySelector('.tmf-modal-cat-formula').value.trim();
+            let quantity = row.querySelector('.tmf-modal-cat-qty').value.trim();
+            if (name === ''){
+                return;
+            }
+            if (formula !== ''){
+                map[name] = formula;
+            }
+            if (quantity !== ''){
+                quantityMap[name] = quantity;
+            }
+        });
+        categoryDeltas = map;
+        categoryQuantities = quantityMap;
+        saveCategoryDeltas();
+        saveCategoryQuantities();
+        closeSettingsModal();
+        scheduleScan();showToast('Market Price Auto Fill settings saved.');
+    }
+
+    function GetPricesBreakdown(prices){
+        if (prices == null) return "No prices loaded";
+        // An error has no listings to show, only its message: "Failed!", "No listings!" and so on.
+        // The message can be Torn's or weav3r's own text, so it is escaped like any remote string.
+        if (!Array.isArray(prices) && prices.amount === 0) return escapeHtml(prices.price);
+        if (prices[0] === undefined){
+            prices = Array(prices);
+        }
+        const sb = new StringBuilder();
+        for (let i = 0; i < Math.min(prices.length, 5); i++){
+            if(prices[i] == null || typeof prices[i] !== "object" || prices[i].amount === undefined || prices[i].price === undefined) continue;
+            // Listings come from Torn or weav3r responses: only finite numbers are put in the markup.
+            const price = Number(prices[i].price);
+            const amount = Number(prices[i].amount);
+            if (!Number.isFinite(price) || !Number.isFinite(amount)) continue;
+            sb.append(`<span class="tu-market-fill-popup-price" data-price="${price}">${amount} x ${formatNumberWithCommas(price)} (${formatNumberWithCommas(Math.round(price * marketTaxFactor))})</span>`);
+            if (i < Math.min(prices.length, 5)-1){
+                sb.append('<br>');
+            }
+        }
+        return sb.toString();
+    }
+
+    function performOperation(number, operation) {
+        // A formula that is nothing but a source — "[market]", "[bazaar]" — leaves no delta
+        // behind, and means "take the source price as it stands".
+        if (operation == null || operation.trim() === '') {
+            return number;
+        }
+        const match = operation.match(/^([-+]?)(\d+(?:\.\d+)?)(%)?$/);
+        if (!match) {
+            throw new Error('Invalid operation string');
+        }
+        const [, operator, operand, isPercentage] = match;
+        const operandValue = parseFloat(operand);
+        const adjustedOperand = isPercentage ? (number * operandValue) / 100 : operandValue;
+        switch (operator) {
+            case '':
+            case '+':
+                return number + adjustedOperand;
+            case '-':
+                return number - adjustedOperand;
+            default:
+                throw new Error('Invalid operator');
+        }
+    }
+
+    function formatNumberWithCommas(number) {
+        return new Intl.NumberFormat('en-US').format(number);
+    }
+
+    function escapeHtml(text) {
+        return String(text).replace(/[&<>"']/g, function(character){
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character];
+        });
+    }
+
+    function checkApiKey(){return manager.isAuthorized();}
+
+    function getMedianPrice(items) {
+        const sorted = items
+            .map(item => ({ price: item.price, amount: Math.max(0, Math.floor(item.amount ?? 1)) }))
+            .filter(item => item.amount > 0)
+            .sort((a, b) => a.price - b.price);
+        const total = sorted.reduce((sum, item) => sum + item.amount, 0);
+        if (total === 0) {
+            return items.length > 0 ? items[0].price : undefined;
+        }
+        // The price of the unit at 0-based position `index` in the sorted run.
+        const unitAt = index => {
+            for (const item of sorted) {
+                if (index < item.amount) {
+                    return item.price;
+                }
+                index -= item.amount;
+            }
+        };
+        const mid = Math.floor(total / 2);
+        return total % 2 === 0 ? (unitAt(mid - 1) + unitAt(mid)) / 2 : unitAt(mid);
+    }
+
+    function getCurrentPage(){
+        // Case-insensitive, and tolerant of the "Your Items" naming Torn uses for the
+        // view-listings tab.
+        let href = window.location.href.toLowerCase();
+        if (href.indexOf('#/addlisting') > -1){
+            return pages.AddItems;
+        } else if (href.indexOf('#/viewlisting') > -1 || href.indexOf('#/youritems') > -1){
+            return pages.ViewItems;
+        } else {
+            return pages.Other;
+        }
+    }
+
+    function getCurrentMarketTax() {
+        return 0.05;
+    }
+
+    // function getTornToday() {
+    //     const now = document.querySelector('span.server-date-time').textContent.split(' ');
+    //     return now[now.length - 1];
+    // }
+
+    function parseDate(str) {
+        const [dd, mm, yy] = str.split('/').map(Number);
+        const fullYear = yy < 50 ? 2000 + yy : 1900 + yy;
+        return new Date(fullYear, mm - 1, dd);
+    }
+
+    const startHold = () => {
+        holdTimer = setTimeout(() => {
+            openSettingsModal();
+        }, 2000);
+    };
+
+    const cancelHold = () => {
+        clearTimeout(holdTimer);
+    };
+
+    class StringBuilder {
+        constructor() {
+            this.parts = [];
+        }
+        append(str) {
+            this.parts.push(str);
+            return this;
+        }
+        toString() {
+            return this.parts.join('');
+        }
+    }
+
+    async function readPrice(kind,id,options){try{const data=await manager.requestMarketPriceData(kind,id,options);lastNetwork='Price source responded successfully';return data;}catch(error){lastNetwork='Price source unavailable';throw error;}}
+    function notice(error){const text=String(error?.message||'Market fill failed').replace(/https?:\/\/\S+/g,'[URL]').replace(/\b[A-Za-z0-9_-]{16,}\b/g,'[redacted]').slice(0,220);errors.push({at:Date.now(),message:text});errors=errors.slice(-12);showToast(text);}
+    function priceFields(target){const row=target.closest('[data-tmf-item-id]');return [...(row||target.parentNode).querySelectorAll('[class*=priceInputWrapper] input:not([type=button]),[data-market-price-wrapper] input:not([type=button])')].filter(x=>!x.disabled);}
+    async function writeInputs(inputs,value){
+        if(!enabled||!runtimeActive||!manager.isAuthorized())throw Error('Enable this tool and verify TU before filling.');
+        const all=[...inputs];if(!all.length)throw Error('Listing input not found.');
+        const signal=requestController.signal;
+        const row=all[0].closest('[data-tmf-item-id]'),price=row&&priceFields(row.querySelector('.silmaril-market-filler-button')).includes(all[0]);
+        for(let i=0;i<all.length;i++)await setMarketInput(all[i],value,{signal,resolve:()=>{if(!row)return all[i];const button=row.querySelector('.silmaril-market-filler-button');return price?priceFields(button)[i]:[...row.querySelectorAll('[class*=amountInputWrapper] input.input-money,[data-market-quantity]')][i];}});
+        lastInput='Accepted and verified';
+    }
+    async function clearRow(target){
+        const row=target.closest('[data-tmf-item-id]');await writeInputs(priceFields(target),'');
+        if(getCurrentPage()===pages.AddItems){const inputs=row?.querySelectorAll('[class*=amountInputWrapper] input.input-money,[data-market-quantity]');if(inputs?.length)await writeInputs(inputs,'');else{const checkbox=row?.querySelector('input[type=checkbox]');if(checkbox?.checked){checkbox.click();await new Promise(r=>window.setTimeout(r,160));if(row.querySelector('input[type=checkbox]')?.checked)throw Error('Torn did not accept clearing the item selection.');}}}
+        if(target.getAttribute('data-action-flag')==='clear')switchActionFlag(target);
+    }
+    async function guardedFill(target,id,popup){
+        if(!enabled||!runtimeActive||!manager.isAuthorized()||!target.isConnected||busy.has(target))return 'skipped';
+        busy.add(target);const row=target.closest('[data-tmf-item-id]');
+        const original=[...(row?.querySelectorAll('input:not([type=button])')||[])].map(input=>({input,value:input.value,checked:input.type==='checkbox'?input.checked:null}));
+        try{const result=await performFill(target,id,popup);if(!['ok','skipped'].includes(result)&&popup)notice(Error('Price unavailable. Existing values were preserved; check API status or your formula and retry.'));return result;}
+        catch(error){lastInput='Update failed';lastNetwork='Request or update failed';for(const old of original){if(old.input.isConnected)try{if(old.checked!==null){if(old.input.checked!==old.checked)old.input.click();}else if(old.input.value!==old.value)await setMarketInput(old.input,old.value);}catch{}}notice(error);return error?.status===429?'rate-limited':'error';}
+        finally{busy.delete(target);}
+    }
+    function setEnabled(on){operationEpoch++;enabled=!!on;localStorage.setItem(enabledKey,String(enabled));if(enabled&&runtimeActive&&manager.isAuthorized()){requestController=new window.AbortController();observer.observe(document.body,observerConfig);scheduleScan();}else{stopAutoFill();requestController.abort();observer.disconnect();document.querySelectorAll('.silmaril-market-filler-button,.tmf-icons').forEach(x=>x.remove());document.querySelectorAll('.silmaril-market-filler-processed').forEach(x=>{x.classList.remove('silmaril-market-filler-processed');delete x.dataset.tmfItemId;});hideAllFillPopups();closeAnalytics();closeOwnFormula();}}
+    function showSettings(context){
+        settingsMount=context?.mount||settingsMount;if(!settingsMount)return;settingsMount.replaceChildren();
+        const h=document.createElement('h3');h.textContent='Market Price Auto Fill';settingsMount.append(h);
+        const note=document.createElement('p');note.textContent='Fill fields only. Review and submit listings yourself. Prices use Torn API or weav3r.dev; your Torn key is never sent to weav3r.dev.';settingsMount.append(note);
+        const section=(name)=>{const box=document.createElement('details');box.open=name==='General';const s=document.createElement('summary');s.textContent=name;box.append(s);settingsMount.append(box);return box;};
+        const general=section('General'),label=document.createElement('label'),toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=enabled;toggle.onchange=()=>setEnabled(toggle.checked);label.append(toggle,' Enable Market Price Auto Fill');general.append(label);
+        const action=(parent,text,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=text;b.onclick=fn;parent.append(b);return b;};
+        action(general,'Fill All favorites',()=>{if(enabled)startAutoFill();else notice(Error('Enable this tool first.'));});action(general,'Stop / Cancel',()=>{operationEpoch++;stopAutoFill();requestController.abort();requestController=new window.AbortController();});
+        action(general,'Clear filled rows',async()=>{for(const b of document.querySelectorAll('.silmaril-market-filler-button[data-action-flag=clear]'))try{await guardedFill(b,Number(b.closest('[data-tmf-item-id]')?.dataset.tmfItemId),false);}catch(e){notice(e);}});
+        const favorites=section('Favorites');const lists=document.createElement('p');lists.textContent='Favorites: '+[...favourites].join(', ')+' · Excluded: '+[...excluded].join(', ');favorites.append(lists);
+        for(const [name,set,save] of [['Favorites',favourites,saveFavourites],['Excluded',excluded,saveExcluded]]){const input=document.createElement('input');input.type='text';input.setAttribute('aria-label',name+' item IDs');input.value=[...set].join(', ');favorites.append(input);action(favorites,'Save '+name,()=>{const ids=input.value.split(/[ ,]+/).filter(Boolean).map(Number);if(ids.some(n=>!Number.isSafeInteger(n)||n<1||n>=1000000)){notice(Error('Enter valid item IDs separated by commas.'));return;}set.clear();ids.forEach(n=>set.add(n));save();scheduleScan();});}
+        const analytics=section('Analytics');analytics.append('Use the chart on each row to compare market and bazaar prices, fees, net proceeds, stack sizes, source age and formula decisions. Tap a listing to fill its price. Display options appear below.');
+        const diagnostic=section('Diagnostics'),report=document.createElement('pre');report.style.whiteSpace='pre-wrap';diagnostic.append(report);action(diagnostic,'Run safe checks',()=>{report.textContent=JSON.stringify(diagnostics(),null,2);});
+        const credits=document.createElement('small');credits.textContent='Based on Torn Market Filler v3.2.0 by Silmaril [2665762]. MIT © 2026 Ramin Quluzade. Integrated and adapted for TU.';settingsMount.append(credits);
+        openSettingsModal();
+        augmentSettings(general,section,action);
+    }
+    function augmentSettings(general,section,action){
+        const field=(parent,label,value)=>{const l=document.createElement('label');l.textContent=label;const i=document.createElement('input');i.type='text';i.value=value;i.setAttribute('aria-label',label);i.style.width='100%';l.append(i);parent.append(l);return i;};
+        const price=field(general,'Default price formula',priceDeltaRaw),qty=field(general,'Default quantity',quantityModeRaw);
+        action(general,'Save defaults',()=>{const problem=settingProblem(price.value);if(problem||!isKnownQuantityMode(qty.value)){notice(Error(problem||'Quantity must be max, max-N, a number or skip.'));return;}priceDeltaRaw=price.value.trim();quantityModeRaw=qty.value.trim();localStorage.setItem('tu:market-fill:price-delta',priceDeltaRaw);localStorage.setItem('tu:market-fill:quantity-mode',quantityModeRaw);openSettingsModal();showToast('Defaults saved.');});
+        const label=document.createElement('label'),toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=automaticControls;toggle.onchange=()=>{automaticControls=toggle.checked;localStorage.setItem('tu:market-fill:auto-controls',String(automaticControls));if(automaticControls)scheduleScan();};label.append(toggle,' Automatically display Fill controls');general.append(label);
+        action(general,'Show Fill controls now',()=>{showRequested=true;scheduleScan();});
+        const rules=section('Individual item rules'),id=field(rules,'Item ID',''),formula=field(rules,'Item price formula (blank inherits)',''),quantity=field(rules,'Item quantity (blank inherits)','');
+        const list=document.createElement('pre');list.style.whiteSpace='pre-wrap';rules.append(list);const paint=()=>{list.textContent=Object.entries(itemFormulas).map(([id,rule])=>id+': '+(rule.price||'inherit price')+' / '+(rule.quantity||'inherit quantity')).join('\n')||'No individual item overrides.';};paint();
+        action(rules,'Save item rule',()=>{const n=Number(id.value);if(!Number.isSafeInteger(n)||n<1||n>=1000000){notice(Error('Enter a valid item ID.'));return;}const f=formula.value.trim(),q=quantity.value.trim();if(f&&settingProblem(f)||q&&!isKnownQuantityMode(q)){notice(Error('Check the item price formula and quantity rule.'));return;}if(!f&&!q)delete itemFormulas[n];else itemFormulas[n]={...(f?{price:f}:{}),...(q?{quantity:q}:{})};saveItemFormulas();renderOwnFormulaIcons(n);paint();});
+    }
+    function diagnostics(){return {enabled,initialized:true,itemMarket:/sid=ItemMarket/i.test(window.location.search),rows:document.querySelectorAll('[data-tmf-item-id]').length,input:lastInput,network:lastNetwork,api:'TU-managed Public Only / Limited Access; live API tests require user action',platform:/Torn.?PDA/i.test(window.navigator.userAgent)?'PDA (actual Android/iOS interaction unverified)':'Browser (actual Tampermonkey interaction unverified)',checks:[{name:'Fixed formula',result:fixedPrice('=1')===1?'PASS':'FAIL'},{name:'Live input / popup / queue',result:'SKIP',reason:'No live listing fields are changed by diagnostics.'},{name:'Android / iOS / Tampermonkey device',result:'WARN',reason:'Requires actual host acceptance testing.'}],errors:[...errors]};}
+    window.addEventListener('tu-runtime-active',event=>{runtimeActive=event.detail?.active===true;setEnabled(enabled);});
+    window.addEventListener('tu-authorization-change',()=>{if(!manager.isAuthorized()){operationEpoch++;stopAutoFill();requestController.abort();observer.disconnect();}else if(enabled&&runtimeActive){requestController=new window.AbortController();observer.observe(document.body,observerConfig);scheduleScan();}});
+    const tuStyle=document.createElement('style');tuStyle.textContent='[data-tu-embedded="1"].tmf-settings-overlay{position:static!important;display:block!important;padding:0!important;background:none!important;overflow:visible!important}[data-tu-embedded="1"]>.tmf-modal{max-width:none!important;width:100%!important;background:#101417!important;border:0!important;padding:6px!important;font:inherit!important}.tmf-settings-overlay .tmf-modal-key,.tmf-settings-overlay .tmf-modal-key-reveal{display:none!important}.tmf-fillall-bar,.tmf-viewport-border{display:none!important}.silmaril-market-filler-popup,.tmf-ana,.tmf-own-box{max-width:calc(100vw - 12px)!important;max-height:85dvh!important;overflow:auto!important;box-sizing:border-box}.silmaril-market-filler-button,.tmf-fav,.tmf-own,.tmf-ana-btn{touch-action:manipulation;user-select:none;-webkit-user-select:none;min-height:28px}.tmf-modal-tabs{flex-wrap:wrap}';document.head.append(tuStyle);
+    return {activate:showSettings,resume:()=>{if(settingsMount)showSettings();return true;},deactivate(){closeSettingsModal();},diagnostics,setEnabled,test:{parseSetting,settingProblem,resolveQuantity,GetPrice,getMedianPrice,getRowItemId,guardedFill,setMarketInput,priceSetting,performOperation},stop(){setEnabled(false);}};
+
+}

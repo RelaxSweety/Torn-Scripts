@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name         Torn Utilities DEV (All-in-One)
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.5.42.125-dev
+// @version      0.5.42.126-dev
 // @description  Integrated TU development bundle for PDA and Tampermonkey
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
+// @grant        GM.xmlHttpRequest
 // @grant        GM_listValues
 // @grant        GM_getValue
 // @grant        GM_setValue
@@ -13,12 +14,13 @@
 // @grant        unsafeWindow
 // @connect      ffscouter.com
 // @connect      api.torn.com
+// @connect      weav3r.dev
 // @connect      raw.githubusercontent.com
 // @connect      api.github.com
 // @connect      tu-multiplayer-server-dev.tuserver.workers.dev
 // @run-at       document-idle
-// @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/releases/dev/torn-utilities-dev.user.js
-// @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/releases/dev/torn-utilities-dev.user.js
+// @updateURL    https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/market-price-auto-fill/torn-utilities/releases/dev/torn-utilities-dev.user.js
+// @downloadURL  https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/market-price-auto-fill/torn-utilities/releases/dev/torn-utilities-dev.user.js
 // ==/UserScript==
 (() => {
   'use strict';
@@ -48,7 +50,7 @@
   const rawManagerFetch=window.fetch.bind(window);
   const fetch=(input,options)=>apiGovernor.fetch(input,options,rawManagerFetch);
   const managerHttp=rawManagerHttp?details=>apiGovernor.request(details,rawManagerHttp):null;
-  const TU_VERSION='0.5.42.125-dev';
+  const TU_VERSION='0.5.42.126-dev';
   const TU_LOGO='__TU_LOGO_DATA_URL__';
   const registry={schemaVersion:1,categories:[{"id":"business","name":"Business Tools","icon":"▥","order":10},{"id":"games","name":"Games","icon":"♜","order":20},{"id":"single-player","name":"Single Player","icon":"▣","order":21,"parent":"games"},{"id":"multiplayer","name":"Multiplayer","icon":"♟","order":22,"parent":"games"},{"id":"chat","name":"Chat Tools","icon":"◉","order":30},{"id":"other","name":"War Tools","icon":"⚙","order":40}],modules:[{"id":"flight-game","name":"Flight Game","category":"single-player","version":"0.12.8","description":"Standalone Flight Game arcade module, playable anytime"},{"id":"stick-fighter","name":"Stick Fighter","category":"single-player","version":"0.2.7","description":"Standalone Stick Fighter arcade module, playable anytime"},{"id":"chat-archiver","name":"Chat Archiver","category":"chat","version":"0.1.8","description":"Archive Torn chat conversations"},{"id":"tic-tac-toe","name":"Tic-Tac-Toe","category":"multiplayer","version":"0.6.5","description":"Two-player Tic-Tac-Toe with named winners, green winning line, rematches and head-to-head history"},{"id":"torn-four","name":"Torn Four","category":"multiplayer","version":"0.2.5","description":"Connect Four: two-player multiplayer with private room codes"},{"id":"torn-fleet","name":"Torn Fleet","category":"multiplayer","version":"0.2.5","description":"Battleship: fleet placement and turn-based naval combat"},{"id":"torn-snake","name":"Slithering Streets","category":"single-player","version":"0.2.14","description":"Single-player Snake with touch controls and local high scores"},{"id":"chaos-marbles","name":"Chaos Marbles","category":"multiplayer","version":"0.2.5","description":"Online 2\u20134 player marble race with private player sessions, Waiting for Chaos staging, and game history"},{"id":"item-monitor","name":"Travel Assistant and Item Monitor","category":"business","version":"1.10.31-dev","description":"Item Monitor and Travel Assistant with D1 stock reporting, source diagnostics and stock estimation"},{"id":"war-hit-organizer","name":"War Organizer","category":"other","version":"0.3.28-dev","description":"Compact war target board, reservation controls, timer and local development settings"}]};
   const versionCompare=(a,b)=>{const parse=value=>{const match=String(value).match(/^(\d+(?:\.\d+)*)(?:-([\w.-]+))?$/);if(!match)throw Error('Unsupported version format');return {parts:match[1].split('.').map(Number),pre:match[2]||''};};const x=parse(a),y=parse(b);for(let i=0;i<Math.max(x.parts.length,y.parts.length);i++)if((x.parts[i]||0)!==(y.parts[i]||0))return (x.parts[i]||0)-(y.parts[i]||0);if(x.pre===y.pre)return 0;if(!x.pre)return 1;if(!y.pre)return -1;return x.pre.localeCompare(y.pre,undefined,{numeric:true});};
@@ -255,6 +257,8 @@
 
   const publishAuthorization=ok=>{authorizationVerified=!!ok;pageWindow.dispatchEvent(new CustomEvent('tu-authorization-change',{detail:{authorized:authorized()}}));if(!authorized()){ffScouter.reset();stopModule();}};
   const api = Object.freeze({
+    marketPriceAutoFillDiagnostics:()=>registered.get('market-price-auto-fill')?.diagnostics?.()||null,
+    requestMarketPriceData:(kind,id,options)=>marketRequests.read(kind,id,options),
     isAuthorized:()=>authorized(),
     async getAgreementVersion({refresh=false}={}){
       if(!devToken()||!readSavedKey())throw Error('An authenticated DEV session is required');
@@ -335,13 +339,14 @@
           typeof def.activate !== 'function' || typeof def.deactivate !== 'function' ||
           registered.has(def.id)||!registry.modules.some(t=>t.id===def.id)) return false;
       if(def.id==='item-monitor')queueMicrotask(()=>void resumeSavedMonitor());
-      registered.set(def.id, Object.freeze({id:def.id, version:typeof def.version==='string'?def.version:null, activate:def.activate, resume:typeof def.resume==='function'?def.resume:null, deactivate:def.deactivate}));
+      registered.set(def.id, Object.freeze({id:def.id, version:typeof def.version==='string'?def.version:null, activate:def.activate, resume:typeof def.resume==='function'?def.resume:null, diagnostics:typeof def.diagnostics==='function'?def.diagnostics:null, deactivate:def.deactivate}));
       if (typeof render === 'function'&&!panel.hidden) render(currentTab);
       return true;
     },
     isRegistered(id) { return registered.has(id); },
     isActive(id) { return active === id; }
   });
+  const marketRequests=createMarketRequest({window,http:managerHttp,pdaGet:typeof pageWindow.PDA_httpGet==='function'?(url,headers)=>apiGovernor.run(url,{headers},()=>pageWindow.PDA_httpGet(url,headers)):null,fetch:rawManagerFetch?((url,options)=>apiGovernor.fetch(url,options,rawManagerFetch)):null,authorized:()=>authorized(),getKey:()=>{const key=readSavedKey(),entry=readStoredKeys().find(e=>e.key===key);return entry?.verifiedAt&&['Public Only','Limited Access'].includes(entry.level)&&String(entry.playerId)===String(getPlayer()?.id)?key:'';}});
   Object.defineProperty(pageWindow, 'TornUtilities', {value:api, configurable:false, writable:false});
   if(window!==pageWindow)try{Object.defineProperty(window,'TornUtilities',{value:api,configurable:true});}catch(error){console.warn('[TU] Sandbox API bridge unavailable',error);}
   pageWindow.dispatchEvent(new Event('torn-utilities-ready'));
@@ -587,8 +592,9 @@
     if(top)tuNav.current=top;
     tuNav.minimized=true;tuNav.exited=false;tuHideAll();launcher.hidden=false;observeTUWindows();
   };
-  const tuExit=(source)=>{tuNav.history.length=0;tuNav.current='tu-pda-panel';tuMinimize();tuNav.exited=true;stopModule();};
+  const tuExit=(source)=>{tuNav.history.length=0;tuNav.current='tu-pda-panel';tuMinimize();tuNav.exited=true;stopModule();pageWindow.dispatchEvent(new CustomEvent('tu-runtime-active',{detail:{active:false}}));};
   const tuRestore=()=>{
+    pageWindow.dispatchEvent(new CustomEvent('tu-runtime-active',{detail:{active:true}}));
     if(authRestorePending){authOpenRequested=true;tuNav.minimized=true;tuNav.exited=false;panel.hidden=true;launcher.hidden=false;return true;}
     if(tuNav.exited){tuNav.history.length=0;tuNav.current='tu-pda-panel';render(authorized()?'modules':'about');}
     if(!authorized()){tuShow('tu-pda-panel');showAgreement();return true;}
@@ -640,7 +646,7 @@ __TU_COMPACT_UI_CSS__
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.125-dev</span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo" role="img" aria-label="Torn Utilities"></span><div><h2>Torn Utilities</h2><p>Integrated Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Tools</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.5.42.126-dev</span></footer>';
   document.body.appendChild(panel);
   const headerBrand=panel.querySelector('.tu-logo');if(headerBrand){headerBrand.textContent='';headerBrand.classList.add('tu-brand-emblem');headerBrand.setAttribute('role','img');headerBrand.setAttribute('aria-label','Torn Utilities');}
   const identityLine=document.createElement('p');
@@ -729,7 +735,7 @@ __TU_COMPACT_UI_CSS__
 
   }
   const tuScriptPath='torn-utilities/releases/dev/torn-utilities-dev.user.js';
-  const tuScriptUrl='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/releases/dev/torn-utilities-dev.user.js';
+  const tuScriptUrl='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/market-price-auto-fill/torn-utilities/releases/dev/torn-utilities-dev.user.js';
   let tuUpdateStatus='Not checked';
   const tuCheckUpdates=async()=>{
     tuUpdateStatus='Checking GitHub…';render('settings');
@@ -1073,6 +1079,7 @@ __TU_COMPACT_UI_CSS__
   panel.querySelector('.tu-close').addEventListener('click',()=>{tuExit();syncLauncher();});
   panel.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => {if(!authorized()&&b.dataset.tab!=='about'){showAgreement();return;}if(b.dataset.tab==='modules')goModules();else render(b.dataset.tab);}));
   const floatIds=['tu-diagnostics-window','tuim-menu','tuim-panel','tuim-catalog','tca-panel','tu-pda-panel','sff-root','tpfg-manager','tpfg-root','tpfg-prompt'];
+  const windowExpansion=createWindowExpansion({window});
   const floatingSetup=new WeakSet(),floatingResizeObservers=new Map();
   const FLOAT_KEY='tu:window-layout:v1:';
   const getLayout=id=>{try{return JSON.parse(localStorage.getItem(FLOAT_KEY+id)||'null')}catch(_){return null}};
@@ -1099,7 +1106,7 @@ __TU_COMPACT_UI_CSS__
       }
     }
     const remember=()=>{
-      if(el.hidden||!el.isConnected)return;
+      if(el.hidden||!el.isConnected||el.dataset.tuExpanded==='true')return;
       const rect=el.getBoundingClientRect();
       if(rect.width<100||rect.height<70)return;
       putLayout(el.id,{width:Math.round(rect.width),height:Math.round(rect.height),left:Math.round(rect.left),top:Math.round(rect.top)});
@@ -1145,7 +1152,7 @@ __TU_COMPACT_UI_CSS__
     for(const id of visible){if(id!==latest){const el=tuRoot(id);el.hidden=true;if(id==='tpfg-root'||id==='tu-who-panel')el.style.display='none';}}
     tuWindowSyncing=false;
   };
-  const enhanceFloating=()=>floatIds.forEach(id=>setupFloating(document.getElementById(id)));
+  const enhanceFloating=()=>{floatIds.forEach(id=>setupFloating(document.getElementById(id)));for(const id of new Set([...floatIds,...tuRoots]))windowExpansion.enhance(document.getElementById(id));};
   const enhancedHeaders=new WeakSet();
   const tuEnhanceHeaders=()=>{
     for(const id of floatIds){
