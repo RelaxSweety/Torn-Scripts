@@ -136,3 +136,16 @@ metadata, visible label and exported version consistently identify 0.2.49-dev.
 Automated Market, manager integration (191 checks), War navigation, diagnostics,
 PDA-loader/startup and idle-performance checks passed. Actual PDA pricing needs
 a user retest: the attached report has no market-page capture or pricing error.
+
+## PDA quantity detection fixed in .129
+
+The .128 report showed the tool enabled and market rows detected, but three
+`Available quantity is unknown` errors. The user confirmed quantity was not filling.
+The prior detector only searched the pricing-info container. It now searches the
+complete owning item row, validated maximum attributes, marked quantity/count
+elements, ASCII x, multiplication-sign ×, and labeled available/owned counts.
+No oversized input probe or submission is used. Tests move the count outside
+pricing controls and remove the input maximum attribute, reproducing the failure
+and verifying max-minus fills and preservation of manually entered quantities.
+Quantity-source evidence is exported; local quantity errors no longer masquerade
+as a failed network request. Native PDA verification remains required.

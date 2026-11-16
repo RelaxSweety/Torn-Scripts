@@ -18,9 +18,15 @@ try{
  filler.setEnabled(true);await delay(50);let button=d.querySelector('.silmaril-market-filler-button');assert.ok(button,'Dynamic rows receive Fill');
  assert.equal(d.querySelectorAll('.silmaril-market-filler-button').length,1);assert.equal(d.querySelector('.tmf-fillall-bar'),null,'No independent floating manager');
  const price=d.querySelector('[class*=priceInputWrapper] input.input-money'),quantity=d.querySelector('[class*=amountInputWrapper] input.input-money');
+ // PDA layouts keep the owned count beside the picture, outside the info controls.
+ quantity.removeAttribute('max');d.querySelector('.info_new > span').remove();
+ const stock=d.createElement('span');stock.className='inventory-count';stock.textContent=' ×12';d.querySelector('.itemRow_new').prepend(stock);
+ for(const label of [' x12',' ×12',' Available: 12','12 in inventory']){stock.textContent=label;assert.equal(await filler.test.discoverMaxQuantity([quantity],d.querySelector('.info_new')),12,label);assert.equal(quantity.value,'','Read-only discovery never probes live quantity');}
+ stock.textContent=' ×1,234';assert.equal(await filler.test.discoverMaxQuantity([quantity],d.querySelector('.info_new')),1234);stock.textContent='';stock.className='itemQuantity_new';stock.textContent='12';assert.equal(await filler.test.discoverMaxQuantity([quantity],d.querySelector('.info_new')),12);stock.textContent=' ×12';
  let inputs=0,changes=0;price.addEventListener('input',()=>inputs++);price.addEventListener('change',()=>changes++);
  assert.equal(await filler.test.guardedFill(button,206,false),'ok');assert.equal(price.value,'1');assert.equal(quantity.value,'10');assert.ok(inputs&&changes);assert.equal(button.dataset.actionFlag,'clear');assert.equal(calls.length,0,'Fixed pricing makes no request');
  await filler.test.guardedFill(button,206,false);assert.equal(price.value,'');assert.equal(quantity.value,'');assert.equal(button.dataset.actionFlag,'fill');
+ filler.activate({mount:d.getElementById('mount')});const defaultQty=d.querySelector('[aria-label="Default quantity"]');defaultQty.value='max';[...d.querySelectorAll('button')].find(x=>x.textContent==='Save defaults').click();assert.equal(await filler.test.guardedFill(button,206,false),'ok');assert.equal(quantity.value,'12','Max fills the picture-side inventory count');await filler.test.guardedFill(button,206,false);defaultQty.value='max-2';[...d.querySelectorAll('button')].find(x=>x.textContent==='Save defaults').click();
  quantity.value='3';await filler.test.guardedFill(button,206,false);assert.equal(quantity.value,'3','Manual quantities are respected');
  assert.equal(filler.test.resolveQuantity(12,'max-2'),10);assert.equal(filler.test.resolveQuantity(12,'skip'),null);assert.equal(filler.test.resolveQuantity(12,'4'),4);
  for(const formula of ['-1[0]','-5%[market]','-1[bazaar:median]','-1[bazaar:avg]','-1[100x+]','min(max(-1[0],+10%[market]),-1[14])','max(-1[0],=1000)','-1[bazaar] | -1[0]'])assert.equal(filler.test.settingProblem(formula),null,formula);

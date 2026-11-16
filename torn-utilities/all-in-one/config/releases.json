@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.129-dev",
+    "date": "2026-11-16",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Read available inventory quantities across the complete Item Market row, including PDA picture-side counts and multiplication symbols",
+        "Include quantity detection evidence in diagnostics and preserve successful network status on local input failures"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.128-dev",
     "date": "2026-11-16",
     "securityBundle": true,
