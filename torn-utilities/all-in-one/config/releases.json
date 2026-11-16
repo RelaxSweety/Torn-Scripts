@@ -1,5 +1,19 @@
 [
   {
+    "version": "0.5.42.137-dev",
+    "date": "2026-11-16",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Recognize native weapon selection independently of the anonymous-listing checkbox using captured Item Market identifiers",
+        "Track protected copies by individual weapon UID from native selection/info controls across row reordering"
+      ],
+      "Diagnostics": [
+        "Report pending keep-quantity edits separately from active saved restrictions"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.136-dev",
     "date": "2026-11-16",
     "securityBundle": true,

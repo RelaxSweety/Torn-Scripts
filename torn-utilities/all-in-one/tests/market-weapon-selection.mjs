@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import {JSDOM} from 'jsdom';
+import {createMarketPriceAutoFill} from '../src/features/market-price-auto-fill.js';
+import {setMarketInput} from '../src/features/market-input.js';
+import {readItemStockQuantity} from '../src/features/item-stock-quantity.js';
+const dom=new JSDOM('<body><main id="item-market-root"></main><div id="mount"></div></body>',{url:'https://www.torn.com/page.php?sid=ItemMarket#/addListing',pretendToBeVisual:true}),w=dom.window,d=w.document,market=d.querySelector('main'),pause=ms=>new Promise(r=>setTimeout(r,ms));
+w.HTMLElement.prototype.getClientRects=function(){return this.isConnected?[{}]:[];};
+const uids=['21958651725','21724118344','21964174721'];
+const rows=uids.map((uid,index)=>{const row=d.createElement('div');row.className='itemRowWrapper___Yeimd';row.innerHTML=`<button aria-controls="wai-inventoryManager-itemInfo-401-${uid}">Info</button><img src="/images/items/401/large.png" alt="Lead Pipe"><span>${[27.27,27.95,26.24][index]}</span><div class="info_test"><input type="checkbox" id="itemRow-incognitoCheckbox-401-${uid}" aria-label="Make my listing of Lead Pipe anonymous (+10% fee)." checked><div class="checkboxWrapper___m7yhw"><input type="checkbox" id="itemRow-selectCheckbox-401-${uid}" aria-label="Select Lead Pipe"></div><div class="priceInputWrapper_test"><div class="input-money-group"><input class="input-money"></div></div></div>`;market.append(row);return row;});
+const selection=row=>row.querySelector('[id*=selectCheckbox]'),anonymous=row=>row.querySelector('[id*=incognitoCheckbox]'),price=row=>row.querySelector('[class*=priceInputWrapper] input.input-money'),fill=row=>row.querySelector('.silmaril-market-filler-button');
+const footer=d.createElement('footer');footer.innerHTML='<label><input type="checkbox">Fill</label><button type="submit">List items</button>';market.append(footer);let submissions=0;market.addEventListener('submit',e=>{e.preventDefault();submissions++;});
+w.localStorage.setItem('tu:market-fill:excluded','[401]');w.localStorage.setItem('tu:market-fill:restricted-quantities','{"401":"all"}');w.localStorage.setItem('tu:market-fill:price-delta','=1');w.localStorage.setItem('tu:market-fill:quantity-mode','max');
+const tool=createMarketPriceAutoFill({window:w,manager:{isAuthorized:()=>true,requestMarketPriceData:async()=>{throw Error('Fixed price must not request data');}},setMarketInput,readItemStockQuantity});
+try{
+ tool.setEnabled(true);await pause(100);tool.activate({mount:d.getElementById('mount')});const keep=d.querySelector('[aria-label="Keep quantity for 401"]');keep.value='1';keep.dispatchEvent(new w.Event('input',{bubbles:true}));assert.equal(tool.diagnostics().restrictedQuantities['401'],'all');assert.equal(tool.diagnostics().pendingRestrictedQuantities['401'],'1');d.querySelector('[data-tu-mark-save]').click();await pause(50);assert.equal(tool.diagnostics().restrictedQuantities['401'],1);assert.equal(JSON.parse(w.localStorage.getItem('tu:market-fill:restricted-quantities'))['401'],1);
+ assert.equal(await tool.test.guardedFill(fill(rows[0]),401,false),'skipped');assert.equal(await tool.test.guardedFill(fill(rows[1]),401,false),'ok');
+ market.prepend(rows[1]);assert.equal(await tool.test.guardedFill(fill(rows[0]),401,false),'skipped','Native UID preserves retained copy across row reorder');assert.equal(await tool.test.guardedFill(fill(rows[2]),401,false),'ok');assert.deepEqual(rows.map(r=>selection(r).checked),[false,true,true]);assert.ok(rows.every(r=>anonymous(r).checked),'Anonymous settings unchanged');
+ assert.equal(await tool.test.guardedFill(fill(rows[2]),401,false),'ok');assert.equal(selection(rows[2]).checked,false);assert.equal(anonymous(rows[2]).checked,true,'Clear only deselects the listing checkbox');
+ // Restore visual order and prove the actual Fill List path handles both checkboxes.
+ for(const row of rows)market.insertBefore(row,footer);d.querySelector('[data-tu-fill-list]').click();for(let i=0;i<100&&tool.diagnostics().listFill.active;i++)await pause(100);assert.equal(tool.diagnostics().listFill.active,false);assert.deepEqual(rows.map(r=>selection(r).checked),[false,true,true]);assert.ok(rows.every(r=>anonymous(r).checked));assert.equal(submissions,0);
+ console.log('Captured Lead Pipe regression passed: Keep 1 saves, native weapon UID survives reorder, two checkbox roles, manual/Clear/Fill List preserve anonymity and no submissions.');
+}finally{tool.stop();w.close();}

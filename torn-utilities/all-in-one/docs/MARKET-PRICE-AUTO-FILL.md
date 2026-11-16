@@ -280,3 +280,11 @@ TU Testing & Diagnostics adds Capture Item Market now and opt-in Start/Stop/Clea
 Additional evidence: visible native weapon detail/tooltip portals are captured separately (up to 40 variants). Current rows are capped at 512K characters; retained row/detail history shares a 1M-character budget. Per-row truncation and dropped-history counts identify bounded evidence. Automated coverage verifies three same-name weapons with distinct identities/stats, bonuses, shared cached names/keep rules, tooltip portals, scroll/remount history, credential/getter exclusion, Stop/Clear, and read-only exports.
 
 Validation: `npm run build`, full `npm test`, and final focused Item Market/diagnostics checks passed. The final capture also includes a sanitized parent-indexed row structure. Actual PDA weapon evidence still requires the user capture; the tests use simulated weapon rows.
+
+## 0.5.42.137-dev — captured Lead Pipe checkbox roles
+
+The .136 user capture establishes Lead Pipe base ID 401 and three individual weapon UIDs. Each row has an incognito checkbox plus a selectCheckbox. The prior one-checkbox requirement rejected these rows even with an active Keep 1 rule. Selection now prioritizes the native selectCheckbox identifier or Select accessibility label, with a conservative fallback excluding anonymity controls. Clear, verification and queue readiness share this detector. Reservation/queue identity reads matching base-ID/weapon-UID pairs from native selectCheckbox and itemInfo controls, ahead of occurrence fallback; conflicting identities fail safely. No automatic changes are made to saved restrictions. Pending keep edits are exported separately from active restrictions.
+
+The regression fixture uses the captured control IDs, weapon UIDs and damage values: save Keep 1, manually fill only surplus copies, reorder rows without moving the protected reservation, Clear and Fill List while preserving anonymity, and never submit a listing. Actual PDA execution of this fix remains unverified until tested.
+
+Validation: build, full regression suite, and final captured-layout Lead Pipe fixture passed. Generated TU/diagnostics syntax and DEV alias/snapshot comparisons passed. Live PDA acceptance remains pending; no live listings were submitted.
