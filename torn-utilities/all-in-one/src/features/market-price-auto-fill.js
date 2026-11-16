@@ -26,10 +26,11 @@ SOFTWARE.
 export function createMarketPriceAutoFill({window,manager,setMarketInput,readItemStockQuantity}){
 
  let lastQuantityEvidence=null;
- let autoFillMode='favorites',rowQueueSequence=0;const rowQueueIds=new WeakMap();
- const itemNames=new Map();
+ let autoFillMode='favorites',runMarketScope='';const listJobs=new Map(),restrictionLedger=new Map(),restrictedQuantities=new Map(),initialPeerCounts=new Map();
+ const itemNames=new Map(),autoQuantities=new WeakMap();
  const document=window.document,localStorage=window.localStorage;
  try{for(const [id,name] of Object.entries(JSON.parse(localStorage.getItem('tu:market-fill:item-names')||'{}')))if(/^\d+$/.test(id)&&typeof name==='string')itemNames.set(Number(id),name.slice(0,80));}catch{}
+ try{for(const [id,n] of Object.entries(JSON.parse(localStorage.getItem('tu:market-fill:restricted-quantities')||'{}')))if(/^\d+$/.test(id)&&(n==='all'||Number.isSafeInteger(n)&&n>=0))restrictedQuantities.set(Number(id),n);}catch{}
  const Event=window.Event,MutationObserver=window.MutationObserver;
  const requestAnimationFrame=window.requestAnimationFrame.bind(window);
  const enabledKey='tu:market-fill:enabled';let enabled=localStorage.getItem(enabledKey)==='true';
@@ -289,6 +290,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
     // An item is either neutral, a favourite or excluded — never two of those at once.
     const excludedStorageKey = "tu:market-fill:excluded";
     let excluded = loadExcluded();
+    for(const id of excluded)favourites.delete(id);
 
     // Per-category price-delta overrides + a persistent item→category(type) cache.
     // Item categories are immutable, so caching them avoids extra API calls when picking
@@ -376,7 +378,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
     // Falling back to the body keeps the scan and the observer alive if the root is renamed
     // or has not mounted yet; the row selectors below are specific enough to stay correct.
     const observerTarget = document.querySelector("#item-market-root") ?? document.body;
-    const observerConfig = { attributes: false, childList: true, characterData: false, subtree: true };
+    const observerConfig = { attributes: true, attributeFilter:['data-item-id','data-itemid','data-item-uid','data-listing-id','src','aria-controls','disabled','readonly'], childList: true, characterData: true, subtree: true };
 
     // Debounced whole-root scan instead of matching specific mutation targets: rows on the
     // Add Items and Your Items (view listings) pages mount at different depths (tab panels,
@@ -387,13 +389,14 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         scanScheduled = false;
         if(!enabled||!runtimeActive||!manager.isAuthorized()||!automaticControls&&!showRequested)return;
         currentPage = getCurrentPage();
+        if(autoFillActive&&runMarketScope!==marketScope())cancelActiveFill();
         if (currentPage == pages.Other) {
             document.querySelector('.tu-market-list-controls')?.remove();return;
         }
         document.querySelectorAll('#item-market-root [class*=priceInputWrapper],#item-market-root [data-market-price-wrapper]').forEach(x=>AddFillButton(x));
         attachListFillControl();
         if (autoFillActive) {
-            if(autoFillMode!=='list')enqueueVisibleFavourites();
+            enqueueVisibleFavourites();
         }
     }
 
@@ -408,7 +411,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         for (const m of mutations) {
             const target=m.target.nodeType===1?m.target:m.target.parentElement;
             if(!target?.closest('#item-market-root')&&![...m.addedNodes].some(n=>n.nodeType===1&&(n.id==='item-market-root'||n.querySelector('#item-market-root'))))continue;
-            if (m.addedNodes.length || m.removedNodes.length) {
+            if (m.type!=='childList'||m.addedNodes.length || m.removedNodes.length) {
                 scheduleScan();
                 return;
             }
@@ -452,17 +455,17 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
     }
 
     function AddFillButton(itemPriceElement){
-        if (itemPriceElement.querySelector('.silmaril-market-filler-button') != null){
-            return;
-        }
-        const wrapperParent = findParentByCondition(itemPriceElement, (el) => el.hasAttribute?.('data-tmf-item-id')||el.matches?.('[data-item-id],[data-itemid],[class*=itemRowWrapper],tr,[role=row]'));
+        const wrapperParent=findParentByCondition(itemPriceElement,el=>el.matches?.('[data-item-id],[data-itemid],[class*=itemRowWrapper],tr,[role=row]'));
         if(!wrapperParent)return;
-        wrapperParent.classList.add('silmaril-market-filler-processed');
-        let itemId = getRowItemId(wrapperParent);
-        if(!Number.isSafeInteger(Number(itemId))||Number(itemId)<=0)return;
-        rememberMarketName(Number(itemId),wrapperParent);
+        const itemId=Number(getRowItemId(wrapperParent)),old=itemPriceElement.querySelector('.silmaril-market-filler-button');
+        if(!Number.isSafeInteger(itemId)||itemId<=0){old?.remove();wrapperParent.querySelectorAll('.tmf-icons').forEach(el=>el.remove());delete wrapperParent.dataset.tmfItemId;wrapperParent.classList.remove('silmaril-market-filler-processed');return;}
+        if(old&&old.dataset.tuMarketItemId===String(itemId)){wrapperParent.dataset.tmfItemId=String(itemId);return;}
+        old?.remove();wrapperParent.querySelectorAll('.tmf-icons').forEach(el=>el.remove());
+        wrapperParent.classList.add('silmaril-market-filler-processed');wrapperParent.dataset.tmfItemId=String(itemId);
+        rememberMarketName(itemId,wrapperParent);
         const span = document.createElement('span');
         span.className = 'silmaril-market-filler-button input-money-symbol';
+        span.dataset.tuMarketItemId=String(itemId);
         span.style.position = "relative";
         span.setAttribute('data-action-flag', 'fill');
         span.addEventListener('click', async function(e) { await handleFillClick(e, itemId) });
@@ -504,6 +507,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
                 favBtn.addEventListener('click', function(e){
                     e.preventDefault();
                     e.stopPropagation();
+                    if(Number(getRowItemId(wrapperParent))!==itemIdNum){scheduleScan();return;}
                     cycleItemState(itemIdNum);
                     if (autoFillActive && autoFillMode!=='list' && favourites.has(itemIdNum)){
                         enqueueFavouriteRow(wrapperParent);
@@ -1864,7 +1868,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         // but it says so, so an accidental click on the wrong row is obvious straight away.
         let itemIdNum = parseInt(itemId, 10);
         if (!isNaN(itemIdNum) && excluded.has(itemIdNum) && target.getAttribute('data-action-flag') == 'fill'){
-            showToast("Heads up: this item is marked excluded (⊘). Filling it anyway because you clicked Fill.");
+            showToast('Restricted item: '+(restrictionKeep(itemIdNum)==='all'?'all copies are protected.':'keeping '+restrictionKeep(itemIdNum)+' copies.'));
         }
         await guardedFill(target,itemId,true);
     }
@@ -1994,7 +1998,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         return maximum;
     }
 
-    async function applyQuantity(target, action, category, isAuto,quantityOverride=null){
+    async function applyQuantity(target, action, category, isAuto,quantityOverride=null,reservationKey=null){
         let parentRow = findParentByCondition(target, (el) => el.matches?.('[class*=info],[data-market-fields]')||el.hasAttribute?.('data-tmf-item-id'));
         if (parentRow == null){
             return 'ok';
@@ -2003,15 +2007,28 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         let configured=getEffectiveQuantity(category,host!=null?host.dataset.tmfItemId:null);
         let mode=['skip','none','0'].includes(String(configured).trim().toLowerCase())?configured:quantityOverride||configured;
         let quantityInputs = parentRow.querySelectorAll('[class^=amountInputWrapper] .input-money-group > .input-money');
+        const restriction=excluded.has(Number(host?.dataset.tmfItemId))?restrictionKeep(Number(host.dataset.tmfItemId)):null;
+        if(restriction==='all')return 'skipped';
+        if(restriction!==null&&quantityInputs.length){
+            const max=await discoverMaxQuantity(quantityInputs,parentRow,{nativeFallback:true}),allowed=restrictedAllowance(Number(host.dataset.tmfItemId),max,reservationKey);
+            if(allowed<1)return 'skipped';
+            const owned=autoQuantities.get(host),current=String(quantityInputs[0].value).replace(/[,\s]/g,'');
+            const manual=owned?.id===Number(host.dataset.tmfItemId)&&owned.value===current?0:Number(current);
+            if(manual>0){if(manual>allowed)throw Error('Entered quantity would sell protected copies. Lower it to '+allowed+' or change the restriction.');return 'ok';}
+            if(['skip','none','0'].includes(String(mode).trim().toLowerCase()))return 'skipped';
+            const wanted=resolveQuantity(max,mode);if(wanted===null)return 'skipped';
+            await setQuantityInputs(quantityInputs,Math.min(wanted,allowed));return 'ok';
+        }
         if (quantityInputs.length === 0){
             // Single-copy rows (most clothing) carry a checkbox instead of an amount input,
             // so their maximum is 1 by definition.
             let checkbox = parentRow.querySelector('[class^=checkboxWrapper] > [class^=checkboxContainer] [type=checkbox]');
             if (checkbox == null){
+                if(restriction!==null)throw Error('Cannot identify the protected item selection safely.');
                 return 'ok';
             }
             if (action == 'fill'){
-                if (resolveQuantity(1, mode) === null){
+                if (resolveQuantity(1, mode) === null||restriction!==null&&restrictedAllowance(Number(host.dataset.tmfItemId),1,reservationKey)<1){
                     reportSkipped(mode, 1, isAuto);
                     return 'skipped';
                 }
@@ -2161,7 +2178,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         // listings) rows carry a remove-amount input instead — touching it would be wrong,
         // and the missing containers used to throw and abort the Fill All loop.
         if (getCurrentPage() == pages.AddItems){
-            let quantityStatus = await applyQuantity(target, action, pricing.category, !showPopup,options.quantityOverride);
+            let quantityStatus = await applyQuantity(target, action, pricing.category, !showPopup,options.quantityOverride,options.reservationKey);
             if (quantityStatus === 'skipped'){
                 // Nothing is being listed, so leave the price (and the button state) alone.
                 return 'skipped';
@@ -2172,6 +2189,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         if(action==='fill'&&(!Number.isSafeInteger(price)||price<1))throw Error('The formula did not produce a valid positive whole-dollar price.');
         if(epoch!==operationEpoch)throw Error('Fill cancelled.');
         await writeInputs(priceFields(target),price);
+        if(showPopup)recentFilledInput=priceFields(target);
         switchActionFlag(target);
         return status;
     }
@@ -2332,6 +2350,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
 
     function saveExcluded(){
         localStorage.setItem(excludedStorageKey, JSON.stringify([...excluded]));
+        saveRestrictions();
         refreshFavoriteViews();
     }
 
@@ -2344,6 +2363,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
 
     // neutral → favourite → excluded → neutral. The three states are mutually exclusive.
     function cycleItemState(itemId){
+        if(getItemState(itemId)==='favourite')cancelActiveFill();
         switch (getItemState(itemId)) {
             case 'neutral':
                 favourites.add(itemId);
@@ -2353,11 +2373,12 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
                 excluded.add(itemId);
                 break;
             default:
-                excluded.delete(itemId);
+                excluded.delete(itemId);favourites.delete(itemId);restrictedQuantities.delete(itemId);saveRestrictions();
                 break;
         }
         saveFavourites();
         saveExcluded();
+        if(excluded.has(itemId))void invalidatePrepared(itemId).catch(notice);
         let state = getItemState(itemId);
         document.querySelectorAll('.tmf-fav[data-tmf-item-id="' + itemId + '"]').forEach(function(el){
             renderFavIcon(el, state);
@@ -2371,7 +2392,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         el.title = state === 'favourite'
             ? 'Favourite — filled by Fill All. Click to exclude.'
             : (state === 'excluded'
-               ? 'Excluded — never filled by Fill All, and a manual Fill warns first. Click to reset.'
+               ? 'Restricted: keep '+restrictionKeep(Number(el.dataset.tmfItemId))+' copies. Click to remove this restriction.'
                : 'Click to mark as a favourite (used by Fill All).');
     }
 
@@ -2648,10 +2669,44 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         }
     }
 
+    function marketScope(){return window.location.pathname+window.location.search+window.location.hash;}
+    async function invalidatePrepared(id){for(const row of document.querySelectorAll('.silmaril-market-filler-processed')){if(Number(getRowItemId(row))!==Number(id))continue;const button=row.querySelector('.silmaril-market-filler-button');if(button?.getAttribute('data-action-flag')!=='clear')continue;await writeInputs(priceFields(button),'');if(button.getAttribute('data-action-flag')==='clear')switchActionFlag(button);}}
+    function cancelActiveFill(){if(!autoFillActive)return;operationEpoch++;stopAutoFill();requestController.abort();requestController=new window.AbortController();}
+    function restrictionKeep(id){return excluded.has(Number(id))?(restrictedQuantities.get(Number(id))??'all'):null;}
+    function fullyRestricted(id){return restrictionKeep(id)==='all';}
+    function saveRestrictions(){for(const id of restrictedQuantities.keys())if(!excluded.has(id))restrictedQuantities.delete(id);localStorage.setItem('tu:market-fill:restricted-quantities',JSON.stringify(Object.fromEntries(restrictedQuantities)));}
+    function reloadMarks(){
+        const before=[...favourites].sort().join(',')+'|'+[...excluded].sort().join(',')+'|'+JSON.stringify(Object.fromEntries(restrictedQuantities));
+        const fav=loadFavourites(),restricted=loadExcluded();favourites.clear();excluded.clear();
+        for(const id of restricted)excluded.add(id);for(const id of fav)if(!excluded.has(id))favourites.add(id);
+        restrictedQuantities.clear();try{for(const [id,n] of Object.entries(JSON.parse(localStorage.getItem('tu:market-fill:restricted-quantities')||'{}')))if(excluded.has(Number(id))&&(n==='all'||Number.isSafeInteger(n)&&n>=0))restrictedQuantities.set(Number(id),n);}catch{}
+        const after=[...favourites].sort().join(',')+'|'+[...excluded].sort().join(',')+'|'+JSON.stringify(Object.fromEntries(restrictedQuantities));if(before!==after)cancelActiveFill();
+        refreshFavoriteViews();
+    }
+    function restrictedAllowance(id,maximum,key){
+        const rule=restrictionKeep(id);if(rule===null)return maximum;if(rule==='all')return 0;
+        const held=key?[...restrictionLedger].reduce((n,[other,entry])=>n+(other!==key&&entry.id===id?entry.keep:0),0):0;
+        const keep=Math.min(maximum,Math.max(0,rule-held));if(key)restrictionLedger.set(key,{id,keep});return Math.max(0,maximum-keep);
+    }
     function fillQueueKey(row){
-        if(autoFillMode!=='list')return 'favorite:'+row.dataset.tmfItemId;
-        if(!rowQueueIds.has(row))rowQueueIds.set(row,++rowQueueSequence);
-        return 'list:'+rowQueueIds.get(row);
+        const id=Number(getRowItemId(row));if(autoFillMode!=='list')return 'favorite:'+id;
+        for(const attr of ['data-item-uid','data-listing-id','data-row-id','data-index','aria-rowindex']){const value=row.getAttribute(attr);if(value!==null&&value!=='')return 'list:'+id+':'+attr+':'+value;}
+        const peers=[...document.querySelectorAll('.silmaril-market-filler-processed')].filter(el=>Number(getRowItemId(el))===id);
+        if(!initialPeerCounts.has(id))initialPeerCounts.set(id,peers.length);
+        if(initialPeerCounts.get(id)!==peers.length)return null; // Ambiguous duplicate stacks wait for a stable group.
+        return 'list:'+id+':occurrence:'+peers.indexOf(row);
+    }
+    function marketRowReady(row){
+        const button=row?.querySelector('.silmaril-market-filler-button');if(!button)return false;
+        const prices=priceFields(button),quantities=[...row.querySelectorAll('[class*=amountInputWrapper] input.input-money,[data-market-quantity]')];
+        const selection=row.querySelector('[class^=checkboxWrapper] > [class^=checkboxContainer] input[type=checkbox]');
+        if(!prices.length&&!quantities.length&&selection&&!selection.checked&&!selection.disabled){const raw=[...row.querySelectorAll('[class*=priceInputWrapper] input.input-money')];return !!raw.length&&raw.every(input=>!input.readOnly);}
+        return !!prices.length&&[...prices,...quantities].every(input=>!input.disabled&&!input.readOnly);
+    }
+
+    function resolveQueuedRow(job){
+        if(job.wrapper?.isConnected&&Number(getRowItemId(job.wrapper))===job.id&&fillQueueKey(job.wrapper)===job.key&&marketRowReady(job.wrapper))return job.wrapper;
+        return [...document.querySelectorAll('.silmaril-market-filler-processed')].find(row=>Number(getRowItemId(row))===job.id&&fillQueueKey(row)===job.key&&marketRowReady(row))||null;
     }
 
     function rememberMarketName(id,row){
@@ -2662,18 +2717,21 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
     }
 
     function refreshFavoriteViews(){
-        for(const section of document.querySelectorAll('[data-tu-favorite-section]'))section.querySelector('summary').textContent='Favorites & Excluded ('+favourites.size+' / '+excluded.size+')';
+        const drafts=new Map([...document.querySelectorAll('[data-tu-restricted-qty]')].filter(input=>input.dataset.dirty==='1').map(input=>[Number(input.dataset.tuRestrictedQty),input.value]));
+        for(const section of document.querySelectorAll('[data-tu-favorite-section]'))section.querySelector('summary').textContent='Favorites & Restricted ('+favourites.size+' / '+excluded.size+')';
         for(const box of document.querySelectorAll('[data-tu-favorite-summary]')){
             box.replaceChildren();
             for(const [name,items] of [['Favorites',favourites],['Excluded',excluded]]){
-                const title=document.createElement('strong');title.textContent=name+' ('+items.size+')';box.append(title);
+                const title=document.createElement('strong');title.textContent=(name==='Excluded'?'Restricted':name)+' ('+items.size+')';box.append(title);
                 const list=document.createElement('ul');list.dataset.tuFavoriteEntries=name;box.append(list);
                 if(!items.size){const empty=document.createElement('li');empty.textContent='None selected';list.append(empty);}
-                for(const id of [...items].sort((a,b)=>a-b)){const li=document.createElement('li');li.dataset.itemId=String(id);const label=document.createElement('span');label.textContent=(itemNames.get(id)||'Item')+' ['+id+']';const remove=document.createElement('button');remove.type='button';remove.textContent='Remove';remove.setAttribute('aria-label','Remove '+id+' from '+name);remove.onclick=()=>{items.delete(id);saveFavourites();saveExcluded();};li.append(label,remove);list.append(li);}
+                for(const id of [...items].sort((a,b)=>a-b)){const li=document.createElement('li');li.dataset.itemId=String(id);const label=document.createElement('span');label.textContent=(itemNames.get(id)||'Item')+' ['+id+']';li.append(label);
+                    if(name==='Excluded'){const hold=document.createElement('label');hold.textContent=' Keep ';const quantity=document.createElement('input');quantity.type='text';quantity.inputMode='numeric';quantity.dataset.tuRestrictedQty=String(id);quantity.setAttribute('aria-label','Keep quantity for '+id);quantity.title='all keeps every copy; a number keeps that many; 0 removes the restriction';quantity.style.cssText='width:65px;max-width:100%';quantity.value=drafts.has(id)?drafts.get(id):String(restrictionKeep(id));if(drafts.has(id))quantity.dataset.dirty='1';quantity.oninput=()=>{quantity.dataset.dirty='1';};const save=document.createElement('button');save.type='button';save.textContent='Save quantity';save.onclick=()=>{const value=quantity.value.trim().toLowerCase(),n=value==='all'?'all':/^\d+$/.test(value)?Number(value):NaN;if(n!=='all'&&(!Number.isSafeInteger(n)||n<0)){notice(Error('Enter all or a whole number of copies to keep.'));return;}quantity.dataset.dirty='0';cancelActiveFill();if(n===0){excluded.delete(id);restrictedQuantities.delete(id);saveFavourites();saveExcluded();scheduleScan();return;}restrictedQuantities.set(id,n);restrictionLedger.clear();saveRestrictions();refreshFavoriteViews();void invalidatePrepared(id).catch(notice);scheduleScan();};const all=document.createElement('button');all.type='button';all.textContent='All';all.setAttribute('aria-label','Keep all copies of '+id);all.onclick=()=>{quantity.value='all';save.click();};hold.append(quantity,save,all);li.append(hold);}
+                    const remove=document.createElement('button');remove.type='button';remove.textContent='Remove';remove.setAttribute('aria-label','Remove '+id+' from '+name);remove.onclick=()=>{cancelActiveFill();items.delete(id);if(name==='Excluded')restrictedQuantities.delete(id);saveFavourites();saveExcluded();};li.append(remove);list.append(li);}
             }
         }
         for(const input of document.querySelectorAll('[data-tu-favorite-input]'))if(input.dataset.dirty!=='1')input.value=[...(input.dataset.tuFavoriteInput==='Favorites'?favourites:excluded)].join(', ');
-        for(const star of document.querySelectorAll('.tmf-fav[data-tmf-item-id]')){const state=getItemState(Number(star.dataset.tmfItemId));const text=state==='favourite'?'★':state==='excluded'?'⊘':'☆';if(star.textContent!==text)renderFavIcon(star,state);}
+        for(const star of document.querySelectorAll('.tmf-fav[data-tmf-item-id]')){const state=getItemState(Number(star.dataset.tmfItemId));const text=state==='favourite'?'★':state==='excluded'?'⊘':'☆';if(star.textContent!==text)renderFavIcon(star,state);else if(state==='excluded'){const title='Restricted: keep '+restrictionKeep(Number(star.dataset.tmfItemId))+' copies. Click to remove this restriction.';if(star.title!==title)star.title=title;}}
     }
 
     function attachListFillControl(){
@@ -2694,8 +2752,8 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
 
     function updateAutoFillUI(){
         const listButton=document.querySelector('[data-tu-fill-list]'),listStatus=document.querySelector('[data-tu-fill-list-status]');
-        if(listButton){const label=autoFillActive?'Stop filling':'Fill current list to maximum';const icon=autoFillActive?'■':'$';if(listButton.textContent!==icon)listButton.textContent=icon;listButton.setAttribute('aria-label',label);listButton.title=label+'; excluded and skip items are left untouched. Fields only; review before submitting.';}
-        if(listStatus){const text=autoFillActive?autoFillDoneIds.size+' / '+(autoFillDoneIds.size+autoFillQueuedIds.size):'Fill list';if(listStatus.textContent!==text)listStatus.textContent=text;}
+        if(listButton){const label=autoFillActive?'Stop filling':'Fill current list to maximum';const icon=autoFillActive?'■':'$';if(listButton.textContent!==icon)listButton.textContent=icon;listButton.setAttribute('aria-label',label);listButton.title=label+'; keep quantities and skip rules are respected. Fields only; review before submitting.';}
+        if(listStatus){const pending=[...listJobs.values()].filter(job=>!job.done).length;const text=autoFillActive?autoFillDoneIds.size+' / '+listJobs.size+(!autoFillQueuedIds.size&&pending?' · waiting for rows':''):'Fill list';if(listStatus.textContent!==text)listStatus.textContent=text;}
         let bar = document.querySelector(".tmf-fillall-bar");
         if (bar != null) {
             bar.querySelector(".tmf-fillall-btn").value = autoFillActive ? "Stop fill" : "Fill All ★";
@@ -2728,7 +2786,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
     function startAutoFill(mode='favorites'){
         if(!enabled||!runtimeActive||!manager.isAuthorized())return;
         if(autoFillActive){notice(Error('Stop the current fill run before starting another.'));return;}
-        autoFillMode=mode;
+        autoFillMode=mode;runMarketScope=marketScope();listJobs.clear();restrictionLedger.clear();initialPeerCounts.clear();
         if (autoFillMode==='favorites'&&favourites.size === 0){
             showToast('No favourites set yet — tap the ☆ star next to an item first, then use Fill All.');
             return;
@@ -2746,7 +2804,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
     function stopAutoFill(){
         autoFillActive = false;
         autoFillQueue = [];
-        autoFillQueuedIds.clear();
+        autoFillQueuedIds.clear();listJobs.clear();restrictionLedger.clear();initialPeerCounts.clear();
         updateAutoFillUI();
     }
 
@@ -2759,11 +2817,17 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
             return;
         }
         let itemId = parseInt(wrapper.dataset.tmfItemId, 10),key=fillQueueKey(wrapper);
-        if (!wrapper.getClientRects().length||autoFillMode==='favorites'&&!favourites.has(itemId) || excluded.has(itemId) || autoFillDoneIds.has(key) || autoFillQueuedIds.has(key)) {
+        if(key===null)return;
+        const previous=listJobs.get(key);
+        if(autoFillDoneIds.has(key)&&previous?.wrapper!==wrapper){const button=wrapper.querySelector('.silmaril-market-filler-button'),prices=button?priceFields(button):[],quantities=[...wrapper.querySelectorAll('[class*=amountInputWrapper] input.input-money')];if(prices.length&&prices.every(input=>!input.value)&&quantities.every(input=>!input.value)){autoFillDoneIds.delete(key);previous.done=false;}}
+
+        if (!wrapper.getClientRects().length||autoFillMode==='favorites'&&!favourites.has(itemId) || fullyRestricted(itemId) || autoFillDoneIds.has(key) || autoFillQueuedIds.has(key)) {
             return;
         }
         autoFillQueuedIds.add(key);
-        autoFillQueue.push(wrapper);
+        const job=listJobs.get(key)||{key,id:itemId,done:false};job.wrapper=wrapper;listJobs.set(key,job);
+        if(!marketRowReady(wrapper)){autoFillQueuedIds.delete(key);return;}
+        autoFillQueue.push(job);
         runAutoFillLoop();
     }
 
@@ -2775,32 +2839,34 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         const queueEpoch=operationEpoch;
         try {
             while (autoFillActive && autoFillQueue.length > 0 && queueEpoch===operationEpoch) {
-                let wrapper = autoFillQueue.shift();
-                let itemId = parseInt(wrapper.dataset.tmfItemId, 10),key=fillQueueKey(wrapper);
-                if (!wrapper.isConnected || autoFillMode==='favorites'&&!favourites.has(itemId) || excluded.has(itemId)) {
+                const job=autoFillQueue.shift(),key=job.key,itemId=job.id;
+                let wrapper=resolveQueuedRow(job);
+                if(!wrapper){autoFillQueuedIds.delete(key);continue;}
+                if (!wrapper.isConnected || autoFillMode==='favorites'&&!favourites.has(itemId) || fullyRestricted(itemId)) {
                     // Row unmounted or unfavourited meanwhile; the observer re-queues it
                     // if it shows up again.
-                    autoFillQueuedIds.delete(key);
+                    autoFillQueuedIds.delete(key);job.done=true;
                     continue;
                 }
                 let fillBtn = wrapper.querySelector(".silmaril-market-filler-button");
                 if (fillBtn == null || fillBtn.getAttribute('data-action-flag') !== 'fill') {
                     // Already filled (button is in "clear" state) — count as done.
                     autoFillQueuedIds.delete(key);
-                    autoFillDoneIds.add(key);
+                    autoFillDoneIds.add(key);job.done=true;
                     continue;
                 }
                 let status;
                 try {
-                    status = await guardedFill(fillBtn, itemId, false,{quantityOverride:autoFillMode==='list'?'max':null});
+                    status = await guardedFill(fillBtn, itemId, false,{quantityOverride:autoFillMode==='list'?'max':null,reservationKey:key});
                 } catch (error) {
                     // A single row with unexpected DOM must not abort the whole run.
                     console.warn('[TU Market Price Auto Fill] Operation failed; check configuration.');
                     status = "error";
                 }
                 if(queueEpoch!==operationEpoch)break;
+                if(status==='row-changed'){autoFillQueuedIds.delete(key);restrictionLedger.delete(key);await sleep(FILL_COOLDOWN_MIN_MS);scheduleScan();continue;}
                 if (status === "rate-limited") {
-                    autoFillQueue.unshift(wrapper); // retry the same row after the pause
+                    autoFillQueue.unshift(job); // retry the same row after the pause
                     await sleep(randomBetween(RATE_LIMIT_PAUSE_MIN_MS, RATE_LIMIT_PAUSE_MAX_MS));
                     continue;
                 }
@@ -2810,7 +2876,8 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
                     break;
                 }
                 autoFillQueuedIds.delete(key);
-                autoFillDoneIds.add(key);
+                autoFillDoneIds.add(key);job.done=true;
+                if(status!=='ok'&&status!=='skipped')restrictionLedger.delete(key);
                 if (status !== "ok" && status !== "skipped") {
                     console.warn("[TU Market Price Auto Fill] Fill All skipped item " + itemId + " after error.");
                 }
@@ -2819,7 +2886,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
             }
         } finally {
             autoFillLoopRunning = false;
-            if(queueEpoch===operationEpoch&&autoFillMode==='list'&&!autoFillQueue.length){autoFillActive=false;updateAutoFillUI();}
+            if(queueEpoch===operationEpoch&&autoFillMode==='list'&&!autoFillQueue.length&&![...listJobs.values()].some(job=>!job.done)){autoFillActive=false;updateAutoFillUI();}
         }
         // Rows enqueued while the loop was winding down (e.g. during the last cooldown)
         if (autoFillActive && autoFillQueue.length > 0) {
@@ -3814,7 +3881,8 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
     // the quantity goes in too and the square flips to Clear. A listing click sets the price only.
     async function applyAnalyticsPrice(price, withQuantity){
         const target=analyticsRow?.target;if(!target||busy.has(target))return;
-        busy.add(target);const row=target.closest('[data-tmf-item-id]');
+        const row=target.closest('[data-tmf-item-id]');if(Number(getRowItemId(row))!==Number(id)){scheduleScan();return 'row-changed';}if(fullyRestricted(Number(id)))return 'skipped';
+        busy.add(target);
         const saved=[...(row?.querySelectorAll('input:not([type=button])')||[])].map(input=>({input,value:input.value,checked:input.type==='checkbox'?input.checked:null}));
         try{await applyAnalyticsPriceUnsafe(price,withQuantity);}catch(error){for(const item of saved)if(item.input.isConnected)try{if(item.checked!==null){if(item.input.checked!==item.checked)item.input.click();}else if(item.input.value!==item.value)await setMarketInput(item.input,item.value);}catch{}notice(error);}finally{busy.delete(target);}
     }
@@ -5395,8 +5463,9 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         if(!enabled||!runtimeActive||!manager.isAuthorized())throw Error('Enable this tool and verify TU before filling.');
         const all=[...inputs];if(!all.length)throw Error('Listing input not found.');
         const signal=requestController.signal;
-        const row=all[0].closest('[data-tmf-item-id]'),price=row&&priceFields(row.querySelector('.silmaril-market-filler-button')).includes(all[0]);
-        for(let i=0;i<all.length;i++)await setMarketInput(all[i],value,{signal,resolve:()=>{if(!row)return all[i];const button=row.querySelector('.silmaril-market-filler-button');return price?priceFields(button)[i]:[...row.querySelectorAll('[class*=amountInputWrapper] input.input-money,[data-market-quantity]')][i];}});
+        const row=all[0].closest('[data-tmf-item-id]'),expectedId=row?Number(getRowItemId(row)):null,price=row&&priceFields(row.querySelector('.silmaril-market-filler-button')).includes(all[0]);
+        for(let i=0;i<all.length;i++)await setMarketInput(all[i],value,{signal,resolve:()=>{if(!row)return all[i];if(!row.isConnected||Number(getRowItemId(row))!==expectedId)throw Error('Item row changed while filling.');const button=row.querySelector('.silmaril-market-filler-button');return price?priceFields(button)[i]:[...row.querySelectorAll('[class*=amountInputWrapper] input.input-money,[data-market-quantity]')][i];}});
+        if(row&&!price)autoQuantities.set(row,{id:expectedId,value:String(all[0].value).replace(/[,\s]/g,'')});
         lastInput='Accepted and verified';
     }
     async function clearRow(target){
@@ -5406,14 +5475,16 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
     }
     async function guardedFill(target,id,popup,options={}){
         if(!enabled||!runtimeActive||!manager.isAuthorized()||!target.isConnected||busy.has(target))return 'skipped';
-        busy.add(target);const row=target.closest('[data-tmf-item-id]');
+        const row=target.closest('[data-tmf-item-id]');if(Number(getRowItemId(row))!==Number(id)){scheduleScan();return 'row-changed';}if(fullyRestricted(Number(id)))return 'skipped';
+        busy.add(target);
         const original=[...(row?.querySelectorAll('input:not([type=button])')||[])].map(input=>({input,value:input.value,checked:input.type==='checkbox'?input.checked:null}));
         try{const result=await performFill(target,id,popup,operationEpoch,options);if(!['ok','skipped'].includes(result)&&popup)notice(Error('Price unavailable. Existing values were preserved; check API status or your formula and retry.'));return result;}
-        catch(error){lastInput=String(error?.message||'').includes('quantity is unknown')?'Available quantity not detected':'Update failed';for(const old of original){if(old.input.isConnected)try{if(old.checked!==null){if(old.input.checked!==old.checked)old.input.click();}else if(old.input.value!==old.value)await setMarketInput(old.input,old.value);}catch{}}notice(error);return error?.status===429?'rate-limited':'error';}
+        catch(error){lastInput=String(error?.message||'').includes('quantity is unknown')?'Available quantity not detected':'Update failed';for(const old of original){if(old.input.isConnected&&Number(getRowItemId(row))===Number(id))try{if(old.checked!==null){if(old.input.checked!==old.checked)old.input.click();}else if(old.input.value!==old.value)await setMarketInput(old.input,old.value);}catch{}}if(!row?.isConnected||Number(getRowItemId(row))!==Number(id)||!marketRowReady(row)||original.some(entry=>!entry.input.isConnected))return 'row-changed';notice(error);return error?.status===429?'rate-limited':'error';}
         finally{busy.delete(target);}
     }
-    function setEnabled(on){operationEpoch++;enabled=!!on;localStorage.setItem(enabledKey,String(enabled));if(enabled&&runtimeActive&&manager.isAuthorized()){requestController=new window.AbortController();observer.observe(document.body,observerConfig);scheduleScan();}else{stopAutoFill();requestController.abort();observer.disconnect();document.querySelector('.tu-market-list-controls')?.remove();document.querySelectorAll('.silmaril-market-filler-button,.tmf-icons').forEach(x=>x.remove());document.querySelectorAll('.silmaril-market-filler-processed').forEach(x=>{x.classList.remove('silmaril-market-filler-processed');delete x.dataset.tmfItemId;});hideAllFillPopups();closeAnalytics();closeOwnFormula();}}
+    function setEnabled(on){if(enabled===!!on&&enabled&&runtimeActive&&manager.isAuthorized()&&!requestController.signal.aborted){observer.observe(document.body,observerConfig);scheduleScan();return;}operationEpoch++;enabled=!!on;localStorage.setItem(enabledKey,String(enabled));if(enabled&&runtimeActive&&manager.isAuthorized()){requestController=new window.AbortController();observer.observe(document.body,observerConfig);scheduleScan();}else{stopAutoFill();requestController.abort();observer.disconnect();document.querySelector('.tu-market-list-controls')?.remove();document.querySelectorAll('.silmaril-market-filler-button,.tmf-icons').forEach(x=>x.remove());document.querySelectorAll('.silmaril-market-filler-processed').forEach(x=>{x.classList.remove('silmaril-market-filler-processed');delete x.dataset.tmfItemId;});hideAllFillPopups();closeAnalytics();closeOwnFormula();}}
     function showSettings(context){
+        reloadMarks();
         if(context?.mount){
             let frame=context.mount.querySelector('#tu-market-fill-window');
             if(!frame){frame=document.createElement('section');frame.id='tu-market-fill-window';const head=document.createElement('header');const title=document.createElement('strong');title.textContent='Market Price Auto Fill';head.append(title);const body=document.createElement('div');body.className='tu-market-fill-body';frame.append(head,body);context.mount.append(frame);}
@@ -5429,7 +5500,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         action(general,'Fill All favorites',()=>{if(enabled)startAutoFill();else notice(Error('Enable this tool first.'));});action(general,'Stop / Cancel',()=>{operationEpoch++;stopAutoFill();requestController.abort();requestController=new window.AbortController();});
         action(general,'Clear filled rows',async()=>{for(const b of document.querySelectorAll('.silmaril-market-filler-button[data-action-flag=clear]'))try{await guardedFill(b,Number(b.closest('[data-tmf-item-id]')?.dataset.tmfItemId),false);}catch(e){notice(e);}});
         const favorites=section('Favorites');favorites.dataset.tuFavoriteSection='1';const lists=document.createElement('div');lists.dataset.tuFavoriteSummary='1';favorites.append(lists);
-        for(const [name,set,save] of [['Favorites',favourites,saveFavourites],['Excluded',excluded,saveExcluded]]){const input=document.createElement('input');input.type='text';input.setAttribute('aria-label',name+' item IDs');input.dataset.tuFavoriteInput=name;input.value=[...set].join(', ');input.oninput=()=>{input.dataset.dirty='1';};favorites.append(input);action(favorites,'Save '+name,()=>{const ids=input.value.split(/[ ,]+/).filter(Boolean).map(Number);if(ids.some(n=>!Number.isSafeInteger(n)||n<1||n>=1000000)){notice(Error('Enter valid item IDs separated by commas.'));return;}set.clear();const other=name==='Favorites'?excluded:favourites;ids.forEach(n=>{set.add(n);other.delete(n);});input.dataset.dirty='0';saveFavourites();saveExcluded();scheduleScan();});}
+        for(const [name,set,save] of [['Favorites',favourites,saveFavourites],['Excluded',excluded,saveExcluded]]){const input=document.createElement('input');input.type='text';input.setAttribute('aria-label',name+' item IDs');input.dataset.tuFavoriteInput=name;input.value=[...set].join(', ');input.oninput=()=>{input.dataset.dirty='1';};favorites.append(input);action(favorites,'Save '+name,()=>{const ids=input.value.split(/[ ,]+/).filter(Boolean).map(Number);if(ids.some(n=>!Number.isSafeInteger(n)||n<1||n>=1000000)){notice(Error('Enter valid item IDs separated by commas.'));return;}if(name==='Excluded')cancelActiveFill();set.clear();const other=name==='Favorites'?excluded:favourites;ids.forEach(n=>{set.add(n);other.delete(n);});input.dataset.dirty='0';saveFavourites();saveExcluded();scheduleScan();});}
         refreshFavoriteViews();
         const analytics=section('Analytics');analytics.append('Use the chart on each row to compare market and bazaar prices, fees, net proceeds, stack sizes, source age and formula decisions. Tap a listing to fill its price. Display options appear below.');
         const diagnostic=section('Diagnostics'),report=document.createElement('pre');report.style.whiteSpace='pre-wrap';diagnostic.append(report);action(diagnostic,'Run safe checks',()=>{report.textContent=JSON.stringify(diagnostics(),null,2);});
@@ -5447,7 +5518,9 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         const list=document.createElement('pre');list.style.whiteSpace='pre-wrap';rules.append(list);const paint=()=>{list.textContent=Object.entries(itemFormulas).map(([id,rule])=>id+': '+(rule.price||'inherit price')+' / '+(rule.quantity||'inherit quantity')).join('\n')||'No individual item overrides.';};paint();
         action(rules,'Save item rule',()=>{const n=Number(id.value);if(!Number.isSafeInteger(n)||n<1||n>=1000000){notice(Error('Enter a valid item ID.'));return;}const f=formula.value.trim(),q=quantity.value.trim();if(f&&settingProblem(f)||q&&!isKnownQuantityMode(q)){notice(Error('Check the item price formula and quantity rule.'));return;}if(!f&&!q)delete itemFormulas[n];else itemFormulas[n]={...(f?{price:f}:{}),...(q?{quantity:q}:{})};saveItemFormulas();renderOwnFormulaIcons(n);paint();});
     }
-    function diagnostics(){const frame=document.getElementById('tu-market-fill-window');return {enabled,initialized:true,favorites:[...favourites],excluded:[...excluded],listFill:{present:!!document.querySelector('[data-tu-fill-list]'),placement:document.querySelector('.tu-market-list-controls')?.dataset.placement||null,active:autoFillActive,mode:autoFillMode},settingsWindow:{present:!!frame,hidden:frame?.hidden??null,display:frame?window.getComputedStyle(frame).display:null,position:frame?window.getComputedStyle(frame).position:null,hasTUEmblem:!!frame?.querySelector('[data-tu-brand-emblem]'),hasNavigation:!!frame?.querySelector('[data-tu-nav-controls]')},itemMarket:/sid=ItemMarket/i.test(window.location.search),rows:document.querySelectorAll('.silmaril-market-filler-processed').length,quantity:lastQuantityEvidence,input:lastInput,network:lastNetwork,api:'TU-managed Public Only / Limited Access; live API tests require user action',platform:/Torn.?PDA/i.test(window.navigator.userAgent)?'PDA (actual Android/iOS interaction unverified)':'Browser (actual Tampermonkey interaction unverified)',checks:[{name:'Fixed formula',result:fixedPrice('=1')===1?'PASS':'FAIL'},{name:'Live input / popup / queue',result:'SKIP',reason:'No live listing fields are changed by diagnostics.'},{name:'Android / iOS / Tampermonkey device',result:'WARN',reason:'Requires actual host acceptance testing.'}],errors:[...errors]};}
+    function diagnostics(){const frame=document.getElementById('tu-market-fill-window');return {enabled,initialized:true,favorites:[...favourites],excluded:[...excluded],restrictedQuantities:Object.fromEntries([...excluded].map(id=>[id,restrictionKeep(id)])),listFill:{present:!!document.querySelector('[data-tu-fill-list]'),placement:document.querySelector('.tu-market-list-controls')?.dataset.placement||null,active:autoFillActive,mode:autoFillMode,pending:[...listJobs.values()].filter(job=>!job.done).length},settingsWindow:{present:!!frame,hidden:frame?.hidden??null,display:frame?window.getComputedStyle(frame).display:null,position:frame?window.getComputedStyle(frame).position:null,hasTUEmblem:!!frame?.querySelector('[data-tu-brand-emblem]'),hasNavigation:!!frame?.querySelector('[data-tu-nav-controls]')},itemMarket:/sid=ItemMarket/i.test(window.location.search),rows:document.querySelectorAll('.silmaril-market-filler-processed').length,quantity:lastQuantityEvidence,input:lastInput,network:lastNetwork,api:'TU-managed Public Only / Limited Access; live API tests require user action',platform:/Torn.?PDA/i.test(window.navigator.userAgent)?'PDA (actual Android/iOS interaction unverified)':'Browser (actual Tampermonkey interaction unverified)',checks:[{name:'Fixed formula',result:fixedPrice('=1')===1?'PASS':'FAIL'},{name:'Live input / popup / queue',result:'SKIP',reason:'No live listing fields are changed by diagnostics.'},{name:'Android / iOS / Tampermonkey device',result:'WARN',reason:'Requires actual host acceptance testing.'}],errors:[...errors]};}
+    window.addEventListener('storage',event=>{if([favouritesStorageKey,excludedStorageKey,'tu:market-fill:restricted-quantities'].includes(event.key))reloadMarks();});
+    window.addEventListener('scroll',()=>{if(autoFillActive&&!autoFillQueuedIds.size)scheduleScan();},{passive:true,capture:true});
     window.addEventListener('tu-runtime-active',event=>{runtimeActive=event.detail?.active===true;setEnabled(enabled);});
     window.addEventListener('tu-authorization-change',()=>{if(!manager.isAuthorized()){operationEpoch++;stopAutoFill();requestController.abort();observer.disconnect();}else if(enabled&&runtimeActive){requestController=new window.AbortController();observer.observe(document.body,observerConfig);scheduleScan();}});
     const tuStyle=document.createElement('style');tuStyle.textContent='#tu-market-fill-window{position:fixed;z-index:2147483644;top:6vh;left:4vw;width:min(92vw,540px);height:min(84dvh,780px);max-width:100vw;max-height:100dvh;overflow:auto;background:#101417;color:#eee;border:1px solid #c49a46;border-radius:10px;font:12px/1.4 system-ui;box-sizing:border-box}#tu-market-fill-window[hidden]{display:none!important}#tu-market-fill-window>header{display:flex;align-items:center;gap:6px;position:sticky;top:0;padding:8px;background:#101417;color:#f1ce72;z-index:3;border-bottom:1px solid #806a3e}#tu-market-fill-window .tu-market-fill-body{padding:10px}#tu-market-fill-window button{background:#28343b;color:#edcc76;border:1px solid #806a3e;border-radius:5px;min-height:28px;padding:4px 7px;font:inherit}#tu-market-fill-window input{box-sizing:border-box;max-width:100%;background:#283239;color:#eee;border:1px solid #57616a;padding:6px}#tu-market-fill-window details{margin:8px 0;border:1px solid #39434a;padding:7px;border-radius:5px}#tu-market-fill-window summary{font-weight:bold;color:#d6b65c;min-height:26px}#tu-market-fill-window label{display:block;padding:4px 0}#tu-market-fill-window small{display:block;color:#aeb8bd}'+'[data-tu-embedded="1"].tmf-settings-overlay{position:static!important;display:block!important;padding:0!important;background:none!important;overflow:visible!important}[data-tu-embedded="1"]>.tmf-modal{max-width:none!important;width:100%!important;background:#101417!important;border:0!important;padding:6px!important;font:inherit!important}.tmf-settings-overlay .tmf-modal-key,.tmf-settings-overlay .tmf-modal-key-reveal{display:none!important}.tmf-fillall-bar,.tmf-viewport-border{display:none!important}.silmaril-market-filler-popup,.tmf-ana,.tmf-own-box{max-width:calc(100vw - 12px)!important;max-height:85dvh!important;overflow:auto!important;box-sizing:border-box}.silmaril-market-filler-button,.tmf-fav,.tmf-own,.tmf-ana-btn{touch-action:manipulation;user-select:none;-webkit-user-select:none;min-height:28px}.tmf-modal-tabs{flex-wrap:wrap}';document.head.append(tuStyle);

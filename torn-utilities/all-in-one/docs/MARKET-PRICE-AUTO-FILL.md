@@ -201,3 +201,41 @@ exclusions/skip/manual amounts, no form submission, live names/list synchronizat
 legacy ID types and persistence. Actual native PDA footer placement remains an
 acceptance check; its detected placement is included in the diagnostic export.
 Both TU and Testing and Diagnostics update together as 0.5.42.131-dev.
+
+## Canonical marks, keep quantities and scrolling in .132
+
+Visible row controls are now rebound when Torn reuses a row for a different item.
+Native identity attributes and image/control changes trigger reconciliation. Stale
+handlers cannot change another item's marks, and another tab's persisted mark
+changes are reflected in the module. Remove/unmark clears saved restriction values;
+only marked IDs populate the corresponding lists. Marks for genuinely off-page
+items remain persistent rather than being erased by scrolling.
+
+Restricted items now have a Keep quantity editor. Existing exclusions default to
+all copies, preserving their prior protection. A number such as 1 permits only
+surplus to fill. The per-run ledger reserves copies once across separate stacks;
+one-copy rows stay unfilled when their copy is reserved. A manually entered amount
+above the permitted surplus fails without overwriting it. Changes to a restriction
+cancel pending filling and invalidate tool-prepared prices for that item; a new
+Fill recalculates against the saved count. No listing is submitted.
+
+The list queue retains logical work keyed by native item/stack identifiers, with
+an occurrence fallback for stable groups. Unmounted work remains pending instead
+of being marked complete. Scrolling and remounts can resume pending work, while
+recycled rows cannot receive a prior item's price or rollback. Already completed
+rows remounted with empty fields can be refilled while the run remains active.
+Ambiguous duplicate groups wait until identifiable; status exposes pending rows
+and Stop remains available. Navigation to another route cancels the run.
+
+Regression fixtures cover canonical mark removal, storage events, native-ID row
+reuse, keep-one across two stacks, manual cap rejection, only-copy preservation,
+unmounting a queued row, recycling an in-flight price row, resuming both rows and
+no form submission. Physical Android/iOS PDA scrolling still needs acceptance.
+TU and Testing and Diagnostics both identify 0.5.42.132-dev.
+
+The restricted editor includes an All button for touch keyboards; saving 0 removes
+the restriction and its mark. Changing a keep quantity refreshes row tooltips and
+clears prepared prices before recalculation while preserving manual quantities.
+Temporarily disabled/remounted fields wait for native readiness instead of being
+counted as completed; single-copy selection checkboxes can unlock their price
+field while protected single copies remain unselected.

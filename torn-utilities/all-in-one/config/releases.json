@@ -1,5 +1,20 @@
 [
   {
+    "version": "0.5.42.132-dev",
+    "date": "2026-11-16",
+    "securityBundle": true,
+    "changes": {
+      "Features": [
+        "Set a per-item restricted keep quantity: retain all copies or keep a specified number and fill only surplus"
+      ],
+      "Fixes": [
+        "Rebind row marks to current native item identities and synchronize canonical favorites/restrictions across views and tabs",
+        "Keep fill work pending through scrolling, row remounts and recycled nodes; retry matching rows without applying another item\u2019s quote",
+        "Count protected copies once across duplicate stacks and preserve manual quantities exceeding a restriction as errors rather than overwriting them"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.131-dev",
     "date": "2026-11-16",
     "securityBundle": true,
