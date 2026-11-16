@@ -1,7 +1,7 @@
 // Read-only endpoints; credentials are supplied only for api.torn.com.
 export function createMarketRequest({window,http,pdaGet,fetch,getKey,authorized,now=()=>Date.now()}){
  const cache=new Map(),nextSend={torn:0,bazaar:0};let bazaarPause=0;
- async function read(kind,id,{signal}={}){
+ async function read(kind,id,{signal,refresh=false}={}){
   if(!authorized())throw Error('Open TU and verify your session and agreement.');
   if(!['market','items','bazaar','bazaar-all'].includes(kind)||(!Number.isSafeInteger(Number(id))||Number(id)<=0)&&kind!=='bazaar-all')throw Error('Invalid item or price source.');
   const third=kind.startsWith('bazaar'),key=third?'':getKey();
@@ -9,7 +9,7 @@ export function createMarketRequest({window,http,pdaGet,fetch,getKey,authorized,
   if(third&&now()<bazaarPause)throw Error('Bazaar rate limit reached. Wait one minute before retrying.');
   if(signal?.aborted)throw Error('Fill cancelled.');
   const token=kind+':'+id+':'+(third?'public':key),prior=cache.get(token);
-  if(prior&&now()-prior.at<60000)return prior.data;
+  if(!refresh&&prior&&now()-prior.at<60000)return prior.data;
   const url=third?'https://weav3r.dev/api/marketplace'+(kind==='bazaar-all'?'':'/'+id):kind==='items'?'https://api.torn.com/torn/'+id+'?selections=items':'https://api.torn.com/v2/market?id='+id+'&selections=itemMarket';
   const headers={Accept:'application/json',...(!third?{Authorization:'ApiKey '+key}:{})};
   if(signal?.aborted)throw Error('Fill cancelled.');

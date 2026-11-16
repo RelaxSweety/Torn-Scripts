@@ -300,3 +300,15 @@ Regression coverage includes off-screen zero-rectangle controls, three virtual p
 The captured Torn markup also contains hidden mirror inputs. Quantity/price writes and queue readiness now ignore hidden mirrors, preserving the full two-pass verification on editable fields while avoiding duplicate hidden-field writes and disabled-mirror stalls. The virtual-list fixture includes disabled hidden mirrors. Redundant source comments were shortened to retain the existing 1.45 MB unified-build budget.
 
 Validation: build and full regression suite passed. After the hidden-mirror changes, the affected automatic-list, pricing/input, restrictions/remount, weapon-selection, list-fill, request-pacing and diagnostics tests were rerun and passed. Generated TU/diagnostics syntax and DEV alias/snapshot equality checks passed. Automatic scrolling and performance on real PDA/iOS/Android remain unverified until acceptance testing.
+
+## 0.5.42.139-dev — ordered DOM fill and Edit Listings update
+
+The .138 PDA report confirms 53 processed rows already in the DOM; automatic surveying was unnecessary. Removed all automatic scrolling and backward seek behavior. Discovery is now batched before the fill loop starts, and queued mounted rows are sorted by DOM position. Missing/unready controls retain bounded read-only retries and explicit unresolved diagnostics, without moving the page. Rows Torn has not mounted cannot be filled from API inventory data alone; only native mounted listing controls are written.
+
+Zero native itemInfo UIDs represent ordinary grouped stacks, not unique weapons. They now use the existing stack/occurrence identity fallback so separate zero-UID rows are not merged. Nonzero individual weapon IDs keep the captured .137 retention handling.
+
+Edit/Your Listings now has a bottom money-icon Update listing prices control. It forces price refresh even for previously filled rows, bypasses the prior quote cache once per item/source per run, and reuses that run’s response for duplicates. Existing inventory keep rules do not block pricing of already-listed items. Quantities, anonymity settings and save/submit controls are untouched. The user reviews and saves changes through Torn.
+
+Tests cover three existing listing rows including duplicate zero UIDs, native DOM pricing order, repeated refresh, unchanged quantities/anonymity, zero scroll writes, no submissions, cached versus explicit fresh reads, and the retained weapon/remount regressions.
+
+Validation: build and full regression suite passed. Final focused Add/Edit DOM-order/no-scroll, restrictions/remount, request cache-refresh/pacing and diagnostics checks passed. Generated TU/diagnostics syntax and DEV alias/snapshot comparisons passed. Actual PDA acceptance remains pending; tests do not submit live listings.

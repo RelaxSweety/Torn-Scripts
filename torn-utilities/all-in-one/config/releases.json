@@ -1,5 +1,19 @@
 [
   {
+    "version": "0.5.42.139-dev",
+    "date": "2026-11-16",
+    "securityBundle": true,
+    "changes": {
+      "Features": [
+        "Add a money-icon Update listing prices control on Edit/Your Listings; refresh current quotes without changing quantities, anonymity or submitting changes"
+      ],
+      "Fixes": [
+        "Process mounted rows in DOM order without any automatic scrolling or backward revisits",
+        "Batch initial queue discovery before filling and treat zero native UIDs as ordinary stacks rather than unique weapons"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.138-dev",
     "date": "2026-11-16",
     "securityBundle": true,
