@@ -5,6 +5,9 @@ import {createAcceptanceSession} from '../src/diagnostics/acceptance-session.js'
 const read=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const catalog=JSON.parse(read('config/test-cases.json')),tools=JSON.parse(read('config/tools.json')),targetBuild=JSON.parse(read('config/releases.json'))[0].version;
 const source=read('dist/tu-diagnostics-dev.user.js'),bundle=read('dist/tu-integrated-staging-dev.user.js');
+const expectedDiagnosticVersion=targetBuild;
+assert.equal(source.match(/^\/\/ @version\s+(\S+)/m)[1],expectedDiagnosticVersion,'Diagnostics auto-update version advances with its TU target');
+assert.ok(!source.includes('__TU_DIAGNOSTICS_VERSION__'));
 const make=(platform='tampermonkey',initial={})=>createAcceptanceSession({targetBuild,checklistVersion:catalog.checklistVersion,tests:catalog.tests,platform,initial});
 assert.equal(catalog.tests.length,73);assert.equal(catalog.tests.filter(t=>t.kind==='automatic').length,7);
 for(const t of tools)for(const suffix of ['function','lifecycle'])assert.ok(catalog.tests.some(c=>c.id==='tool.'+t.id+'.'+suffix));
@@ -69,7 +72,7 @@ console.log('TU Test regression checks passed: catalog coverage, redaction, buil
  const b=boot();try{
   const {w,button}=b;const dialog=w.document.createElement('div');dialog.setAttribute('role','dialog');dialog.innerHTML='<p>Use a First Aid Kit?</p><button>Yes</button><button>No</button>';w.document.body.append(dialog);let submitted=0;dialog.querySelector('button').onclick=()=>submitted++;
   button('Start monitoring').click();dialog.querySelector('button').dispatchEvent(new w.MouseEvent('click',{bubbles:true,cancelable:true}));assert.equal(submitted,1);button('Stop monitoring').click();
-  button('Export all diagnostics').click();const report=b.report();assert.equal(report.toolVersion,'0.2.49-dev');assert.equal(report.installedBuild,targetBuild);assert.equal(report.travelDom.captures.length,1);assert.equal(report.travelDom.captures[0].installedBuild,targetBuild);assert.ok(report.travelDom.captures[0].html.includes('Yes'));assert.ok(report.detectedEnvironment.os);assert.ok(report.detectedEnvironment.browser);assert.ok(report.platforms.tampermonkey.meta);assert.equal(b.requests.length,0,'Region capture/export makes no network requests');assert.deepEqual(b.errors,[]);
+  button('Export all diagnostics').click();const report=b.report();assert.equal(report.toolVersion,source.match(/^\/\/ @version\s+(\S+)/m)[1]);assert.ok(report.toolVersion.includes(targetBuild.match(/\.(\d+)-dev$/)[1]));assert.equal(report.installedBuild,targetBuild);assert.equal(report.travelDom.captures.length,1);assert.equal(report.travelDom.captures[0].installedBuild,targetBuild);assert.ok(report.travelDom.captures[0].html.includes('Yes'));assert.ok(report.detectedEnvironment.os);assert.ok(report.detectedEnvironment.browser);assert.ok(report.platforms.tampermonkey.meta);assert.equal(b.requests.length,0,'Region capture/export makes no network requests');assert.deepEqual(b.errors,[]);
  }finally{b.close()}
 }
 

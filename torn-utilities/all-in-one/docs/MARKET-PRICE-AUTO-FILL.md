@@ -149,3 +149,27 @@ pricing controls and remove the input maximum attribute, reproducing the failure
 and verifying max-minus fills and preservation of manually entered quantities.
 Quantity-source evidence is exported; local quantity errors no longer masquerade
 as a failed network request. Native PDA verification remains required.
+
+## Shared quantity handling and diagnostic updates in .130
+
+Market Auto Fill and Item Monitor now use the same stock quantity reader in the
+unified bundle. Market-specific owned counts and validated input bounds remain
+first choices. If they are absent, an explicit Fill may use the unique native
+quantity MAX control, following Snatch and Run's verified native-maximum approach.
+The fallback is restricted to the matching quantity input container and non-submit
+controls. It verifies a stable accepted quantity twice, restores the original field,
+then applies the configured max/max-N amount through the shared React setter.
+Stop/cancellation restores the pre-MAX field. No purchase/listing submit or
+price-side MAX control is clicked. Missing or ambiguous controls remain errors.
+
+Tests cover absent quantities, native MAX, max-N, cancellation during MAX, unrelated
+price controls and submit rejection, alongside manual quantity preservation.
+
+The diagnostics updater previously retained version 0.2.49-dev while its bundled TU
+target changed. A host could therefore retain an outdated required TU version.
+The diagnostics version now uses the full TU release version at build time:
+TU and TU Test both identify 0.5.42.130-dev, including future numeric rollovers. Metadata, visible version and
+export agree automatically on future builds. Version mismatch guidance asks users
+to update both scripts rather than downgrade TU. Strict per-build acceptance
+isolation remains. Update both the unified TU script and the existing diagnostic
+script through their established DEV URLs; production is unchanged.

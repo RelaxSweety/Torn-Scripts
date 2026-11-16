@@ -23,7 +23,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-export function createMarketPriceAutoFill({window,manager,setMarketInput}){
+export function createMarketPriceAutoFill({window,manager,setMarketInput,readItemStockQuantity}){
 
  let lastQuantityEvidence=null;
  const document=window.document,localStorage=window.localStorage;
@@ -1940,18 +1940,53 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput}){
 
     // Inventory counts often sit beside the item picture, outside the pricing controls.
     // Read the entire owning item row, without probing a live field with an oversized value.
-    async function discoverMaxQuantity(inputs,row){
+    async function discoverMaxQuantity(inputs,row,{nativeFallback=false}={}){
         const host=row?.closest('.silmaril-market-filler-processed')||row?.closest('[data-tmf-item-id]')||row;
         const candidates=[],add=(value,source)=>{if(value!=null&&value!=='')candidates.push({value,source});};
         for(const input of inputs)for(const attr of ['max','aria-valuemax','data-max','data-max-quantity','data-available'])add(input.getAttribute(attr),'input-'+attr);
         for(const el of new Set([host,row]))if(el)for(const attr of ['data-quantity','data-available','data-stock','data-amount','data-max-quantity'])add(el.getAttribute(attr),'row-'+attr);
         const marked=host?.querySelectorAll('[data-available],[data-stock],[data-quantity],[data-amount],[class*=amountAvailable],[class*=quantityAvailable],[class*=itemAmount],[class*=itemQty],[class*=itemQuantity],[class*=stockCount],[class*=amount],[class*=quantity],[class*=qty]')||[];
         for(const el of marked){if(el.closest('[class*=priceInputWrapper],[data-market-price-wrapper],.tmf-icons,.tmf-settings-overlay'))continue;for(const attr of ['data-available','data-stock','data-quantity','data-amount'])add(el.getAttribute(attr),'count-'+attr);const text=String(el.textContent||'').trim();if(/^(?:[x×]\s*)?\d[\d,\s\u202f]*(?:\s*[x×])?$/i.test(text))add(text.replace(/[x×]/ig,''),'count-element');}
+        for(const el of host?.querySelectorAll('[aria-label],[title],img[alt]')||[]){if(el.closest('[class*=priceInputWrapper],[data-market-price-wrapper],.tmf-icons'))continue;for(const attr of ['aria-label','title','alt']){const label=el.getAttribute(attr)||'';add(label.match(/(?:^|[\s(])[x×]\s*(\d[\d,]*)/i)?.[1],'labeled-item-count');add(label.match(/\b(?:qty|quantity|amount|owned|available|stock)\s*:?\s*(\d[\d,]*)/i)?.[1],'labeled-item-count');}}
+        if(typeof readItemStockQuantity==='function')add(readItemStockQuantity(host,{exclude:'[class*=priceInputWrapper],[data-market-price-wrapper],.tmf-icons'}),'item-monitor-stock-reader');
         const text=String(host?.textContent||'');
         for(const pattern of [/(?:^|[\s(])[x×]\s*(\d[\d,\u00a0\u202f]*)/i,/(?:available|in stock|owned|quantity)\s*:?\s*(\d[\d,\u00a0\u202f]*)/i,/(\d[\d,\u00a0\u202f]*)\s*(?:available|owned|in inventory|in stock)\b/i])add(text.match(pattern)?.[1],'item-row-text');
         for(const {value,source} of candidates){const n=Number(String(value).replace(/[,\s\u202f]/g,''));if(Number.isSafeInteger(n)&&n>0){lastQuantityEvidence={itemId:Number(host?.dataset.tmfItemId)||null,found:true,maximum:n,source};return n;}}
         lastQuantityEvidence={itemId:Number(host?.dataset.tmfItemId)||null,found:false,inputCount:inputs.length,hasCountElements:marked.length>0};
+        if(nativeFallback)return await nativeMarketMaximum(inputs,host);
         throw Error('Available quantity is unknown; enter the quantity manually.');
+    }
+
+    async function nativeMarketMaximum(inputs,host){
+        const first=inputs[0],container=first?.closest('[class*=amountInputWrapper],[class*=quantityInputWrapper],[data-market-quantity-wrapper]')||first?.closest('.input-money-group');
+        if(!container||!host?.isConnected)throw Error('Available quantity is unknown and this row has no native quantity MAX control. Enter the quantity manually.');
+        const controls=[...container.querySelectorAll('input[type=button],button[type=button],[role=button]')].filter(el=>{
+            if(el.closest('.silmaril-market-filler-button,.tmf-icons')||el.disabled||!el.getClientRects().length)return false;
+            const label=[el.value,el.textContent,el.getAttribute('aria-label'),el.getAttribute('title')].filter(Boolean).join(' ').trim();
+            return /^(?:max(?:imum)?)(?:\s+(?:max(?:imum)?|amount|quantity|available|items))*$/i.test(label)||!label&&el.matches('input.wai-btn[type=button]');
+        });
+        lastQuantityEvidence={...lastQuantityEvidence,nativeMaxControls:controls.length};
+        if(controls.length!==1)throw Error('Native quantity MAX is missing or ambiguous. Enter the quantity manually.');
+        const original=[...inputs].map(el=>el.value),signal=requestController.signal;
+        const current=()=>[...host.querySelectorAll('[class*=amountInputWrapper] input.input-money,[class*=quantityInputWrapper] input.input-money,[data-market-quantity]')];
+        let maximum=null;
+        try{
+            if(signal.aborted||!enabled||!runtimeActive||!manager.isAuthorized())throw Error('Fill cancelled.');
+            controls[0].click();
+            for(let attempt=0;attempt<2;attempt++){
+                await new Promise(resolve=>window.setTimeout(resolve,80));
+                if(signal.aborted||!host.isConnected)throw Error('Fill cancelled or item row changed.');
+                const input=current()[0],n=Number(String(input?.value||'').replace(/[,\s]/g,''));
+                if(!input?.isConnected||!Number.isSafeInteger(n)||n<1||maximum!==null&&maximum!==n)throw Error('Torn did not confirm a stable native maximum quantity.');
+                maximum=n;
+            }
+        }finally{
+            // MAX only discovers Torn's allowed amount; restore before applying max-N or skip.
+            for(let i=0;i<original.length;i++){const input=current()[i];if(input?.isConnected&&input.value!==original[i])await setMarketInput(input,original[i],{resolve:()=>current()[i]});}
+        }
+        if(signal.aborted||!enabled||!runtimeActive||!manager.isAuthorized())throw Error('Fill cancelled.');
+        lastQuantityEvidence={itemId:Number(host.dataset.tmfItemId)||null,found:true,maximum,source:'verified-native-quantity-max'};
+        return maximum;
     }
 
     async function applyQuantity(target, action, category, isAuto){
@@ -1996,16 +2031,19 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput}){
             quantityInputs[0].dispatchEvent(new Event("input", {bubbles: true}));
             return 'ok';
         }
+        if(['skip','none','0'].includes(String(mode).trim().toLowerCase())){
+            reportSkipped(mode,null,isAuto);return 'skipped';
+        }
         if (isMaxQuantityMode(mode) || !isKnownQuantityMode(mode)){
             // Unparseable modes fall back to "max" rather than silently listing nothing.
             if (!isKnownQuantityMode(mode)){
                 console.warn("[TU Market Price Auto Fill] Unrecognised quantity mode '" + mode + "', using max.");
             }
-            await setQuantityInputs(quantityInputs, await discoverMaxQuantity(quantityInputs,parentRow));
+            await setQuantityInputs(quantityInputs, await discoverMaxQuantity(quantityInputs,parentRow,{nativeFallback:true}));
             return 'ok';
         }
         let maxQuantity = null;
-        try{maxQuantity=await discoverMaxQuantity(quantityInputs,parentRow);}catch(error){if(needsRowMaximum(mode))throw error;}
+        try{maxQuantity=await discoverMaxQuantity(quantityInputs,parentRow,{nativeFallback:true});}catch(error){if(needsRowMaximum(mode))throw error;}
         let resolved = resolveQuantity(maxQuantity, mode);
         if (resolved === null){
             await setQuantityInputs(quantityInputs, '');
@@ -2154,7 +2192,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput}){
             if (!isNaN(typed) && typed >= 1){
                 return typed;
             }
-            let maxQuantity = await discoverMaxQuantity(quantityInputs, parentRow);
+            let maxQuantity = await discoverMaxQuantity(quantityInputs, parentRow,{nativeFallback:true});
             let cached = getCachedCategory(parseInt(itemId, 10));
             let listed = resolveQuantity(maxQuantity, getEffectiveQuantity(cached != null ? cached.type : null, itemId));
             return listed ?? maxQuantity;

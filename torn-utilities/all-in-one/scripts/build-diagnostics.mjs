@@ -9,6 +9,8 @@ import {createAcceptanceSession} from '../src/diagnostics/acceptance-session.js'
 const base=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const read=p=>fs.readFileSync(path.join(base,p),'utf8');
 const catalog=JSON.parse(read('config/test-cases.json')),tools=JSON.parse(read('config/tools.json')),target=JSON.parse(read('config/releases.json'))[0].version;
+// One version authority for both installations, including future numeric rollovers.
+const diagnosticVersion=target;
 if(new Set(catalog.tests.map(t=>t.id)).size!==catalog.tests.length)throw Error('Duplicate check IDs');
 for(const tool of tools)for(const suffix of ['function','lifecycle'])if(!catalog.tests.some(t=>t.id==='tool.'+tool.id+'.'+suffix))throw Error('Missing tool coverage: '+tool.id);
 for(const check of catalog.tests)if(check.section.startsWith('tool.')&&!tools.some(t=>check.section==='tool.'+t.id))throw Error('Obsolete tool check: '+check.id);
@@ -16,7 +18,7 @@ const agreementVersion=JSON.parse(read('../agreements/dev/current.json')).agreem
 const versionMetadata=JSON.stringify({agreement_version:agreementVersion},null,2)+'\n';
 const versionPath=path.join(base,'../agreements/dev/version.json');
 if(process.argv.includes('--check')){if(fs.readFileSync(versionPath,'utf8')!==versionMetadata)throw Error('Stale agreement version metadata');}else fs.writeFileSync(versionPath,versionMetadata);
-let output=read('src/diagnostics/tu-test.user.js').replace('__TU_CHAT_MONITOR__',()=>createChatMonitor.toString()).replace('__TU_TRAVEL_DOM_DIAGNOSTIC__',()=>createTravelDomDiagnostic.toString()).replace('__TU_ENVIRONMENT_DETECTOR__',()=>detectTestEnvironment.toString()).replace('__TU_ACCEPTANCE_ENGINE__',()=>createAcceptanceSession.toString()).replace('__TU_TEST_CATALOG__',()=>JSON.stringify(catalog)).replace('__TU_TEST_TOOLS__',()=>JSON.stringify(tools.map(({id,name})=>({id,name})))).replaceAll('__TU_TEST_TARGET__',target);
+let output=read('src/diagnostics/tu-test.user.js').replace('__TU_CHAT_MONITOR__',()=>createChatMonitor.toString()).replace('__TU_TRAVEL_DOM_DIAGNOSTIC__',()=>createTravelDomDiagnostic.toString()).replace('__TU_ENVIRONMENT_DETECTOR__',()=>detectTestEnvironment.toString()).replace('__TU_ACCEPTANCE_ENGINE__',()=>createAcceptanceSession.toString()).replace('__TU_TEST_CATALOG__',()=>JSON.stringify(catalog)).replace('__TU_TEST_TOOLS__',()=>JSON.stringify(tools.map(({id,name})=>({id,name})))).replaceAll('__TU_TEST_TARGET__',target).replaceAll('__TU_DIAGNOSTICS_VERSION__',diagnosticVersion);
 new vm.Script(output,{filename:'tu-diagnostics-dev.user.js'});
 new vm.Script(output.replace(/[“”]/g,'\"').replace(/[‘’]/g,"'"),{filename:'tu-diagnostics-dev.pda-adapted.user.js'});
 const dest=path.join(base,'dist/tu-diagnostics-dev.user.js');

@@ -1,5 +1,6 @@
 import {createMonitorClient} from '../src/features/monitor-client.js';
 import {setMarketInput} from '../src/features/market-input.js';
+import {readItemStockQuantity} from '../src/features/item-stock-quantity.js';
 import {createMarketRequest} from '../src/adapters/market-request.js';
 import {createWindowExpansion} from '../src/ui/window-expansion.js';
 import {createFFScouter} from '../src/features/ffscouter.js';
@@ -57,7 +58,7 @@ const transport=preparedIntegration?`function authorize(url,options,context){con
 for(const tool of tools){
  const filename=path.join(root,tool.source);
  let source=fs.readFileSync(filename,'utf8').replace(/^\/\/ ==UserScript==[\s\S]*?^\/\/ ==\/UserScript==\s*/m,'');
- if(tool.id==='market-price-auto-fill')source='const setMarketInput='+setMarketInput.toString()+';\n'+source.replace('export function createMarketPriceAutoFill','function createMarketPriceAutoFill')+`\nconst filler=createMarketPriceAutoFill({window,manager:window.TornUtilities,setMarketInput});window.__TU_MARKET_FILL_DIAGNOSTICS__=filler.diagnostics;window.TornUtilities.register({id:'market-price-auto-fill',activate:filler.activate,resume:filler.resume,diagnostics:filler.diagnostics,deactivate:filler.deactivate});`;
+ if(tool.id==='market-price-auto-fill')source='const readItemStockQuantity='+readItemStockQuantity.toString()+';\n'+'const setMarketInput='+setMarketInput.toString()+';\n'+source.replace('export function createMarketPriceAutoFill','function createMarketPriceAutoFill')+`\nconst filler=createMarketPriceAutoFill({window,manager:window.TornUtilities,setMarketInput,readItemStockQuantity});window.__TU_MARKET_FILL_DIAGNOSTICS__=filler.diagnostics;window.TornUtilities.register({id:'market-price-auto-fill',activate:filler.activate,resume:filler.resume,diagnostics:filler.diagnostics,deactivate:filler.deactivate});`;
  new vm.Script(source,{filename:tool.source});
  if(!source.includes(tool.id))throw Error('Source missing tool ID: '+tool.id);
  source=source.replaceAll('https://tu-multiplayer-server.tuserver.workers.dev','https://tu-multiplayer-server-dev.tuserver.workers.dev');
@@ -71,6 +72,7 @@ for(const tool of tools){
  if(tool.id==='war-hit-organizer')source=source.replace(/"data:image\/webp;base64,[A-Za-z0-9+/=]+"/g,'manager.getLogo()');
 
  if(tool.id==='item-monitor'&&preparedIntegration)source=secureCandidateReporting(source);
+ if(tool.id==='item-monitor'){const reader=/const quantity=row=>\{[^\n]+\};/;if(!reader.test(source))throw Error('Item Monitor quantity reader changed');source='const readItemStockQuantity='+readItemStockQuantity.toString()+';\n'+source.replace(reader,'const quantity=row=>readItemStockQuantity(row,{text});');}
  if(tool.id==='item-monitor')source='const createNativeClockSync='+createNativeClockSync.toString()+';\n'+'const createStockMonitorDiagnostic='+createStockMonitorDiagnostic.toString()+';\nconst createAlarmAudio='+createAlarmAudio.toString()+';\nconst createLandingAlarm='+createLandingAlarm.toString()+';\nconst TU_INTEGRATED_BUILD='+JSON.stringify(version)+';\nconst createTravelDomDiagnostic='+createTravelDomDiagnostic.toString()+';\nconst createAcceptanceSession='+createAcceptanceSession.toString()+';\nconst detectTestEnvironment='+detectTestEnvironment.toString()+';\n'+'const createHospitalClock='+createHospitalClock.toString()+';\n'+'const createNativeTravelActions='+createNativeTravelActions.toString()+';\n'+'const createTravelEnhancements='+createTravelEnhancements.toString()+';\n'+source;
  if(tool.id==='chat-archiver')source='const createChatCaptureSupport='+createChatCaptureSupport.toString()+';\n'+source;
  source=compactPresentation(source);

@@ -1,5 +1,17 @@
 [
   {
+    "version": "0.5.42.130-dev",
+    "date": "2026-11-16",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Share Item Monitor stock quantity detection with Market Price Auto Fill and verify Torn native quantity MAX as a scoped fallback",
+        "Advance the Testing and Diagnostics userscript version with each TU build so auto-update cannot retain an old target requirement",
+        "Explain outdated diagnostic targets without instructing users to downgrade TU"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.129-dev",
     "date": "2026-11-16",
     "securityBundle": true,
