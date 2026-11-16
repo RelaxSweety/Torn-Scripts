@@ -1,5 +1,31 @@
 [
   {
+    "version": "0.5.42.127-dev",
+    "date": "2026-11-16",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Publish Market Price Auto Fill, War filter collapse and expandable windows to the established DEV auto-update channel",
+        "Keep update checks, download links and userscript metadata on dev/tu-all-in-one"
+      ]
+    }
+  },
+  {
+    "version": "0.5.42.126-dev",
+    "date": "2026-11-16",
+    "securityBundle": true,
+    "changes": {
+      "Features": [
+        "Integrated Market Price Auto Fill based on Silmaril\u2019s MIT Market Filler 3.2.0",
+        "Collapse all Players filters in War Organizer",
+        "Expand all TU windows across the web viewport; optional browser fullscreen"
+      ],
+      "Fixes": [
+        "Verified native React input updates, shared TU API credentials and read-only price transport"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.125-dev",
     "date": "2026-11-15",
     "securityBundle": true,

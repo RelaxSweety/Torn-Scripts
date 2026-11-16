@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Testing and Diagnostics DEV
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.2.47-dev
+// @version      0.2.48-dev
 // @description  Guided DEV acceptance, system information and sanitized travel DOM diagnostics
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -109,12 +109,16 @@
  const detectedDetails=text('p','');detectedDetails.id='tu-test-detected-environment';
  text('h2','Acceptance checklist filters');
  const section=document.createElement('select');section.id='tu-test-section';
- const sections=[['all','All sections'],['automatic','Read-only automatic checks'],['auth','Authentication & agreement'],['core','Manager, data & release'],...tools.map(t=>['tool.'+t.id,t.name])];
+ const sections=[['all','All sections'],['automatic','Read-only automatic checks'],['auth','Authentication & agreement'],['core','Manager, data & release'],['market-fill','Market Price Auto Fill acceptance'],...tools.map(t=>['tool.'+t.id,t.name])];
  for(const [id,label] of sections){const o=document.createElement('option');o.value=id;o.textContent=label;section.append(o);}content.append(section);
  const filter=document.createElement('select');filter.id='tu-test-status';
  for(const [id,label] of [['all','All results'],['unpassed','Not passed'],['fail','Failed'],['blocked','Blocked'],['not-tested','Not tested']]){const o=document.createElement('option');o.value=id;o.textContent=label;filter.append(o);}content.append(filter);
  const summary=text('p','');summary.id='tu-test-summary';summary.setAttribute('role','status');
  const actions=document.createElement('div');content.append(actions);
+ const marketSection=document.createElement('section');content.append(marketSection);text('h3','Market Price Auto Fill · safe diagnostic',marketSection);
+ text('p','No listing inputs or live listing records are changed by this diagnostic. Device interaction remains unverified until the manual checks are completed.',marketSection);
+ const marketReport=document.createElement('pre');marketReport.style.whiteSpace='pre-wrap';marketSection.append(marketReport);
+ const marketCheck=document.createElement('button');marketCheck.type='button';marketCheck.textContent='Check Market Price Auto Fill';marketSection.append(marketCheck);marketCheck.onclick=()=>{const diagnostic=host.TornUtilities?.marketPriceAutoFillDiagnostics||window.TornUtilities?.marketPriceAutoFillDiagnostics||host.__TU_MARKET_FILL_DIAGNOSTICS__||window.__TU_MARKET_FILL_DIAGNOSTICS__;marketReport.textContent=typeof diagnostic==='function'?JSON.stringify(diagnostic(),null,2):'SKIP — Open Market Price Auto Fill in TU first. Initialization is unverified.';};
  const travelSection=document.createElement('section');travelSection.id='tu-test-travel-dom';content.append(travelSection);
  text('h3','Snatch and Run · DOM diagnostic',travelSection);
  text('p','Start monitoring on the Travel Agency, flight or foreign page before arming Snatch and Run. Native travel page and inventory DOM fragments are captured automatically, without selecting individual elements. Minimize TU Test and complete its Heal, optional Destroy Travel Inventory, Purchase Max and Return button sequence without stopping. Native manual actions are recorded too. Clicks, Snatch and Run function events/errors, and related DOM changes are recorded without blocking actions. Recording continues across navigation in this tab until Stop monitoring. Stage labels are optional. Up to 64 native page fragments / 512 KB are retained separately. Latest 200 action captures / 1 MB of HTML are retained; older entries are discarded at the limit. Review exported JSON before sharing.',travelSection);
@@ -199,13 +203,13 @@
    const actual=currentBuild();setAuto('runtime.build',actual===targetBuild?'pass':actual?'fail':'blocked',actual?'Visible installed TU '+actual+'; target '+targetBuild:'TU version label unavailable; open/install the integrated DEV Manager.');
    let api;try{api=host.TornUtilities||window.TornUtilities;}catch{}
    if(typeof api?.isRegistered!=='function')setAuto('runtime.registry','blocked','Shared Manager API unavailable; this does not establish missing tools.');
-   else{const missing=tools.filter(t=>!api.isRegistered(t.id));const removed=api.isRegistered('alerts-calculations');setAuto('runtime.registry',!missing.length&&!removed?'pass':'fail',missing.length?'Missing registrations: '+missing.map(t=>t.name).join(', '):removed?'Removed Stock and Calculations still registered':'All ten expected registrations present; removed tool absent. Functionality remains manual.');}
+   else{const missing=tools.filter(t=>!api.isRegistered(t.id));const removed=api.isRegistered('alerts-calculations');setAuto('runtime.registry',!missing.length&&!removed?'pass':'fail',missing.length?'Missing registrations: '+missing.map(t=>t.name).join(', '):removed?'Removed Stock and Calculations still registered':'All expected registrations present; removed tool absent. Functionality remains manual.');}
    const temp='tu:test:probe:'+Date.now();try{localStorage.setItem(temp,'roundtrip');const ok=localStorage.getItem(temp)==='roundtrip';setAuto('runtime.storage',ok?'pass':'fail','Temporary local storage roundtrip '+(ok?'succeeded':'failed'));}catch{setAuto('runtime.storage','blocked','Local storage is unavailable');}finally{try{localStorage.removeItem(temp)}catch{}}
    try{
     const source=await getText(artifact);const version=source.match(/^\/\/\s*@version\s+(\S+)/m)?.[1];
     const markers=tools.every(t=>source.includes('/* Integrated tool: '+t.id+' ('));
-    const ok=source.startsWith('// ==UserScript==')&&version===targetBuild&&markers&&(source.match(/\/\* Integrated tool:/g)||[]).length===10&&!source.includes('/* Integrated tool: alerts-calculations')&&!source.includes('war-status-diagnostic')&&!source.includes('modules.json')&&!source.includes('https://tu-multiplayer-server.tuserver.workers.dev');
-    setAuto('source.bundle',ok?'pass':'fail','Published '+(version||'unknown')+'; single-script metadata, ten tool markers, exclusions and DEV endpoints '+(ok?'match':'do not match')+'. This does not execute the source.');
+    const ok=source.startsWith('// ==UserScript==')&&version===targetBuild&&markers&&(source.match(/\/\* Integrated tool:/g)||[]).length===tools.length&&!source.includes('/* Integrated tool: alerts-calculations')&&!source.includes('war-status-diagnostic')&&!source.includes('modules.json')&&!source.includes('https://tu-multiplayer-server.tuserver.workers.dev');
+    setAuto('source.bundle',ok?'pass':'fail','Published '+(version||'unknown')+'; single-script metadata, expected tool markers, exclusions and DEV endpoints '+(ok?'match':'do not match')+'. This does not execute the source.');
    }catch(e){setAuto('source.bundle',e.blocked?'blocked':'fail',e.message);}
    let github=null,worker=null;
    try{github=JSON.parse(await getText(githubAgreement));if(!validAgreement(github))throw Error('Invalid published version');setAuto('agreement.github','pass','Published DEV agreement version '+github.agreement_version+'; metadata only');}

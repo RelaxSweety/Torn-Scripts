@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "checklistVersion": "dev-acceptance-2026-11-09-v28",
+  "checklistVersion": "dev-acceptance-2026-11-16-market-fill",
   "tests": [
     {
       "id": "runtime.build",
@@ -17,8 +17,8 @@
     {
       "id": "runtime.registry",
       "section": "automatic",
-      "label": "Ten integrated tools registered",
-      "instructions": "Read the shared TU API and confirm all ten expected tools are registered; Stock and Calculations must be absent. Registration does not prove a tool works.",
+      "label": "Eleven integrated tools registered",
+      "instructions": "Read the shared TU API and confirm all eleven expected tools are registered; Stock and Calculations must be absent. Registration does not prove a tool works.",
       "kind": "automatic",
       "critical": true,
       "platforms": [
@@ -42,7 +42,7 @@
       "id": "source.bundle",
       "section": "automatic",
       "label": "Published single-script DEV artifact",
-      "instructions": "Check release metadata, ten bundled factory markers, removed tool exclusion and DEV-only backend URLs. This is a source check, not runtime validation.",
+      "instructions": "Check release metadata, eleven bundled factory markers, removed tool exclusion and DEV-only backend URLs. This is a source check, not runtime validation.",
       "kind": "automatic",
       "critical": true,
       "platforms": [
@@ -366,7 +366,7 @@
       "id": "release.update",
       "section": "core",
       "label": "Single-script update",
-      "instructions": "Install/update via rolling DEV URL; confirm version, all ten tools, settings/history, approved logo, and no separate tool installation.",
+      "instructions": "Install/update via rolling DEV URL; confirm version, all eleven tools, settings/history, approved logo, and no separate tool installation.",
       "kind": "manual",
       "critical": true,
       "platforms": [
@@ -708,6 +708,174 @@
       "platforms": [
         "tampermonkey",
         "pda"
+      ]
+    },
+    {
+      "id": "market-fill.android",
+      "section": "market-fill",
+      "label": "PDA Android compatibility",
+      "instructions": "Verify enable, Fill, quantity, popup taps and Stop on actual Android PDA. Unverified until tested.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "pda",
+        "tampermonkey"
+      ]
+    },
+    {
+      "id": "market-fill.ios",
+      "section": "market-fill",
+      "label": "PDA iOS compatibility",
+      "instructions": "Verify enable, Fill, quantity and popup interactions on actual iOS PDA. Unverified until tested.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "pda",
+        "tampermonkey"
+      ]
+    },
+    {
+      "id": "market-fill.tampermonkey",
+      "section": "market-fill",
+      "label": "Tampermonkey compatibility",
+      "instructions": "Verify the integrated review build using desktop Tampermonkey. Do not submit a listing.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "pda",
+        "tampermonkey"
+      ]
+    },
+    {
+      "id": "market-fill.initialization",
+      "section": "market-fill",
+      "label": "Initialization and market detection",
+      "instructions": "Enable under Business Tools. Visit Add Items and Your Items; controls appear once and remount correctly.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "pda",
+        "tampermonkey"
+      ]
+    },
+    {
+      "id": "market-fill.ids",
+      "section": "market-fill",
+      "label": "Item ID and input detection",
+      "instructions": "Verify item IDs against Torn information controls, images and validated DOM attributes; invalid rows must not request prices.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "pda",
+        "tampermonkey"
+      ]
+    },
+    {
+      "id": "market-fill.input",
+      "section": "market-fill",
+      "label": "Price and quantity React synchronization",
+      "instructions": "On an unsubmitted test row, verify accepted values survive Torn rerenders, including formatted inputs and Clear. Preserve manually entered quantity.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "pda",
+        "tampermonkey"
+      ]
+    },
+    {
+      "id": "market-fill.formula",
+      "section": "market-fill",
+      "label": "Fixed and combined formulas",
+      "instructions": "Check =1 and min(max(-1[0],+10%[market]),-1[14]); confirm values independently without publishing.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "pda",
+        "tampermonkey"
+      ]
+    },
+    {
+      "id": "market-fill.api",
+      "section": "market-fill",
+      "label": "Market / Bazaar retrieval and errors",
+      "instructions": "Request analytics deliberately; verify both sources, freshness and fees. Simulate missing key, timeout, malformed JSON and rate limit; no input may change after pricing failure.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "pda",
+        "tampermonkey"
+      ]
+    },
+    {
+      "id": "market-fill.popup",
+      "section": "market-fill",
+      "label": "Popup interaction",
+      "instructions": "Test price selection, viewport bounds, single tap and keyboard behavior; no long-press fill.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "pda",
+        "tampermonkey"
+      ]
+    },
+    {
+      "id": "market-fill.queue",
+      "section": "market-fill",
+      "label": "Favorites queue and cancellation",
+      "instructions": "Fill All must populate fields only. One failed row must not stop other favorites. Stop prevents pending writes. Excluded items remain untouched.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "pda",
+        "tampermonkey"
+      ]
+    },
+    {
+      "id": "market-fill.settings",
+      "section": "market-fill",
+      "label": "Settings persistence and disable",
+      "instructions": "Change defaults, category/item overrides, favorites/exclusions. Reload. Verify enable persistence and disable removes controls and stops pending requests.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "pda",
+        "tampermonkey"
+      ]
+    },
+    {
+      "id": "market-fill.windows",
+      "section": "market-fill",
+      "label": "Expanded windows and filters",
+      "instructions": "Verify expand/restore across TU tools and War filter collapse retaining values. Browser fullscreen availability and native PDA toolbar coverage must be reported separately.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "pda",
+        "tampermonkey"
+      ]
+    },
+    {
+      "id": "tool.market-price-auto-fill.function",
+      "section": "tool.market-price-auto-fill",
+      "label": "Market Price Auto Fill function",
+      "instructions": "Verify controls, formulas, analytics and lifecycle using unsubmitted rows only. Actual platform behavior remains unverified until tested.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "pda",
+        "tampermonkey"
+      ]
+    },
+    {
+      "id": "tool.market-price-auto-fill.lifecycle",
+      "section": "tool.market-price-auto-fill",
+      "label": "Market Price Auto Fill lifecycle",
+      "instructions": "Verify controls, formulas, analytics and lifecycle using unsubmitted rows only. Actual platform behavior remains unverified until tested.",
+      "kind": "manual",
+      "critical": true,
+      "platforms": [
+        "pda",
+        "tampermonkey"
       ]
     }
   ]

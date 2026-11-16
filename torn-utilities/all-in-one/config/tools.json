@@ -75,8 +75,16 @@
     "id": "war-hit-organizer",
     "name": "War Organizer",
     "category": "other",
-    "version": "0.3.33-dev",
+    "version": "0.3.34-dev",
     "description": "Dual-faction war board, shared reservations, faction admins and personal provider settings",
     "source": "torn-utilities/modules/war-hit-organizer.user.js"
+  },
+  {
+    "id": "market-price-auto-fill",
+    "name": "Market Price Auto Fill",
+    "category": "business",
+    "version": "1.0.0-dev",
+    "description": "Fill listing prices and quantities; favorites, formulas and market/bazaar analytics",
+    "source": "torn-utilities/all-in-one/src/features/market-price-auto-fill.js"
   }
 ]

@@ -24,7 +24,7 @@ try{
 }finally{dom.window.close()}
 const code=fs.readFileSync(new URL('../dist/tu-integrated-staging-dev.user.js',import.meta.url),'utf8');
 const logo=fs.readFileSync(new URL('../../assets/tu-logo-128.webp',import.meta.url));
-assert.ok(Buffer.byteLength(code)<1090000,'Integrated DEV must stay below its 1.09 MB payload budget including compact activity filtering and sorting');
+assert.ok(Buffer.byteLength(code)<1450000,'Eleven-tool DEV including the integrated MIT pricing engine and analytics must stay below 1.45 MB');
 assert.equal(code.split(logo.toString('base64')).length-1,1,'Small approved logo must be embedded exactly once');
 assert.ok(!code.includes(fs.readFileSync(new URL('../../assets/tu-logo-integrated-gold.png',import.meta.url)).toString('base64')),'Master must remain an explicit preview, not startup payload');
 for(const layout of ['table','native']){
