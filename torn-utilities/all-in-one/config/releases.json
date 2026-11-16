@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.136-dev",
+    "date": "2026-11-16",
+    "securityBundle": true,
+    "changes": {
+      "Diagnostics": [
+        "Passive Item Market weapon-row capture with identities, stats, tooltip and DOM attributes, controls and accessible React item fields",
+        "Include Item Monitor cached item names and saved retention quantities; record changing rows through scrolling and native detail views without filling or submitting"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.135-dev",
     "date": "2026-11-16",
     "securityBundle": true,

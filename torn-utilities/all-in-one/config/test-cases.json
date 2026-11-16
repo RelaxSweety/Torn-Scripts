@@ -858,7 +858,7 @@
       "id": "tool.market-price-auto-fill.function",
       "section": "tool.market-price-auto-fill",
       "label": "Market Price Auto Fill function",
-      "instructions": "Verify controls, formulas, analytics and lifecycle using unsubmitted rows only. Actual platform behavior remains unverified until tested.",
+      "instructions": "Verify controls, formulas, analytics and lifecycle using unsubmitted rows only. For distinct weapons, Start item-row recording, scroll and open native details, Stop, and Export all diagnostics to compare identities, stats and keep rules. Actual platform behavior remains unverified until tested.",
       "kind": "manual",
       "critical": true,
       "platforms": [
@@ -870,7 +870,7 @@
       "id": "tool.market-price-auto-fill.lifecycle",
       "section": "tool.market-price-auto-fill",
       "label": "Market Price Auto Fill lifecycle",
-      "instructions": "Verify controls, formulas, analytics and lifecycle using unsubmitted rows only. Actual platform behavior remains unverified until tested.",
+      "instructions": "Verify controls, formulas, analytics and lifecycle using unsubmitted rows only. For distinct weapons, Start item-row recording, scroll and open native details, Stop, and Export all diagnostics to compare identities, stats and keep rules. Actual platform behavior remains unverified until tested.",
       "kind": "manual",
       "critical": true,
       "platforms": [

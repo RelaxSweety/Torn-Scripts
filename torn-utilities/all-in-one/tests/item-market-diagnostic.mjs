@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {JSDOM} from 'jsdom';
+import {createItemMarketDiagnostic} from '../src/diagnostics/item-market.js';
+const dom=new JSDOM('<body><div id="tu-test-dev-panel"></div><main></main></body>',{url:'https://www.torn.com/page.php?sid=ItemMarket'}),w=dom.window,d=w.document,main=d.querySelector('main');
+w.HTMLElement.prototype.getClientRects=function(){return this.isConnected?[{}]:[];};
+const pause=ms=>new Promise(r=>w.setTimeout(r,ms));let events=0,getterReads=0;
+d.addEventListener('click',()=>events++);d.addEventListener('input',()=>events++);w.fetch=()=>{throw Error('No network');};
+w.localStorage.setItem('tuim-catalog-v2',JSON.stringify({items:[{id:'67',name:'Lead Pipe'}]}));w.localStorage.setItem('tu:market-fill:restricted-quantities','{"67":1}');
+function row(uid,damage){const el=d.createElement('div');el.className='itemRowWrapper_new';el.dataset.itemId='67';el.dataset.itemUid=uid;el.dataset.meta=JSON.stringify({damage,apiKey:'JSON_SECRET',owner:'JSON_OWNER'});el.innerHTML=`<img src="/images/items/67/large.png?token=PRIVATE" alt="Lead Pipe"><span title="Damage ${damage}; Accuracy 50; Quality 80%">Lead Pipe</span><div data-quality="80"><input type="checkbox"><input class="price" value="123"><input type="hidden" name="csrf" value="HIDDEN_SECRET"></div>`;el.__reactProps$test={item:{id:67,uid,damage,accuracy:50,bonuses:[{name:'Cripple',value:12}],apiKey:'PRIVATE_KEY',owner:{name:'PRIVATE_OWNER'}}};Object.defineProperty(el.__reactProps$test.item,'quality',{get(){getterReads++;return 90;},enumerable:true});return el;}
+const a=row('weapon-a',40),b=row('weapon-b',55),c=row('weapon-c',61);main.append(a,b,c);const diagnostic=createItemMarketDiagnostic({document:d,window:w,onChange:value=>{d.getElementById('tu-test-dev-panel').textContent=value;}});
+try{
+ const report=diagnostic.report();assert.equal(report.current.length,3);assert.deepEqual(report.current.map(r=>r.catalogNames[0]),Array(3).fill({id:'67',name:'Lead Pipe',savedKeep:1}));assert.deepEqual(report.current.map(r=>r.reactItemFields.find(x=>x.path.endsWith('.damage')).value),[40,55,61]);assert.equal(getterReads,0);assert.equal(events,0);
+ const json=JSON.stringify(report);for(const secret of ['PRIVATE_KEY','PRIVATE_OWNER','HIDDEN_SECRET','token=PRIVATE','JSON_SECRET','JSON_OWNER'])assert.ok(!json.includes(secret),secret+' excluded');assert.ok(json.includes('weapon-b'));assert.ok(json.includes('Cripple'));
+ const tip=d.createElement('div');tip.setAttribute('role','tooltip');tip.textContent='Lead Pipe Damage 40 Accuracy 50 Quality 80% Cripple bonus';d.body.append(tip);
+ diagnostic.start();assert.equal(diagnostic.report().detailRecords.length,1,'Portalled weapon details are included');assert.equal(diagnostic.report().records.length,3);main.replaceChildren(row('weapon-d',70));w.dispatchEvent(new w.Event('scroll'));await pause(550);assert.equal(diagnostic.report().records.length,4,'Remounted weapon retained with earlier variants');
+ diagnostic.stop();main.append(row('weapon-e',77));await pause(550);assert.equal(diagnostic.report().records.length,4,'Stop disconnects recording');assert.equal(diagnostic.report().current.length,2,'Export obtains current mounted evidence even without recording');assert.equal(events,0);assert.equal(getterReads,0);diagnostic.clear();assert.equal(diagnostic.report().records.length,0);
+ console.log('Item Market evidence passed: distinct weapon IDs/stats/bonuses, shared catalog and rules, passive scroll/remount recording, getter/secret exclusion, Stop/Clear and fresh export. Actual device interaction unverified.');
+}finally{diagnostic.stop();w.close();}
