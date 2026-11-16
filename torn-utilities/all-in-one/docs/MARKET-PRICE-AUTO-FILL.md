@@ -118,3 +118,21 @@ available on its review branch. Production remains unchanged.
 
 Canonical DEV installation/update URL:
 https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/dev/tu-all-in-one/torn-utilities/releases/dev/torn-utilities-dev.user.js
+
+## PDA window defect fixed in .128
+
+The .127 PDA report identified a failed manual Market tool check despite seven
+automatic checks passing. The settings had been mounted in an unpositioned body
+host while the Manager hid itself. The visible module content also caused the
+launcher to hide, leaving the settings and its enable toggle inaccessible.
+
+The market settings now use a fixed TU-managed window registered with shared
+window navigation, expansion and layout persistence. The new lifecycle regression
+checks actual visibility, TU branding, navigation controls, enable, minimize/restore,
+Back/reopen, background enable preference and Exit/launcher recovery. Diagnostic
+exports now include the Market tool's own window, input and network state; TU Test
+metadata, visible label and exported version consistently identify 0.2.49-dev.
+
+Automated Market, manager integration (191 checks), War navigation, diagnostics,
+PDA-loader/startup and idle-performance checks passed. Actual PDA pricing needs
+a user retest: the attached report has no market-page capture or pricing error.

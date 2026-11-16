@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.128-dev",
+    "date": "2026-11-16",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Show Market Price Auto Fill in a visible TU-branded managed window instead of an unpositioned host",
+        "Keep shared Back, Minimize, Exit, Expand and launcher restoration available for market settings"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.127-dev",
     "date": "2026-11-16",
     "securityBundle": true,
