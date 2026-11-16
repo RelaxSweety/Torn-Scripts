@@ -239,3 +239,24 @@ clears prepared prices before recalculation while preserving manual quantities.
 Temporarily disabled/remounted fields wait for native readiness instead of being
 counted as completed; single-copy selection checkboxes can unlock their price
 field while protected single copies remain unselected.
+
+## Alphabetical lists, search and master Save in .133
+
+Favorites and Restricted items sort alphabetically by cached item name, ignoring
+case and using item ID as the tie-breaker. A shared search field filters both lists
+by name keywords or item ID, with matching/total counts and empty-result messages.
+Unknown names retain an Item [ID] label until Torn supplies the name.
+
+Per-item Save quantity, Save Favorites and Save Excluded buttons are replaced by
+one Save changes button at the bottom of the combined list pane. Keep quantities,
+All and manual ID edits are drafts until that button is pressed. Drafts persist
+through filtering and name/row refreshes, including items hidden by search.
+All drafts validate before any settings are written; invalid values prevent
+partial application. Row marks and Remove continue to apply immediately and
+update staged ID edits so a later Save does not resurrect a removed mark.
+Search and focused quantity controls retain focus on refresh.
+
+Tests cover alphabetical ordering, case-insensitive multi-keyword and ID search,
+draft retention, hidden-item batch saving, one bottom Save, validation without
+partial persistence, All drafts, removal and existing restriction/fill workflows.
+TU and Testing and Diagnostics both identify 0.5.42.133-dev.

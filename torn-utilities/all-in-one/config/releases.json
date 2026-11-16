@@ -1,5 +1,20 @@
 [
   {
+    "version": "0.5.42.133-dev",
+    "date": "2026-11-16",
+    "securityBundle": true,
+    "changes": {
+      "Features": [
+        "Alphabetical Favorites and Restricted lists with shared case-insensitive keyword and item-ID search",
+        "One bottom Save changes button for quantity and ID edits, including filtered-out items"
+      ],
+      "Fixes": [
+        "Preserve unsaved quantity drafts while filtering and refreshing list names",
+        "Validate the entire batch before persisting changes; All is a draft action and Remove/row marks still apply immediately"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.132-dev",
     "date": "2026-11-16",
     "securityBundle": true,

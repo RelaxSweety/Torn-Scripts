@@ -27,7 +27,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
 
  let lastQuantityEvidence=null;
  let autoFillMode='favorites',runMarketScope='';const listJobs=new Map(),restrictionLedger=new Map(),restrictedQuantities=new Map(),initialPeerCounts=new Map();
- const itemNames=new Map(),autoQuantities=new WeakMap();
+ const itemNames=new Map(),autoQuantities=new WeakMap(),restrictionDrafts=new Map();let favoriteSearch='';const markDrafts={Favorites:null,Excluded:null};
  const document=window.document,localStorage=window.localStorage;
  try{for(const [id,name] of Object.entries(JSON.parse(localStorage.getItem('tu:market-fill:item-names')||'{}')))if(/^\d+$/.test(id)&&typeof name==='string')itemNames.set(Number(id),name.slice(0,80));}catch{}
  try{for(const [id,n] of Object.entries(JSON.parse(localStorage.getItem('tu:market-fill:restricted-quantities')||'{}')))if(/^\d+$/.test(id)&&(n==='all'||Number.isSafeInteger(n)&&n>=0))restrictedQuantities.set(Number(id),n);}catch{}
@@ -2376,6 +2376,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
                 excluded.delete(itemId);favourites.delete(itemId);restrictedQuantities.delete(itemId);saveRestrictions();
                 break;
         }
+        updateMarkDraft(itemId,getItemState(itemId));
         saveFavourites();
         saveExcluded();
         if(excluded.has(itemId))void invalidatePrepared(itemId).catch(notice);
@@ -2674,7 +2675,7 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
     function cancelActiveFill(){if(!autoFillActive)return;operationEpoch++;stopAutoFill();requestController.abort();requestController=new window.AbortController();}
     function restrictionKeep(id){return excluded.has(Number(id))?(restrictedQuantities.get(Number(id))??'all'):null;}
     function fullyRestricted(id){return restrictionKeep(id)==='all';}
-    function saveRestrictions(){for(const id of restrictedQuantities.keys())if(!excluded.has(id))restrictedQuantities.delete(id);localStorage.setItem('tu:market-fill:restricted-quantities',JSON.stringify(Object.fromEntries(restrictedQuantities)));}
+    function saveRestrictions(){for(const id of restrictionDrafts.keys())if(!excluded.has(id))restrictionDrafts.delete(id);for(const id of restrictedQuantities.keys())if(!excluded.has(id))restrictedQuantities.delete(id);localStorage.setItem('tu:market-fill:restricted-quantities',JSON.stringify(Object.fromEntries(restrictedQuantities)));}
     function reloadMarks(){
         const before=[...favourites].sort().join(',')+'|'+[...excluded].sort().join(',')+'|'+JSON.stringify(Object.fromEntries(restrictedQuantities));
         const fav=loadFavourites(),restricted=loadExcluded();favourites.clear();excluded.clear();
@@ -2716,22 +2717,53 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         localStorage.setItem('tu:market-fill:item-names',JSON.stringify(Object.fromEntries(itemNames)));refreshFavoriteViews();
     }
 
+    function updateMarkDraft(id,state){
+        for(const name of ['Favorites','Excluded'])if(markDrafts[name]!==null){const tokens=markDrafts[name].split(/[ ,]+/).filter(token=>token&&Number(token)!==id);if(state===(name==='Favorites'?'favourite':'excluded'))tokens.push(String(id));markDrafts[name]=tokens.join(', ');const input=document.querySelector('[data-tu-favorite-input="'+name+'"]');if(input)input.value=markDrafts[name];}
+    }
+    function captureRestrictionDrafts(){
+        for(const input of document.querySelectorAll('[data-tu-restricted-qty]')){const id=Number(input.dataset.tuRestrictedQty);if(input.dataset.dirty==='1'||input.value.trim()!==String(restrictionKeep(id)))restrictionDrafts.set(id,input.value);}
+    }
+    async function saveFavoriteChanges(button){
+        captureRestrictionDrafts();const status=document.querySelector('[data-tu-mark-save-status]');
+        const message=text=>{if(status)status.textContent=text;};
+        const parseIDs=value=>{const ids=String(value).split(/[ ,]+/).filter(Boolean).map(Number);if(ids.some(id=>!Number.isSafeInteger(id)||id<1||id>=1000000))throw Error('Enter valid item IDs separated by commas.');return new Set(ids);};
+        try{
+            const inputs=[...document.querySelectorAll('[data-tu-favorite-input]')],changed={};
+            for(const input of inputs){const name=input.dataset.tuFavoriteInput,current=[...(name==='Favorites'?favourites:excluded)].join(', ');changed[name]=markDrafts[name]!==null||input.dataset.dirty==='1'||input.value!==current;if(changed[name])markDrafts[name]=input.value;}
+            const nextFav=changed.Favorites?parseIDs(markDrafts.Favorites):new Set(favourites),nextRestricted=changed.Excluded?parseIDs(markDrafts.Excluded):new Set(excluded);
+            for(const id of [...nextFav])if(nextRestricted.has(id)){if(changed.Favorites&&!changed.Excluded)nextRestricted.delete(id);else if(changed.Excluded&&!changed.Favorites)nextFav.delete(id);else throw Error('An item cannot be both favorite and restricted. Remove the duplicate ID before saving.');}
+            const nextRules=new Map([...restrictedQuantities].filter(([id])=>nextRestricted.has(id))),invalidate=[];
+            for(const [id,raw] of restrictionDrafts){if(!nextRestricted.has(id))continue;const text=String(raw).trim().toLowerCase(),n=text==='all'?'all':/^\d+$/.test(text)?Number(text):NaN;if(n!=='all'&&(!Number.isSafeInteger(n)||n<0))throw Error('Invalid keep quantity for '+(itemNames.get(id)||'item '+id)+'. Enter all or a whole number.');if(n===0){nextRestricted.delete(id);nextRules.delete(id);}else nextRules.set(id,n);}
+            for(const id of nextRestricted)if(!excluded.has(id)||(nextRules.get(id)??'all')!==restrictionKeep(id))invalidate.push(id);
+            const stateChanged=invalidate.length>0||nextFav.size!==favourites.size||nextRestricted.size!==excluded.size||[...favourites].some(id=>!nextFav.has(id))||[...excluded].some(id=>!nextRestricted.has(id));
+            const nextValues=[[favouritesStorageKey,JSON.stringify([...nextFav])],[excludedStorageKey,JSON.stringify([...nextRestricted])],['tu:market-fill:restricted-quantities',JSON.stringify(Object.fromEntries(nextRules))]],previous=nextValues.map(([key])=>[key,localStorage.getItem(key)]);
+            try{for(const [key,value] of nextValues)localStorage.setItem(key,value);}catch(error){for(const [key,value] of previous)try{if(value===null)localStorage.removeItem(key);else localStorage.setItem(key,value);}catch{}throw Error('Changes could not be saved. Existing settings were retained where storage permits.');}
+            if(stateChanged)cancelActiveFill();favourites.clear();for(const id of nextFav)favourites.add(id);excluded.clear();for(const id of nextRestricted)excluded.add(id);restrictedQuantities.clear();for(const [id,n] of nextRules)restrictedQuantities.set(id,n);if(stateChanged)restrictionLedger.clear();restrictionDrafts.clear();markDrafts.Favorites=null;markDrafts.Excluded=null;for(const input of [...inputs,...document.querySelectorAll('[data-tu-restricted-qty]')])input.dataset.dirty='0';
+            button.disabled=true;message('Saving changes…');refreshFavoriteViews();
+            try{for(const id of invalidate)await invalidatePrepared(id);message('Changes saved.');}catch(error){message('Settings saved. Some prepared prices could not be cleared; review them before submitting.');notice(error);}
+            scheduleScan();
+        }catch(error){message(error.message);notice(error);}finally{button.disabled=false;}
+    }
     function refreshFavoriteViews(){
-        const drafts=new Map([...document.querySelectorAll('[data-tu-restricted-qty]')].filter(input=>input.dataset.dirty==='1').map(input=>[Number(input.dataset.tuRestrictedQty),input.value]));
+        captureRestrictionDrafts();for(const id of restrictionDrafts.keys())if(!excluded.has(id))restrictionDrafts.delete(id);
+        const focused=document.activeElement,focusedID=focused?.dataset?.tuRestrictedQty,selection=focusedID?{start:focused.selectionStart,end:focused.selectionEnd}:null;
+        const terms=favoriteSearch.toLowerCase().trim().split(/\s+/).filter(Boolean),matches=id=>terms.every(term=>((itemNames.get(id)||'Item')+' '+id).toLowerCase().includes(term));
         for(const section of document.querySelectorAll('[data-tu-favorite-section]'))section.querySelector('summary').textContent='Favorites & Restricted ('+favourites.size+' / '+excluded.size+')';
         for(const box of document.querySelectorAll('[data-tu-favorite-summary]')){
             box.replaceChildren();
             for(const [name,items] of [['Favorites',favourites],['Excluded',excluded]]){
-                const title=document.createElement('strong');title.textContent=(name==='Excluded'?'Restricted':name)+' ('+items.size+')';box.append(title);
+                const ids=[...items].filter(matches).sort((a,b)=>(itemNames.get(a)||'Item').localeCompare(itemNames.get(b)||'Item',undefined,{sensitivity:'base',numeric:true})||a-b);
+                const title=document.createElement('strong');title.textContent=(name==='Excluded'?'Restricted':name)+' ('+(terms.length?ids.length+' / ':'')+items.size+')';box.append(title);
                 const list=document.createElement('ul');list.dataset.tuFavoriteEntries=name;box.append(list);
-                if(!items.size){const empty=document.createElement('li');empty.textContent='None selected';list.append(empty);}
-                for(const id of [...items].sort((a,b)=>a-b)){const li=document.createElement('li');li.dataset.itemId=String(id);const label=document.createElement('span');label.textContent=(itemNames.get(id)||'Item')+' ['+id+']';li.append(label);
-                    if(name==='Excluded'){const hold=document.createElement('label');hold.textContent=' Keep ';const quantity=document.createElement('input');quantity.type='text';quantity.inputMode='numeric';quantity.dataset.tuRestrictedQty=String(id);quantity.setAttribute('aria-label','Keep quantity for '+id);quantity.title='all keeps every copy; a number keeps that many; 0 removes the restriction';quantity.style.cssText='width:65px;max-width:100%';quantity.value=drafts.has(id)?drafts.get(id):String(restrictionKeep(id));if(drafts.has(id))quantity.dataset.dirty='1';quantity.oninput=()=>{quantity.dataset.dirty='1';};const save=document.createElement('button');save.type='button';save.textContent='Save quantity';save.onclick=()=>{const value=quantity.value.trim().toLowerCase(),n=value==='all'?'all':/^\d+$/.test(value)?Number(value):NaN;if(n!=='all'&&(!Number.isSafeInteger(n)||n<0)){notice(Error('Enter all or a whole number of copies to keep.'));return;}quantity.dataset.dirty='0';cancelActiveFill();if(n===0){excluded.delete(id);restrictedQuantities.delete(id);saveFavourites();saveExcluded();scheduleScan();return;}restrictedQuantities.set(id,n);restrictionLedger.clear();saveRestrictions();refreshFavoriteViews();void invalidatePrepared(id).catch(notice);scheduleScan();};const all=document.createElement('button');all.type='button';all.textContent='All';all.setAttribute('aria-label','Keep all copies of '+id);all.onclick=()=>{quantity.value='all';save.click();};hold.append(quantity,save,all);li.append(hold);}
-                    const remove=document.createElement('button');remove.type='button';remove.textContent='Remove';remove.setAttribute('aria-label','Remove '+id+' from '+name);remove.onclick=()=>{cancelActiveFill();items.delete(id);if(name==='Excluded')restrictedQuantities.delete(id);saveFavourites();saveExcluded();};li.append(remove);list.append(li);}
+                if(!ids.length){const empty=document.createElement('li');empty.textContent=items.size?'No matching items':'None selected';list.append(empty);}
+                for(const id of ids){const li=document.createElement('li');li.dataset.itemId=String(id);const label=document.createElement('span');label.textContent=(itemNames.get(id)||'Item')+' ['+id+']';li.append(label);
+                    if(name==='Excluded'){const hold=document.createElement('label');hold.textContent=' Keep ';const quantity=document.createElement('input');quantity.type='text';quantity.inputMode='numeric';quantity.dataset.tuRestrictedQty=String(id);quantity.setAttribute('aria-label','Keep quantity for '+id);quantity.title='all keeps every copy; a number keeps that many; 0 removes the restriction after Save changes';quantity.style.cssText='width:65px;max-width:100%';quantity.value=restrictionDrafts.has(id)?restrictionDrafts.get(id):String(restrictionKeep(id));if(restrictionDrafts.has(id))quantity.dataset.dirty='1';quantity.oninput=()=>{quantity.dataset.dirty='1';restrictionDrafts.set(id,quantity.value);};const all=document.createElement('button');all.type='button';all.textContent='All';all.setAttribute('aria-label','Keep all copies of '+id);all.onclick=event=>{event.preventDefault();quantity.value='all';quantity.dataset.dirty='1';restrictionDrafts.set(id,'all');};hold.append(quantity,all);li.append(hold);}
+                    const remove=document.createElement('button');remove.type='button';remove.textContent='Remove';remove.setAttribute('aria-label','Remove '+id+' from '+name);remove.onclick=()=>{cancelActiveFill();items.delete(id);restrictionDrafts.delete(id);if(name==='Excluded')restrictedQuantities.delete(id);updateMarkDraft(id,getItemState(id));saveFavourites();saveExcluded();};li.append(remove);list.append(li);}
             }
         }
-        for(const input of document.querySelectorAll('[data-tu-favorite-input]'))if(input.dataset.dirty!=='1')input.value=[...(input.dataset.tuFavoriteInput==='Favorites'?favourites:excluded)].join(', ');
-        for(const star of document.querySelectorAll('.tmf-fav[data-tmf-item-id]')){const state=getItemState(Number(star.dataset.tmfItemId));const text=state==='favourite'?'★':state==='excluded'?'⊘':'☆';if(star.textContent!==text)renderFavIcon(star,state);else if(state==='excluded'){const title='Restricted: keep '+restrictionKeep(Number(star.dataset.tmfItemId))+' copies. Click to remove this restriction.';if(star.title!==title)star.title=title;}}
+        for(const input of document.querySelectorAll('[data-tu-favorite-input]'))if(input.dataset.dirty!=='1'&&markDrafts[input.dataset.tuFavoriteInput]===null)input.value=[...(input.dataset.tuFavoriteInput==='Favorites'?favourites:excluded)].join(', ');
+        for(const star of document.querySelectorAll('.tmf-fav[data-tmf-item-id]')){const state=getItemState(Number(star.dataset.tmfItemId)),text=state==='favourite'?'★':state==='excluded'?'⊘':'☆';if(star.textContent!==text)renderFavIcon(star,state);else if(state==='excluded'){const title='Restricted: keep '+restrictionKeep(Number(star.dataset.tmfItemId))+' copies. Click to remove this restriction.';if(star.title!==title)star.title=title;}}
+        if(focusedID){const input=document.querySelector('[data-tu-restricted-qty="'+Number(focusedID)+'"]');if(input){input.focus({preventScroll:true});try{input.setSelectionRange(selection.start,selection.end);}catch{}}}
     }
 
     function attachListFillControl(){
@@ -5499,8 +5531,13 @@ export function createMarketPriceAutoFill({window,manager,setMarketInput,readIte
         const action=(parent,text,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=text;b.onclick=fn;parent.append(b);return b;};
         action(general,'Fill All favorites',()=>{if(enabled)startAutoFill();else notice(Error('Enable this tool first.'));});action(general,'Stop / Cancel',()=>{operationEpoch++;stopAutoFill();requestController.abort();requestController=new window.AbortController();});
         action(general,'Clear filled rows',async()=>{for(const b of document.querySelectorAll('.silmaril-market-filler-button[data-action-flag=clear]'))try{await guardedFill(b,Number(b.closest('[data-tmf-item-id]')?.dataset.tmfItemId),false);}catch(e){notice(e);}});
-        const favorites=section('Favorites');favorites.dataset.tuFavoriteSection='1';const lists=document.createElement('div');lists.dataset.tuFavoriteSummary='1';favorites.append(lists);
-        for(const [name,set,save] of [['Favorites',favourites,saveFavourites],['Excluded',excluded,saveExcluded]]){const input=document.createElement('input');input.type='text';input.setAttribute('aria-label',name+' item IDs');input.dataset.tuFavoriteInput=name;input.value=[...set].join(', ');input.oninput=()=>{input.dataset.dirty='1';};favorites.append(input);action(favorites,'Save '+name,()=>{const ids=input.value.split(/[ ,]+/).filter(Boolean).map(Number);if(ids.some(n=>!Number.isSafeInteger(n)||n<1||n>=1000000)){notice(Error('Enter valid item IDs separated by commas.'));return;}if(name==='Excluded')cancelActiveFill();set.clear();const other=name==='Favorites'?excluded:favourites;ids.forEach(n=>{set.add(n);other.delete(n);});input.dataset.dirty='0';saveFavourites();saveExcluded();scheduleScan();});}
+        const favorites=section('Favorites');favorites.dataset.tuFavoriteSection='1';
+        const search=document.createElement('input');search.type='search';search.placeholder='Search by name, keyword or item ID';search.setAttribute('aria-label','Search favorites and restricted items');search.value=favoriteSearch;search.style.width='100%';search.oninput=()=>{favoriteSearch=search.value;refreshFavoriteViews();};favorites.append(search);
+        const lists=document.createElement('div');lists.dataset.tuFavoriteSummary='1';favorites.append(lists);
+        for(const [name,set] of [['Favorites',favourites],['Excluded',excluded]]){const label=document.createElement('label');label.textContent=name==='Excluded'?'Restricted item IDs':'Favorite item IDs';const input=document.createElement('input');input.type='text';input.setAttribute('aria-label',name+' item IDs');input.dataset.tuFavoriteInput=name;input.value=markDrafts[name]??[...set].join(', ');if(markDrafts[name]!==null)input.dataset.dirty='1';input.oninput=()=>{input.dataset.dirty='1';markDrafts[name]=input.value;};label.append(input);favorites.append(label);}
+        const help=document.createElement('small');help.textContent='Quantity and ID edits apply together with Save changes, including items hidden by search. Row marks and Remove apply immediately.';favorites.append(help);
+        const status=document.createElement('small');status.dataset.tuMarkSaveStatus='1';status.setAttribute('role','status');favorites.append(status);
+        const master=action(favorites,'Save changes',()=>saveFavoriteChanges(master));master.dataset.tuMarkSave='1';
         refreshFavoriteViews();
         const analytics=section('Analytics');analytics.append('Use the chart on each row to compare market and bazaar prices, fees, net proceeds, stack sizes, source age and formula decisions. Tap a listing to fill its price. Display options appear below.');
         const diagnostic=section('Diagnostics'),report=document.createElement('pre');report.style.whiteSpace='pre-wrap';diagnostic.append(report);action(diagnostic,'Run safe checks',()=>{report.textContent=JSON.stringify(diagnostics(),null,2);});

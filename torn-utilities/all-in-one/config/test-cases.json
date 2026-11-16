@@ -834,7 +834,7 @@
       "id": "market-fill.settings",
       "section": "market-fill",
       "label": "Settings persistence and disable",
-      "instructions": "Change defaults, category/item overrides, favorites/exclusions. Reload. Verify enable persistence and disable removes controls and stops pending requests. Keep the Favorites view open while changing row stars. Verify named favorites/exclusions, counts, ID editors and Remove actions synchronize immediately and persist. Unmark or Remove an item and confirm it disappears from the matching list. Set a restricted item to keep 1, then verify only surplus is filled, including separate stacks. Existing all-copy restrictions must remain all by default.",
+      "instructions": "Change defaults, category/item overrides, favorites/exclusions. Reload. Verify enable persistence and disable removes controls and stops pending requests. Keep the Favorites view open while changing row stars. Verify named favorites/exclusions, counts, ID editors and Remove actions synchronize immediately and persist. Unmark or Remove an item and confirm it disappears from the matching list. Set a restricted item to keep 1, then verify only surplus is filled, including separate stacks. Existing all-copy restrictions must remain all by default. Verify both lists sort by item name. Search using mixed-case keywords and item IDs. Edit several keep quantities, hide one with search, then use the single bottom Save changes button. Confirm all valid drafts save together and an invalid value prevents partial saving.",
       "kind": "manual",
       "critical": true,
       "platforms": [
