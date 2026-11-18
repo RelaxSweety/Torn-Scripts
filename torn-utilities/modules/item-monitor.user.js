@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU Travel Assistant and Item Monitor
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      1.12.58-dev
+// @version      1.12.59-dev
 // @description  Persistent foreign, shop and item market quantity and price alerts
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -81,6 +81,7 @@ const norm=s=>String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
 const text=e=>e?.innerText||e?.textContent||'';
 const money=v=>{const m=String(v||'').match(/\$\s*([\d,]+(?:\.\d+)?)/);return m?Number(m[1].replaceAll(',','')):NaN};
 const pageItem=()=>{
+ const route=(location.search+'&'+location.hash).match(/(?:[?&#/])item_?id=(\d+)(?:[&#/]|$)/i);
  const visible=e=>e&&e.getClientRects().length>0;
  const exact=e=>text(e).trim().replace(/\s+/g,' ');
  const invalid=/^(item market|owner|cost|qty|buy|search for an item|text based rpg\s*-\s*torn)$/i;
@@ -105,10 +106,10 @@ const pageItem=()=>{
    }
  }
  if(!name){
-   const el=[...document.querySelectorAll('[class*=itemName],[class*=ItemName],[class*=itemTitle],[class*=ItemTitle],h3,h4')].find(e=>visible(e)&&exact(e).length>0&&exact(e).length<90&&!invalid.test(exact(e))&&e.closest('[class*=market],[class*=Market],main'));
+   const el=[...document.querySelectorAll('[class*=itemName],[class*=ItemName],[class*=itemTitle],[class*=ItemTitle],h3,h4')].find(e=>visible(e)&&exact(e).length>0&&exact(e).length<90&&!invalid.test(exact(e))&&e.closest('#item-market-root,[class*=market],[class*=Market],main'));
    if(el)name=exact(el);
  }
- return name?{key:'name:'+norm(name),name}:null;
+ return route?{key:'id:'+route[1],name}:name?{key:'name:'+norm(name),name}:null;
 };
 const marketTileItem=target=>{
  const visible=e=>!!e&&e.getClientRects().length>0;
@@ -125,9 +126,9 @@ const marketTileItem=target=>{
  }
  return null;
 };
-const listingSelector='[data-listing-id],[data-seller-id],tr,[role=row],[class*=sellerRow],[class*=SellerRow],[class*=listingRow],[class*=ListingRow],[class*=marketRow],[class*=MarketRow]';
-const listings=()=>[...document.querySelectorAll(listingSelector)].filter(e=>!e.closest('#tuim-panel,#tu-pda-panel')&&purchaseRow(e)&&Number.isFinite(listingPrice(e))&&(!e.parentElement?.closest(listingSelector)));
-const listingPrice=row=>{const unit=row.querySelector('[data-unit-price],[class*=unitPrice],[class*=UnitPrice],[class*=pricePer],[class*=PricePer]');if(unit){const n=money(unit.getAttribute('data-unit-price')||text(unit));if(Number.isFinite(n))return n}for(const el of row.querySelectorAll('[data-price],[class*=price],[class*=Price]')){const n=money(el.getAttribute('data-price')||text(el));if(Number.isFinite(n))return n}return money(text(row))};
+const listingSelector='[data-listing-id],[data-seller-id],tr,[role=row],li,[class*=sellerRow],[class*=SellerRow],[class*=listingRow],[class*=ListingRow],[class*=marketRow],[class*=MarketRow],[class*=itemRowWrapper]';
+const listings=()=>{const rows=[...(document.getElementById('item-market-root')||document).querySelectorAll(listingSelector)].filter(e=>!e.closest('#tuim-panel,#tu-pda-panel')&&purchaseRow(e));return rows.filter(e=>!rows.some(child=>child!==e&&e.contains(child)));};
+const listingPrice=row=>{const parse=v=>{const n=String(v||'').trim().replace(/^\$\s*/,'').replaceAll(',','');return /^\d+(?:\.\d+)?$/.test(n)?Number(n):money(v)};const unit=row.hasAttribute('data-unit-price')?row:row.querySelector('[data-unit-price],[class*=unitPrice],[class*=UnitPrice],[class*=pricePer],[class*=PricePer]');if(unit){const n=parse(unit.getAttribute('data-unit-price')||text(unit));if(Number.isFinite(n))return n}for(const el of [...(row.hasAttribute('data-price')?[row]:[]),...row.querySelectorAll('[data-price],[class*=price],[class*=Price]')]){const n=parse(el.getAttribute('data-price')||text(el));if(Number.isFinite(n))return n}return money(text(row))};
 const candidates='[data-item-id],[data-itemname],[data-item-name],tr,[role=row],li,[class*=itemWrap],[class*=ItemWrap],[class*=itemRow],[class*=ItemRow],[class*=itemCard],[class*=ItemCard],[class*=row],[class*=Row],[class*=card],[class*=Card]';
 const category=()=>{const path=location.pathname.toLowerCase(),sid=new URLSearchParams(location.search).get('sid')?.toLowerCase();if(/^\/(?:i?market|itemmarket)\.php$/.test(path)||path==='/page.php'&&sid==='itemmarket')return 'Item Market';if(/^\/(?:travelagency|travel|abroad)\.php$/.test(path)||path==='/page.php'&&sid==='travel')return 'Foreign';if(/^\/(?:shops?|stores?|bazaar)\.php$/.test(path)||path==='/page.php'&&['shop','shops','bazaar'].includes(sid))return 'Stores';return 'Other'};
 const purchaseRow=row=>{if(!row||row.closest('#tuim-panel,#tuim-catalog,#tu-pda-panel,#tu-snatch-run'))return false;return (row.getClientRects().length||row.dataset.tuMonitorFiltered==='1')&&[...row.querySelectorAll('button,input[type=submit],input[type=button],a,[role=button]')].some(e=>(e.getClientRects().length||row.dataset.tuMonitorFiltered==='1')&&!e.disabled&&e.getAttribute('aria-disabled')!=='true'&&(e.matches('[class*=buyIconButton],[class*=buyButton]')||/^(?:buy|purchase)(?:\s|$)/i.test((e.getAttribute('aria-label')||e.value||text(e)).trim())));};
@@ -148,7 +149,7 @@ const foreignStock=row=>{
  const raw=cell?text(cell).replace(/stock/ig,'').replace(/,/g,'').trim():'';
  const value=raw.match(/\b(\d+)\b/);return value?Number(value[1]):quantity(row);
 };
-const quantity=row=>{for(const e of row.querySelectorAll('[data-stock],[data-quantity],[class*=stock],[class*=Stock],[class*=quantity],[class*=available]')){const raw=e.getAttribute('data-stock')||e.getAttribute('data-quantity')||text(e);const m=raw.match(/(?:stock|quantity|available|remaining|in stock)?\s*:?\s*([\d,]+)/i);if(m)return Number(m[1].replaceAll(',',''))}const m=text(row).match(/(?:stock|quantity|available|remaining)\s*:?\s*([\d,]+)/i);return m?Number(m[1].replaceAll(',','')):NaN};
+const quantity=row=>{for(const e of row.querySelectorAll('[data-stock],[data-quantity],[class*=stock],[class*=Stock],[class*=quantity],[class*=qty],[class*=Qty],[class*=available]')){const raw=e.getAttribute('data-stock')||e.getAttribute('data-quantity')||text(e);const m=raw.match(/(?:stock|quantity|available|remaining|in stock)?\s*:?\s*([\d,]+)/i);if(m)return Number(m[1].replaceAll(',',''))}const m=text(row).match(/(?:stock|quantity|available|remaining)\s*:?\s*([\d,]+)/i);return m?Number(m[1].replaceAll(',','')):NaN};
 const price=row=>{for(const e of row.querySelectorAll('[data-price],[class*=price],[class*=Price]')){const raw=e.getAttribute('data-price')||text(e);const m=raw.match(/\$\s*([\d,]+(?:\.\d+)?)/)||raw.match(/^\s*([\d,]+(?:\.\d+)?)\s*$/);if(m)return Number(m[1].replaceAll(',',''))}const m=text(row).match(/\$\s*([\d,]+(?:\.\d+)?)/);return m?Number(m[1].replaceAll(',','')):NaN};
 const E=(tag,parent,t)=>{const e=document.createElement(tag);if(t!==undefined)e.textContent=t;parent?.append(e);return e};
 const B=(p,t,f)=>{const b=E('button',p,t);b.type='button';b.onclick=event=>{event.preventDefault();event.stopPropagation();return f(event);};return b};
@@ -253,13 +254,13 @@ function travelStyle(){if(document.getElementById('tuim-travel-style'))return;co
 function sound(watch=null){if(watch?.audibleAlerts===false)return;state.alarmItemKey=watch?.key||null;stockEvent('inventory-alarm-requested',watch,watch?.key?'stock-threshold-hit':'manual-test');inventoryAudio.play({sound:state.cfg.alarmSound||'beep'});stockEvent('inventory-alarm-dispatched',watch,inventoryAudio.status().contextState==='running'?'audio-context-running':'audio-unavailable-or-suspended');}
 function alertItem(w,reason){const p=state.panel?.querySelector('#tuim-status');if(p&&w.visualAlerts!==false)p.textContent='ALERT: '+w.name+' — '+reason;enhancements?.stock(w,snatchSnapshot(w));stockEvent('stock-threshold-hit',w,reason);if(w.audibleAlerts!==false)sound(w);else stockEvent('inventory-alarm-suppressed',w,'item-audible-alert-disabled')}
 function stockEvent(event,watch,reason){try{stockDiagnostic?.event({event,item:watch?.name||'',key:watch?.key||'',category:watch?.category||'',reason,audibleEnabled:watch?.audibleAlerts!==false,visualEnabled:watch?.visualAlerts!==false,audioActive:inventoryAudio.status().active,audioState:inventoryAudio.status().contextState||'unavailable',volume:Number(state.cfg.alarmVolume??60),sound:state.cfg.alarmSound||'beep'});}catch{}}
-function recordStockScan(status,watch=null,engineQuantity=null,priceRead=null,qualifies=false,alarmDecision='not-evaluated'){
+function recordStockScan(status,watch=null,engineQuantity=null,priceRead=null,qualifies=false,alarmDecision='not-evaluated',market=null){
  if(!stockDiagnostic?.isActive())return;
- try{if(!watch)stockDiagnostic.attempt(status==='completed'||status==='diagnostic-start'?'completed':status);const cat=category(),run=enhancements?.getState(),audio=inventoryAudio.status();for(const w of watch?[watch]:state.items){const native=!document.hidden&&cat==='Foreign'?foreignRow(w):null,nativeQuantity=native?foreignStock(native):null;stockDiagnostic.observe({item:w.name,key:w.key,category:w.category,pageCategory:cat,country:liveCountry()||run?.country||'',scanStatus:status,quantity:nativeQuantity,nativeStockText:native?.querySelector('[class*="tabletColC"],[data-stock],[data-quantity]')?.textContent?.trim()||'',engineQuantity,minimumQty:w.minQty,maximumPrice:w.maxPrice,price:priceRead,nativeRowFound:!!native,cachedRowConnected:!!w.row?.isConnected,cachedMatchesNative:!!native&&native===w.row,rowSource:!w.row?'none':native===w.row?'native-shop':'cached-or-fallback',qualifies,alarmDecision,nativeThresholdMet:!!native&&w.minQty!=null&&Number.isFinite(nativeQuantity)&&nativeQuantity>=Number(w.minQty),fired:!!w.fired,audibleEnabled:w.audibleAlerts!==false,visualEnabled:w.visualAlerts!==false,focused:document.hasFocus(),visible:!document.hidden,stage:run?.stage||'off',readinessReason:document.getElementById('tu-snatch-run')?.dataset.readinessReason||'',audioActive:!!audio.active,audioState:audio.contextState||'unavailable',volume:Number(state.cfg.alarmVolume??60)});}}catch{stockDiagnostic?.attempt('evidence-error');}
+ try{const cat=category(),run=enhancements?.getState(),audio=inventoryAudio.status();for(const w of watch?[watch]:state.items){const native=!document.hidden&&cat==='Foreign'?foreignRow(w):null,nativeQuantity=native?foreignStock(native):null;stockDiagnostic.observe({...market,item:w.name,key:w.key,category:w.category,pageCategory:cat,country:liveCountry()||run?.country||'',scanStatus:status,quantity:nativeQuantity,nativeStockText:native?.querySelector('[class*="tabletColC"],[data-stock],[data-quantity]')?.textContent?.trim()||'',engineQuantity,minimumQty:w.minQty,maximumPrice:w.maxPrice,price:priceRead,nativeRowFound:!!native||!!market?.listingCount,cachedRowConnected:!!w.row?.isConnected,cachedMatchesNative:!!native&&native===w.row,rowSource:market?.listingCount?'item-market':!w.row?'none':native===w.row?'native-shop':'cached-or-fallback',qualifies,alarmDecision,nativeThresholdMet:!!native&&w.minQty!=null&&Number.isFinite(nativeQuantity)&&nativeQuantity>=Number(w.minQty),fired:!!w.fired,audibleEnabled:w.audibleAlerts!==false,visualEnabled:w.visualAlerts!==false,focused:document.hasFocus(),visible:!document.hidden,stage:run?.stage||'off',readinessReason:document.getElementById('tu-snatch-run')?.dataset.readinessReason||'',audioActive:!!audio.active,audioState:audio.contextState||'unavailable',volume:Number(state.cfg.alarmVolume??60)});}}catch{stockDiagnostic?.attempt('evidence-error');}
 }
-function scan(){try{return scanMonitor();}catch(error){stockDiagnostic?.attempt('monitor-scan-error');stockEvent('monitor-scan-error',null,error?.name||'unknown-error');throw error;}}
+function scan(){try{const result=scanMonitor();stockDiagnostic?.attempt(document.hidden?'page-hidden':!document.hasFocus()?'page-not-focused':'completed');return result;}catch(error){stockDiagnostic?.attempt('monitor-scan-error');stockDiagnostic?.event({event:'monitor-scan-error',reason:'monitor-scan-error',errorName:error?.name||'Error',errorMessage:String(error?.message||error),errorStack:String(error?.stack||'')});throw error;}}
 function scanMonitor(){
-  if(document.hidden||!document.hasFocus()){recordStockScan(document.hidden?'page-hidden':'page-not-focused');return;}stockDiagnostic?.attempt('completed');if(!state.items.length){enhancements?.restoreRows();return;}enhancements?.update();
+  if(document.hidden||!document.hasFocus()){recordStockScan(document.hidden?'page-hidden':'page-not-focused');return;}if(!state.items.length){enhancements?.restoreRows();return;}enhancements?.update();
   style();
   const cat=category();clearHighlights();const rows=cat==='Foreign'?foreignShopTables().flatMap(shop=>shop.rows):cat==='Stores'?[...document.querySelectorAll(candidates)].filter(row=>purchaseRow(row)&&Number.isFinite(price(row))):[];
   if(cat==='Other'){for(const w of state.items){w.row=null;w.fired=false;w.status='Waiting for a shop or market listing';}if(state.alarmItemKey){inventoryAudio.stop();state.alarmItemKey=null;}recordStockScan('unsupported-page');return;}
@@ -268,20 +269,21 @@ function scanMonitor(){
     if(cat==='Item Market'){
       previous?.classList.remove('tuim-watch','tuim-trigger','tuim-wait');w.row=null;
       const active=pageItem();
-      const matching=active&&(w.key===active.key||norm(w.name)===norm(active.name));
-      if(!matching){w.status='Waiting for '+w.name;w.fired=false;recordStockScan('market-item-mismatch',w);continue}
-      const found=listings(),qualifying=[];
+      const matching=active&&(w.key.startsWith('id:')&&active.key.startsWith('id:')?w.key===active.key:w.key===active.key||norm(w.name)===norm(active.name));
+      if(!matching){w.status='Waiting for '+w.name;w.fired=false;recordStockScan('market-item-mismatch',w,null,null,false,'not-evaluated',{activeItem:active?.name||'',activeItemKey:active?.key||'',listingCount:0});continue}
+      const found=listings(),qualifying=[],reads=[];
       for(const row of found){
         if(idOf(row)&&w.key.startsWith('id:')&&w.key!=='id:'+idOf(row))continue;
         const p=listingPrice(row);
         const q=quantity(row),available=!Number.isFinite(q)||q>0;const match=available&&(w.minQty==null&&w.maxPrice==null||w.minQty!=null&&Number.isFinite(q)&&q>=w.minQty||w.maxPrice!=null&&Number.isFinite(p)&&p<=w.maxPrice);
         row.classList.toggle('tuim-trigger',w.visualAlerts!==false&&match);row.classList.toggle('tuim-wait',w.visualAlerts!==false&&!match&&w.maxPrice!=null);
-        if(match)qualifying.push({row,p});
+        reads.push({price:Number.isFinite(p)?p:null,quantity:Number.isFinite(q)?q:null,qualifies:match});if(match)qualifying.push({row,p});
       }
-      w.status=qualifying.length?qualifying.length+' qualifying listing(s), lowest $'+Math.min(...qualifying.map(x=>x.p)).toLocaleString():found.length+' listing(s), none matching alerts';
+      const prices=reads.map(r=>r.price).filter(Number.isFinite),lowest=prices.length?Math.min(...prices):null,qualifiedPrices=qualifying.map(x=>x.p).filter(Number.isFinite);
+      w.status=qualifying.length?qualifying.length+' qualifying listing(s)'+(qualifiedPrices.length?', lowest $'+Math.min(...qualifiedPrices).toLocaleString():''):reads.length+' listing(s), none matching alerts';
       if(qualifying.length&&!w.fired){w.fired=true;alertItem(w,w.status)}
       if(!qualifying.length)w.fired=false;
-      recordStockScan('completed',w,null,qualifying.length?Math.min(...qualifying.map(x=>x.p)):null,qualifying.length>0);continue;
+      recordStockScan(!reads.length?'market-no-listings':!prices.length?'market-price-unreadable':'completed',w,null,lowest,qualifying.length>0,qualifying.length?(alarmWasFired?'already-latched':w.audibleAlerts===false?'item-muted':'alarm-requested'):'below-threshold',{activeItem:active?.name||w.name,activeItemKey:active?.key||'',listingCount:reads.length,candidateListingCount:found.length,parsedPriceCount:prices.length,parsedQuantityCount:reads.filter(r=>r.quantity!==null).length,qualifyingListingCount:qualifying.length,lowestListingPrice:lowest,listings:reads.slice(0,20)});continue;
     }
     w.row=rows.filter(row=>rowMatches(row,w)).sort((a,b)=>text(a).length-text(b).length)[0]||null;
     if(previous&&previous!==w.row)previous.classList.remove('tuim-watch','tuim-trigger','tuim-wait');

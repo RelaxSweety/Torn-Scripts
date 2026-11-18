@@ -1,5 +1,19 @@
 [
   {
+    "version": "0.5.42.140-dev",
+    "date": "2026-11-18",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Item Monitor accepts numeric unit-price attributes and nested native Buy rows, identifies active items from market routes or headings, and reads Qty fields",
+        "Keep Item Market scan counts distinct from unsupported-page/diagnostic events"
+      ],
+      "Diagnostics": [
+        "Export detected item identity, listing/parsed/qualifying counts, nonqualifying prices, bounded listing samples, and redacted error messages and stacks"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.139-dev",
     "date": "2026-11-16",
     "securityBundle": true,

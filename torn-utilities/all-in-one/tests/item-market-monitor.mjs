@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import {JSDOM} from 'jsdom';
+import {createStockMonitorDiagnostic} from '../src/diagnostics/stock-monitor.js';
+const src=fs.readFileSync(new URL('../../modules/item-monitor.user.js',import.meta.url),'utf8');
+const between=(a,b)=>src.slice(src.indexOf(a),src.indexOf(b,src.indexOf(a)));
+const helpers=between('const pageItem=','\nconst marketTileItem=')+between('const listingSelector=','\nconst E=')+between('function scanMonitor(){','\nfunction draggable(');
+const dom=new JSDOM('<body><div id="item-market-root"><h3 class="itemName_test">Blank DVDs</h3><div class="marketRow_outer"><ul><li data-listing-id="one"><span data-unit-price="850">850</span><span class="qty_test">2</span><button aria-label="Buy Blank DVDs">Buy</button></li><li data-listing-id="two"><span data-price="1200">1,200</span><span data-quantity="4">4</span><button>Buy</button></li></ul></div></div></body>',{url:'https://www.torn.com/page.php?sid=ItemMarket&itemID=233',pretendToBeVisual:true}),w=dom.window,d=w.document,observations=[],alerts=[];
+w.HTMLElement.prototype.getClientRects=()=>[{}];d.hasFocus=()=>true;
+const watch={name:'Blank DVDs',key:'id:233',category:'Item Market',minQty:null,maxPrice:900},context={document:d,location:w.location,URLSearchParams,text:e=>e?.textContent||'',norm:s=>String(s||'').toLowerCase().trim(),money:v=>Number(String(v).match(/\$([\d,]+)/)?.[1]?.replaceAll(',','')||NaN),state:{items:[watch]},style(){},stockDiagnostic:{attempt(){}},enhancements:null,inventoryAudio:{stop(){}},recordStockScan:(...args)=>observations.push(args),alertItem:(...args)=>alerts.push(args)};
+try{
+ vm.createContext(context);vm.runInContext(helpers,context);const scan=()=>vm.runInContext('scanMonitor()',context);scan();assert.equal(alerts.length,1);let evidence=observations.at(-1);assert.equal(evidence[0],'completed');assert.equal(evidence[3],850);assert.equal(evidence[6].listingCount,2);assert.equal(evidence[6].parsedPriceCount,2);assert.equal(evidence[6].parsedQuantityCount,2);assert.equal(evidence[6].qualifyingListingCount,1);assert.equal(d.querySelectorAll('.tuim-trigger').length,1,'Nested purchase rows are retained and container is not counted twice');scan();assert.equal(alerts.length,1,'Alarm remains latched');
+ d.querySelector('[data-unit-price]').setAttribute('data-unit-price','950');d.querySelector('[data-unit-price]').textContent='950';scan();assert.equal(observations.at(-1)[3],950,'Nonqualifying price still exported');assert.equal(observations.at(-1)[4],false);
+ watch.key='name:blank dvds';scan();assert.equal(observations.at(-1)[0],'completed','Name-based legacy watch still matches with an ID route');watch.key='id:233';
+ w.history.replaceState({},'','/page.php?sid=ItemMarket&itemID=999');scan();assert.equal(observations.at(-1)[0],'market-item-mismatch');assert.equal(observations.at(-1)[6].activeItemKey,'id:999');
+ w.history.replaceState({},'','/page.php?sid=ItemMarket');scan();assert.equal(observations.at(-1)[0],'completed','Heading inside market root works without route ID');d.querySelectorAll('li').forEach(el=>el.remove());scan();assert.equal(observations.at(-1)[0],'market-no-listings');
+ d.querySelector('#item-market-root').insertAdjacentHTML('beforeend','<li data-listing-id=unknown><span data-quantity=2>2</span><button>Buy</button></li>');scan();assert.equal(observations.at(-1)[0],'market-price-unreadable');
+ d.querySelector('li').setAttribute('data-unit-price','880');scan();assert.equal(observations.at(-1)[3],880,'Unit-price attributes on the row itself are parsed');
+ const diag=createStockMonitorDiagnostic({window:w,storageKey:'market-monitor-test',scrub:v=>String(v).replaceAll('PRIVATE','[REDACTED]')});diag.start();diag.observe({item:'Blank DVDs',key:'id:233',...evidence[6]});diag.event({event:'monitor-scan-error',errorName:'TypeError',errorMessage:'PRIVATE detail',errorStack:'TypeError\n at scan https://example.com/?key=PRIVATE',apiKey:'PRIVATE'});const report=diag.report();assert.equal(report.latest[0].listingCount,2);assert.equal(report.latest[0].listings[0].price,850);assert.ok(!JSON.stringify(report).includes('PRIVATE'));assert.equal(report.events.at(-1).errorName,'TypeError');diag.stop();
+ console.log('Item Market Monitor passed: route/heading identity, nested native buy rows, numeric unit prices, Qty parsing, threshold/latch, no-listings vs nonqualifying evidence and redacted errors.');
+}finally{w.close();}

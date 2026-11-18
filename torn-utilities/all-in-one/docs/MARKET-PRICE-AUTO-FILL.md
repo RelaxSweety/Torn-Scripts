@@ -312,3 +312,13 @@ Edit/Your Listings now has a bottom money-icon Update listing prices control. It
 Tests cover three existing listing rows including duplicate zero UIDs, native DOM pricing order, repeated refresh, unchanged quantities/anonymity, zero scroll writes, no submissions, cached versus explicit fresh reads, and the retained weapon/remount regressions.
 
 Validation: build and full regression suite passed. Final focused Add/Edit DOM-order/no-scroll, restrictions/remount, request cache-refresh/pacing and diagnostics checks passed. Generated TU/diagnostics syntax and DEV alias/snapshot comparisons passed. Actual PDA acceptance remains pending; tests do not submit live listings.
+
+## 0.5.42.140-dev — Item Monitor on Item Market
+
+Item Monitor 1.12.59-dev accepts numeric unit/data price attributes without a dollar sign, retains nested native Buy rows instead of rejecting them because of a matching ancestor, scopes listings to the market root, reads Qty labels, and identifies the active item from an itemID route or a heading inside the native market root. Other items remain gated by identity, and zero-stock/disabled controls are not made eligible. Existing OR semantics for quantity/price thresholds are retained.
+
+Stock evidence now distinguishes no native listings, unreadable prices and parsed nonqualifying prices, recording active item identity, listing/parsed/qualifying counts, lowest observed price and up to 20 price/quantity/qualification samples. Owner identities and listing DOM are not captured. Scan errors include redacted name/message/stack; global runtime errors also retain redacted details. Scan accounting no longer labels unsupported-page or diagnostic snapshots as errors.
+
+The unified payload grows by approximately 3 KB for the detector/evidence fixes. Its explicit size guard is adjusted from 1.45 MB to 1.46 MB; functional checks are unchanged. No production branch or release is modified. The prior user report does not contain native listing markup or error stacks, so these changes repair demonstrated code defects and improve evidence rather than claiming the device failure is conclusively reproduced.
+
+Validation: build and full regression suite passed. After the final identity/row-attribute adjustments, focused Item Market Monitor, item scope and integrated stock-evidence checks passed again. Generated TU/diagnostics syntax and DEV alias/snapshot equality checks passed. Real PDA confirmation remains pending; no market purchases or listings were submitted during testing.
