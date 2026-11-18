@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.5.42.142-dev",
+    "date": "2026-11-18",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Require every configured quantity and unit-price threshold to match; quantity availability no longer bypasses the price cap",
+        "Clarify the combined-threshold rule in Item Monitor settings; single-threshold and availability-only monitors remain supported"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.141-dev",
     "date": "2026-11-18",
     "securityBundle": true,
