@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Achievement Compiler (Standalone)
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts-Dev
-// @version      0.9.7
+// @version      0.9.8
 // @description  Read-only achievements report for RelaxSweety; enter an API key in the tool.
 // @match        *://www.torn.com/*
 // @match        *://torn.com/*
@@ -15,7 +15,7 @@
   'use strict';
   const PLAYER = 4539436;
   const API = 'https://api.torn.com/v2';
-  const SCRIPT_VERSION='0.9.7';
+  const SCRIPT_VERSION='0.9.8';
   let current = null;
   const button = document.createElement('button');
   button.id = 'achievement-compiler-launcher';
@@ -59,7 +59,7 @@
   #achievement-compiler-panel summary {color:#f3c76d!important;font-size:17px!important;font-weight:900!important;cursor:pointer}
   #achievement-compiler-panel .ac-preview {white-space:pre-wrap!important;user-select:text!important;overflow-wrap:anywhere!important;background:#080b10!important;padding:12px!important;border:1px solid #65758a!important;border-radius:8px!important;font:700 14px/1.65 monospace!important;color:#f7f2e7!important}
   `;
-  document.head.appendChild(style);
+  (document.head || document.documentElement).appendChild(style);
   const header=el('h3','ACHIEVEMENT COMPILER v'+SCRIPT_VERSION);
   const info=el('p','Enter your Torn API key below. The key stays in this input during the session; it is not saved or included in exports.');
   const input=el('input');
@@ -423,7 +423,14 @@
     }catch(e){status.textContent=e.message+'; verify endpoint permissions and API response format.';}
     finally{input.value='';run.disabled=false;}
   };
+  // PDA and SPA navigation can replace document.body after userscript injection.
+  // Mount immediately, retry on DOM readiness and reattach after route changes.
+  mount();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount, {once:true});
-  else mount();
+  window.addEventListener('pageshow', mount);
+  const observer = new MutationObserver(() => {
+    if (!button.isConnected || !panel.isConnected) mount();
+  });
+  observer.observe(document.documentElement, {childList:true,subtree:true});
   setInterval(() => { if (!button.isConnected || !panel.isConnected) mount(); }, 2500);
 })();
