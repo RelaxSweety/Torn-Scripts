@@ -128,6 +128,14 @@
       "version": "0.7.9",
       "description": "Active ranked war discovery, war-page navigation, synchronized dual-faction API and DOM monitoring, and comparison exports",
       "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/war-status-diagnostic.user.js"
+    },
+    {
+      "id": "honors-medals",
+      "name": "Honors & Medals",
+      "category": "other",
+      "version": "0.1.0",
+      "description": "Earned and unearned awards, sortable progress and closest remaining achievements",
+      "scriptUrl": "https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/honors-medals.user.js"
     }
   ]
 }

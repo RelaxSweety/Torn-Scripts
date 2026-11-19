@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Utilities PDA
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.4.42
+// @version      0.4.43
 // @description  Movable TU launcher and module catalog for Torn PDA
 // @author       RelaxSweety [4539436]
 // @match        https://www.torn.com/*
@@ -41,7 +41,7 @@ const TU_TERMS_VERSION='2026-10-20';
   }
 
   const KEY = 'relaxsweety_tu_pda_v1';
-  const TU_VERSION='0.4.42';
+  const TU_VERSION='0.4.43';
   const REGISTRY_URL='https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules.json';
   const CACHE_KEY='tu:registry:v1';
   const FALLBACK={schemaVersion:1,categories:[
@@ -52,6 +52,7 @@ const TU_TERMS_VERSION='2026-10-20';
     {id:'chat',name:'Chat Tools',icon:'◉',order:30},
     {id:'other',name:'Other Tools',icon:'⚙',order:40}
   ],modules:[
+    {id:'honors-medals',name:'Honors & Medals',category:'other',version:'0.1.0',description:'Sort achievements and estimate supported progress',scriptUrl:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/honors-medals.user.js'},
     {id:'alerts-calculations',name:'Alerts and Calculations',category:'business',version:'0.2.0',description:'Stock cash targets, foreign item alerts and calculator',scriptUrl:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/torn-utilities/modules/alerts-and-calculations.user.js'},
     {id:'flight-game',name:'Flight Game',category:'single-player',version:'0.11.13',description:'Flight arcade and Stick Fighter',scriptUrl:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/pda-flight-game/Torn-PDA-Flight-Game.user.js'},
     {id:'stick-fighter',name:'Stick Fighter',category:'single-player',version:'0.1.6',description:'Stick Fighter arcade game',scriptUrl:'https://raw.githubusercontent.com/RelaxSweety/Torn-Scripts/main/pda-flight-game/Torn-PDA-Flight-Game.user.js'},
@@ -250,6 +251,23 @@ const TU_TERMS_VERSION='2026-10-20';
   const api = Object.freeze({
     storage,
     getPlayer,
+    async requestTorn(path){
+      const allowed=['/v2/torn/honors','/v2/torn/medals','/v2/user/honors','/v2/user/medals','/v2/user/personalstats?cat=all'];
+      if(!allowed.includes(path))throw Error('Unsupported Torn API path');
+      const key=getPublicApiKey();if(!key)throw Error('Set your API key in TU Manager Info or PDA Settings');
+      const url='https://api.torn.com'+path+(path.includes('?')?'&':'?')+'key='+encodeURIComponent(key);
+      let timer;
+      try{
+        const raw=await Promise.race([
+          typeof PDA_httpGet==='function'?PDA_httpGet(url):fetch(url,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.text();}),
+          new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Torn API timeout')),30000);})
+        ]);
+        let data=raw?.responseText??raw?.data??raw?.body??raw?.response??raw;
+        if(typeof data==='string')data=JSON.parse(data);
+        if(data?.error)throw Error(data.error.error||'Torn API error');
+        return data;
+      }finally{clearTimeout(timer);}
+    },
     refreshPlayer:()=>hasAgreement()?updatePlayer():Promise.resolve(false),
     requestPlayerProfile:()=>hasAgreement()?openProfileHelp():showAgreement(),
     closeActiveModule(){stopModule();panel.hidden=false;viewModule=null;render('modules');syncLauncher();},
@@ -295,7 +313,7 @@ const TU_TERMS_VERSION='2026-10-20';
   try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch {}
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch {} };
   const tuNav={history:[],current:'tu-pda-panel',minimized:true,exited:true};
-  const tuRoots=['tu-pda-panel','tuim-panel','tuim-catalog','tuim-travel-window','tuim-data-window','tuac-panel','tca-panel','tca-playbar','tpfg-root','tpfg-manager','tpfg-prompt','sff-root','tu-diagnostics-window'];
+  const tuRoots=['tuhm-panel','tu-pda-panel','tuim-panel','tuim-catalog','tuim-travel-window','tuim-data-window','tuac-panel','tca-panel','tca-playbar','tpfg-root','tpfg-manager','tpfg-prompt','sff-root','tu-diagnostics-window'];
   const tuRoot=id=>document.getElementById(id);
   const tuHideAll=()=>tuRoots.forEach(id=>{const el=tuRoot(id);if(el){el.hidden=true;if(id==='tpfg-root')el.style.display='none';}});
   const tuShow=id=>{const el=tuRoot(id);if(!el)return false;tuHideAll();el.hidden=false;if(id==='tpfg-root')el.style.display='block';tuNav.current=id;tuNav.minimized=false;tuNav.exited=false;return true;};
@@ -352,7 +370,7 @@ const TU_TERMS_VERSION='2026-10-20';
   const panel = document.createElement('section');
   panel.id = 'tu-pda-panel';
   panel.hidden = true;
-  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.42 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
+  panel.innerHTML = '<header><span class="tu-logo">TU</span><div><h2>Torn Utilities</h2><p>Modular Tools for Torn City</p></div><button class="tu-close" aria-label="Close">×</button></header><nav><button data-tab="modules" aria-selected="true">Modules</button><button data-tab="settings">Settings</button><button data-tab="about">About</button></nav><div class="tu-content"></div><footer style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Torn Utilities v0.4.43 (PDA)</span><span id="tu-catalog-updated" style="text-align:right"></span></footer>';
   document.body.appendChild(panel);
   const identityLine=document.createElement('p');
   identityLine.className='tu-player-identity';
@@ -605,7 +623,7 @@ const TU_TERMS_VERSION='2026-10-20';
       }
       }
     }else{
-      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.42 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
+      const p=document.createElement('p');p.textContent='Torn Utilities v0.4.43 by RelaxSweety [4539436]. Drag TU to reposition. Modules are installed separately in Torn PDA Scripts.';content.append(p);
       {
         const apiSection=document.createElement('section');apiSection.style.cssText='border:1px solid #806a3e;border-radius:8px;padding:12px;margin:12px 0';
         const title=document.createElement('h3');title.textContent='Public Only Torn API Key';apiSection.append(title);
@@ -637,7 +655,7 @@ const TU_TERMS_VERSION='2026-10-20';
     return !!el&&el.isConnected&&!el.hidden&&getComputedStyle(el).display!=='none'&&getComputedStyle(el).visibility!=='hidden';
   };
   const syncLauncher=()=>{
-    const moduleVisible=!!active&&(['tuim-panel','tuim-catalog','tpfg-root','tpfg-manager','tpfg-prompt','sff-root','tca-panel','tca-playbar','tuac-panel'].some(isVisible)||[...moduleHost.children].some(el=>isVisible(el.id)||(!el.hidden&&el.getClientRects().length>0)));
+    const moduleVisible=!!active&&(['tuhm-panel','tuim-panel','tuim-catalog','tpfg-root','tpfg-manager','tpfg-prompt','sff-root','tca-panel','tca-playbar','tuac-panel'].some(isVisible)||[...moduleHost.children].some(el=>isVisible(el.id)||(!el.hidden&&el.getClientRects().length>0)));
     const hide=tuNav.minimized||tuNav.exited?false:(!panel.hidden||moduleVisible);
     if(launcher.hidden!==hide)launcher.hidden=hide;
   };
@@ -653,7 +671,7 @@ const TU_TERMS_VERSION='2026-10-20';
   panel.querySelector('.tu-close').addEventListener('click',()=>{tuExit();syncLauncher();});
   panel.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => {if(!hasAgreement()&&b.dataset.tab!=='about'){showAgreement();return;}render(b.dataset.tab);}));
   // Shared floating-window support for TU module panels.
-  const floatIds=['tuim-panel','tuim-catalog','tuim-travel-window','tuim-data-window','tuac-panel','tca-panel','tu-pda-panel','sff-root','tpfg-manager','tpfg-root','tpfg-prompt','tu-diagnostics-window'];
+  const floatIds=['tuhm-panel','tuim-panel','tuim-catalog','tuim-travel-window','tuim-data-window','tuac-panel','tca-panel','tu-pda-panel','sff-root','tpfg-manager','tpfg-root','tpfg-prompt','tu-diagnostics-window'];
   const floatingSetup=new WeakSet();
   const setupFloating=el=>{
     if(!el||floatingSetup.has(el))return;
