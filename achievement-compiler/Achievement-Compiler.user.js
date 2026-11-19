@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Achievement Compiler (Standalone)
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts-Dev
-// @version      0.9.6
+// @version      0.9.7
 // @description  Read-only achievements report for RelaxSweety; enter an API key in the tool.
 // @match        *://www.torn.com/*
 // @match        *://torn.com/*
@@ -15,7 +15,7 @@
   'use strict';
   const PLAYER = 4539436;
   const API = 'https://api.torn.com/v2';
-  const SCRIPT_VERSION='0.9.6';
+  const SCRIPT_VERSION='0.9.7';
   let current = null;
   const button = document.createElement('button');
   button.id = 'achievement-compiler-launcher';
@@ -100,6 +100,23 @@
   }
 
   const pick=(o,...keys)=>keys.reduce((v,k)=>v==null?undefined:v[k],o);
+  const CAREER_KEY='achievement-compiler-career-history-'+PLAYER;
+  function careerJob(payload){
+    const j=payload?.job??payload??{};
+    const name=j.name??j.company?.name??j.job??null;
+    if(typeof name!=='string'||!name)return null;
+    return {name,position:j.position??j.rank??null,company_id:j.company?.id??j.company_id??null};
+  }
+  function normalizeCareer(d,prior){
+    const current=careerJob(d.job);
+    const events=Array.isArray(prior?.events)?prior.events.slice(-199):[];
+    const last=events[events.length-1];
+    if(current&&(!last||last.name!==current.name||last.position!==current.position||last.company_id!==current.company_id))
+      events.push({...current,observed_at:d.generated_at,source:'api_snapshot'});
+    return {current,standard_job_ranks:d.jobranks?.jobranks??d.jobranks??null,
+      job_points:d.jobpoints?.jobpoints??d.jobpoints??null,observed_events:events.slice(-200),
+      history_complete:false,note:'Prior ranks and job points do not establish service dates; snapshots only record changes observed from now onward.'};
+  }
   function dossier(d){
     const p=pick(d,'personalstats','personalstats')||{};
     const profile=d.profile?.profile||d.profile||{};
@@ -112,7 +129,7 @@
     const island=name&&/private island/i.test(name);
     const address=name?(island?'1 Cartel Cove, Sovereign Isle, Torn City':'4539 Cartel Avenue, Torn City'):null;
     const aw=d.awards.filter(a=>a.earned);
-    const history=d.history||{};
+    const history=d.history||{};\n    const career=d.career_history||{};
     const enemies=d.enemies?.list??d.enemies?.enemies;
     const enemyTotal=d.enemies?._metadata?.total??(Array.isArray(enemies)?enemies.length:null);
     const logs=d.logs?.log??d.logs?.logs;
@@ -175,7 +192,7 @@
         'Manual labor':work.manual_labor??work.manual??p.jobs?.stats?.manual,
         'Intelligence':work.intelligence??p.jobs?.stats?.intelligence,
         'Endurance':work.endurance??p.jobs?.stats?.endurance,
-        'Work history':null,'Completed courses':d.education?completed.length:null,'Education history':d.education?completedNames.join('; '):null,'Current education':currentName,'Current education ends (UTC)':currentUntil?formatDate(currentUntil):null,'Education completion dates':'Not provided by education selection'},
+        'Observed career changes':(career.observed_events||[]).map(e=>e.name+' / '+(e.position||'Unknown rank')+' (observed '+e.observed_at+')').join('; ')||'No earlier snapshots',\n        'Standard job ranks':career.standard_job_ranks?JSON.stringify(career.standard_job_ranks):null,\n        'Job points':career.job_points?JSON.stringify(career.job_points):null,\n        'History completeness':'Partial; historical dates are not inferred','Completed courses':d.education?completed.length:null,'Education history':d.education?completedNames.join('; '):null,'Current education':currentName,'Current education ends (UTC)':currentUntil?formatDate(currentUntil):null,'Education completion dates':'Not provided by education selection'},
       'Wealth & trading':{'Net worth ($)':p.networth?.total,
         'Item market revenue ($)':p.trading?.item_market?.revenue,
         'Item market sales':p.trading?.item_market?.sales,
@@ -332,7 +349,7 @@
       }
       const awards=[...compile(data.honors,data.honors_catalog,'honors'),
                     ...compile(data.medals,data.medals_catalog,'medals')];
-      const extras={profile:'/user/profile',basic:'/user/basic',job:'/user/job',
+      const extras={profile:'/user/profile',basic:'/user/basic',job:'/user/job',jobranks:'/user/jobranks',jobpoints:'/user/jobpoints',
         workstats:'/user/workstats',property:'/user/property',faction:'/user/faction',education:'/user/education',education_catalog:'/torn/education'};
       const unavailable={};
       for(const [name,path] of Object.entries(extras)){
@@ -369,8 +386,16 @@
       current={player_id:PLAYER,generated_at:new Date().toISOString(),awards,
         ...historical,
         personalstats:data.personalstats,profile:data.profile,basic:data.basic,
-        job:data.job,workstats:data.workstats,property:data.property,
+        job:data.job,jobranks:data.jobranks,jobpoints:data.jobpoints,workstats:data.workstats,property:data.property,
         faction:data.faction,education:data.education,education_catalog:data.education_catalog,unavailable_sources:unavailable,api_diagnostics:apiDiagnostics};
+      try{
+        const oldCareer=JSON.parse(localStorage.getItem(CAREER_KEY)||'null');
+        current.career_history=normalizeCareer(current,oldCareer);
+        localStorage.setItem(CAREER_KEY,JSON.stringify({events:current.career_history.observed_events}));
+      }catch(e){
+        unavailable.career_history_storage=String(e.message);
+        current.career_history=normalizeCareer(current,null);
+      }
       try{
         const storageKey='achievement-compiler-snapshots-'+PLAYER;
         const old=JSON.parse(localStorage.getItem(storageKey)||'[]');
