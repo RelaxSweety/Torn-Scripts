@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Achievement Compiler (Standalone)
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts-Dev
-// @version      0.9.8
+// @version      0.9.9
 // @description  Read-only achievements report for RelaxSweety; enter an API key in the tool.
 // @match        *://www.torn.com/*
 // @match        *://torn.com/*
@@ -15,7 +15,7 @@
   'use strict';
   const PLAYER = 4539436;
   const API = 'https://api.torn.com/v2';
-  const SCRIPT_VERSION='0.9.8';
+  const SCRIPT_VERSION='0.9.9';
   let current = null;
   const button = document.createElement('button');
   button.id = 'achievement-compiler-launcher';
@@ -129,7 +129,8 @@
     const island=name&&/private island/i.test(name);
     const address=name?(island?'1 Cartel Cove, Sovereign Isle, Torn City':'4539 Cartel Avenue, Torn City'):null;
     const aw=d.awards.filter(a=>a.earned);
-    const history=d.history||{};\n    const career=d.career_history||{};
+    const history=d.history||{};
+    const career=d.career_history||{};
     const enemies=d.enemies?.list??d.enemies?.enemies;
     const enemyTotal=d.enemies?._metadata?.total??(Array.isArray(enemies)?enemies.length:null);
     const logs=d.logs?.log??d.logs?.logs;
@@ -192,7 +193,10 @@
         'Manual labor':work.manual_labor??work.manual??p.jobs?.stats?.manual,
         'Intelligence':work.intelligence??p.jobs?.stats?.intelligence,
         'Endurance':work.endurance??p.jobs?.stats?.endurance,
-        'Observed career changes':(career.observed_events||[]).map(e=>e.name+' / '+(e.position||'Unknown rank')+' (observed '+e.observed_at+')').join('; ')||'No earlier snapshots',\n        'Standard job ranks':career.standard_job_ranks?JSON.stringify(career.standard_job_ranks):null,\n        'Job points':career.job_points?JSON.stringify(career.job_points):null,\n        'History completeness':'Partial; historical dates are not inferred','Completed courses':d.education?completed.length:null,'Education history':d.education?completedNames.join('; '):null,'Current education':currentName,'Current education ends (UTC)':currentUntil?formatDate(currentUntil):null,'Education completion dates':'Not provided by education selection'},
+        'Observed career changes':(career.observed_events||[]).map(e=>e.name+' / '+(e.position||'Unknown rank')+' (observed '+e.observed_at+')').join('; ')||'No earlier snapshots',
+        'Standard job ranks':career.standard_job_ranks?JSON.stringify(career.standard_job_ranks):null,
+        'Job points':career.job_points?JSON.stringify(career.job_points):null,
+        'History completeness':'Partial; historical dates are not inferred','Completed courses':d.education?completed.length:null,'Education history':d.education?completedNames.join('; '):null,'Current education':currentName,'Current education ends (UTC)':currentUntil?formatDate(currentUntil):null,'Education completion dates':'Not provided by education selection'},
       'Wealth & trading':{'Net worth ($)':p.networth?.total,
         'Item market revenue ($)':p.trading?.item_market?.revenue,
         'Item market sales':p.trading?.item_market?.sales,
