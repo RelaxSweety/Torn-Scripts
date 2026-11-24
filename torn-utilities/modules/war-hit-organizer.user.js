@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU War Organizer
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.3.37-dev
+// @version      0.3.38-dev
 // @description  Compact War Organizer target board and reservation design preview
 // @match        https://www.torn.com/*
 // @grant        none
@@ -12,7 +12,7 @@
 (()=>{
 'use strict';
 const ID='war-hit-organizer',STORE='tu:who:state:v2',LOGO="data:image/webp;base64,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";
-let exportBusy=false;
+let exportBusy=false,exportDiagnostic={phase:'idle',transport:null};
 let root=null,ctx=null,stylesheet=null,lastUserScroll=0,rosterTimer=null,rosterEpoch=0,rosterLoading=false,rosterError='',rosterUpdated=0,ownOnline=null,enemyOnline=null,rosterFaction='',tab='targets',filter='all',activityFilter='all',query='',sort='release',expanded='',message='',poll=null;
 let state={};try{state=JSON.parse(localStorage.getItem(STORE)||'{}')}catch{}
 state.targets=state.targets||{};state.reservations=state.reservations||{};state.reservationLimit=Number(state.reservationLimit||state.hits||1);state.reservationTimer=Number(state.reservationTimer||5);
@@ -216,7 +216,7 @@ function rosterSpreadsheet(groups,estimates,now=Date.now()){
 async function exportPlayers(){
  if(exportBusy)return;const api=window.TornUtilities,viewer=identity().id,friendly=ownFactionId(),opposing=String(state.factionId||'');
  if(!friendly||!/^[1-9][0-9]*$/.test(opposing)||friendly===opposing){message='Select both friendly and opposing factions before exporting.';render();return;}
- exportBusy=true;message='Preparing both faction rosters…';render();
+ exportBusy=true;exportDiagnostic={phase:'preparing',transport:null};message='Preparing both faction rosters…';render();
  try{
   for(let i=0;rosterLoading&&i<100;i++)await new Promise(resolve=>setTimeout(resolve,150));if(rosterLoading)throw Error('Roster refresh is busy. Please retry.');
   const started=Date.now(),complete=await refreshRoster();if(!complete||ownRosterFaction!==friendly||rosterFaction!==opposing||ownRosterUpdated<started||rosterUpdated<started)throw Error('Both current faction rosters are required. Refresh and retry.');
@@ -225,9 +225,11 @@ async function exportPlayers(){
   try{context=await api.getWhoScouterState?.();if(context?.enabled&&state.mode!=='offline'){const cached=await api.getWhoScouterSnapshot?.(ids);if(cached?.scope===context.scope)estimates=Object.fromEntries((cached.rows||[]).map(row=>[String(row.playerId),row]));const data=await api.requestWhoScouter(ids);if(data?.scope===context.scope)estimates={...estimates,...Object.fromEntries((data.rows||[]).map(row=>[String(row.playerId),row]))};}}catch{}
   if(context?.enabled){const current=await api.getWhoScouterState();if(current.scope!==context.scope||!current.enabled)throw Error('The selected estimate key changed. Please retry the export.');}
   if(!root||!api.isAuthorized?.()||identity().id!==viewer||ownFactionId()!==friendly||String(state.factionId)!==opposing)throw Error('War Organizer identity or faction changed. Please retry.');
-  const workbook=rosterSpreadsheet(groups,estimates);let binary='';for(let at=0;at<workbook.length;at+=8192)binary+=String.fromCharCode(...workbook.subarray(at,at+8192));const link=document.createElement('a');link.href='data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,'+btoa(binary);link.download='tu-war-players-'+friendly+'-vs-'+opposing+'-'+new Date().toISOString().slice(0,10)+'.xlsx';document.body.append(link);link.click();link.remove();
-  const count=groups.reduce((n,group)=>n+Object.keys(group.players).length,0);message='Exported '+count+' players from both factions. Missing activity/BS values are marked Unknown.';
- }catch(error){message=error?.message||'Spreadsheet export failed. Please retry.';}
+  const workbook=rosterSpreadsheet(groups,estimates);let binary='';for(let at=0;at<workbook.length;at+=8192)binary+=String.fromCharCode(...workbook.subarray(at,at+8192));const base64Data=btoa(binary),fileName='tu-war-players-'+friendly+'-vs-'+opposing+'-'+new Date().toISOString().slice(0,10)+'.xlsx',native=api.workbookTransport?.()==='native-share'||/torn[ -]?pda/i.test(navigator.userAgent);
+  const count=groups.reduce((n,group)=>n+Object.keys(group.players).length,0);exportDiagnostic={phase:'handoff',transport:native?'native-share':'browser-download',bytes:workbook.length,players:count};
+  if(native){if(!api.shareWarWorkbook)throw Error('Update TU and Torn PDA, then reload to enable file sharing.');await api.shareWarWorkbook(base64Data,fileName);}else{const link=document.createElement('a');link.href='data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,'+base64Data;link.download=fileName;document.body.append(link);link.click();link.remove();}
+  exportDiagnostic.phase='handed-off';message=(native?'Workbook prepared for '+count+' players. Choose Save or Drive in the phone file/share sheet.':'Spreadsheet download requested for '+count+' players.')+' Missing activity/BS values are marked Unknown.';
+ }catch(error){exportDiagnostic={...exportDiagnostic,phase:'failed',error:'Spreadsheet preparation or handoff failed'};message=error?.message||'Spreadsheet export failed. Please retry.';}
  finally{exportBusy=false;if(root)render({background:true});}
 }
 
@@ -454,6 +456,6 @@ const beginGesture=(e,resize)=>{if(e.button!==undefined&&e.button!==0)return;if(
 root.addEventListener('pointerdown',e=>{if(e.target===grip)beginGesture(e,true);else if(e.target.closest('.who-header'))beginGesture(e,false)});
 root.addEventListener('touchmove',()=>{lastUserScroll=Date.now()},{passive:true});root.addEventListener('wheel',()=>{lastUserScroll=Date.now()},{passive:true});document.body.append(root);render();showOrganizer();startRoster();void refreshCoordination();poll=setInterval(()=>{if(!root||root.hidden||tab!=='targets')return;paintFlights();paintReservations();for(const clock of root.querySelectorAll('.who-countdown')){const remaining=seconds(Number(clock.dataset.releaseAt));if(remaining===null)continue;clock.textContent=formatCountdown(remaining);clock.style.color=remaining>0&&remaining<=state.reservationTimer?'#8fe0a8':'#f0b85c';}},1000);
 }
-function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.33-dev',activate,resume,deactivate:close})}
+function register(){window.TornUtilities?.register?.({id:ID,version:'0.3.38-dev',diagnostics:()=>({...exportDiagnostic}),activate,resume,deactivate:close})}
 if(window.TornUtilities)register();else window.addEventListener('torn-utilities-ready',register,{once:true});
 })();

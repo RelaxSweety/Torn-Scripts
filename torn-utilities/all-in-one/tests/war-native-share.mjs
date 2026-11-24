@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import {createRosterWorkbook} from '../src/features/roster-workbook.js';
+const source=fs.readFileSync('src/manager/manager.user.js','utf8');
+const method=source.slice(source.indexOf('    async shareWarWorkbook('),source.indexOf('    marketPriceAutoFillDiagnostics:'));
+let allowed=true,bridge,status='success',calls=[];
+const context=vm.createContext({authorized:()=>allowed,get nativeBridge(){return bridge;},Error});
+const share=vm.runInContext('({'+method+'}).shareWarWorkbook',context);
+const bytes=createRosterWorkbook([{side:'Friendly',faction:'Test',factionId:'1',id:'2',name:'Synthetic',level:5,days:1,bs:123456789}]),base64=Buffer.from(bytes).toString('base64'),name='tu-war-players-1-vs-2-2026-11-24.xlsx';
+bridge={callHandler:async(handler,args)=>{calls.push({handler,args});return {status};}};
+await share(base64,name);assert.equal(calls[0].handler,'shareFile');assert.deepEqual(Buffer.from(calls[0].args.base64Data,'base64'),Buffer.from(bytes));assert.equal(calls[0].args.fileName,name);
+status='error';await assert.rejects(share(base64,name),/could not prepare/);
+bridge={callHandler:async()=>{throw Error('private native detail');}};await assert.rejects(share(base64,name),/could not open/);
+bridge=undefined;await assert.rejects(share(base64,name),/unavailable/);
+allowed=false;await assert.rejects(share(base64,name),/Verify/);allowed=true;
+await assert.rejects(share(base64,'../unsafe.xlsx'),/Invalid/);await assert.rejects(share('not-base64',name),/Invalid/);
+console.log('Native workbook sharing: exact binary fidelity, safe filename, authorization, missing bridge, rejected and thrown native errors.');

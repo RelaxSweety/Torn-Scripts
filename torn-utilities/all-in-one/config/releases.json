@@ -1,5 +1,19 @@
 [
   {
+    "version": "0.5.42.146-dev",
+    "date": "2026-11-24",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Use Torn PDA native shareFile binary-safe workbook handoff instead of unsupported data-URL downloads; retain browser download on desktop",
+        "Include War export phase and transport in diagnostics without roster or workbook contents"
+      ],
+      "Validation": [
+        "Native handoff success, failure, byte fidelity and desktop export regression tests; actual Android/iOS saving remains unverified"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.145-dev",
     "date": "2026-11-24",
     "securityBundle": true,
