@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TU War Organizer
 // @namespace    https://github.com/RelaxSweety/Torn-Scripts
-// @version      0.3.36-dev
+// @version      0.3.37-dev
 // @description  Compact War Organizer target board and reservation design preview
 // @match        https://www.torn.com/*
 // @grant        none
@@ -225,7 +225,7 @@ async function exportPlayers(){
   try{context=await api.getWhoScouterState?.();if(context?.enabled&&state.mode!=='offline'){const cached=await api.getWhoScouterSnapshot?.(ids);if(cached?.scope===context.scope)estimates=Object.fromEntries((cached.rows||[]).map(row=>[String(row.playerId),row]));const data=await api.requestWhoScouter(ids);if(data?.scope===context.scope)estimates={...estimates,...Object.fromEntries((data.rows||[]).map(row=>[String(row.playerId),row]))};}}catch{}
   if(context?.enabled){const current=await api.getWhoScouterState();if(current.scope!==context.scope||!current.enabled)throw Error('The selected estimate key changed. Please retry the export.');}
   if(!root||!api.isAuthorized?.()||identity().id!==viewer||ownFactionId()!==friendly||String(state.factionId)!==opposing)throw Error('War Organizer identity or faction changed. Please retry.');
-  const workbook=rosterSpreadsheet(groups,estimates),blob=new Blob([workbook],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='tu-war-players-'+friendly+'-vs-'+opposing+'-'+new Date().toISOString().slice(0,10)+'.xlsx';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
+  const workbook=rosterSpreadsheet(groups,estimates);let binary='';for(let at=0;at<workbook.length;at+=8192)binary+=String.fromCharCode(...workbook.subarray(at,at+8192));const link=document.createElement('a');link.href='data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,'+btoa(binary);link.download='tu-war-players-'+friendly+'-vs-'+opposing+'-'+new Date().toISOString().slice(0,10)+'.xlsx';document.body.append(link);link.click();link.remove();
   const count=groups.reduce((n,group)=>n+Object.keys(group.players).length,0);message='Exported '+count+' players from both factions. Missing activity/BS values are marked Unknown.';
  }catch(error){message=error?.message||'Spreadsheet export failed. Please retry.';}
  finally{exportBusy=false;if(root)render({background:true});}
@@ -256,7 +256,7 @@ function render({resetList=false,background=false}={}){renderingBoard=true;try{
   const stats=el('div',lower,undefined,'who-scouter');stats.dataset.scouterId=id;const bs=el('span',stats,'BS ');el('strong',bs,'—','who-bs-value');const ff=el('span',stats,'FF ');el('strong',ff,'—','who-ff-value');if(friendly&&coordination?.adminIds?.includes(id)){const star=document.createElement('span');star.textContent='★';star.className='who-admin-star';star.title='Faction War Admin';nameGroup.prepend(star);}const right=el('div',row,undefined,'who-right');if(friendly)btn(right,'Details',()=>{expanded=expanded===id?'':id;render();},'who-member-details');else reservationControl(right,id,target);
   btn(row,expanded===id?'⌃':'⌄',()=>{expanded=expanded===id?'':id;render();},'who-expand');if(expanded===id){row.classList.add('who-expanded');const detail=el('div',list,undefined,'who-detail');el('div',detail,'ID: '+id+' · Battle estimate: '+(scouterRows[id]?.bs?format(scouterRows[id].bs):'Unavailable')+' · FF: '+(scouterRows[id]?.ff?.toFixed(2)||'Unavailable'));if(scouterRows[id]?.lastUpdated)el('div',detail,'FFScouter updated: '+new Date(scouterRows[id].lastUpdated*1000).toLocaleString());el('div',detail,'Status: '+(target.statusDescription||target.status||'Unknown'));el('div',detail,'Source: '+(target.source||'Unknown')+' · Activity: '+(target.activity||'Unknown'));if(target.revivable===true){const reviveInfo=el('div',detail,'Revivable','who-revivable');reviveInfo.dataset.revivable='yes';}if(!friendly)el('div',detail,'Reservations: '+bookingEntries(id).length+'/'+slotLimit(id)+(bookingEntries(id).length?' · '+bookingEntries(id).map(entry=>entry.name).join(', '):' · Available'));if(/^travel(?:l)?ing$/i.test(target.status||'')){const flight=el('div',detail);flight.dataset.flightDetail=id;}}
  }
- if(!entries.length)el('p',list,scouterPending&&ranged?'Loading FF estimates…':'No players match the current search and filters.','who-hint');dataFooter(content);bookingSheet(content);const sharedStatus=el('div',content,'','who-coordination-status');sharedStatus.dataset.coordinationStatus='1';if(message)el('div',content,message,'who-message');paintScouter();paintReservations();for(const [id] of entries)paintHealth(id);restoreListPosition(resetList);pendingViewTop=null;
+ if(!entries.length)el('p',list,scouterPending&&ranged?'Loading FF estimates…':'No players match the current search and filters.','who-hint');const listFooter=el('div',list,undefined,'who-list-footer');dataFooter(listFooter);bookingSheet(content);const sharedStatus=el('div',listFooter,'','who-coordination-status');sharedStatus.dataset.coordinationStatus='1';if(message)el('div',listFooter,message,'who-message');paintScouter();paintReservations();for(const [id] of entries)paintHealth(id);restoreListPosition(resetList);pendingViewTop=null;
  if(focusSearch){search.focus({preventScroll:true});if(selection)search.setSelectionRange(selection.start,selection.end);}
 }finally{renderingBoard=false;}}
 function isOpen(t){const status=String(t.status||'').toLowerCase();if(status==='okay'||status==='traveling'||status==='travelling'||status==='abroad')return true;const s=seconds(t.releaseAt);return status==='hospital'&&s!==null&&s>0&&s<=state.reservationTimer}
@@ -424,13 +424,13 @@ stylesheet=document.createElement('style');stylesheet.textContent=`
 #tu-who-panel .who-player-view .who-member-details{background:#2b3d48!important;color:#d9e7ee!important;border:1px solid #516a7b!important}
 #tu-who-panel .who-player-view .who-list .who-row .who-expand{width:15px!important;min-width:15px!important;min-height:27px!important;padding:0!important}
 #tu-who-panel .who-player-view .who-list .who-detail{flex:none;padding:6px;font-size:10px}
-#tu-who-panel .who-data-footer{flex:none;border-top:1px solid #46515a;padding:7px 0 8px;color:#9eafba;font-size:9.5px;line-height:1.5;max-height:28%;overflow:auto;overscroll-behavior:contain}
+#tu-who-panel .who-data-footer{flex:none;border-top:1px solid #46515a;padding:7px 0 8px;color:#9eafba;font-size:9.5px;line-height:1.5;max-height:none;overflow:visible}
 #tu-who-panel .who-data-footer .who-provider-status{color:#98cdb0}
 #tu-who-panel .who-data-footer summary{color:#dfc579;cursor:pointer}
 #tu-who-panel .who-data-footer p{margin:3px 0;font-size:9.5px;line-height:1.4}
-#tu-who-panel .who-message{flex:none}
+#tu-who-panel .who-message{flex:none}#tu-who-panel .who-list-footer{flex:0 0 auto;position:static}
 #tu-who-panel .who-fixed-controls.who-filters-collapsed>:not(.who-collapse-filters){display:none!important}
-#tu-who-panel .who-controls-collapsed .who-data-footer>:not(.who-export-bar),#tu-who-panel .who-controls-collapsed>.who-coordination-status{display:none!important}
+#tu-who-panel .who-controls-collapsed .who-data-footer>:not(.who-export-bar),#tu-who-panel .who-controls-collapsed .who-coordination-status{display:none!important}
 #tu-who-panel .who-export-bar{display:flex;align-items:center;gap:6px;padding:3px 0}#tu-who-panel .who-export-players{font-size:10px!important;min-height:26px!important}
 #tu-who-panel #tu-who-search{color:#eee!important;background:#28343b!important;opacity:1!important;visibility:visible!important;min-width:0!important}#tu-who-panel #tu-who-search:focus{outline:2px solid #edcc76;outline-offset:-2px}
 @media(max-width:360px){#tu-who-panel .who-fixed-controls .who-tools{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}#tu-who-panel #tu-who-search{grid-column:1/-1}}

@@ -1,5 +1,19 @@
 [
   {
+    "version": "0.5.42.145-dev",
+    "date": "2026-11-24",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Download Excel workbooks through a base64 data URL instead of a binary Blob URL to prevent UTF-8 corruption in text-based download bridges",
+        "Place status text, export button, connection status and messages after the players inside the same scrolling list; remove the separate footer scroll area"
+      ],
+      "Validation": [
+        "Reproduced the supplied damaged workbook as an exact UTF-8 round trip and validated binary-safe transport while retaining filters and full roster data"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.144-dev",
     "date": "2026-11-24",
     "securityBundle": true,

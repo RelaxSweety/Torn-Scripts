@@ -75,7 +75,7 @@
     "id": "war-hit-organizer",
     "name": "War Organizer",
     "category": "other",
-    "version": "0.3.36-dev",
+    "version": "0.3.37-dev",
     "description": "Dual-faction war board, shared reservations, faction admins and personal provider settings",
     "source": "torn-utilities/modules/war-hit-organizer.user.js"
   },
