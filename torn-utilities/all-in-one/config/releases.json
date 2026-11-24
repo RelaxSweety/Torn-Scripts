@@ -1,5 +1,20 @@
 [
   {
+    "version": "0.5.42.143-dev",
+    "date": "2026-11-24",
+    "securityBundle": true,
+    "changes": {
+      "Fixes": [
+        "Keep War Organizer search visible when the mobile keyboard reduces viewport height",
+        "Collapse faction cards, tabs, search, filters and routine footer status together while preserving settings"
+      ],
+      "Features": [
+        "Export both complete faction rosters as a spreadsheet-compatible CSV, sorted by numeric BS estimate descending, with level and days since last activity",
+        "Keep export at the bottom of the player-list window; mark unavailable activity/estimates Unknown and reject incomplete roster or changed-identity exports"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.142-dev",
     "date": "2026-11-18",
     "securityBundle": true,
