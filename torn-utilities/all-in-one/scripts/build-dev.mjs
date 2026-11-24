@@ -1,3 +1,4 @@
+import {createRosterWorkbook} from '../src/features/roster-workbook.js';
 import {createMonitorClient} from '../src/features/monitor-client.js';
 import {setMarketInput} from '../src/features/market-input.js';
 import {readItemStockQuantity} from '../src/features/item-stock-quantity.js';
@@ -74,6 +75,7 @@ for(const tool of tools){
  if(tool.id==='item-monitor'&&preparedIntegration)source=secureCandidateReporting(source);
  if(tool.id==='item-monitor'){const reader=/const quantity=row=>\{[^\n]+\};/;if(!reader.test(source))throw Error('Item Monitor quantity reader changed');source='const readItemStockQuantity='+readItemStockQuantity.toString()+';\n'+source.replace(reader,'const quantity=row=>readItemStockQuantity(row,{text});');}
  if(tool.id==='item-monitor')source='const createNativeClockSync='+createNativeClockSync.toString()+';\n'+'const createStockMonitorDiagnostic='+createStockMonitorDiagnostic.toString()+';\nconst createAlarmAudio='+createAlarmAudio.toString()+';\nconst createLandingAlarm='+createLandingAlarm.toString()+';\nconst TU_INTEGRATED_BUILD='+JSON.stringify(version)+';\nconst createTravelDomDiagnostic='+createTravelDomDiagnostic.toString()+';\nconst createAcceptanceSession='+createAcceptanceSession.toString()+';\nconst detectTestEnvironment='+detectTestEnvironment.toString()+';\n'+'const createHospitalClock='+createHospitalClock.toString()+';\n'+'const createNativeTravelActions='+createNativeTravelActions.toString()+';\n'+'const createTravelEnhancements='+createTravelEnhancements.toString()+';\n'+source;
+ if(tool.id==='war-hit-organizer')source='const createRosterWorkbook='+createRosterWorkbook.toString()+';\n'+source;
  if(tool.id==='chat-archiver')source='const createChatCaptureSupport='+createChatCaptureSupport.toString()+';\n'+source;
  source=compactPresentation(source);
  // Each retained source runs only on first use. A private Window facade captures

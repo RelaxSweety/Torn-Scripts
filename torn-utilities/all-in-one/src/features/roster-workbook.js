@@ -1,0 +1,26 @@
+// Minimal self-contained OOXML workbook. No remote library, macros, formulas or external links.
+export function createRosterWorkbook(rows){
+ const xml=value=>String(value??'Unknown').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g,'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[ch]));
+ const round=n=>Math.round((n+Number.EPSILON*Math.max(1,Math.abs(n)))*100)/100;
+ const short=value=>{if(typeof value!=='number'||!Number.isFinite(value))return 'Unknown';const units=['','K','M','B','T','Qa','Qi'];let n=value,index=0;while(Math.abs(n)>=1000&&index<units.length-1){n/=1000;index++;}if(Math.abs(round(n))>=1000&&index<units.length-1){n/=1000;index++;}return round(n).toFixed(2)+units[index];};
+ const headers=['Faction side','Faction name','Faction ID','Player name','Player ID','Level','Days since last active','BS estimate','BS abbreviated'];
+ const data=[headers,...rows.map(r=>[r.side,r.faction,r.factionId,r.name,r.id,r.level,r.days,r.bs??'Unknown',short(r.bs)])],range='A1:I'+data.length;
+ const sheetRows=data.map((row,index)=>'<row r="'+(index+1)+'">'+row.map((value,col)=>{const ref=String.fromCharCode(65+col)+(index+1);return typeof value==='number'&&Number.isFinite(value)?'<c r="'+ref+'" s="'+(col===6?3:2)+'"><v>'+value+'</v></c>':'<c r="'+ref+'" t="inlineStr"'+(!index?' s="1"':'')+'><is><t xml:space="preserve">'+xml(value)+'</t></is></c>';}).join('')+'</row>').join('');
+ const ns='http://schemas.openxmlformats.org/spreadsheetml/2006/main',rels='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+ const files={
+ '[Content_Types].xml':'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',
+ '_rels/.rels':'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="'+rels+'/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+ 'xl/workbook.xml':'<workbook xmlns="'+ns+'" xmlns:r="'+rels+'"><sheets><sheet name="Faction players" sheetId="1" r:id="rId1"/></sheets></workbook>',
+ 'xl/_rels/workbook.xml.rels':'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="'+rels+'/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="'+rels+'/styles" Target="styles.xml"/></Relationships>',
+ 'xl/styles.xml':'<styleSheet xmlns="'+ns+'"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="4"><xf xfId="0"/><xf xfId="0" fontId="1" applyFont="1"/><xf xfId="0" numFmtId="1" applyNumberFormat="1"/><xf xfId="0" numFmtId="2" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>',
+ 'xl/worksheets/sheet1.xml':'<worksheet xmlns="'+ns+'"><dimension ref="'+range+'"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>'+[12,24,13,24,13,8,23,22,18].map((width,i)=>'<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+width+'" customWidth="1"/>').join('')+'</cols><sheetData>'+sheetRows+'</sheetData><autoFilter ref="'+range+'"/></worksheet>'
+ };
+ const encode=value=>new TextEncoder().encode(value),parts=[],central=[];let offset=0;
+ const record=(size,values)=>{const bytes=new Uint8Array(size),view=new DataView(bytes.buffer);for(const [at,n,length] of values)length===2?view.setUint16(at,n,true):view.setUint32(at,n,true);return bytes;};
+ for(const [path,content] of Object.entries(files)){
+  const name=encode(path),body=encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+content);let crc=0xffffffff;for(const byte of body){crc^=byte;for(let bit=0;bit<8;bit++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}crc=(crc^0xffffffff)>>>0;
+  const header=record(30,[[0,0x04034b50,4],[4,20,2],[12,33,2],[14,crc,4],[18,body.length,4],[22,body.length,4],[26,name.length,2]]),entry=record(46,[[0,0x02014b50,4],[4,20,2],[6,20,2],[14,33,2],[16,crc,4],[20,body.length,4],[24,body.length,4],[28,name.length,2],[42,offset,4]]);
+  parts.push(header,name,body);central.push(entry,name);offset+=header.length+name.length+body.length;
+ }
+ const centralSize=central.reduce((n,bytes)=>n+bytes.length,0),end=record(22,[[0,0x06054b50,4],[8,Object.keys(files).length,2],[10,Object.keys(files).length,2],[12,centralSize,4],[16,offset,4]]),output=new Uint8Array(offset+centralSize+end.length);let at=0;for(const part of [...parts,...central,end]){output.set(part,at);at+=part.length;}return output;
+}

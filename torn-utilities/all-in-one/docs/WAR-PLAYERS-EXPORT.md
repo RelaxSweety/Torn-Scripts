@@ -1,4 +1,4 @@
-# War Organizer player controls and export — DEV 0.5.42.143
+# War Organizer player controls and export
 
 Removed the keyboard-height two-column rule that placed search inside an undersized nested grid. The search row retains its normal width at short heights and stacks on very narrow widths. Hide controls now collapses faction cards, navigation tabs, search, status/FF filters, counts and routine footer status; Show controls remains available, along with the spreadsheet export. Existing collapse state, queries, filters and list-position persistence are reused.
 
@@ -9,3 +9,11 @@ Estimate retrieval reuses the existing selected-key FFScouter service and its ca
 The explicit unified-script size guard increases from 1.46 MB to 1.47 MB to accommodate the export and keyboard-layout changes (approximately 6 KB growth). Functional tests remain intact. Production is unchanged.
 
 Validation: build, full regression suite, final War Organizer navigation/scouter/export checks, generated-script syntax and DEV alias/snapshot comparisons passed. Export tests include full unfiltered membership, numeric ordering, activity days, Unknown values, CSV formula neutralization, incomplete roster rejection and selected-key scope changes. Chromium layout rendering stalled in this environment and was stopped; real PDA keyboard geometry and file download handling are unverified.
+
+## 0.5.42.144-dev — filtered Excel workbook
+
+The footer export now generates a native .xlsx file locally rather than CSV. All nine columns have AutoFilter dropdowns over the complete data range; the header row is frozen. A BS abbreviated column sits immediately after the full numeric BS estimate. Values use two decimal places with K/M/B/T/Qa/Qi suffixes and promote a unit when rounding reaches 1000 (for example 999995 becomes 1.00M). Original numeric BS values and descending roster order are retained. Text is stored as literal inline strings, so names beginning with a formula character are preserved without becoming executable formulas. No formulas, macros, external relationships or downloaded libraries are included.
+
+The self-contained writer emits six OOXML package parts with stored ZIP entries and CRC32 checksums. Tests check the complete roster download, numeric values, unknowns, filter range, frozen header, boundary rounding, Unicode/XML escaping and literal text safety. Both the isolated writer file and full UI-exported workbook were independently opened with Python openpyxl, and ZIP CRC checks passed. PDA workbook download/opening and spreadsheet-app filter UI still require actual device verification.
+
+Validation for .144: build, full regression suite, workbook/export checks, generated-script syntax and DEV alias/snapshot comparisons passed. Python zipfile CRC checks and openpyxl independently validated both generated workbook fixtures, including filter ranges, frozen headers, numeric BS cells and absence of formulas. Actual mobile file handling and filter dropdown interaction remain unverified.

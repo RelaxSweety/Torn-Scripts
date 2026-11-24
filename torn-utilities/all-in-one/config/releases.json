@@ -1,5 +1,19 @@
 [
   {
+    "version": "0.5.42.144-dev",
+    "date": "2026-11-24",
+    "securityBundle": true,
+    "changes": {
+      "Features": [
+        "Export faction players as a native Excel XLSX workbook with filter dropdowns on every column and a frozen header",
+        "Add an adjacent BS abbreviated column using two decimal places and K/M/B/T suffixes while preserving full numeric BS and descending order"
+      ],
+      "Compatibility": [
+        "Workbook is generated locally without external libraries, formulas, macros or additional API calls"
+      ]
+    }
+  },
+  {
     "version": "0.5.42.143-dev",
     "date": "2026-11-24",
     "securityBundle": true,
